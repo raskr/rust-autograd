@@ -1,6 +1,7 @@
 # autograd
 
-[![Build Status](https://travis-ci.org/perrier1034/pico-dnn.svg?branch=master)](https://travis-ci.org/perrier1034/pico-dnn)
+[![Build Status](https://travis-ci.org/perrier1034/rust-autograd.svg?branch=master)](https://travis-ci.org/perrier1034/rust-autograd)
+
 A library to run the computation graphs, whose backend is 
 [rust-ndarray](https://github.com/bluss/rust-ndarray).
 
