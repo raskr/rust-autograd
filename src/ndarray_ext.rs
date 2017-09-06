@@ -48,18 +48,3 @@ pub fn into_mat(x: NdArray) -> ndarray::Array<f32, ndarray::Ix2> {
     let b = x.shape()[1];
     x.into_shape(ndarray::Ix2(a, b)).unwrap()
 }
-
-
-#[test]
-pub fn bbb() {
-    let arr = ::init::zeros(&[1, 2, 3]);
-    let batch_size = 100;
-    let num_samples = 60000;
-    let num_batches = num_samples % batch_size;
-    let perm = ::init::permutation(num_samples).to_vec();
-
-    for i in 0..num_batches {
-        let x_indices = perm[i..i+num_batches].to_vec();
-        let x_batch = arr.select(ndarray::Axis(0), x_indices.as_slice());
-    }
-}
