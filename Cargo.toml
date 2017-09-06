@@ -1,0 +1,18 @@
+[package]
+name = "autograd"
+version = "0.1.0"
+authors = ["perrier1034 <janne.dc.ib.sa@gmail.com>"]
+
+repository = "https://github.com/perrier1034/rust-autograd"
+keywords = ["automatic-differentiation", "machine-learning", "neural-networks"]
+license-file = "LICENSE"
+readme = "README.md"
+description = "A toy library to run the computation graphs mimicking TensorFlow and Theano"
+documentation = "http://perrier1034.github.io/rust-autograd/"
+
+
+[dependencies]
+rand = "0.3.15"
+ndarray = { version = "0.10.0" }
+glob = "0.2"
+# blas-sys = { version = "0.6", default-features = true, features = ["openblas"] }

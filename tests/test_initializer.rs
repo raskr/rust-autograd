@@ -1,0 +1,58 @@
+extern crate autograd as ag;
+extern crate ndarray;
+
+
+#[test]
+fn zeros() {
+    let a = ag::initializers::zeros(&[3]);
+    let b = ndarray::ArrayD::<f32>::zeros(ndarray::IxDyn(&[3]));
+    assert!(a == b);
+}
+
+#[test]
+fn ones() {
+    let a = ag::initializers::ones(&[3]);
+    let b = ndarray::ArrayD::<f32>::from_elem(ndarray::IxDyn(&[3]), 1.);
+    assert!(a == b);
+}
+
+#[test]
+fn from_vec() {
+    let a = ag::initializers::from_vec(vec![1., 1., 1.], &[3]);
+    let b = ndarray::ArrayD::<f32>::from_elem(ndarray::IxDyn(&[3]), 1.);
+    assert!(a == b);
+}
+#[test]
+fn from_slice() {
+    let a = ag::initializers::from_slice(&[1., 1., 1.], &[3]);
+    let b = ndarray::ArrayD::<f32>::from_elem(ndarray::IxDyn(&[3]), 1.);
+    assert!(a == b);
+}
+
+#[test]
+fn randu() {
+    let a = ag::initializers::randu(&[3]);
+    let b = ag::initializers::randu(&[3]);
+    assert!(a != b);
+}
+
+#[test]
+fn randn() {
+    let a = ag::initializers::randn(&[3]);
+    let b = ag::initializers::randn(&[3]);
+    assert!(a != b);
+}
+
+#[test]
+fn glorot_normal() {
+    let a = ag::initializers::glorot_normal(&[3]);
+    let b = ag::initializers::glorot_normal(&[3]);
+    assert!(a != b);
+}
+
+#[test]
+fn glorot_uniform() {
+    let a = ag::initializers::glorot_uniform(&[3]);
+    let b = ag::initializers::glorot_uniform(&[3]);
+    assert!(a != b);
+}

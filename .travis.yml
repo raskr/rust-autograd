@@ -1,0 +1,16 @@
+language: rust
+
+rust:
+  - "1.18.0"
+
+script:
+  - ./run_test.sh
+
+install:
+  - cargo build
+
+notifications:
+  emails:
+    - janne.dc.ib.sa@gmail.com
+  on_success: always # default: change
+  on_failure: always
