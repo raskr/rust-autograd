@@ -4,13 +4,12 @@ rust:
   - "1.18.0"
 
 script:
-  - ./run_test.sh
-
-install:
-  - cargo build
-
-notifications:
-  emails:
-    - janne.dc.ib.sa@gmail.com
-  on_success: always # default: change
-  on_failure: always
+  - cargo build \
+ && cargo test --test test_binary_op_eval \
+ && cargo test --test test_binary_op_grad \
+ && cargo test --test test_graph_eval \
+ && cargo test --test test_graph_source \
+ && cargo test --test test_initializer \
+ && cargo test --test test_tensor_ops_eval \
+ && cargo test --test test_tensor_ops_grad \
+ && cargo test --test test_topology
