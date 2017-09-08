@@ -9,6 +9,7 @@ use ndarray_ext::NdArray;
 use ops;
 
 
+
 /// Performs actual graph traversal and its evaluation
 // TODO: loop-based rather than recursion
 #[inline]
@@ -17,18 +18,16 @@ pub fn perform_eval(target: &Tensor, memo: &mut HashMap<Tensor, NdArray>, train:
         return;
     }
 
-    // need clone
-    let ref inputs = target.borrow().inputs.clone();
-
-    // recurse
-    for x in inputs.iter() {
-        perform_eval(x, memo, train);
-    }
-
     let y = {
-        let mut xs = Vec::with_capacity(inputs.len());
-        for input in inputs.iter() {
-            xs.push(memo.get(input).unwrap());
+        let mut xs = vec![];
+        {
+            let ref inputs = target.borrow().inputs;
+            for input in inputs.iter() {
+                perform_eval(input, memo, train);
+            }
+            for input in inputs.iter() {
+                xs.push(memo.get(input).unwrap());
+            }
         }
         // run op
         target.borrow_mut().op.compute(xs.as_slice(), train)
@@ -42,20 +41,20 @@ pub fn perform_eval(target: &Tensor, memo: &mut HashMap<Tensor, NdArray>, train:
 #[inline]
 // make mapping of {node => the node contributed to gradient or not}
 // TODO: loop-based rather than recursion
-pub fn contributed_to_grads(objective: &Tensor, wrt: &[&Tensor]) -> HashMap<Tensor, bool> {
-    fn rec(target: &Tensor, wrt: &[&Tensor], memo: &mut HashMap<Tensor, bool>) {
+pub fn contributed_to_grads(objective: &Tensor, variables: &[&Tensor]) -> HashMap<Tensor, bool> {
+    fn rec(target: &Tensor, vars: &[&Tensor], memo: &mut HashMap<Tensor, bool>) {
         if memo.contains_key(target) {
             return;
         }
 
         let mut contributed = false;
 
-        if wrt.contains(&target) {
+        if vars.contains(&target) {
             contributed = true;
         } else {
             for input in target.borrow().inputs.iter() {
                 // recurse
-                rec(input, wrt, memo);
+                rec(input, vars, memo);
                 // unwrap is always safe
                 contributed |= *memo.get(input).unwrap();
             }
@@ -65,7 +64,7 @@ pub fn contributed_to_grads(objective: &Tensor, wrt: &[&Tensor]) -> HashMap<Tens
     }
 
     let mut memo = HashMap::new();
-    rec(objective, wrt, &mut memo);
+    rec(objective, variables, &mut memo);
     memo
 }
 
@@ -73,17 +72,18 @@ pub fn contributed_to_grads(objective: &Tensor, wrt: &[&Tensor]) -> HashMap<Tens
 #[inline]
 /// Returns symbolic gradient tensors.
 ///
-/// This computes partial derivatives of `objective` with `wrt` and returns the
+/// This computes partial derivatives of `objective` with `variables` and returns the
 /// gradients. This is achieved by building the subgraph between `objective` and
-/// `wrt` in reverse order from user's graph definition.
+/// `variables` in reverse order from user's graph definition.
 ///
 /// NOTE: Nodes that do not contribute to the gradient won't be included to avoid
 /// unnecessary computation.
 pub fn symbolic_gradients(
     objective: &Tensor,
-    wrt: &[&Tensor],
-    initial_grad: Option<&Tensor>,
+    variables: &[&Tensor],
+    initial_grad: Option<&Tensor>
 ) -> Vec<Tensor> {
+
     let initial_grad = initial_grad.map(|a| a.clone()).unwrap_or_else(||
         ::graph_sources::scalar(1.)
     );
@@ -92,7 +92,7 @@ pub fn symbolic_gradients(
     let mut grads = HashMap::new();
 
     // Mapping of {node => must visit or not (boolean)}
-    let contrib = contributed_to_grads(objective, wrt);
+    let contrib = contributed_to_grads(objective, variables);
 
     // Prepare the heap with tensor's rank numbers for reversed
     // topological sort.
@@ -101,49 +101,45 @@ pub fn symbolic_gradients(
     grads.insert(objective.clone(), initial_grad);
     let mut lop_done = HashSet::<Tensor>::new();
 
-    // backprop implementation
+    // BackProp implementation
     while let Some(target) = heap.pop() {
-        let target_brr = target.borrow();
+        let borrowed_target = target.borrow();
 
-        let mut xs = vec![];
-        for x in target_brr.inputs.iter() {
-            xs.push(x);
-        }
+        // Vec<Tensor> to Vec<&Tensor>
+        let xs: Vec<&Tensor> = borrowed_target.inputs.iter().map(|a| a).collect();
 
+        // time to call lop
         let gxs = {
-            // TODO: remove unwrap
-            // Calling the Lop of `op`, whose arguments are:
-            // "op's inputs", "op's output", "the output's gradient"
+            // Safe unwrap is guaranteed by topological ordering
             let gy = grads.get(&target).unwrap();
-            target_brr.op.lop(gy, xs.as_slice(), &target)
+            borrowed_target.op.lop(gy, xs.as_slice(), &target)
         };
 
         debug_assert_eq!(xs.len(), gxs.len(), "Bad grad from ({})", target);
 
-        // For now, if gx is None, cutting the backward path
-        for (x, maybe_gx) in xs.iter().zip(gxs.iter()) {
-            if let Some(gx) = maybe_gx.as_ref() {
-                if contrib.contains_key(x) {
-                    // memo gradient
-                    if let Some(g_base) = grads.remove(x) {
-                        // accumulate
-                        grads.insert((*x).clone(), g_base + gx);
-                    } else {
-                        // first time
-                        grads.insert((*x).clone(), (*gx).clone());
-                    }
-                    // update heap
-                    if !x.is_source() && !lop_done.contains(x).clone() {
-                        lop_done.insert((*x).clone());
-                        heap.push((*x).clone());
-                    }
+        // cuts the backward path if gx is None.
+        for (x, maybe_gx) in xs.into_iter().zip(gxs) {
+            if let Some(gx) = maybe_gx {
+                if !contrib.contains_key(x) {
+                    continue
+                }
+                // memo gradient
+                if let Some(g) = grads.remove(x) {
+                    grads.insert(x.clone(), g + &gx);
+                } else {
+                    grads.insert(x.clone(), gx);
+                }
+                // update heap
+                if !x.is_source() && !lop_done.contains(x) {
+                    lop_done.insert(x.clone());
+                    heap.push(x.clone());
                 }
             }
         }
     }
 
     // TODO: returning appropriate error
-    wrt.iter()
+    variables.iter()
        .map(|v|
            grads.remove(v).expect("Input variable(s) didn't contributed to gradient computation")
        )
