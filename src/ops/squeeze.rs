@@ -6,7 +6,7 @@ use ops;
 
 
 pub struct Squeeze {
-    pub axis: isize,
+    pub axes: Vec<isize>,
 }
 
 impl ops::Op for Squeeze {
@@ -15,16 +15,18 @@ impl ops::Op for Squeeze {
     }
 
     fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray {
-        let x = xs[0].clone();
-        let axis = if self.axis == -1 {
-            x.ndim() - 1
-        } else {
-            self.axis as usize
-        };
-        x.remove_axis(ndarray::Axis(axis))
+        let mut x = xs[0].view();
+        let mut adjust = 0;
+        for &i in self.axes.iter() {
+            let axis = if i == -1 { x.ndim() } else { i as usize };
+            println!("remove: {}, {}, {}", x.ndim(), axis, axis-adjust);
+            x = x.remove_axis(ndarray::Axis(axis-adjust));
+            adjust += 1;
+        }
+        x.to_owned()
     }
 
     fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
-        vec![Some(ops::expand_dims(gy, self.axis))]
+        vec![Some(ops::expand_dims(gy, self.axes.as_slice()))]
     }
 }

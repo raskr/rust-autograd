@@ -239,16 +239,19 @@ pub fn argmax(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor {
 
 #[inline]
 /// Expands dims.
-pub fn expand_dims(x: &Tensor, axis: isize) -> Tensor {
-    let op = expand_dims::ExpandDims { axis: axis };
-    apply_op(op, &[x])
+pub fn expand_dims(x: &Tensor, axes: &[isize]) -> Tensor {
+    let mut axes = axes.to_vec();
+    axes.sort();
+    apply_op(expand_dims::ExpandDims { axes: axes }, &[x])
 }
 
 
 #[inline]
 /// Squeezes designated dim.
-pub fn squeeze(x: &Tensor, axis: isize) -> Tensor {
-    apply_op(squeeze::Squeeze { axis: axis }, &[x])
+pub fn squeeze(x: &Tensor, axes: &[isize]) -> Tensor {
+    let mut axes = axes.to_vec();
+    axes.sort();
+    apply_op(squeeze::Squeeze { axes: axes }, &[x])
 }
 
 

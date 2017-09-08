@@ -139,15 +139,15 @@ fn log() {
 #[test]
 fn expand_dims() {
     let ref v = ag::variable(ag::init::randn(&[3]));
-    let ref z = ag::expand_dims(v, 0);
-    let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[1, 3])));
+    let ref z = ag::expand_dims(v, &[0, 2]);
+    let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[1, 3, 1])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
 }
 
 #[test]
 fn squeeze() {
-    let ref v = ag::variable(ag::init::randn(&[3, 1, 2]));
-    let ref z = ag::squeeze(v, 1);
+    let ref v = ag::variable(ag::init::randn(&[3, 1, 2, 1]));
+    let ref z = ag::squeeze(v, &[3, 1]);
     let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[3, 2])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
 }
