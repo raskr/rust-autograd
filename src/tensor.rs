@@ -14,7 +14,7 @@ use topology;
 use ops;
 
 
-/// A symbolic multi-dimensional array which supports
+/// Symbolic multi-dimensional array which supports
 /// efficient gradient computation.
 pub struct Tensor(pub Rc<RefCell<RawTensor>>);
 
@@ -97,7 +97,7 @@ impl Tensor {
             F: FnMut(&Tensor) -> (),
     {
         if visited.contains(self) {
-            return; // exit early
+            return // exit early
         } else {
             visited.insert(self.clone()); // first visit
         }
@@ -200,6 +200,7 @@ impl Input {
     #[inline]
     pub fn add(mut self, symbolic_tensor: &Tensor, array: NdArray) -> Self {
         self.hash_map.insert(symbolic_tensor.clone(), array);
+        // move self
         self
     }
 }

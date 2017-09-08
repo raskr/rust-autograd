@@ -3,14 +3,14 @@ extern crate ndarray;
 use std::mem;
 use std::collections::hash_set::HashSet;
 use tensor::{Tensor, Input};
-use optimizers;
+use sgd;
 use ndarray_ext;
 use ndarray_ext::NdArray;
 
 
 #[inline]
 /// Update params with gradients
-pub fn apply_gradients<T: optimizers::Optimizer>(
+pub fn apply_gradients<T: sgd::Optimizer>(
     optimizer: &mut T,
     variables: &[&Tensor],
     gradients: &[Tensor],

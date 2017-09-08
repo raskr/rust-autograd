@@ -38,8 +38,8 @@ fn main() {
     let ref accuracy = ag::reduce_mean(&ag::equals(predictions, y), 0, false);
 
     // -- actual training --
-    let mut optimizer = ag::optimizers::Adam { ..Default::default() };
-//     let mut optimizer = ag::optimizers::SGD { lr: 0.1 };
+    let mut optimizer = ag::sgd::Adam { ..Default::default() };
+//     let mut optimizer = ag::sgd::SGD { lr: 0.1 };
     let batch_size = 100;
     let num_samples = x_train.shape()[0];
     let num_batches = num_samples / batch_size;

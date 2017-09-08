@@ -50,7 +50,7 @@ fn main() {
     let ref grads = ag::gradients(loss, params.as_slice(), None);
 
     // training
-    let mut optimizer = ag::optimizers::Adam { ..Default::default() };
+    let mut optimizer = ag::sgd::Adam { ..Default::default() };
     let num_samples = x_train.shape()[0];
     let num_batches = num_samples / batch_size;
 

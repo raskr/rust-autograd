@@ -12,7 +12,7 @@ pub mod ops;
 
 pub mod nn_impl;
 
-pub mod optimizers;
+pub mod sgd;
 
 pub mod graph_sources;
 

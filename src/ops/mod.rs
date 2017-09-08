@@ -10,7 +10,7 @@ mod clip;
 mod add_n;
 mod log_softmax;
 mod identity;
-mod cmp;
+mod cmp_ops;
 mod math_ops;
 mod concat;
 mod tile;
@@ -71,16 +71,6 @@ fn apply_op<T: Op + 'static>(op: T, inputs: &[&Tensor]) -> Tensor {
 // ---------------------------------------
 // -- Ops to manipulate `Tensor` object --
 // ---------------------------------------
-
-pub fn tile(x: &Tensor, axis: isize, num: usize) -> Tensor {
-    let op = tile::Tile { axis: axis, num: num };
-    apply_op(op, &[x])
-}
-
-pub fn clip(x: &Tensor, min: f32, max: f32) -> Tensor {
-    let op = clip::Clip { min: min, max: max };
-    apply_op(op, &[x])
-}
 
 #[inline]
 pub fn asinh(x: &Tensor) -> Tensor {
@@ -190,27 +180,23 @@ pub fn div(a: &Tensor, b: &Tensor) -> Tensor {
 
 
 #[inline]
-/// Computes x^a, elementwise
 pub fn sqrt(x: &Tensor) -> Tensor {
     apply_op(math_ops::Sqrt, &[x])
 }
 
 #[inline]
-/// Computes x^a, elementwise
 pub fn pow(x: &Tensor, a: f32) -> Tensor {
     apply_op(math_ops::Pow { a: a }, &[x])
 }
 
 
 #[inline]
-/// Log function
 pub fn log(x: &Tensor, a: f32) -> Tensor {
     apply_op(math_ops::Log { a: a }, &[x])
 }
 
 
 #[inline]
-/// Exponential function
 pub fn exp(x: &Tensor) -> Tensor {
     apply_op(math_ops::Exp, &[x])
 }
@@ -222,7 +208,7 @@ pub fn exp(x: &Tensor) -> Tensor {
 /// # Panics
 /// When a.shape != b.shape.
 pub fn equals(a: &Tensor, b: &Tensor) -> Tensor {
-    apply_op(cmp::Equals, &[a, b])
+    apply_op(cmp_ops::Equals, &[a, b])
 }
 
 
@@ -256,7 +242,23 @@ pub fn squeeze(x: &Tensor, axes: &[isize]) -> Tensor {
 
 
 #[inline]
-/// Reduce max.
+/// Tiles input tensor along specified axis.
+pub fn tile(x: &Tensor, axis: isize, num: usize) -> Tensor {
+    let op = tile::Tile { axis: axis, num: num };
+    apply_op(op, &[x])
+}
+
+
+#[inline]
+/// Limits all elements so as to be within `[min, max]`
+pub fn clip(x: &Tensor, min: f32, max: f32) -> Tensor {
+    let op = clip::Clip { min: min, max: max };
+    apply_op(op, &[x])
+}
+
+
+#[inline]
+/// Take max along specified axis.
 pub fn reduce_max(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor {
     let op = reduction_ops::ReduceMax {
         axis: axis,
@@ -267,7 +269,7 @@ pub fn reduce_max(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor {
 
 
 #[inline]
-/// Reduce min.
+/// Take min along specified axis.
 pub fn reduce_min(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor {
     let op = reduction_ops::ReduceMin {
         axis: axis,
@@ -278,7 +280,7 @@ pub fn reduce_min(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor {
 
 
 #[inline]
-/// Reduce mean.
+/// Take mean along specified axis.
 pub fn reduce_mean(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor {
     let op = reduction_ops::ReduceMean {
         axis: axis,
@@ -289,7 +291,7 @@ pub fn reduce_mean(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor {
 
 
 #[inline]
-/// Reduce sum.
+/// Take sum along specified axis.
 pub fn reduce_sum(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor {
     let op = reduction_ops::ReduceSum {
         axis: axis,
@@ -330,28 +332,28 @@ pub fn reshape(x: &Tensor, shape: &[usize]) -> Tensor {
 #[inline]
 /// Returns binary tensor.
 pub fn greater(x: &Tensor, a: f32) -> Tensor {
-    apply_op(cmp::Greater { a: a }, &[x])
+    apply_op(cmp_ops::Greater { a: a }, &[x])
 }
 
 
 #[inline]
 /// Returns binary tensor.
 pub fn greater_equal(x: &Tensor, a: f32) -> Tensor {
-    apply_op(cmp::GreaterEqual { a: a }, &[x])
+    apply_op(cmp_ops::GreaterEqual { a: a }, &[x])
 }
 
 
 #[inline]
 /// Returns binary tensor.
 pub fn lesser(x: &Tensor, a: f32) -> Tensor {
-    apply_op(cmp::Lesser { a: a }, &[x])
+    apply_op(cmp_ops::Lesser { a: a }, &[x])
 }
 
 
 #[inline]
 /// Returns binary tensor.
 pub fn lesser_equal(x: &Tensor, a: f32) -> Tensor {
-    apply_op(cmp::LesserEqual { a: a }, &[x])
+    apply_op(cmp_ops::LesserEqual { a: a }, &[x])
 }
 
 
@@ -373,6 +375,7 @@ pub fn sigmoid(x: &Tensor) -> Tensor {
 
 #[inline]
 /// Elementwise exponential linear unit function.
+/// (https://arxiv.org/abs/1511.07289)
 pub fn elu(x: &Tensor, alpha: f32) -> Tensor {
     apply_op(elu::ELU {alpha: alpha}, &[x])
 }
@@ -406,9 +409,9 @@ pub fn softmax(x: &Tensor, axis: isize) -> Tensor {
 
 
 #[inline]
-/// Just computes (a-b)^2.
+/// Just computes 0.5*(a-b)^2.
 ///
-/// The performance is better than directly computing (a-b)^2
+/// The performance is better than directly computing 0.5*(a-b)^2
 /// if the gradient computation is required.
 ///
 /// # Panics
@@ -505,7 +508,7 @@ pub fn slice(x: &Tensor, starts: &[isize], ends: &[isize]) -> Tensor {
 
 
 #[inline]
-/// Concat two tensors.
+/// Concat input tensors.
 pub fn concat(tensors: &[&Tensor], axis: usize) -> Tensor {
     apply_op(concat::Concat { axis: axis }, tensors)
 }
