@@ -28,7 +28,7 @@ fn main() {
     let batch_size = 128;
 
     // build computation graph
-    let ref tbl = ag::variable(ag::init::random_uniform(&[vocab_size, vec_dim]));
+    let ref tbl = ag::variable(ag::init::standard_uniform(&[vocab_size, vec_dim]));
     let ref w = ag::variable(ag::init::glorot_uniform(&[state_size, 1]));
     let ref b = ag::variable(ag::init::zeros(&[1, 1]));
     let ref sentences = ag::placeholder(&[-1, max_sent_len as isize]);
@@ -38,7 +38,7 @@ fn main() {
     let mut hs = vec![];
     for i in 0..max_sent_len {
         let id = ag::slice(sentences, &[0, i], &[-1, i + 1]);
-        let x = ag::embedding_lookup(tbl, &id);
+        let x = ag::gather(tbl, &id, ndarray::Axis(0));
         let h = ag::rnn_step(&x, &mut rnn, i==max_sent_len-1);
         hs.push(h);
     }

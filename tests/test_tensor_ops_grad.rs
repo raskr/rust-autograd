@@ -330,11 +330,11 @@ fn sparse_softmax_cross_entropy() {
 }
 
 #[test]
-fn embedding_lookup() {
-    let ref x = ag::constant(ag::init::from_slice(&[2., 0.], &[2]));
-    let ref v = ag::variable(ag::init::standard_normal(&[3, 4]));
-    let ref z = ag::embedding_lookup(v, x);
-    let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[2, 4])));
+fn gather() {
+    let ref v = ag::variable(ag::init::zeros(&[5, 4, 8, 2]));
+    let ref x = ag::constant(ag::init::from_slice(&[5., 4., 3., 2., 1., 0.], &[2, 3]));
+    let ref z = ag::gather(v, x, 2);
+    let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[5, 4, 2, 3, 2])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
 }
 
@@ -387,7 +387,7 @@ fn primitive_back_propagation_through_time() {
             ));
             // new `h`
             ag::tanh(
-                &(ag::embedding_lookup(&lookup_table, &id) + ag::matmul(last_h, wh)),
+                &(ag::gather(&lookup_table, &id, 0) + ag::matmul(last_h, wh)),
             )
         };
 
@@ -429,7 +429,7 @@ pub fn lstm_lm() {
     for i in 0..max_sent {
         let cur_id = ag::slice(&sentences, &[0, i], &[-1, i + 1]);
         let nex_id = ag::slice(&sentences, &[0, i + 1], &[-1, i + 2]);
-        let x = ag::embedding_lookup(tbl, &cur_id);
+        let x = ag::gather(tbl, &cur_id, 0);
         let h = ag::rnn_step(&x, &mut rnn, i==max_sent-1);
         let prediction = ag::matmul(&h, w);
         loss_buf.push(ag::sparse_softmax_cross_entropy(&prediction, &nex_id));

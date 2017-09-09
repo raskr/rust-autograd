@@ -60,3 +60,11 @@ fn argmax_keep() {
     let result = ag::argmax(&input, 1, true);
     assert_eq!(result.eval(), answer);
 }
+
+#[test]
+fn gather() {
+    let ref param = ag::constant(ag::init::zeros(&[5, 4, 8, 2]));
+    let ref indices = ag::constant(ag::init::from_slice(&[5., 4., 3., 2., 1., 0.], &[2, 3]));
+    let y = ag::gather(param, indices, 2);
+    assert_eq!(y.eval().shape(), &[5, 4, 2, 3, 2])
+}

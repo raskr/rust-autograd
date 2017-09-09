@@ -24,7 +24,7 @@ mod relu;
 mod slice;
 mod sigmoid_cross_entropy;
 mod softmax_cross_entropy;
-mod embedding_lookup;
+mod gather;
 mod sparse_softmax_cross_entropy;
 mod matmul;
 mod swap_axes;
@@ -515,25 +515,23 @@ pub fn concat(tensors: &[&Tensor], axis: usize) -> Tensor {
 
 
 #[inline]
-/// Lookup embedding vectors.
+/// Gather slices.
 ///
-/// Get rows of `lookup_table` by use of slice indices.
-/// `indices` tensor can be arbitrary shape.
+/// For example, this can be used for vector lookup.
+/// See https://www.tensorflow.org/api_docs/python/tf/gather.
 ///
 /// # Arguments
-/// * `lookup_table` - Tensor with shape (vocab_size, embedding_dim) from `variable()`.
-/// * `indices` - Tensor with arbitrary shape.
+/// * `param` - Target of slicing.
+/// * `indices` - Index tensor with arbitrary shape.
+/// * `axis` - Slices sub tensors along this axis.
 ///
 /// # Returns
-/// Tensor with shape `(indices.shape ++ lookup_table.shape[1])`
-pub fn embedding_lookup(lookup_table: &Tensor, indices: &Tensor) -> Tensor {
-    if lookup_table.borrow().param.is_none() {
-        panic!("First argument for `embedding_lookup` must be shared variable.");
-    }
-    let op = embedding_lookup::EmbeddingLookup {
-        vec_dim: lookup_table.borrow().param.as_ref().unwrap().shape()[1],
+/// Tensor with shape `(param.shape[..axis] + indices.shape + param.shape[axis+1..])`
+pub fn gather(param: &Tensor, indices: &Tensor, axis: isize) -> Tensor {
+    let op = gather::Gather {
+        axis: axis,
     };
-    apply_op(op, &[indices, lookup_table])
+    apply_op(op, &[indices, param])
 }
 
 
