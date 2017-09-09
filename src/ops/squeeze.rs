@@ -19,7 +19,6 @@ impl ops::Op for Squeeze {
         let mut adjust = 0;
         for &i in self.axes.iter() {
             let axis = if i == -1 { x.ndim() } else { i as usize };
-            println!("remove: {}, {}, {}", x.ndim(), axis, axis-adjust);
             x = x.remove_axis(ndarray::Axis(axis-adjust));
             adjust += 1;
         }
