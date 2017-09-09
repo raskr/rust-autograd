@@ -322,8 +322,7 @@ pub fn gradients(
 /// Reshapes input tensor.
 pub fn reshape(x: &Tensor, shape: &[usize]) -> Tensor {
     let op = reshape::Reshape {
-        target_shape: shape.to_vec().into_boxed_slice(),
-        original_shape: Box::new([]),
+        target_shape: shape.to_vec(),
     };
     apply_op(op, &[x])
 }

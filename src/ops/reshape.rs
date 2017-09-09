@@ -6,8 +6,11 @@ use ndarray_ext::NdArray;
 use ops;
 
 pub struct Reshape {
-    pub target_shape: Box<[usize]>,
-    pub original_shape: Box<[usize]>,
+    pub target_shape: Vec<usize>,
+}
+
+pub struct ReshapeGrad {
+    pub target_shape: Vec<usize>,
 }
 
 
@@ -18,12 +21,6 @@ impl ops::Op for Reshape {
 
     fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray {
         let ret = xs[0].clone();
-        if 0 == self.original_shape.len() {
-            mem::swap(
-                &mut self.original_shape,
-                &mut Box::new(ret.shape().to_vec().into_boxed_slice()),
-            );
-        }
         if let Ok(a) = ret.into_shape(ndarray::IxDyn(&*self.target_shape)) {
             a
         } else {
@@ -32,8 +29,27 @@ impl ops::Op for Reshape {
     }
 
     fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
-        vec![
-            Some(ops::reshape(gy, self.original_shape.to_vec().as_slice())),
-        ]
+        let op = ReshapeGrad { target_shape: self.target_shape.clone() };
+        vec![Some(ops::apply_op(op, &[inputs[0], gy]))]
+    }
+}
+
+impl ops::Op for ReshapeGrad {
+    fn name(&self) -> &str {
+        "ReshapeGrad"
+    }
+
+    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray {
+        let x = xs[0];
+        let gy: &NdArray = xs[1];
+        let orig_shape = x.shape();
+        // unwrap is safe
+        gy.clone().into_shape(orig_shape).unwrap()
+    }
+
+    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
+        let op = ReshapeGrad { target_shape: self.target_shape.clone() };
+        let gy = inputs[1];
+        vec![Some(ops::reshape(gy, self.target_shape.as_slice()))]
     }
 }

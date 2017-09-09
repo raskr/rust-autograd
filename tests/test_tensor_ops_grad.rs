@@ -358,6 +358,23 @@ fn slice() {
 }
 
 #[test]
+fn reshape() {
+    let ref v = ag::variable(ag::init::standard_normal(&[4, 4]));
+    let ref z = ag::reshape(v, &[4, 2, 2]);
+    let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[4, 2, 2])));
+    ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
+}
+
+#[test]
+fn reshape_grad() {
+    let ref v = ag::variable(ag::init::standard_normal(&[4, 4]));
+    let ref z = ag::reshape(v, &[4, 2, 2]);
+    let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[4, 2, 2])))[0];
+    let ref gg = ag::gradients(g, &[v], Some(&init_grad(1., &[4, 4])));
+    ag::test_helper::gradient_check(g, &[v], gg.as_slice(), &ag::Input::new(), 1e-3);
+}
+
+#[test]
 fn primitive_back_propagation_through_time() {
     let max_sent = 3;
     let batch_size = 2;
