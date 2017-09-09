@@ -29,13 +29,7 @@ pub use tensor::Tensor;
 
 pub use ops::*;
 
-pub use graph_sources::variable;
-
-pub use graph_sources::placeholder;
-
-pub use graph_sources::constant;
-
-pub use graph_sources::scalar;
+pub use graph_sources::*;
 
 pub use initializers as init;
 

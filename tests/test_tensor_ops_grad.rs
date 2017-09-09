@@ -10,7 +10,7 @@ fn init_grad(val: f32, objective_shape: &[usize]) -> ag::Tensor {
 
 #[test]
 fn clip() {
-    let ref v = ag::variable(ag::init::randn(&[10]));
+    let ref v = ag::variable(ag::init::standard_normal(&[10]));
     let ref z = ag::clip(v, -1e-3, 1e-3);
     let ref g = ag::gradients(z, &[v], Some(&&init_grad(1., &[10])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -18,7 +18,7 @@ fn clip() {
 
 #[test]
 fn asinh() {
-    let ref v = ag::variable(ag::init::randn(&[3]));
+    let ref v = ag::variable(ag::init::standard_normal(&[3]));
     let ref z = ag::asinh(v);
     let ref g = ag::gradients(z, &[v], Some(&&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -26,7 +26,7 @@ fn asinh() {
 
 #[test]
 fn acosh() {
-    let ref v = ag::variable(ag::init::randn(&[3]));
+    let ref v = ag::variable(ag::init::standard_normal(&[3]));
     let ref z = ag::acosh(v);
     let ref g = ag::gradients(z, &[v], Some(&&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -34,7 +34,7 @@ fn acosh() {
 
 #[test]
 fn atanh() {
-    let ref v = ag::variable(ag::init::randn(&[3]));
+    let ref v = ag::variable(ag::init::standard_normal(&[3]));
     let ref z = ag::atanh(v);
     let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -42,7 +42,7 @@ fn atanh() {
 
 #[test]
 fn sinh() {
-    let ref v = ag::variable(ag::init::randn(&[3]));
+    let ref v = ag::variable(ag::init::standard_normal(&[3]));
     let ref z = ag::sinh(v);
     let ref g = ag::gradients(z, &[v], Some(&&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -50,7 +50,7 @@ fn sinh() {
 
 #[test]
 fn cosh() {
-    let ref v = ag::variable(ag::init::randn(&[3]));
+    let ref v = ag::variable(ag::init::standard_normal(&[3]));
     let ref z = ag::cosh(v);
     let ref g = ag::gradients(z, &[v], Some(&&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -58,7 +58,7 @@ fn cosh() {
 
 #[test]
 fn tanh() {
-    let ref v = ag::variable(ag::init::randn(&[3]));
+    let ref v = ag::variable(ag::init::standard_normal(&[3]));
     let ref z = ag::tanh(v);
     let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -66,7 +66,7 @@ fn tanh() {
 
 #[test]
 fn asin() {
-    let ref v = ag::variable(ag::init::randn(&[3]));
+    let ref v = ag::variable(ag::init::standard_normal(&[3]));
     let ref z = ag::asin(v);
     let ref g = ag::gradients(z, &[v], Some(&&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -74,7 +74,7 @@ fn asin() {
 
 #[test]
 fn acos() {
-    let ref v = ag::variable(ag::init::randn(&[3]));
+    let ref v = ag::variable(ag::init::standard_normal(&[3]));
     let ref z = ag::acos(v);
     let ref g = ag::gradients(z, &[v], Some(&&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -82,7 +82,7 @@ fn acos() {
 
 #[test]
 fn atan() {
-    let ref v = ag::variable(ag::init::randn(&[3]));
+    let ref v = ag::variable(ag::init::standard_normal(&[3]));
     let ref z = ag::atan(v);
     let ref g = ag::gradients(z, &[v], Some(&&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -90,7 +90,7 @@ fn atan() {
 
 #[test]
 fn sin() {
-    let ref v = ag::variable(ag::init::randn(&[3]));
+    let ref v = ag::variable(ag::init::standard_normal(&[3]));
     let ref z = ag::sin(v);
     let ref g = ag::gradients(z, &[v], Some(&&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -98,7 +98,7 @@ fn sin() {
 
 #[test]
 fn cos() {
-    let ref v = ag::variable(ag::init::randn(&[3]));
+    let ref v = ag::variable(ag::init::standard_normal(&[3]));
     let ref z = ag::cos(v);
     let ref g = ag::gradients(z, &[v], Some(&&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -106,7 +106,7 @@ fn cos() {
 
 #[test]
 fn tan() {
-    let ref v = ag::variable(ag::init::randn(&[3]));
+    let ref v = ag::variable(ag::init::standard_normal(&[3]));
     let ref z = ag::tan(v);
     let ref g = ag::gradients(z, &[v], Some(&&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -114,7 +114,7 @@ fn tan() {
 
 #[test]
 fn pow() {
-    let ref v = ag::variable(ag::init::randn(&[3]));
+    let ref v = ag::variable(ag::init::standard_normal(&[3]));
     let ref z = ag::pow(v, 3.);
     let ref g = ag::gradients(z, &[v], Some(&&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -122,7 +122,7 @@ fn pow() {
 
 #[test]
 fn exp() {
-    let ref v = ag::variable(ag::init::randn(&[3]));
+    let ref v = ag::variable(ag::init::standard_normal(&[3]));
     let ref z = ag::exp(v);
     let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -130,7 +130,7 @@ fn exp() {
 
 #[test]
 fn log() {
-    let ref v = ag::variable(ag::init::randn(&[3]));
+    let ref v = ag::variable(ag::init::standard_normal(&[3]));
     let ref z = ag::log(v, 3.);
     let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -138,7 +138,7 @@ fn log() {
 
 #[test]
 fn expand_dims() {
-    let ref v = ag::variable(ag::init::randn(&[3]));
+    let ref v = ag::variable(ag::init::standard_normal(&[3]));
     let ref z = ag::expand_dims(v, &[0, 2]);
     let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[1, 3, 1])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -146,7 +146,7 @@ fn expand_dims() {
 
 #[test]
 fn squeeze() {
-    let ref v = ag::variable(ag::init::randn(&[3, 1, 2, 1]));
+    let ref v = ag::variable(ag::init::standard_normal(&[3, 1, 2, 1]));
     let ref z = ag::squeeze(v, &[3, 1]);
     let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[3, 2])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -154,8 +154,8 @@ fn squeeze() {
 
 #[test]
 fn matmul() {
-    let ref a = ag::constant(ag::init::randn(&[4, 2]));
-    let ref v = ag::variable(ag::init::randn(&[2, 3]));
+    let ref a = ag::constant(ag::init::standard_normal(&[4, 2]));
+    let ref v = ag::variable(ag::init::standard_normal(&[2, 3]));
     let ref z = ag::matmul(a, v);
     let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[4, 3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -163,8 +163,8 @@ fn matmul() {
 
 #[test]
 fn wx_plus_b() {
-    let ref a = ag::constant(ag::init::randn(&[4, 2]));
-    let ref v = ag::variable(ag::init::randn(&[2, 3]));
+    let ref a = ag::constant(ag::init::standard_normal(&[4, 2]));
+    let ref v = ag::variable(ag::init::standard_normal(&[2, 3]));
     let ref b = ag::variable(ag::init::zeros(&[4, 3]));
     let ref z = ag::matmul(a, v) + b;
     let ref g = ag::gradients(z, &[b], Some(&init_grad(1., &[4, 3])));
@@ -173,7 +173,7 @@ fn wx_plus_b() {
 
 #[test]
 fn reduce_min() {
-    let ref v = ag::variable(ag::init::randn(&[3, 2, 2]));
+    let ref v = ag::variable(ag::init::standard_normal(&[3, 2, 2]));
     let ref z = ag::reduce_min(v, 1, false); // keep_dims=false
     let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[3, 2])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -181,7 +181,7 @@ fn reduce_min() {
 
 #[test]
 fn reduce_min_keep() {
-    let ref v = ag::variable(ag::init::randn(&[3, 2, 2]));
+    let ref v = ag::variable(ag::init::standard_normal(&[3, 2, 2]));
     let ref z = ag::reduce_min(v, 1, true); // keep_dims=true
     let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[3, 1, 2])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -189,7 +189,7 @@ fn reduce_min_keep() {
 
 #[test]
 fn reduce_max() {
-    let ref v = ag::variable(ag::init::randn(&[3, 2, 2]));
+    let ref v = ag::variable(ag::init::standard_normal(&[3, 2, 2]));
     let ref z = ag::reduce_max(v, 1, false); // keep_dims=false
     let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[3, 2])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -197,7 +197,7 @@ fn reduce_max() {
 
 #[test]
 fn reduce_max_keep() {
-    let ref v = ag::variable(ag::init::randn(&[3, 2, 2]));
+    let ref v = ag::variable(ag::init::standard_normal(&[3, 2, 2]));
     let ref z = ag::reduce_max(v, 1, true); // keep_dims=true
     let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[3, 1, 2])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -205,7 +205,7 @@ fn reduce_max_keep() {
 
 #[test]
 fn reduce_mean() {
-    let ref v = ag::variable(ag::init::randn(&[3, 2, 2]));
+    let ref v = ag::variable(ag::init::standard_normal(&[3, 2, 2]));
     let ref z = ag::reduce_mean(v, 1, false); // keep_dims=false
     let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[3, 2])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -213,7 +213,7 @@ fn reduce_mean() {
 
 #[test]
 fn reduce_mean_keep() {
-    let ref v = ag::variable(ag::init::randn(&[3, 2, 2]));
+    let ref v = ag::variable(ag::init::standard_normal(&[3, 2, 2]));
     let ref z = ag::reduce_mean(v, 1, true); // keep_dims=true
     let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[3, 1, 2])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -221,7 +221,7 @@ fn reduce_mean_keep() {
 
 #[test]
 fn reduce_sum() {
-    let ref v = ag::variable(ag::init::randn(&[3, 2, 2]));
+    let ref v = ag::variable(ag::init::standard_normal(&[3, 2, 2]));
     let ref z = ag::reduce_sum(v, 1, false); // keep_dims=false
     let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[3, 2])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -229,7 +229,7 @@ fn reduce_sum() {
 
 #[test]
 fn reduce_sum_keep() {
-    let ref v = ag::variable(ag::init::randn(&[3, 2, 2]));
+    let ref v = ag::variable(ag::init::standard_normal(&[3, 2, 2]));
     let ref z = ag::reduce_sum(v, 1, true); // keep_dims=true
     let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[3, 1, 2])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -237,7 +237,7 @@ fn reduce_sum_keep() {
 
 #[test]
 fn swap_axes() {
-    let ref v = ag::variable(ag::init::randn(&[2, 3]));
+    let ref v = ag::variable(ag::init::standard_normal(&[2, 3]));
     let ref z = ag::swap_axes(v, 0, 1);
     let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[3, 2])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -245,8 +245,8 @@ fn swap_axes() {
 
 #[test]
 fn add() {
-    let ref a = ag::variable(ag::init::randn(&[2, 2]));
-    let ref b = ag::variable(ag::init::randn(&[2, 2]));
+    let ref a = ag::variable(ag::init::standard_normal(&[2, 2]));
+    let ref b = ag::variable(ag::init::standard_normal(&[2, 2]));
     let ref z = a + b;
     let ref g = ag::gradients(z, &[a, b], Some(&init_grad(1., &[2, 2])));
     ag::test_helper::gradient_check(z, &[a, b], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -254,8 +254,8 @@ fn add() {
 
 #[test]
 fn mul() {
-    let ref a = ag::variable(ag::init::randn(&[2, 2]));
-    let ref b = ag::variable(ag::init::randn(&[2, 2]));
+    let ref a = ag::variable(ag::init::standard_normal(&[2, 2]));
+    let ref b = ag::variable(ag::init::standard_normal(&[2, 2]));
     let ref z = a * b;
     let ref g = ag::gradients(z, &[a, b], Some(&init_grad(1., &[2, 2])));
     ag::test_helper::gradient_check(z, &[a, b], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -263,7 +263,7 @@ fn mul() {
 
 #[test]
 fn sigmoid() {
-    let ref v = ag::variable(ag::init::randn(&[2, 2]));
+    let ref v = ag::variable(ag::init::standard_normal(&[2, 2]));
     let ref z = ag::sigmoid(v);
     let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[2, 2])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -271,7 +271,7 @@ fn sigmoid() {
 
 #[test]
 fn elu() {
-    let ref v = ag::variable(ag::init::randn(&[2, 2]));
+    let ref v = ag::variable(ag::init::standard_normal(&[2, 2]));
     let ref z = ag::elu(v, 1.);
     let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[2, 2])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -279,7 +279,7 @@ fn elu() {
 
 #[test]
 fn relu() {
-    let ref v = ag::variable(ag::init::randn(&[2, 2]));
+    let ref v = ag::variable(ag::init::standard_normal(&[2, 2]));
     let ref z = ag::relu(v);
     let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[2, 2])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -287,8 +287,8 @@ fn relu() {
 
 #[test]
 fn mean_squared_error() {
-    let ref t = ag::constant(ag::init::randn(&[2, 3]));
-    let ref v = ag::variable(ag::init::randn(&[2, 3]));
+    let ref t = ag::constant(ag::init::standard_normal(&[2, 3]));
+    let ref v = ag::variable(ag::init::standard_normal(&[2, 3]));
     let ref z = ag::mean_squared_error(v, t);
     let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[2, 3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -296,7 +296,7 @@ fn mean_squared_error() {
 
 #[test]
 fn log_softmax() {
-    let ref v = ag::variable(ag::init::randn(&[1, 3]));
+    let ref v = ag::variable(ag::init::standard_normal(&[1, 3]));
     let ref z = ag::log_softmax(v, 1);
     let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[1, 3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -305,7 +305,7 @@ fn log_softmax() {
 #[test]
 fn softmax_cross_entropy() {
     let ref t = ag::constant(ag::init::from_slice(&[1., 0., 0.], &[1, 3]));
-    let ref v = ag::variable(ag::init::randn(&[1, 3]));
+    let ref v = ag::variable(ag::init::standard_normal(&[1, 3]));
     let ref z = ag::softmax_cross_entropy(v, t);
     let ref g = ag::gradients(z, &[v], None);
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -313,8 +313,8 @@ fn softmax_cross_entropy() {
 
 #[test]
 fn sigmoid_cross_entropy() {
-    let ref t = ag::constant(ag::init::randn(&[1, 3]));
-    let ref v = ag::variable(ag::init::randn(&[1, 3]));
+    let ref t = ag::constant(ag::init::standard_normal(&[1, 3]));
+    let ref v = ag::variable(ag::init::standard_normal(&[1, 3]));
     let ref z = ag::sigmoid_cross_entropy(v, t);
     let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[1])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -323,7 +323,7 @@ fn sigmoid_cross_entropy() {
 #[test]
 fn sparse_softmax_cross_entropy() {
     let ref t = ag::constant(ag::init::from_slice(&[1., 0.], &[2]));
-    let ref v = ag::variable(ag::init::randn(&[2, 3]));
+    let ref v = ag::variable(ag::init::standard_normal(&[2, 3]));
     let ref z = ag::sparse_softmax_cross_entropy(v, t);
     let ref g = ag::gradients(z, &[v], None);
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -332,7 +332,7 @@ fn sparse_softmax_cross_entropy() {
 #[test]
 fn embedding_lookup() {
     let ref x = ag::constant(ag::init::from_slice(&[2., 0.], &[2]));
-    let ref v = ag::variable(ag::init::randu(&[3, 4]));
+    let ref v = ag::variable(ag::init::standard_normal(&[3, 4]));
     let ref z = ag::embedding_lookup(v, x);
     let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[2, 4])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -340,8 +340,8 @@ fn embedding_lookup() {
 
 #[test]
 fn concat() {
-    let ref v1 = ag::variable(ag::init::randn(&[1, 2]));
-    let ref v2 = ag::variable(ag::init::randn(&[1, 2]));
+    let ref v1 = ag::variable(ag::init::standard_normal(&[1, 2]));
+    let ref v2 = ag::variable(ag::init::standard_normal(&[1, 2]));
     let ref z = ag::concat(&[v1, v2], 1);
     let ref g = ag::gradients(z, &[v1], Some(&init_grad(1., &[1, 4])));
     ag::test_helper::gradient_check(z, &[v1], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -351,7 +351,7 @@ fn concat() {
 
 #[test]
 fn slice() {
-    let ref v = ag::variable(ag::init::randn(&[4, 4]));
+    let ref v = ag::variable(ag::init::standard_normal(&[4, 4]));
     let ref z = ag::slice(v, &[0, 0], &[-1, 2]); // numpy equivalent is v[:, 0:2]
     let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[4, 2])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -362,11 +362,11 @@ fn primitive_back_propagation_through_time() {
     let max_sent = 3;
     let batch_size = 2;
 
-    let ref lookup_table = ag::variable(ag::init::randu(&[5, 3]));
+    let ref lookup_table = ag::variable(ag::init::standard_normal(&[5, 3]));
     // (vector_dim -> vocab)
-    let ref wo = ag::variable(ag::init::randn(&[3, 5]));
+    let ref wo = ag::variable(ag::init::standard_normal(&[3, 5]));
     // (vector_dim -> vector_dim)
-    let ref wh = ag::variable(ag::init::randn(&[3, 3]));
+    let ref wh = ag::variable(ag::init::standard_normal(&[3, 3]));
 
     // -- build graph for BPTT --
     let mut loss_buf = vec![];
@@ -420,8 +420,8 @@ pub fn lstm_lm() {
     let batch_size = 2;
 
     // === graph def
-    let ref tbl = ag::variable(ag::init::randu(&[vocab_size, vec_dim]));
-    let ref w = ag::variable(ag::init::randn(&[state_size, vocab_size]));
+    let ref tbl = ag::variable(ag::init::standard_normal(&[vocab_size, vec_dim]));
+    let ref w = ag::variable(ag::init::standard_normal(&[state_size, vocab_size]));
     let sentences = ag::placeholder(&[-1, 3]);
     let mut rnn = ag::nn_impl::rnn::LSTM::new(state_size, vec_dim, batch_size);
 

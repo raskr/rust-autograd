@@ -6,6 +6,7 @@ use tensor::{Tensor, RawTensor};
 use ndarray_ext::NdArray;
 
 pub mod dummy_op;
+pub mod random_ops;
 mod clip;
 mod add_n;
 mod log_softmax;
@@ -53,7 +54,6 @@ pub trait Op {
 
 #[inline]
 fn apply_op<T: Op + 'static>(op: T, inputs: &[&Tensor]) -> Tensor {
-    debug_assert_ne!(inputs.len(), 0);
     Tensor(Rc::new(RefCell::new(RawTensor {
         op: Box::new(op),
         inputs: inputs.iter().map(|a| (*a).clone()).collect::<Vec<Tensor>>(),

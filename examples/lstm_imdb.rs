@@ -28,7 +28,7 @@ fn main() {
     let batch_size = 128;
 
     // build computation graph
-    let ref tbl = ag::variable(ag::init::randu(&[vocab_size, vec_dim]));
+    let ref tbl = ag::variable(ag::init::random_uniform(&[vocab_size, vec_dim]));
     let ref w = ag::variable(ag::init::glorot_uniform(&[state_size, 1]));
     let ref b = ag::variable(ag::init::zeros(&[1, 1]));
     let ref sentences = ag::placeholder(&[-1, max_sent_len as isize]);

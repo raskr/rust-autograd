@@ -33,7 +33,7 @@ fn reduce_mean() {
 
 #[test]
 fn reshape() {
-    let input_arr = ag::init::randn(&[3, 2, 2]);
+    let input_arr = ag::init::standard_normal(&[3, 2, 2]);
     let answer = input_arr
         .clone()
         .into_shape(ndarray::IxDyn(&[3, 4]))

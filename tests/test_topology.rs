@@ -11,8 +11,8 @@ fn init_grad(val: f32, objective_shape: &[usize]) -> ag::Tensor {
 #[test]
 fn contributed_to_grads() {
     // dummy graph
-    let ref t = ag::constant(ag::initializers::randn(&[2, 3]));
-    let ref v = ag::variable(ag::initializers::randn(&[2, 3]));
+    let ref t = ag::constant(ag::initializers::standard_normal(&[2, 3]));
+    let ref v = ag::variable(ag::initializers::standard_normal(&[2, 3]));
     let ref z = ag::mean_squared_error(&v, &t);
     let booleans = ag::topology::contributed_to_grads(z, &[v]);
     assert_eq!(booleans.len(), 3);
@@ -23,8 +23,8 @@ fn contributed_to_grads() {
 
 #[test]
 fn topological_ordering() {
-    let ref a = ag::constant(ag::init::randn(&[4, 2]));
-    let ref v = ag::variable(ag::init::randn(&[2, 3]));
+    let ref a = ag::constant(ag::init::standard_normal(&[4, 2]));
+    let ref v = ag::variable(ag::init::standard_normal(&[2, 3]));
     let ref b = ag::variable(ag::init::zeros(&[4, 3]));
     let ref z = ag::matmul(a, v) + b;
     let mut vars = [a, v, b, z];
@@ -35,8 +35,8 @@ fn topological_ordering() {
 
 #[test]
 fn topological_ordering_on_reverse_mode() {
-    let ref x = ag::constant(ag::init::randn(&[4, 2]));
-    let ref w = ag::variable(ag::init::randn(&[2, 3]));
+    let ref x = ag::constant(ag::init::standard_normal(&[4, 2]));
+    let ref w = ag::variable(ag::init::standard_normal(&[2, 3]));
     let ref b = ag::variable(ag::init::zeros(&[4, 3]));
     let ref z = ag::matmul(x, w) + b;
     let ref g = ag::gradients(z, &[w], Some(&init_grad(1., &[4, 3])))[0];
