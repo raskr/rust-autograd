@@ -198,8 +198,10 @@ impl Input {
     }
 
     #[inline]
-    pub fn add(mut self, symbolic_tensor: &Tensor, array: NdArray) -> Self {
-        self.hash_map.insert(symbolic_tensor.clone(), array);
+    pub fn add<T>(mut self, symbolic_tensor: &Tensor, array: ndarray::Array<f32, T>) -> Self
+    where T: ndarray::Dimension
+    {
+        self.hash_map.insert(symbolic_tensor.clone(), array.into_dyn());
         // move self
         self
     }

@@ -22,11 +22,11 @@ pub fn placeholder(shape: &[isize]) -> Tensor {
 
 /// Creates a shared variable.
 #[inline]
-pub fn variable(array: ndarray::Array<f32, ndarray::IxDyn>) -> Tensor {
+pub fn variable<T: ndarray::Dimension>(array: ndarray::Array<f32, T>) -> Tensor {
     Tensor(Rc::new(RefCell::new(RawTensor {
         op: Box::new(ops::dummy_op::DummyOp{ name: "Variable".to_string() }),
         inputs: vec![],
-        param: Some(array),
+        param: Some(array.into_dyn()),
         rank: 0,
     })))
 }
@@ -53,11 +53,11 @@ pub fn ones(shape: &[usize]) -> Tensor {
 
 /// Creates a constant tensor.
 #[inline]
-pub fn constant(array: ndarray::Array<f32, ndarray::IxDyn>) -> Tensor {
+pub fn constant<T: ndarray::Dimension>(array: ndarray::Array<f32, T>) -> Tensor {
     Tensor(Rc::new(RefCell::new(RawTensor {
         op: Box::new(ops::dummy_op::DummyOp{ name: "Constant".to_string() }),
         inputs: vec![],
-        param: Some(array),
+        param: Some(array.into_dyn()),
         rank: 0,
     })))
 }

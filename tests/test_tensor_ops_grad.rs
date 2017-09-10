@@ -304,7 +304,7 @@ fn log_softmax() {
 
 #[test]
 fn softmax_cross_entropy() {
-    let ref t = ag::constant(ag::init::from_slice(&[1., 0., 0.], &[1, 3]));
+    let ref t = ag::constant(ndarray::arr2(&[[1., 0., 0.]]));
     let ref v = ag::variable(ag::init::standard_normal(&[1, 3]));
     let ref z = ag::softmax_cross_entropy(v, t);
     let ref g = ag::gradients(z, &[v], None);
@@ -322,7 +322,7 @@ fn sigmoid_cross_entropy() {
 
 #[test]
 fn sparse_softmax_cross_entropy() {
-    let ref t = ag::constant(ag::init::from_slice(&[1., 0.], &[2]));
+    let ref t = ag::constant(ndarray::arr1(&[1., 0.]));
     let ref v = ag::variable(ag::init::standard_normal(&[2, 3]));
     let ref z = ag::sparse_softmax_cross_entropy(v, t);
     let ref g = ag::gradients(z, &[v], None);
@@ -332,7 +332,7 @@ fn sparse_softmax_cross_entropy() {
 #[test]
 fn gather() {
     let ref v = ag::variable(ag::init::zeros(&[5, 4, 8, 2]));
-    let ref x = ag::constant(ag::init::from_slice(&[5., 4., 3., 2., 1., 0.], &[2, 3]));
+    let ref x = ag::constant(ndarray::arr2(&[[5., 4., 3.], [2., 1., 0.]]));
     let ref z = ag::gather(v, x, 2);
     let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[5, 4, 2, 3, 2])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -426,10 +426,7 @@ fn primitive_back_propagation_through_time() {
     // inputs (batch_size=2, sentence_len=4)
     let ref fd = ag::Input::new()
         .add(&h_buf[0], ag::init::zeros(&[batch_size, 3]))
-        .add(
-            &sentences,
-            ag::init::from_slice(&[2., 3., 1., 3., 0., 2., 0., 1.], &[batch_size, 4]),
-        );
+        .add(&sentences, ndarray::arr2(&[[2., 3., 1., 3.], [0., 2., 0., 1.]]));
 
     let params = &[lookup_table, wo, wh];
     let ref g = ag::gradients(loss, params, Some(&init_grad(1., &[batch_size, 1])));
@@ -465,7 +462,7 @@ pub fn lstm_lm() {
     // == graph building end ==
     let ref fd = ag::Input::new().add(
         &sentences,
-        ag::init::from_slice(&[2., 3., 1., 3., 0., 1.], &[batch_size, 3]),
+        ndarray::arr2(&[[2., 3., 1.], [3., 0., 1.]]),
     );
 
     // ==  test ==

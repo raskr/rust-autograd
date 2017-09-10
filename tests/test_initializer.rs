@@ -17,19 +17,6 @@ fn ones() {
 }
 
 #[test]
-fn from_vec() {
-    let a = ag::initializers::from_vec(vec![1., 1., 1.], &[3]);
-    let b = ndarray::ArrayD::<f32>::from_elem(ndarray::IxDyn(&[3]), 1.);
-    assert_eq!(a, b);
-}
-#[test]
-fn from_slice() {
-    let a = ag::initializers::from_slice(&[1., 1., 1.], &[3]);
-    let b = ndarray::ArrayD::<f32>::from_elem(ndarray::IxDyn(&[3]), 1.);
-    assert_eq!(a, b);
-}
-
-#[test]
 fn random_uniform() {
     let a = ag::initializers::random_uniform(&[3], 0., 1.);
     let b = ag::initializers::random_uniform(&[3], 0., 1.);

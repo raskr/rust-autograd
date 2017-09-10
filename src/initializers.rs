@@ -45,28 +45,8 @@ pub fn ones(shape: &[usize]) -> ndarray::Array<f32, ndarray::IxDyn> {
 
 #[inline]
 /// Create ndarray object from a slice.
-pub fn from_slice(slice: &[f32], shape: &[usize]) -> ndarray::Array<f32, ndarray::IxDyn> {
-    if let Ok(a) = NdArray::from_shape_vec(ndarray::IxDyn(shape), slice.to_vec()) {
-        a
-    } else {
-        panic!("can't reshape input slice to shape you provided ");
-    }
-}
-
-#[inline]
-/// Create ndarray object from a slice.
 pub fn from_scalar(val: f32) -> ndarray::Array<f32, ndarray::IxDyn> {
     NdArray::from_elem(ndarray::IxDyn(&[1]), val)
-}
-
-#[inline]
-/// Create ndarray object from a Vec.
-pub fn from_vec(vec: Vec<f32>, shape: &[usize]) -> ndarray::Array<f32, ndarray::IxDyn> {
-    if let Ok(a) = NdArray::from_shape_vec(ndarray::IxDyn(shape), vec) {
-        a
-    } else {
-        panic!("can't reshape input slice to shape you provided ");
-    }
 }
 
 #[inline]
