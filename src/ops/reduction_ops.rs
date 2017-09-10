@@ -28,11 +28,7 @@ impl ops::Op for ArgMax {
     // cf. https://github.com/tensorflow/compiler/tf2xla/kernels/index_ops.cc
     fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray {
         let x = xs[0];
-        let axis = if -1 == self.axis {
-            x.ndim() - 1
-        } else {
-            self.axis as usize
-        };
+        let axis = if -1 == self.axis { x.ndim() - 1 } else { self.axis as usize };
         let x_shape = x.shape();
 
         // 1. Make binary mask tensor (maximum is 1)
@@ -79,7 +75,7 @@ impl ops::Op for ArgMax {
             } else {
                 final_shape.remove(axis);
             }
-            // unwrap is safe maybe (95% confidence...)
+            // unwrap is safe (95% confidence...)
             mat.into_dyn()
                .into_shape(ndarray::IxDyn(final_shape.as_slice()))
                .unwrap()
@@ -101,11 +97,7 @@ impl ops::Op for ReduceMin {
     fn compute(&mut self, xs: &[&NdArray], train: bool) -> NdArray {
         let x = xs[0];
 
-        let axis = if -1 == self.axis {
-            x.ndim() - 1
-        } else {
-            self.axis as usize
-        };
+        let axis = if -1 == self.axis { x.ndim() - 1 } else { self.axis as usize };
 
         let min_fn = f32::min;
         let mut min = x.fold_axis(ndarray::Axis(axis), f32::MAX, move |&a, &b| min_fn(a, b));
@@ -135,11 +127,7 @@ impl ops::Op for ReduceMinGrad {
         let x = xs[0].view();
         let y = xs[1].view();
         let gy = xs[2].view();
-        let axis = if -1 == self.axis {
-            x.ndim() - 1
-        } else {
-            self.axis as usize
-        };
+        let axis = if -1 == self.axis { x.ndim() - 1 } else { self.axis as usize };
 
         let (y, gy) = if self.keep_dim {
             (y, gy)
@@ -176,11 +164,7 @@ impl ops::Op for ReduceMax {
     fn compute(&mut self, xs: &[&NdArray], train: bool) -> NdArray {
         let x = xs[0];
 
-        let axis = if -1 == self.axis {
-            x.ndim() - 1
-        } else {
-            self.axis as usize
-        };
+        let axis = if -1 == self.axis { x.ndim() - 1 } else { self.axis as usize };
 
         let max_fn = f32::max;
         let mut maxed = x.fold_axis(ndarray::Axis(axis), f32::MIN, move |&a, &b| max_fn(a, b));
@@ -210,11 +194,7 @@ impl ops::Op for ReduceMaxGrad {
         let x = xs[0].view();
         let y = xs[1].view();
         let gy = xs[2].view();
-        let axis = if -1 == self.axis {
-            x.ndim() - 1
-        } else {
-            self.axis as usize
-        };
+        let axis = if -1 == self.axis { x.ndim() - 1 } else { self.axis as usize };
 
         let (y, gy) = if self.keep_dim {
             (y, gy)
@@ -258,11 +238,7 @@ impl ops::Op for ReduceMean {
             )
         }
 
-        let axis = if -1 == self.axis {
-            x.ndim()
-        } else {
-            self.axis as usize
-        };
+        let axis = if -1 == self.axis { x.ndim() } else { self.axis as usize };
 
         if self.keep_dim {
             let ret = x.mean(ndarray::Axis(axis));
@@ -288,11 +264,7 @@ impl ops::Op for ReduceMeanGrad {
 
     fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray {
         let x = xs[0];
-        let axis = if -1 == self.axis {
-            x.ndim() - 1
-        } else {
-            self.axis as usize
-        };
+        let axis = if -1 == self.axis { x.ndim() - 1 } else { self.axis as usize };
 
         // add dim for broadcast (the result is "view")
         let gy = if self.keep_dim {
@@ -325,11 +297,7 @@ impl ops::Op for ReduceSum {
     fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray {
         let x = &xs[0];
 
-        let axis = if -1 == self.axis {
-            x.ndim()
-        } else {
-            self.axis as usize
-        };
+        let axis = if -1 == self.axis { x.ndim() } else { self.axis as usize };
 
         if self.keep_dim {
             let ret = x.sum(ndarray::Axis(axis));
@@ -355,11 +323,7 @@ impl ops::Op for ReduceSumGrad {
 
     fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray {
         let x = xs[0];
-        let axis = if -1 == self.axis {
-            x.ndim() - 1
-        } else {
-            self.axis as usize
-        };
+        let axis = if -1 == self.axis { x.ndim() - 1 } else { self.axis as usize };
 
         // add dim for broadcast (the result is "view")
         let gy = if self.keep_dim {
