@@ -358,6 +358,14 @@ fn slice() {
 }
 
 #[test]
+fn flatten() {
+    let ref v = ag::variable(ag::init::standard_normal(&[4, 4]));
+    let ref z = ag::flatten(v);
+    let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[16])));
+    ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
+}
+
+#[test]
 fn reshape() {
     let ref v = ag::variable(ag::init::standard_normal(&[4, 4]));
     let ref z = ag::reshape(v, &[4, 2, 2]);

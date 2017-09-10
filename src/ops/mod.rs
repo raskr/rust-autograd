@@ -320,9 +320,33 @@ pub fn gradients(
 
 #[inline]
 /// Reshapes input tensor.
-pub fn reshape(x: &Tensor, shape: &[usize]) -> Tensor {
+pub fn reshape(x: &Tensor, shape: &[isize]) -> Tensor {
+    let mut minus_one_found = false;
+    let shape = shape.iter().map(|&len| {
+        if len == -1 {
+            if minus_one_found {
+                panic!("`shape` has two or more `-1` dim.");
+            }
+            minus_one_found = true;
+            None
+        } else if len < -1 {
+            panic!("`shape` contains invalid dim size: {}", len);
+        } else {
+            Some(len as usize)
+        }
+    }).collect::<Vec<_>>();
     let op = reshape::Reshape {
-        target_shape: shape.to_vec(),
+        target_shape: shape
+    };
+    apply_op(op, &[x])
+}
+
+
+#[inline]
+/// Returns 1-ranked tensor (vector)
+pub fn flatten(x: &Tensor) -> Tensor {
+    let op = reshape::Reshape {
+        target_shape: vec![None]
     };
     apply_op(op, &[x])
 }
