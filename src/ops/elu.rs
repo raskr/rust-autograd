@@ -38,6 +38,6 @@ impl ops::Op for ELUGrad {
 
     // TODO: impl
     fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
-        vec![None]
+        vec![None, None]
     }
 }

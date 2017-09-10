@@ -81,6 +81,6 @@ impl ops::Op for ConcatGrad {
     }
 
     fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
-        vec![None]
+        (0..inputs.len()).map(|_| None).collect::<Vec<_>>()
     }
 }

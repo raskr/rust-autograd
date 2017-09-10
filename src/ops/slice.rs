@@ -54,6 +54,6 @@ impl ops::Op for SliceGrad {
 
     fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
         // is this ok?
-        vec![None]
+        vec![None, None]
     }
 }

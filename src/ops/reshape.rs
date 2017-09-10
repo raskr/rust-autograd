@@ -50,6 +50,6 @@ impl ops::Op for ReshapeGrad {
     fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
         let op = ReshapeGrad { target_shape: self.target_shape.clone() };
         let gy = inputs[1];
-        vec![Some(ops::reshape(gy, self.target_shape.as_slice()))]
+        vec![None, Some(ops::reshape(gy, self.target_shape.as_slice()))]
     }
 }

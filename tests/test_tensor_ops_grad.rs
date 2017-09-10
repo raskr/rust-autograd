@@ -10,7 +10,7 @@ fn init_grad(val: f32, objective_shape: &[usize]) -> ag::Tensor {
 
 #[test]
 fn clip() {
-    let ref v = ag::variable(ag::init::standard_normal(&[10]));
+    let ref v = ag::variable(ag::init::standard_uniform(&[10]));
     let ref z = ag::clip(v, -1e-3, 1e-3);
     let ref g = ag::gradients(z, &[v], Some(&&init_grad(1., &[10])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3);
@@ -368,7 +368,7 @@ fn reshape() {
 #[test]
 fn reshape_grad() {
     let ref v = ag::variable(ag::init::standard_normal(&[4, 4]));
-    let ref z = ag::reshape(v, &[4, 2, 2]);
+    let ref z = ag::reshape(&(v*v), &[4, 2, 2]);
     let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[4, 2, 2])))[0];
     let ref gg = ag::gradients(g, &[v], Some(&init_grad(1., &[4, 4])));
     ag::test_helper::gradient_check(g, &[v], gg.as_slice(), &ag::Input::new(), 1e-3);

@@ -91,6 +91,6 @@ impl ::Op for GatherGrad {
     }
 
     fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
-        vec![None, None]
+        vec![None, None, None]
     }
 }

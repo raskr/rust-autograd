@@ -164,7 +164,7 @@ impl ops::Op for ReduceMinGrad {
 
 
     fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
-        vec![None]
+        vec![None, None, None]
     }
 }
 
@@ -238,7 +238,7 @@ impl ops::Op for ReduceMaxGrad {
     }
 
     fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
-        vec![None]
+        vec![None, None, None]
     }
 }
 
@@ -313,7 +313,7 @@ impl ops::Op for ReduceMeanGrad {
     }
 
     fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
-        vec![None]
+        vec![None, None]
     }
 }
 
@@ -377,6 +377,6 @@ impl ops::Op for ReduceSumGrad {
     }
 
     fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
-        vec![None]
+        vec![None, None]
     }
 }

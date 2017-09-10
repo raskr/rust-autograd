@@ -34,12 +34,14 @@ impl ops::Op for ClipGrad {
     }
     fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray {
         // cf. https://github.com/chainer/chainer/blob/master/chainer/functions/math/clip.py
-        xs[1] * &xs[0].mapv(move |x|
+        let mut ret = xs[0].mapv(move |x|
             (((x > self.min) as i32) as f32) * (((x < self.max) as i32) as f32)
-        )
+        );
+        ret *= xs[1];
+        ret
     }
 
     fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
-        vec![None]
+        vec![None, None]
     }
 }
