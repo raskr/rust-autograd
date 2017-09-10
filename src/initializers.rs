@@ -89,8 +89,6 @@ pub fn standard_uniform(shape: &[usize]) -> ndarray::Array<f32, ndarray::IxDyn> 
 
 #[inline]
 /// Glorot normal initialization. (a.k.a. Xavier normal initialization)
-///
-/// Normal distribution, but its scaling is determined by its input size.
 pub fn glorot_normal(shape: &[usize]) -> ndarray::Array<f32, ndarray::IxDyn> {
     let s = 1. / (shape[0] as f64).sqrt();
     let normal = rand::distributions::Normal::new(0., s);
@@ -99,8 +97,6 @@ pub fn glorot_normal(shape: &[usize]) -> ndarray::Array<f32, ndarray::IxDyn> {
 
 #[inline]
 /// Glorot uniform initialization. (a.k.a. Xavier uniform initialization)
-///
-/// Uniform distribution, but its range is determined by its input size.
 pub fn glorot_uniform(shape: &[usize]) -> ndarray::Array<f32, ndarray::IxDyn> {
     let s = (6. / shape[0] as f64).sqrt();
     let uniform = rand::distributions::Range::new(-s, s);

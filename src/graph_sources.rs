@@ -73,6 +73,17 @@ pub fn scalar(a: f32) -> Tensor {
     })))
 }
 
+/// Creates a constant tensor.
+#[inline]
+pub fn range(start: usize, end: usize, step: usize) -> Tensor {
+    Tensor(Rc::new(RefCell::new(RawTensor {
+        op: Box::new(ops::dummy_op::DummyOp{ name: "Scalar".to_string() }),
+        inputs: vec![],
+        param: Some(ndarray::Array1::range(start as f32, end as f32, step as f32).into_dyn()),
+        rank: 0,
+    })))
+}
+
 /// Outputs values sampled from the normal distribution.
 pub fn random_normal(shape: &[usize], mean: f64, stddev: f64) -> Tensor {
     let op = ops::random_ops::RandomNormal {
