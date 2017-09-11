@@ -5,7 +5,7 @@ use std::collections::hash_map::HashMap;
 use std::mem;
 use tensor::{Tensor, Input};
 use ops;
-use train;
+use sgd;
 
 
 /// This computes partial derivatives of `objective` with `var_node` using
@@ -20,13 +20,13 @@ pub fn gradient_check(
 ) {
     assert_eq!(variables.len(), gradients.len());
 
-    let theoretical_grads = train::eval_gradients(gradients, feed_dict.clone());
+    let theoretical_grads = sgd::eval_gradients(gradients, feed_dict.clone());
 
     // for each variable nodes
     for (variable, mut theoretical_grad) in variables.iter().zip(theoretical_grads) {
 
         // reduce gradient if necessary
-        let theoretical_grad = train::maybe_reduce_grad(theoretical_grad, variable);
+        let theoretical_grad = sgd::maybe_reduce_grad(theoretical_grad, variable);
 
         let var_size = variable.borrow().param.as_ref()
             .expect(&format!("{} is not shared variable", variable.borrow().op.name())).len();

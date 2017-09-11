@@ -20,10 +20,6 @@ pub mod initializers;
 
 pub mod ndarray_ext;
 
-pub mod train;
-
-pub mod dataset;
-
 // == re-exposures ==
 pub use tensor::Tensor;
 
