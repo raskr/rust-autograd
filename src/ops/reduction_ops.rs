@@ -127,7 +127,7 @@ impl ops::Op for ArgMax {
         result
     }
 
-    fn lop(&self, _:&Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, _:&Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         vec![None]
     }
@@ -160,7 +160,7 @@ impl ops::Op for ReduceMin {
         }
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
     {
         let grad_op = ReduceMinGrad {
             axis: self.axis,
@@ -207,7 +207,7 @@ impl ops::Op for ReduceMinGrad {
     }
 
 
-    fn lop(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         vec![None, None, None]
     }
@@ -239,7 +239,7 @@ impl ops::Op for ReduceMax {
         }
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
     {
         let grad_op = ReduceMaxGrad {
             axis: self.axis,
@@ -285,7 +285,7 @@ impl ops::Op for ReduceMaxGrad {
         mask
     }
 
-    fn lop(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         vec![None, None, None]
     }
@@ -323,7 +323,7 @@ impl ops::Op for ReduceMean {
         }
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         let grad_op = ReduceMeanGrad {
             axis: self.axis,
@@ -363,11 +363,11 @@ impl ops::Op for ReduceMeanGrad {
             gx /= reduction_len;
             gx
         } else {
-            panic!("Lop implementation of immediate successor of ReduceMean is wrong")
+            panic!("grad implementation of immediate successor of ReduceMean is wrong")
         }
     }
 
-    fn lop(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         vec![None, None]
     }
@@ -397,7 +397,7 @@ impl ops::Op for ReduceSum {
         }
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         let grad_op = ReduceSumGrad {
             axis: self.axis,
@@ -433,11 +433,11 @@ impl ops::Op for ReduceSumGrad {
         if let Some(gx) = gy.broadcast(x.shape()) {
             gx.to_owned()
         } else {
-            panic!("Lop implementation of immediate successor of ReduceSum is wrong")
+            panic!("grad implementation of immediate successor of ReduceSum is wrong")
         }
     }
 
-    fn lop(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         vec![None, None]
     }

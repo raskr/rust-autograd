@@ -14,7 +14,7 @@ fn clip()
 {
     let ref v = ag::variable(ndarray::arr1(&[1., 2., 3.]));
     let ref z = ag::clip(v, 1.5, 2.5);
-    let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[3])));
+    let ref g = ag::gradients(z, &[v], Some(&&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3, 1e-3);
     assert_eq!(g[0].eval(), ndarray::arr1(&[0., 1., 0.]).into_dyn())
 }
@@ -24,7 +24,7 @@ fn asinh()
 {
     let ref v = ag::variable(ag::init::standard_normal(&[3]));
     let ref z = ag::asinh(v);
-    let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[3])));
+    let ref g = ag::gradients(z, &[v], Some(&&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3, 1e-3);
 }
 
@@ -33,7 +33,7 @@ fn acosh()
 {
     let ref v = ag::variable(ag::init::standard_normal(&[3]));
     let ref z = ag::acosh(v);
-    let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[3])));
+    let ref g = ag::gradients(z, &[v], Some(&&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3, 1e-3);
 }
 
@@ -51,7 +51,7 @@ fn sinh()
 {
     let ref v = ag::variable(ag::init::standard_normal(&[3]));
     let ref z = ag::sinh(v);
-    let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[3])));
+    let ref g = ag::gradients(z, &[v], Some(&&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3, 1e-3);
 }
 
@@ -60,7 +60,7 @@ fn cosh()
 {
     let ref v = ag::variable(ag::init::standard_normal(&[3]));
     let ref z = ag::cosh(v);
-    let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[3])));
+    let ref g = ag::gradients(z, &[v], Some(&&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3, 1e-3);
 }
 
@@ -78,7 +78,7 @@ fn asin()
 {
     let ref v = ag::variable(ag::init::standard_normal(&[3]));
     let ref z = ag::asin(v);
-    let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[3])));
+    let ref g = ag::gradients(z, &[v], Some(&&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3, 1e-2);
 }
 
@@ -87,7 +87,7 @@ fn acos()
 {
     let ref v = ag::variable(ag::init::standard_normal(&[3]));
     let ref z = ag::acos(v);
-    let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[3])));
+    let ref g = ag::gradients(z, &[v], Some(&&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3, 1e-3);
 }
 
@@ -96,7 +96,7 @@ fn atan()
 {
     let ref v = ag::variable(ag::init::standard_normal(&[3]));
     let ref z = ag::atan(v);
-    let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[3])));
+    let ref g = ag::gradients(z, &[v], Some(&&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3, 1e-3);
 }
 
@@ -105,7 +105,7 @@ fn sin()
 {
     let ref v = ag::variable(ag::init::standard_normal(&[3]));
     let ref z = ag::sin(v);
-    let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[3])));
+    let ref g = ag::gradients(z, &[v], Some(&&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3, 1e-3);
 }
 
@@ -114,16 +114,25 @@ fn cos()
 {
     let ref v = ag::variable(ag::init::standard_normal(&[3]));
     let ref z = ag::cos(v);
-    let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[3])));
+    let ref g = ag::gradients(z, &[v], Some(&&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3, 1e-3);
 }
+
+// #[test]
+// fn tan()
+// {
+// let ref v = ag::variable(ag::init::standard_normal(&[3]));
+// let ref z = ag::tan(v);
+// let ref g = ag::gradients(z, &[v], Some(&&init_grad(1., &[3])));
+// ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3, 1e-2);
+// }
 
 #[test]
 fn pow()
 {
     let ref v = ag::variable(ag::init::standard_normal(&[3]));
-    let ref z = ag::pow(v, 1.2);
-    let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[3])));
+    let ref z = ag::pow(v, 0.1);
+    let ref g = ag::gradients(z, &[v], Some(&&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3, 1e-3);
 }
 
@@ -140,7 +149,7 @@ fn exp()
 fn log()
 {
     let ref v = ag::variable(ag::init::standard_normal(&[3]));
-    let ref z = ag::log(v, 0.3);
+    let ref z = ag::log(v, 5.);
     let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3, 1e-2);
 }

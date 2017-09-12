@@ -16,7 +16,7 @@ impl ops::Op for ReLU {
         xs[0].map(|a| a.max(0.))
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         vec![Some(ops::greater(inputs[0], 0.) * gy)]
     }

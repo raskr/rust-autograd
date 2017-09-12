@@ -62,7 +62,7 @@ impl ops::Op for LogSoftmax {
         log_softmax_forward(x, axis)
     }
 
-    fn lop(&self, gy: &Tensor, _: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, _: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
     {
         let sm = ops::exp(output);
         let sum = ops::reduce_sum(gy, 1, true);

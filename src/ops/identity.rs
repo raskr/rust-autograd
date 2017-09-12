@@ -14,7 +14,7 @@ impl ops::Op for Identity {
         xs[0].clone()
     }
 
-    fn lop(&self, gy: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         vec![Some(gy.clone())]
     }

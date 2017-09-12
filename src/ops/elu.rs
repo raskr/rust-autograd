@@ -25,7 +25,7 @@ impl ops::Op for ELU {
         })
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         let gx = ops::apply_op(ELUGrad { alpha: self.alpha }, &[inputs[0], gy]);
         vec![Some(gx)]
@@ -51,7 +51,7 @@ impl ops::Op for ELUGrad {
     }
 
     // TODO: impl
-    fn lop(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         vec![None, None]
     }

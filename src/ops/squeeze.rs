@@ -21,13 +21,15 @@ impl ops::Op for Squeeze {
         let mut adjust = 0;
         for &i in self.axes.iter() {
             let axis = if i == -1 { x.ndim() } else { i as usize };
-            x = x.remove_axis(ndarray::Axis(axis - adjust));
+            let axis = axis - adjust;
+            assert_eq!(1, x.shape()[axis], "Can't squeeze the dim whose length != 1");
+            x = x.remove_axis(ndarray::Axis(axis));
             adjust += 1;
         }
         x.to_owned()
     }
 
-    fn lop(&self, gy: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         vec![Some(ops::expand_dims(gy, self.axes.as_slice()))]
     }

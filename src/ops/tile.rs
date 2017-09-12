@@ -34,7 +34,7 @@ impl ops::Op for Tile {
         ndarray::stack(ndarray::Axis(axis), views.as_slice()).unwrap()
     }
 
-    fn lop(&self, gy: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         vec![Some(ops::reduce_sum(gy, self.axis, true))]
     }

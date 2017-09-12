@@ -31,7 +31,7 @@ impl ops::Op for Slice {
         }
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         let op = SliceGrad { indices: self.indices.clone() };
         vec![Some(ops::apply_op(op, &[inputs[0], gy]))]
@@ -57,7 +57,7 @@ impl ops::Op for SliceGrad {
         gx
     }
 
-    fn lop(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         // is this ok?
         vec![None, None]

@@ -47,7 +47,7 @@ impl ops::Op for Softmax {
         softmax_forward(xs[0], self.axis)
     }
 
-    fn lop(&self, gy: &Tensor, _: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, _: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
     {
         let sum = ops::reduce_sum(&(output * gy), self.axis, true);
         vec![Some((gy - sum) * output)]

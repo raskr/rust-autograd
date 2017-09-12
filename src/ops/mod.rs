@@ -38,16 +38,19 @@ mod expand_dims;
 /// Represents a operation node in a computation graph.
 /// `Tensor` wraps trait-object of this.
 pub trait Op {
-    // Name of this op
+    /// Name of this op
     fn name(&self) -> &str;
 
-    // Returns gradient for each input node by use of output gradient.
-    // (see http://deeplearning.net/software/theano/tutorial/gradients.html)
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>;
+    /// Returns gradient for each input node by use of output gradient.
+    /// # Arguments
+    /// * `gy` - Gradient of output of this op
+    /// * `inputs` - `Tensor` level representation of `compute::xs`
+    /// * `output` - `Tensor` level representation of `compute`'s return value
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>;
 
-    // Actually runs this op.
-    // num of inputs : N
-    // num of outputs: 1
+    /// Actually runs this op.
+    /// num of inputs : N,
+    /// num of outputs: 1
     fn compute(&mut self, xs: &[&NdArray], train: bool) -> NdArray;
 }
 
@@ -259,7 +262,7 @@ pub fn expand_dims(x: &Tensor, axes: &[isize]) -> Tensor
 
 
 #[inline]
-/// Squeezes designated dim.
+/// Squeezes dims.
 pub fn squeeze(x: &Tensor, axes: &[isize]) -> Tensor
 {
     let mut axes = axes.to_vec();
@@ -337,12 +340,13 @@ pub fn reduce_sum(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 }
 
 #[inline]
-/// Returns gradient tensors for each variable.
+/// Returns gradient tensors wrt variables.
 ///
 /// # Arguments
 /// * `objective` - Target of differentiation.
-/// * `variables` - Variable tensors with which differentiate `objective`
-/// * `initial_grad` - If objective is not scalar, this is required.
+/// * `variables` - Variable tensors with which differentiate `objective`.
+/// * `initial_grad` - This is required "if objective is not a scalar". In most cases,
+/// this is initialized with 1s.
 ///
 /// # Returns
 /// Symbolic gradient tensors corresponding to `variables` in the same order as `variables`

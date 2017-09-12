@@ -10,9 +10,9 @@ impl ops::Op for DummyOp {
         &self.name
     }
 
-    fn lop(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
-        panic!("must not be called (DummyOp::lop)")
+        panic!("must not be called (DummyOp::grad)")
     }
 
     fn compute(&mut self, _: &[&::NdArray], _: bool) -> ::NdArray

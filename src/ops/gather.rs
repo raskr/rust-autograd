@@ -47,7 +47,7 @@ impl ops::Op for Gather {
         selected.into_shape(output_shape.as_slice()).unwrap()
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         let grad_op = GatherGrad { axis: self.axis };
 
@@ -125,7 +125,7 @@ impl ::Op for GatherGrad {
         gx
     }
 
-    fn lop(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         vec![None, None, None]
     }

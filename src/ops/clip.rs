@@ -24,7 +24,7 @@ impl ops::Op for Clip {
         xs[0].mapv(move |a| a.min(self.max).max(self.min))
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         let op = ops::apply_op(
             ClipGrad {
@@ -52,7 +52,7 @@ impl ops::Op for ClipGrad {
         ret
     }
 
-    fn lop(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         vec![None, None]
     }

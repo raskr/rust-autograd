@@ -26,7 +26,7 @@ impl ops::Op for SwapAxes {
         ret
     }
 
-    fn lop(&self, gy: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         vec![Some(ops::swap_axes(gy, self.a, self.b))]
     }

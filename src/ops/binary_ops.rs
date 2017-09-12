@@ -47,7 +47,7 @@ impl ops::Op for ElementwiseAdd {
         scalar_tensor_add(a, b)
     }
 
-    fn lop(&self, gy: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         vec![Some(gy.clone()), Some(gy.clone())]
     }
@@ -74,7 +74,7 @@ impl ops::Op for ElementwiseSub {
         }
     }
 
-    fn lop(&self, gy: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         vec![Some(gy.clone()), Some(-1 * gy)]
     }
@@ -93,7 +93,7 @@ impl ops::Op for ElementwiseMul {
         scalar_tensor_mul(a, b)
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         let x0 = inputs[0];
         let x1 = inputs[1];
@@ -120,7 +120,7 @@ impl ops::Op for ElementwiseDiv {
         }
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         let x0 = inputs[0];
         let x1 = inputs[1];

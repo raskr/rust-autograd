@@ -37,7 +37,7 @@ impl ops::Op for Pow {
         x0.map(move |a| a.powf(self.a))
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         let x = inputs[0];
         let gx = gy * self.a * ops::pow(x, self.a - 1.);
@@ -57,7 +57,7 @@ impl ops::Op for Sqrt {
         x0.map(|a| a.sqrt())
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         let x = inputs[0];
         let ret = 0.5 * ops::pow(x, -0.5);
@@ -76,7 +76,7 @@ impl ops::Op for Log {
         xs[0].map(move |a| a.log(self.a))
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         vec![Some(gy / inputs[0])]
     }
@@ -93,7 +93,7 @@ impl ops::Op for Exp {
         xs[0].map(|a| a.exp())
     }
 
-    fn lop(&self, gy: &Tensor, _: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, _: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
     {
         vec![Some(output * gy)]
     }
@@ -105,7 +105,7 @@ impl ops::Op for Atanh {
         "Atanh"
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         let x = inputs[0];
         let y = 1 / (1 - x * x);
@@ -124,7 +124,7 @@ impl ops::Op for Acosh {
         "Acosh"
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         let x = inputs[0];
         let y = -1 / ops::sqrt(&(x * x - 1));
@@ -143,7 +143,7 @@ impl ops::Op for Asinh {
         "Asinh"
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         let x = inputs[0];
         let y = 1 / ops::sqrt(&(x * x + 1));
@@ -167,7 +167,7 @@ impl ops::Op for Tanh {
         xs[0].map(|a| a.tanh())
     }
 
-    fn lop(&self, gy: &Tensor, _: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, _: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
     {
         vec![Some((1. - output * output) * gy)]
     }
@@ -179,7 +179,7 @@ impl ops::Op for Cosh {
         "Cosh"
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         vec![Some(ops::sinh(inputs[0]) * gy)]
     }
@@ -196,7 +196,7 @@ impl ops::Op for Sinh {
         "Sinh"
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         vec![Some(ops::cosh(inputs[0]) * gy)]
     }
@@ -213,7 +213,7 @@ impl ops::Op for Atan {
         "Atan"
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         let x = inputs[0];
         let y = 1 / (1 + x * x);
@@ -232,7 +232,7 @@ impl ops::Op for Acos {
         "Acos"
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         let x = inputs[0];
         let y = -1 / ops::sqrt(&(1 - x * x));
@@ -251,7 +251,7 @@ impl ops::Op for Asin {
         "Asin"
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         let x = inputs[0];
         let y = 1 / ops::sqrt(&(1 - x * x));
@@ -270,7 +270,7 @@ impl ops::Op for Sin {
         "Sin"
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         vec![Some(ops::cos(inputs[0]) * gy)]
     }
@@ -287,7 +287,7 @@ impl ops::Op for Cos {
         "Cos"
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         vec![Some(-1 * ops::sin(inputs[0]) * gy)]
     }
@@ -304,7 +304,7 @@ impl ops::Op for Tan {
         "Tan"
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         let ref cos = ops::cos(inputs[0]);
         vec![Some(gy / (cos * cos))]

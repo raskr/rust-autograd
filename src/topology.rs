@@ -103,7 +103,7 @@ pub fn symbolic_gradients(
     let mut heap = BinaryHeap::new();
     heap.push(objective.clone());
     grads.insert(objective.clone(), initial_grad);
-    let mut lop_done = HashSet::<Tensor>::new();
+    let mut grad_done = HashSet::<Tensor>::new();
 
     // BackProp implementation
     while let Some(target) = heap.pop() {
@@ -112,11 +112,11 @@ pub fn symbolic_gradients(
         // Vec<Tensor> to Vec<&Tensor>
         let xs: Vec<&Tensor> = borrowed_target.inputs.iter().map(|a| a).collect();
 
-        // time to call lop
+        // time to call grad
         let gxs = {
             // Safe unwrapping is guaranteed by topological ordering
             let gy = grads.get(&target).unwrap();
-            borrowed_target.op.lop(gy, xs.as_slice(), &target)
+            borrowed_target.op.grad(gy, xs.as_slice(), &target)
         };
 
         debug_assert_eq!(xs.len(), gxs.len(), "Bad grad from ({})", target);
@@ -134,8 +134,8 @@ pub fn symbolic_gradients(
                     grads.insert(x.clone(), gx);
                 }
                 // update heap
-                if !x.is_source() && !lop_done.contains(x) {
-                    lop_done.insert(x.clone());
+                if !x.is_source() && !grad_done.contains(x) {
+                    grad_done.insert(x.clone());
                     heap.push(x.clone());
                 }
             }

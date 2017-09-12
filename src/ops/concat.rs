@@ -32,7 +32,7 @@ impl ops::Op for Concat {
         }
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         // [x1, x2, x3, ..., gy]
         let mut merged_inputs: Vec<&Tensor> = inputs.to_vec();
@@ -85,7 +85,7 @@ impl ops::Op for ConcatGrad {
         gy.slice(&*indices).to_owned()
     }
 
-    fn lop(&self, _: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, _: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         (0..inputs.len()).map(|_| None).collect::<Vec<_>>()
     }

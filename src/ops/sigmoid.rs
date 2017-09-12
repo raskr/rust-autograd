@@ -22,7 +22,7 @@ impl ops::Op for Sigmoid {
         ret
     }
 
-    fn lop(&self, gy: &Tensor, _: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, _: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
     {
         vec![Some((output * (1 - output)) * gy)]
     }

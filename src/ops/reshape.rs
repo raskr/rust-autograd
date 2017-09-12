@@ -44,7 +44,7 @@ impl ops::Op for Reshape {
         }
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         let op = ReshapeGrad { target_shape: self.target_shape.clone() };
         vec![Some(ops::apply_op(op, &[inputs[0], gy]))]
@@ -66,7 +66,7 @@ impl ops::Op for ReshapeGrad {
         gy.clone().into_shape(orig_shape).unwrap()
     }
 
-    fn lop(&self, _: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, _: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         let gy = inputs[1];
         let reshape = Reshape { target_shape: self.target_shape.clone() };

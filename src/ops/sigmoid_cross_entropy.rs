@@ -26,7 +26,7 @@ impl ops::Op for SigmoidCrossEntropy {
         x.map(move |a| ((-a.abs()).exp() + 1.).log(e) + max_fn(0., *a)) - t * x
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         let x = inputs[0];
         let t = inputs[1];

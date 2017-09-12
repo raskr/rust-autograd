@@ -40,7 +40,7 @@ impl ops::Op for Equals {
         result
     }
 
-    fn lop(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         vec![None]
     }
@@ -57,7 +57,7 @@ impl ops::Op for Greater {
         xs[0].mapv(move |a| ((a > self.a) as i32) as f32)
     }
 
-    fn lop(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         vec![None]
     }
@@ -74,7 +74,7 @@ impl ops::Op for Lesser {
         xs[0].mapv(move |a| ((a < self.a) as i32) as f32)
     }
 
-    fn lop(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         vec![None]
     }
@@ -91,7 +91,7 @@ impl ops::Op for GreaterEqual {
         xs[0].mapv(move |a| ((a >= self.a) as i32) as f32)
     }
 
-    fn lop(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         vec![None]
     }
@@ -108,7 +108,7 @@ impl ops::Op for LesserEqual {
         xs[0].mapv(move |a| ((a <= self.a) as i32) as f32)
     }
 
-    fn lop(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         vec![None]
     }

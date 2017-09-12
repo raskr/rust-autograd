@@ -38,7 +38,7 @@ impl ops::Op for SparseSoftmaxCrossEntropy {
         ret
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         let x = inputs[0];
         let t = inputs[1];
@@ -80,7 +80,7 @@ impl ops::Op for SparseSoftmaxCrossEntropyGrad {
 
     }
 
-    fn lop(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         vec![None, None]
     }

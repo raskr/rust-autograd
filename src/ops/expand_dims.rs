@@ -25,7 +25,7 @@ impl ops::Op for ExpandDims {
         ret.into_shape(output_shape).unwrap()
     }
 
-    fn lop(&self, gy: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         vec![Some(ops::squeeze(gy, self.axes.as_slice()))]
     }

@@ -28,7 +28,7 @@ impl ops::Op for SoftmaxCrossEntropy {
         (t * &log_x).sum(ndarray::Axis(1)) * -1. // summing class dim.
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
     {
         let ref x = ops::softmax(inputs[0], -1);
         let t = inputs[1];

@@ -4,11 +4,11 @@ version = "0.1.0"
 authors = ["perrier1034 <janne.dc.ib.sa@gmail.com>"]
 
 repository = "https://github.com/perrier1034/rust-autograd"
-keywords = ["automatic-differentiation", "machine-learning", "neural-networks"]
+keywords = ["scientific-computations, automatic-differentiation", "machine-learning", "neural-networks"]
 license-file = "LICENSE"
 readme = "README.md"
-description = "A toy library to run the computation graphs mimicking TensorFlow and Theano"
-documentation = "http://perrier1034.github.io/rust-autograd/"
+description = "A toy library to run computation graphs mimicking TensorFlow and Theano"
+# documentation = "http://perrier1034.github.io/rust-autograd/"
 
 [lib]
 name = "autograd"

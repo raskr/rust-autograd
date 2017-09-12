@@ -24,7 +24,7 @@ impl ops::Op for MeanSquaredError {
         diff
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         let x0 = inputs[0];
         let x1 = inputs[1];
