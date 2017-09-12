@@ -1,8 +1,8 @@
 extern crate ndarray;
 
-use tensor::Tensor;
 use ndarray_ext::NdArray;
 use ops;
+use tensor::Tensor;
 
 
 pub struct Gather {
@@ -14,21 +14,32 @@ pub struct GatherGrad {
 }
 
 impl ops::Op for Gather {
-    fn name(&self) -> &str {
+    fn name(&self) -> &str
+    {
         "Gather"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray {
+    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    {
         let indices = xs[0].map(|a| *a as usize);
         let param = &xs[1];
         let param_shape = param.shape();
-        let axis = if self.axis == -1 { param.ndim() } else { self.axis as usize };
+        let axis = if self.axis == -1 {
+            param.ndim()
+        } else {
+            self.axis as usize
+        };
 
         let output_shape: Vec<usize> = {
             let former: &[usize] = &param_shape[..axis];
-            let latter: &[usize] = &param_shape[axis+1..];
+            let latter: &[usize] = &param_shape[axis + 1..];
             // doing former + indices.shape() + latter
-            former.into_iter().chain(indices.shape()).chain(latter).cloned().collect()
+            former
+                .into_iter()
+                .chain(indices.shape())
+                .chain(latter)
+                .cloned()
+                .collect()
         };
 
         let flat_indices = indices.into_raw_vec();
@@ -36,33 +47,54 @@ impl ops::Op for Gather {
         selected.into_shape(output_shape.as_slice()).unwrap()
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
-        let grad_op = GatherGrad {
-            axis: self.axis,
-        };
+    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
+        let grad_op = GatherGrad { axis: self.axis };
 
-        vec![None, Some(ops::apply_op(grad_op, &[inputs[0], inputs[1], gy]))]
+        vec![
+            None,
+            Some(ops::apply_op(grad_op, &[inputs[0], inputs[1], gy])),
+        ]
     }
 }
 
+#[test]
+fn gather()
+{
+    let ref param = ::constant(::init::zeros(&[5, 4, 8, 2]));
+    let ref indices = ::constant(ndarray::arr2(&[[5., 4., 3.], [2., 1., 0.]]));
+    let y = ::gather(param, indices, 2);
+    assert_eq!(y.eval().shape(), &[5, 4, 2, 3, 2])
+}
+
 impl ::Op for GatherGrad {
-    fn name(&self) -> &str {
+    fn name(&self) -> &str
+    {
         "GatherGrad"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray {
+    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    {
         let indices: &NdArray = xs[0];
         let param: &NdArray = xs[1];
         let param_shape = param.shape();
         let gy: &NdArray = xs[2];
-        let axis = if self.axis == -1 { param.ndim() } else { self.axis as usize };
+        let axis = if self.axis == -1 {
+            param.ndim()
+        } else {
+            self.axis as usize
+        };
 
         // get read-only view of gy and reshape it
         let gy = {
             let former = &param_shape[..axis];
-            let latter = &param_shape[axis+1..];
-            let shape: Vec<usize> =
-                former.into_iter().chain(&[indices.len()]).chain(latter).cloned().collect();
+            let latter = &param_shape[axis + 1..];
+            let shape: Vec<usize> = former
+                .into_iter()
+                .chain(&[indices.len()])
+                .chain(latter)
+                .cloned()
+                .collect();
             gy.view().into_shape(shape).unwrap()
         };
 
@@ -71,14 +103,17 @@ impl ::Op for GatherGrad {
         for (gy_sub, &i) in gy.axis_iter(ndarray::Axis(axis)).zip(indices) {
             let i = i as isize;
             // get gx's sub view
-            let mut gx_sliced = gx.slice_mut(
-                (0..param.ndim()).map(|dim| {
-                    if dim == axis {
-                        ndarray::Si(i, Some(i+1), 1) // squeezed later
-                    } else {
-                        ndarray::Si(0, None, 1)
-                    }
-                }).collect::<Vec<_>>().as_slice()
+            let gx_sliced = gx.slice_mut(
+                (0..param.ndim())
+                    .map(|dim| {
+                        if dim == axis {
+                            ndarray::Si(i, Some(i + 1), 1) // squeezed later
+                        } else {
+                            ndarray::Si(0, None, 1)
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .as_slice(),
             );
 
             // squeeze
@@ -90,7 +125,8 @@ impl ::Op for GatherGrad {
         gx
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
+    fn lop(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
         vec![None, None, None]
     }
 }

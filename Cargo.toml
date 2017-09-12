@@ -10,6 +10,13 @@ readme = "README.md"
 description = "A toy library to run the computation graphs mimicking TensorFlow and Theano"
 documentation = "http://perrier1034.github.io/rust-autograd/"
 
+[lib]
+name = "autograd"
+path = "src/lib.rs"
+
+[[bin]]
+name = "mlp_mnist"
+path = "examples/mlp_mnist.rs"
 
 [dependencies]
 rand = "0.3.15"

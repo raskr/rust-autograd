@@ -1,18 +1,20 @@
 extern crate ndarray;
 
-use tensor::Tensor;
 use ndarray_ext::NdArray;
 use ops;
+use tensor::Tensor;
 
 
 pub struct SoftmaxCrossEntropy;
 
 impl ops::Op for SoftmaxCrossEntropy {
-    fn name(&self) -> &str {
+    fn name(&self) -> &str
+    {
         "SoftmaxCrossEntropy"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], train: bool) -> NdArray {
+    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    {
         // `t` must be one-hot unlike KL-divergence
         let x = xs[0];
         let t = xs[1];
@@ -26,7 +28,8 @@ impl ops::Op for SoftmaxCrossEntropy {
         (t * &log_x).sum(ndarray::Axis(1)) * -1. // summing class dim.
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
+    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
+    {
         let ref x = ops::softmax(inputs[0], -1);
         let t = inputs[1];
 

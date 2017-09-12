@@ -21,6 +21,7 @@ pub mod initializers;
 pub mod ndarray_ext;
 
 // == re-exposures ==
+
 pub use tensor::Tensor;
 
 pub use ops::*;

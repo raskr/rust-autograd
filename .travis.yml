@@ -2,17 +2,13 @@ language: rust
 
 rust:
   - "1.18.0"
+
 sudo: false
+
 cache: cargo
+
 install:
+  - cargo build
 
 script:
-  - cargo build
-  - cargo test --test test_binary_op_eval
-  - cargo test --test test_binary_op_grad
-  - cargo test --test test_graph_eval
-  - cargo test --test test_graph_source
-  - cargo test --test test_initializer
-  - cargo test --test test_tensor_ops_eval
-  - cargo test --test test_tensor_ops_grad
-  - cargo test --test test_topology
+  - cargo test

@@ -1,8 +1,8 @@
 extern crate ndarray;
 
-use tensor::Tensor;
 use ndarray_ext::NdArray;
 use ops;
+use tensor::Tensor;
 
 
 pub struct Tile {
@@ -11,8 +11,10 @@ pub struct Tile {
 }
 
 impl ops::Op for Tile {
-
-    fn name(&self) -> &str { "Tile" }
+    fn name(&self) -> &str
+    {
+        "Tile"
+    }
 
     fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
     {
@@ -25,18 +27,17 @@ impl ops::Op for Tile {
         };
 
         let mut views = vec![];
-        for i in 0..self.num {
+        for _ in 0..self.num {
             views.push(x.view());
         }
         // TODO: remove unwrap
         ndarray::stack(ndarray::Axis(axis), views.as_slice()).unwrap()
     }
 
-    fn lop(&self, gy: &Tensor,
-           inputs: &[&Tensor],
-           output: &Tensor) -> Vec<Option<Tensor>>
+    fn lop(&self, gy: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         vec![Some(ops::reduce_sum(gy, self.axis, true))]
     }
-
 }
+
+

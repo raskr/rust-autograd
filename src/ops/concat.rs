@@ -1,7 +1,7 @@
 extern crate ndarray;
 
-use tensor::Tensor;
 use ops;
+use tensor::Tensor;
 
 
 pub struct Concat {
@@ -14,11 +14,13 @@ pub struct ConcatGrad {
 }
 
 impl ops::Op for Concat {
-    fn name(&self) -> &str {
+    fn name(&self) -> &str
+    {
         "Concat"
     }
 
-    fn compute(&mut self, xs: &[&::NdArray], _: bool) -> ::NdArray {
+    fn compute(&mut self, xs: &[&::NdArray], _: bool) -> ::NdArray
+    {
         let mut views = vec![];
         for x in xs.iter() {
             views.push(x.view());
@@ -30,7 +32,8 @@ impl ops::Op for Concat {
         }
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
+    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
         // [x1, x2, x3, ..., gy]
         let mut merged_inputs: Vec<&Tensor> = inputs.to_vec();
         merged_inputs.insert(0, gy);
@@ -50,11 +53,13 @@ impl ops::Op for Concat {
 }
 
 impl ops::Op for ConcatGrad {
-    fn name(&self) -> &str {
+    fn name(&self) -> &str
+    {
         "ConcatGrad"
     }
 
-    fn compute(&mut self, xs: &[&::NdArray], _: bool) -> ::NdArray {
+    fn compute(&mut self, xs: &[&::NdArray], _: bool) -> ::NdArray
+    {
         let gy = xs[0];
         let xs = xs[1..].to_vec();
 
@@ -80,7 +85,8 @@ impl ops::Op for ConcatGrad {
         gy.slice(&*indices).to_owned()
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
+    fn lop(&self, _: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
         (0..inputs.len()).map(|_| None).collect::<Vec<_>>()
     }
 }

@@ -3,7 +3,8 @@ extern crate ndarray;
 
 
 #[test]
-fn scalar_add() {
+fn scalar_add()
+{
     // graph def
     let ones = ag::constant(ndarray::ArrayD::<f32>::from_elem(ndarray::IxDyn(&[3]), 1.));
     let z: ag::Tensor = 3. + ones + 2;
@@ -14,7 +15,8 @@ fn scalar_add() {
 }
 
 #[test]
-fn scalar_sub() {
+fn scalar_sub()
+{
     // graph def
     let ones = ag::constant(ndarray::ArrayD::<f32>::from_elem(ndarray::IxDyn(&[3]), 1.));
     let z: ag::Tensor = 3. - ones - 2;
@@ -25,7 +27,8 @@ fn scalar_sub() {
 }
 
 #[test]
-fn scalar_mul() {
+fn scalar_mul()
+{
     // graph def
     let ones = ag::constant(ndarray::ArrayD::<f32>::from_elem(ndarray::IxDyn(&[3]), 1.));
     let z: ag::Tensor = 3. * ones * 2;
@@ -36,7 +39,8 @@ fn scalar_mul() {
 }
 
 #[test]
-fn scalar_div() {
+fn scalar_div()
+{
     // graph def
     let ones = ag::constant(ndarray::ArrayD::<f32>::from_elem(ndarray::IxDyn(&[3]), 1.));
     let z: ag::Tensor = 3. / &ones / 2;
@@ -47,7 +51,8 @@ fn scalar_div() {
 }
 
 #[test]
-fn add() {
+fn add()
+{
     // graph def
     let zeros = ag::constant(ndarray::ArrayD::<f32>::zeros(ndarray::IxDyn(&[3])));
     let ones = ag::constant(ndarray::ArrayD::<f32>::from_elem(ndarray::IxDyn(&[3]), 1.));
@@ -59,7 +64,8 @@ fn add() {
 }
 
 #[test]
-fn sub() {
+fn sub()
+{
     // graph def
     let zeros = ag::constant(ndarray::ArrayD::<f32>::zeros(ndarray::IxDyn(&[3])));
     let ones = ag::constant(ndarray::ArrayD::<f32>::from_elem(ndarray::IxDyn(&[3]), 1.));
@@ -71,7 +77,8 @@ fn sub() {
 }
 
 #[test]
-fn mul() {
+fn mul()
+{
     // graph def
     let zeros = ag::constant(ndarray::ArrayD::<f32>::zeros(ndarray::IxDyn(&[3])));
     let ones = ag::constant(ndarray::ArrayD::<f32>::from_elem(ndarray::IxDyn(&[3]), 1.));
@@ -83,7 +90,8 @@ fn mul() {
 }
 
 #[test]
-fn div() {
+fn div()
+{
     // graph def
     let zeros = ag::constant(ndarray::ArrayD::<f32>::zeros(ndarray::IxDyn(&[3])));
     let ones = ag::constant(ndarray::ArrayD::<f32>::from_elem(ndarray::IxDyn(&[3]), 1.));

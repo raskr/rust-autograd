@@ -3,13 +3,15 @@ extern crate ndarray;
 
 
 // initial gradient (ones)
-fn init_grad(val: f32, objective_shape: &[usize]) -> ag::Tensor {
+fn init_grad(val: f32, objective_shape: &[usize]) -> ag::Tensor
+{
     let arr = ndarray::ArrayD::<f32>::from_elem(ndarray::IxDyn(objective_shape), val);
     ag::constant(arr)
 }
 
 #[test]
-fn contributed_to_grads() {
+fn contributed_to_grads()
+{
     // dummy graph
     let ref t = ag::constant(ag::initializers::standard_normal(&[2, 3]));
     let ref v = ag::variable(ag::initializers::standard_normal(&[2, 3]));
@@ -22,7 +24,8 @@ fn contributed_to_grads() {
 }
 
 #[test]
-fn topological_ordering() {
+fn topological_ordering()
+{
     let ref a = ag::constant(ag::init::standard_normal(&[4, 2]));
     let ref v = ag::variable(ag::init::standard_normal(&[2, 3]));
     let ref b = ag::variable(ag::init::zeros(&[4, 3]));
@@ -34,7 +37,8 @@ fn topological_ordering() {
 }
 
 #[test]
-fn topological_ordering_on_reverse_mode() {
+fn topological_ordering_on_reverse_mode()
+{
     let ref x = ag::constant(ag::init::standard_normal(&[4, 2]));
     let ref w = ag::variable(ag::init::standard_normal(&[2, 3]));
     let ref b = ag::variable(ag::init::zeros(&[4, 3]));
@@ -47,12 +51,17 @@ fn topological_ordering_on_reverse_mode() {
     // sort by rank
     collected.sort_by_key(|t| t.borrow().rank);
     // tensor to name
-    let sorted_names = collected.into_iter().map(|t|t.borrow().op.name().to_string())
+    let sorted_names = collected
+        .into_iter()
+        .map(|t| t.borrow().op.name().to_string())
         .collect::<Vec<String>>();
     // compare
-    let boolean = sorted_names == vec!["Constant".to_string(), // one or x
-                                       "Constant".to_string(), // one or x
-                                       "SwapAxes".to_string(), // transpose for x
-                                       "MatMul".to_string()];  // MatMulGrad
+    let boolean = sorted_names ==
+        vec![
+            "Constant".to_string(), // one or x
+            "Constant".to_string(), // one or x
+            "SwapAxes".to_string(), // transpose for x
+            "MatMul".to_string(),
+        ]; // MatMulGrad
     assert!(boolean);
 }

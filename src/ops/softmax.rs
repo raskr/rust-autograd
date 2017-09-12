@@ -1,10 +1,9 @@
 extern crate ndarray;
 
-use tensor::Tensor;
 use ndarray_ext::NdArray;
-use std::mem;
-use std::f32;
 use ops;
+use std::f32;
+use tensor::Tensor;
 
 
 pub struct Softmax {
@@ -12,7 +11,8 @@ pub struct Softmax {
 }
 
 #[inline]
-pub fn softmax_forward(x: &NdArray, axis_: isize) -> NdArray {
+pub fn softmax_forward(x: &NdArray, axis_: isize) -> NdArray
+{
     let axis = if axis_ >= 0 {
         axis_ as usize
     } else {
@@ -37,15 +37,18 @@ pub fn softmax_forward(x: &NdArray, axis_: isize) -> NdArray {
 }
 
 impl ops::Op for Softmax {
-    fn name(&self) -> &str {
+    fn name(&self) -> &str
+    {
         "Softmax"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], train: bool) -> NdArray {
+    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    {
         softmax_forward(xs[0], self.axis)
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
+    fn lop(&self, gy: &Tensor, _: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
+    {
         let sum = ops::reduce_sum(&(output * gy), self.axis, true);
         vec![Some((gy - sum) * output)]
     }

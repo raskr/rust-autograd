@@ -1,8 +1,8 @@
 extern crate ndarray;
 extern crate autograd as ag;
 
-use std::time::{Duration, Instant};
 use std::default::Default;
+use std::time::{Duration, Instant};
 
 
 // softmax regression with Adam optimizer for mnist.
@@ -23,8 +23,10 @@ macro_rules! eval_with_time {
   };
 }
 
-fn main() {
-    let ((x_train, y_train), (x_test, y_test)) = mnist::load();
+#[cfg(not(test))]
+fn main()
+{
+    let ((x_train, y_train), (x_test, y_test)) = dataset::load();
 
     // -- graph def --
     let ref x = ag::placeholder(&[-1, 28 * 28]);
@@ -46,7 +48,7 @@ fn main() {
     for epoch in 0..5 {
         let perm = ag::init::permutation(num_samples).to_vec();
         for i in 0..num_batches {
-            let indices = perm[i..i+batch_size].to_vec();
+            let indices = perm[i..i + batch_size].to_vec();
             let x_batch = x_train.select(ndarray::Axis(0), indices.as_slice());
             let y_batch = y_train.select(ndarray::Axis(0), indices.as_slice());
             let feed_dict = ag::Input::new().add(x, x_batch).add(y, y_batch);
@@ -60,22 +62,22 @@ fn main() {
     println!("test accuracy: {}", accuracy.eval_with_input(feed_dict));
 }
 
-pub mod mnist {
+pub mod dataset {
     extern crate ndarray;
-    use std::mem;
-    use std::io;
-    use std::collections::hash_map::HashMap;
-    use std::process;
     use std::fs::File;
-    use std::path::Path;
+    use std::io;
     use std::io::Read;
+    use std::mem;
+    use std::path::Path;
+    use std::process;
 
     type NdArray = ndarray::Array<f32, ndarray::IxDyn>;
 
     /// load mnist dataset as "ndarray" objects.
     ///
     /// labels are sparse (vertical vector).
-    pub fn load() -> ((NdArray, NdArray), (NdArray, NdArray)) {
+    pub fn load() -> ((NdArray, NdArray), (NdArray, NdArray))
+    {
         // load dataset as `Vec`s
         let (train_x, num_image_train): (Vec<f32>, usize) =
             load_images("data/mnist/train-images-idx3-ubyte");
@@ -95,9 +97,11 @@ pub mod mnist {
         ((x_train, y_train), (x_test, y_test))
     }
 
-    fn load_images<P: AsRef<Path>>(path: P) -> (Vec<f32>, usize) {
+    fn load_images<P: AsRef<Path>>(path: P) -> (Vec<f32>, usize)
+    {
         let ref mut buf_reader = io::BufReader::new(File::open(path).expect(
-            "Please run ./download_mnist.sh beforehand"));
+            "Please run ./download_mnist.sh beforehand",
+        ));
         let magic = u32::from_be(read_u32(buf_reader));
         if magic != 2051 {
             panic!("Invalid magic number. expected 2051, got {}", magic)
@@ -114,7 +118,8 @@ pub mod mnist {
         (ret, num_image)
     }
 
-    fn load_labels<P: AsRef<Path>>(path: P) -> (Vec<f32>, usize) {
+    fn load_labels<P: AsRef<Path>>(path: P) -> (Vec<f32>, usize)
+    {
         let ref mut buf_reader = io::BufReader::new(File::open(path).unwrap());
         let magic = u32::from_be(read_u32(buf_reader));
         if magic != 2049 {
@@ -128,7 +133,8 @@ pub mod mnist {
         (ret, num_label)
     }
 
-    fn read_u32<T: Read>(reader: &mut T) -> u32 {
+    fn read_u32<T: Read>(reader: &mut T) -> u32
+    {
         let mut buf: [u8; 4] = [0, 0, 0, 0];
         reader.read_exact(&mut buf);
         unsafe { mem::transmute(buf) }

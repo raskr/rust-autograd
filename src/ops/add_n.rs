@@ -1,17 +1,19 @@
-use std::mem;
-use tensor::{Tensor, RawTensor};
-use ops;
+
 use ndarray_ext::NdArray;
+use ops;
+use tensor::Tensor;
 
 
 pub struct AddN;
 
 impl ops::Op for AddN {
-    fn name(&self) -> &str {
+    fn name(&self) -> &str
+    {
         "AddN"
     }
 
-    fn compute(&mut self, xs: &[&::NdArray], train: bool) -> NdArray {
+    fn compute(&mut self, xs: &[&::NdArray], _: bool) -> NdArray
+    {
         let mut acc = NdArray::zeros(xs[0].shape());
         for &x in xs.iter() {
             acc += x;
@@ -19,7 +21,11 @@ impl ops::Op for AddN {
         acc
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
-        inputs.iter().map(|_| Some((*gy).clone())).collect::<Vec<Option<Tensor>>>()
+    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
+        inputs
+            .iter()
+            .map(|_| Some((*gy).clone()))
+            .collect::<Vec<Option<Tensor>>>()
     }
 }

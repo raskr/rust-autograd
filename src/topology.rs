@@ -1,19 +1,18 @@
 extern crate ndarray;
 
-use std::mem;
+use ndarray_ext::NdArray;
+use std::collections::binary_heap::BinaryHeap;
 use std::collections::hash_map::HashMap;
 use std::collections::hash_set::HashSet;
-use std::collections::binary_heap::BinaryHeap;
-use tensor::{Tensor, Input};
-use ndarray_ext::NdArray;
-use ops;
+use tensor::Tensor;
 
 
 
 /// Performs actual graph traversal and its evaluation
-// TODO: loop-based rather than recursion
+// TODO: loop-based rather than recursion (this would be difficult)
 #[inline]
-pub fn perform_eval(target: &Tensor, memo: &mut HashMap<Tensor, NdArray>, train: bool) {
+pub fn perform_eval(target: &Tensor, memo: &mut HashMap<Tensor, NdArray>, train: bool)
+{
     if memo.contains_key(target) {
         return;
     }
@@ -22,10 +21,13 @@ pub fn perform_eval(target: &Tensor, memo: &mut HashMap<Tensor, NdArray>, train:
         let mut xs = vec![];
         {
             let ref inputs = target.borrow().inputs;
+            // integrating loops below is impossible because of
+            // "memo is already mutably borrowed"
             for input in inputs.iter() {
                 perform_eval(input, memo, train);
             }
             for input in inputs.iter() {
+                // unwrap is safe
                 xs.push(memo.get(input).unwrap());
             }
         }
@@ -41,26 +43,28 @@ pub fn perform_eval(target: &Tensor, memo: &mut HashMap<Tensor, NdArray>, train:
 #[inline]
 // make mapping of {node => the node contributed to gradient or not}
 // TODO: loop-based rather than recursion
-pub fn contributed_to_grads(objective: &Tensor, variables: &[&Tensor]) -> HashMap<Tensor, bool> {
-    fn rec(target: &Tensor, vars: &[&Tensor], memo: &mut HashMap<Tensor, bool>) {
+pub fn contributed_to_grads(objective: &Tensor, variables: &[&Tensor]) -> HashMap<Tensor, bool>
+{
+    fn rec(target: &Tensor, vars: &[&Tensor], memo: &mut HashMap<Tensor, bool>)
+    {
         if memo.contains_key(target) {
             return;
         }
 
-        let mut contributed = false;
+        let mut contrib = false;
 
         if vars.contains(&target) {
-            contributed = true;
+            contrib = true;
         } else {
             for input in target.borrow().inputs.iter() {
                 // recurse
                 rec(input, vars, memo);
                 // unwrap is always safe
-                contributed |= *memo.get(input).unwrap();
+                contrib |= *memo.get(input).unwrap();
             }
         }
 
-        memo.insert(target.clone(), contributed);
+        memo.insert(target.clone(), contrib);
     }
 
     let mut memo = HashMap::new();
@@ -82,11 +86,11 @@ pub fn symbolic_gradients(
     objective: &Tensor,
     variables: &[&Tensor],
     initial_grad: Option<&Tensor>
-) -> Vec<Tensor> {
-
-    let initial_grad = initial_grad.map(|a| a.clone()).unwrap_or_else(||
+) -> Vec<Tensor>
+{
+    let initial_grad = initial_grad.map(|a| a.clone()).unwrap_or_else(|| {
         ::graph_sources::scalar(1.)
-    );
+    });
 
     // Mapping of {y => gy}
     let mut grads = HashMap::new();
@@ -94,7 +98,7 @@ pub fn symbolic_gradients(
     // Mapping of {node => must visit or not (boolean)}
     let contrib = contributed_to_grads(objective, variables);
 
-    // Prepare the heap with tensor's rank numbers for reversed
+    // Prepare a heap with tensor's rank numbers for reversed
     // topological sort.
     let mut heap = BinaryHeap::new();
     heap.push(objective.clone());
@@ -110,7 +114,7 @@ pub fn symbolic_gradients(
 
         // time to call lop
         let gxs = {
-            // Safe unwrap is guaranteed by topological ordering
+            // Safe unwrapping is guaranteed by topological ordering
             let gy = grads.get(&target).unwrap();
             borrowed_target.op.lop(gy, xs.as_slice(), &target)
         };
@@ -119,11 +123,11 @@ pub fn symbolic_gradients(
 
         // cuts the backward path if gx is None.
         for (x, maybe_gx) in xs.into_iter().zip(gxs) {
+            if !contrib.contains_key(x) {
+                continue;
+            }
             if let Some(gx) = maybe_gx {
-                if !contrib.contains_key(x) {
-                    continue
-                }
-                // memo gradient
+                // memo gx
                 if let Some(g) = grads.remove(x) {
                     grads.insert(x.clone(), g + &gx);
                 } else {
@@ -138,19 +142,21 @@ pub fn symbolic_gradients(
         }
     }
 
-    // TODO: returning appropriate error
-    variables.iter()
-       .map(|v|
-           grads.remove(v).expect("Input variable(s) didn't contributed to gradient computation")
-       )
-       .collect::<Vec<Tensor>>()
+    variables
+        .iter()
+        .map(|v| {
+            grads.remove(v).expect(
+                "Input variable(s) didn't contributed to gradient computation",
+            )
+        })
+        .collect::<Vec<Tensor>>()
 }
 
 
-pub fn collect_nodes_from(end_point: &Tensor) -> HashSet<Tensor> {
+// This is used for tests for now
+pub fn collect_nodes_from(end_point: &Tensor) -> HashSet<Tensor>
+{
     let mut collected = HashSet::new();
-    end_point.visit_once(&mut |arg| {
-        collected.insert(arg.clone());
-    });
+    end_point.visit_once(&mut |arg| { collected.insert(arg.clone()); });
     collected
 }

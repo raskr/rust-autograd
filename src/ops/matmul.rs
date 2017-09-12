@@ -1,21 +1,23 @@
 extern crate ndarray;
 
+use ndarray_ext;
+use ndarray_ext::NdArray;
+use ops;
 use std::mem;
 use tensor::Tensor;
-use ndarray_ext::NdArray;
-use ndarray_ext;
-use ops;
 
 
 pub struct MatMul;
 
 impl ops::Op for MatMul {
-    fn name(&self) -> &str {
+    fn name(&self) -> &str
+    {
         "MatMul"
     }
 
     #[allow(mutable_transmutes)]
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray {
+    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    {
         assert_eq!(xs[0].ndim(), 2);
         assert_eq!(xs[1].ndim(), 2);
         let (mut_a, mut_b) = unsafe {
@@ -33,7 +35,8 @@ impl ops::Op for MatMul {
         y
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
+    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
         let ga = ops::matmul(gy, &ops::swap_axes(inputs[1], 0, 1));
         let gb = ops::matmul(&ops::swap_axes(inputs[0], 0, 1), gy);
         vec![Some(ga), Some(gb)]
@@ -42,6 +45,7 @@ impl ops::Op for MatMul {
 
 
 #[inline(always)]
-fn dummy_tensor() -> NdArray {
+fn dummy_tensor() -> NdArray
+{
     NdArray::default(ndarray::IxDyn(&[]))
 }

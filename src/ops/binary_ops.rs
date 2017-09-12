@@ -1,16 +1,17 @@
 /// Implement +, -, *, / operators for Tensor
 extern crate ndarray;
 
-use std::ops::{Add, Sub, Mul, Div};
-use std::rc::Rc;
-use std::cell::RefCell;
-use tensor::{Tensor, RawTensor};
 use ndarray_ext::NdArray;
 use ops;
+use std::cell::RefCell;
+use std::ops::{Add, Div, Mul, Sub};
+use std::rc::Rc;
+use tensor::{RawTensor, Tensor};
 
 
 #[inline(always)]
-fn scalar_tensor_add(a: &NdArray, b: &NdArray) -> NdArray {
+fn scalar_tensor_add(a: &NdArray, b: &NdArray) -> NdArray
+{
     // comparing the rank of tensors doesn't solve the problem here.
     let len_a = a.len();
     let len_b = b.len();
@@ -18,7 +19,8 @@ fn scalar_tensor_add(a: &NdArray, b: &NdArray) -> NdArray {
 }
 
 #[inline(always)]
-fn scalar_tensor_mul(a: &NdArray, b: &NdArray) -> NdArray {
+fn scalar_tensor_mul(a: &NdArray, b: &NdArray) -> NdArray
+{
     // comparing the rank of tensors doesn't solve the problem here.
     let len_a = a.len();
     let len_b = b.len();
@@ -33,31 +35,37 @@ pub struct ElementwiseDiv;
 
 
 impl ops::Op for ElementwiseAdd {
-    fn name(&self) -> &str {
+    fn name(&self) -> &str
+    {
         "ElementwiseAdd"
     }
 
-    fn compute(&mut self, mut xs: &[&NdArray], _: bool) -> NdArray {
+    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    {
         let a = xs[0];
         let b = xs[1];
         scalar_tensor_add(a, b)
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
+    fn lop(&self, gy: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
         vec![Some(gy.clone()), Some(gy.clone())]
     }
 }
 
 
 impl ops::Op for ElementwiseSub {
-    fn name(&self) -> &str {
+    fn name(&self) -> &str
+    {
         "ElementwiseSub"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray {
+    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    {
         let a = xs[0];
         let b = xs[1];
-        if a.shape() == &[1] {  // a is scalar
+        if a.shape() == &[1] {
+            // a is scalar
             // unwrap is safe
             let a = NdArray::from_elem(b.shape(), *a.get(0).unwrap());
             a - b
@@ -66,23 +74,27 @@ impl ops::Op for ElementwiseSub {
         }
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
+    fn lop(&self, gy: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
         vec![Some(gy.clone()), Some(-1 * gy)]
     }
 }
 
 impl ops::Op for ElementwiseMul {
-    fn name(&self) -> &str {
+    fn name(&self) -> &str
+    {
         "ElementwiseMul"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray {
+    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    {
         let a = xs[0];
         let b = xs[1];
         scalar_tensor_mul(a, b)
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
+    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
         let x0 = inputs[0];
         let x1 = inputs[1];
         vec![Some(gy * x1), Some(gy * x0)]
@@ -90,11 +102,13 @@ impl ops::Op for ElementwiseMul {
 }
 
 impl ops::Op for ElementwiseDiv {
-    fn name(&self) -> &str {
+    fn name(&self) -> &str
+    {
         "ElementwiseDiv"
     }
 
-    fn compute(&mut self, mut xs: &[&NdArray], _: bool) -> NdArray {
+    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    {
         let x0 = xs[0];
         let x1 = xs[1];
         if x0.shape() == &[1] {
@@ -106,7 +120,8 @@ impl ops::Op for ElementwiseDiv {
         }
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
+    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
         let x0 = inputs[0];
         let x1 = inputs[1];
         let a: Tensor = gy / x1;
@@ -116,72 +131,80 @@ impl ops::Op for ElementwiseDiv {
 }
 
 
-fn f32_to_tensor(arg: f32) -> Tensor {
+fn f32_to_tensor(arg: f32) -> Tensor
+{
     Tensor(Rc::new(RefCell::new(RawTensor {
-        op: Box::new(ops::dummy_op::DummyOp{ name: "from_f32".to_string() }),
+        op: Box::new(ops::dummy_op::DummyOp { name: "from_f32".to_string() }),
         inputs: vec![],
         param: Some(NdArray::from_elem(ndarray::IxDyn(&[1]), arg)),
         rank: 0,
     })))
 }
 
-fn f64_to_tensor(arg: f64) -> Tensor {
+fn f64_to_tensor(arg: f64) -> Tensor
+{
     Tensor(Rc::new(RefCell::new(RawTensor {
-        op: Box::new(ops::dummy_op::DummyOp{ name: "from_f64".to_string() }),
+        op: Box::new(ops::dummy_op::DummyOp { name: "from_f64".to_string() }),
         inputs: vec![],
         param: Some(NdArray::from_elem(ndarray::IxDyn(&[1]), arg as f32)),
         rank: 0,
     })))
 }
 
-fn i32_to_tensor(arg: i32) -> Tensor {
+fn i32_to_tensor(arg: i32) -> Tensor
+{
     Tensor(Rc::new(RefCell::new(RawTensor {
-        op: Box::new(ops::dummy_op::DummyOp{ name: "from_i32".to_string() }),
+        op: Box::new(ops::dummy_op::DummyOp { name: "from_i32".to_string() }),
         inputs: vec![],
         param: Some(NdArray::from_elem(ndarray::IxDyn(&[1]), arg as f32)),
         rank: 0,
     })))
 }
 
-fn i64_to_tensor(arg: i64) -> Tensor {
+fn i64_to_tensor(arg: i64) -> Tensor
+{
     Tensor(Rc::new(RefCell::new(RawTensor {
-        op: Box::new(ops::dummy_op::DummyOp{ name: "from_i64".to_string() }),
+        op: Box::new(ops::dummy_op::DummyOp { name: "from_i64".to_string() }),
         inputs: vec![],
         param: Some(NdArray::from_elem(ndarray::IxDyn(&[1]), arg as f32)),
         rank: 0,
     })))
 }
 
-fn u32_to_tensor(arg: u32) -> Tensor {
+fn u32_to_tensor(arg: u32) -> Tensor
+{
     Tensor(Rc::new(RefCell::new(RawTensor {
-        op: Box::new(ops::dummy_op::DummyOp{ name: "from_u32".to_string() }),
+        op: Box::new(ops::dummy_op::DummyOp { name: "from_u32".to_string() }),
         inputs: vec![],
         param: Some(NdArray::from_elem(ndarray::IxDyn(&[1]), arg as f32)),
         rank: 0,
     })))
 }
 
-fn u64_to_tensor(arg: u64) -> Tensor {
+fn u64_to_tensor(arg: u64) -> Tensor
+{
     Tensor(Rc::new(RefCell::new(RawTensor {
-        op: Box::new(ops::dummy_op::DummyOp{ name: "from_u64".to_string() }),
+        op: Box::new(ops::dummy_op::DummyOp { name: "from_u64".to_string() }),
         inputs: vec![],
         param: Some(NdArray::from_elem(ndarray::IxDyn(&[1]), arg as f32)),
         rank: 0,
     })))
 }
 
-fn usize_to_tensor(arg: usize) -> Tensor {
+fn usize_to_tensor(arg: usize) -> Tensor
+{
     Tensor(Rc::new(RefCell::new(RawTensor {
-        op: Box::new(ops::dummy_op::DummyOp{ name: "from_usize".to_string() }),
+        op: Box::new(ops::dummy_op::DummyOp { name: "from_usize".to_string() }),
         inputs: vec![],
         param: Some(NdArray::from_elem(ndarray::IxDyn(&[1]), arg as f32)),
         rank: 0,
     })))
 }
 
-fn isize_to_tensor(arg: isize) -> Tensor {
+fn isize_to_tensor(arg: isize) -> Tensor
+{
     Tensor(Rc::new(RefCell::new(RawTensor {
-        op: Box::new(ops::dummy_op::DummyOp{ name: "from_isize".to_string() }),
+        op: Box::new(ops::dummy_op::DummyOp { name: "from_isize".to_string() }),
         inputs: vec![],
         param: Some(NdArray::from_elem(ndarray::IxDyn(&[1]), arg as f32)),
         rank: 0,

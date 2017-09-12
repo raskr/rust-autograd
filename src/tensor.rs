@@ -1,14 +1,14 @@
 extern crate ndarray;
 
-use std::mem;
-use std::fmt;
-use std::cmp::Ordering;
-use std::rc::Rc;
 use std::cell::RefCell;
-use std::ops::{Deref, DerefMut};
-use std::hash::{Hash, Hasher};
+use std::cmp::Ordering;
 use std::collections::hash_map::HashMap;
 use std::collections::hash_set::HashSet;
+use std::fmt;
+use std::hash::{Hash, Hasher};
+use std::mem;
+use std::ops::{Deref, DerefMut};
+use std::rc::Rc;
 use ndarray_ext::NdArray;
 use topology;
 use ops;
@@ -37,19 +37,22 @@ pub struct RawTensor {
 
 impl Tensor {
     #[inline]
-    pub fn is_source(&self) -> bool {
+    pub fn is_source(&self) -> bool
+    {
         self.borrow().inputs.is_empty()
     }
 
     /// Returns a value of this node
     #[inline]
-    pub fn eval(&self) -> ndarray::Array<f32, ndarray::IxDyn> {
+    pub fn eval(&self) -> ndarray::Array<f32, ndarray::IxDyn>
+    {
         self.eval_with_input(Input::new())
     }
 
     #[inline]
     /// Returns a value of this node
-    pub fn eval_with_input(&self, feed_dict: Input) -> ndarray::Array<f32, ndarray::IxDyn> {
+    pub fn eval_with_input(&self, feed_dict: Input) -> ndarray::Array<f32, ndarray::IxDyn>
+    {
         // pre process.
         // pack `feed_dict` in `memo` and collect shared variables
         let mut memo = feed_dict.hash_map;
@@ -85,19 +88,19 @@ impl Tensor {
 
     #[inline]
     pub fn visit_once<F>(&self, f: &mut F)
-        where
-            F: FnMut(&Tensor) -> (),
+    where
+        F: FnMut(&Tensor) -> (),
     {
         self.run_visit_once(f, &mut HashSet::new())
     }
 
     #[inline]
     fn run_visit_once<F>(&self, f: &mut F, visited: &mut HashSet<Tensor>)
-        where
-            F: FnMut(&Tensor) -> (),
+    where
+        F: FnMut(&Tensor) -> (),
     {
         if visited.contains(self) {
-            return // exit early
+            return; // exit early
         } else {
             visited.insert(self.clone()); // first visit
         }
@@ -111,8 +114,8 @@ impl Tensor {
 
     #[inline]
     pub fn visit<F>(&self, f: &mut F)
-        where
-            F: FnMut(&Tensor) -> (),
+    where
+        F: FnMut(&Tensor) -> (),
     {
         f(self);
 
@@ -123,13 +126,15 @@ impl Tensor {
 }
 
 impl Ord for Tensor {
-    fn cmp(&self, other: &Self) -> Ordering {
+    fn cmp(&self, other: &Self) -> Ordering
+    {
         self.borrow().rank.cmp(&other.borrow().rank)
     }
 }
 
 impl PartialOrd for Tensor {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering>
+    {
         Some(self.cmp(other))
     }
 }
@@ -138,7 +143,8 @@ impl PartialOrd for Tensor {
 impl Eq for Tensor {}
 
 impl PartialEq for Tensor {
-    fn eq(&self, other: &Tensor) -> bool {
+    fn eq(&self, other: &Tensor) -> bool
+    {
         // compare addresses on the heap
         Rc::ptr_eq(&self.0, &other.0)
     }
@@ -146,31 +152,37 @@ impl PartialEq for Tensor {
 
 // empty implementation
 impl Hash for Tensor {
-    fn hash<H: Hasher>(&self, _: &mut H) {}
+    fn hash<H: Hasher>(&self, _: &mut H)
+    {
+    }
 }
 
 // data is not cloned; only reference count is incremented.
 impl Clone for Tensor {
-    fn clone(&self) -> Tensor {
+    fn clone(&self) -> Tensor
+    {
         Tensor(self.0.clone())
     }
 }
 
 impl Deref for Tensor {
     type Target = Rc<RefCell<RawTensor>>;
-    fn deref(&self) -> &Self::Target {
+    fn deref(&self) -> &Self::Target
+    {
         &self.0
     }
 }
 
 impl DerefMut for Tensor {
-    fn deref_mut<'a>(&'a mut self) -> &'a mut Rc<RefCell<RawTensor>> {
+    fn deref_mut<'a>(&'a mut self) -> &'a mut Rc<RefCell<RawTensor>>
+    {
         &mut self.0
     }
 }
 
 impl fmt::Display for Tensor {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result
+    {
         let ref_obj = &self.0.borrow();
         let input_names = ref_obj
             .inputs
@@ -193,15 +205,20 @@ pub struct Input {
 
 impl Input {
     #[inline]
-    pub fn new() -> Input {
+    pub fn new() -> Input
+    {
         Input { hash_map: HashMap::new() }
     }
 
     #[inline]
     pub fn add<T>(mut self, symbolic_tensor: &Tensor, array: ndarray::Array<f32, T>) -> Self
-    where T: ndarray::Dimension
+    where
+        T: ndarray::Dimension,
     {
-        self.hash_map.insert(symbolic_tensor.clone(), array.into_dyn());
+        self.hash_map.insert(
+            symbolic_tensor.clone(),
+            array.into_dyn(),
+        );
         // move self
         self
     }

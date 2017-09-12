@@ -1,9 +1,7 @@
 extern crate ndarray;
 
-use std::mem;
-use tensor::Tensor;
 use ops;
-use ndarray_ext::NdArray;
+use tensor::Tensor;
 
 pub struct ExpandDims {
     pub axes: Vec<isize>,
@@ -11,11 +9,13 @@ pub struct ExpandDims {
 
 
 impl ops::Op for ExpandDims {
-    fn name(&self) -> &str {
+    fn name(&self) -> &str
+    {
         "ExpandDims"
     }
 
-    fn compute(&mut self, xs: &[&::NdArray], _: bool) -> ::NdArray {
+    fn compute(&mut self, xs: &[&::NdArray], _: bool) -> ::NdArray
+    {
         let ret = xs[0].clone();
         let mut output_shape = ret.shape().to_vec();
         for &i in self.axes.iter() {
@@ -25,7 +25,8 @@ impl ops::Op for ExpandDims {
         ret.into_shape(output_shape).unwrap()
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
+    fn lop(&self, gy: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
         vec![Some(ops::squeeze(gy, self.axes.as_slice()))]
     }
 }

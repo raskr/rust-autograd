@@ -1,11 +1,8 @@
 extern crate ndarray;
 extern crate rand;
 
-use std::collections::hash_map::HashMap;
-use std::mem;
-use tensor::{Tensor, Input};
-use ops;
 use sgd;
+use tensor::{Input, Tensor};
 
 
 /// This computes partial derivatives of `objective` with `var_node` using
@@ -17,19 +14,28 @@ pub fn gradient_check(
     gradients: &[Tensor],
     feed_dict: &Input,
     eps: f32,
-) {
+    tol: f32,
+)
+{
     assert_eq!(variables.len(), gradients.len());
 
     let theoretical_grads = sgd::eval_gradients(gradients, feed_dict.clone());
 
     // for each variable nodes
-    for (variable, mut theoretical_grad) in variables.iter().zip(theoretical_grads) {
+    for (variable, theoretical_grad) in variables.iter().zip(theoretical_grads) {
 
         // reduce gradient if necessary
         let theoretical_grad = sgd::maybe_reduce_grad(theoretical_grad, variable);
 
-        let var_size = variable.borrow().param.as_ref()
-            .expect(&format!("{} is not shared variable", variable.borrow().op.name())).len();
+        let var_size = variable
+            .borrow()
+            .param
+            .as_ref()
+            .expect(&format!(
+                "{} is not shared variable",
+                variable.borrow().op.name()
+            ))
+            .len();
 
         // for each values
         for i in 0..var_size as isize {
@@ -37,20 +43,23 @@ pub fn gradient_check(
 
             let head_ptr: *mut f32 = variable.borrow_mut().param.as_mut().unwrap().as_mut_ptr();
 
-            unsafe {  // perturbation (+)
+            unsafe {
+                // perturbation (+)
                 evacuated = *head_ptr.offset(i);
                 *head_ptr.offset(i) = evacuated + eps;
             }
 
             let obj_pos = objective.eval_with_input(feed_dict.clone());
 
-            unsafe {  // perturbation (-)
+            unsafe {
+                // perturbation (-)
                 *head_ptr.offset(i) = evacuated - eps;
             }
 
             let obj_neg = objective.eval_with_input(feed_dict.clone());
 
-            unsafe {  // restore
+            unsafe {
+                // restore
                 *head_ptr.offset(i) = evacuated;
             }
 
@@ -59,8 +68,12 @@ pub fn gradient_check(
 
             // compare
             let diff = (g_num - g_th).abs();
-            if diff > 1e-3 {
-                panic!("Gradient checking failed with too large error: num={}, bp={}", g_num, g_th);
+            if diff > tol {
+                panic!(
+                    "Gradient checking failed with too large error: num={}, bp={}",
+                    g_num,
+                    g_th
+                );
             }
         }
     }

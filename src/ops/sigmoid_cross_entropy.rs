@@ -1,19 +1,21 @@
 extern crate ndarray;
 
-use tensor::Tensor;
 use ndarray_ext::NdArray;
-use std::f32;
 use ops;
+use std::f32;
+use tensor::Tensor;
 
 
 pub struct SigmoidCrossEntropy;
 
 impl ops::Op for SigmoidCrossEntropy {
-    fn name(&self) -> &str {
+    fn name(&self) -> &str
+    {
         "SigmoidCrossEntropy"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray {
+    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    {
         let x = xs[0];
         let t = xs[1];
 
@@ -24,7 +26,8 @@ impl ops::Op for SigmoidCrossEntropy {
         x.map(move |a| ((-a.abs()).exp() + 1.).log(e) + max_fn(0., *a)) - t * x
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
+    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
         let x = inputs[0];
         let t = inputs[1];
 

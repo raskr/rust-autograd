@@ -1,20 +1,21 @@
 extern crate ndarray;
 
-use tensor::Tensor;
 use ndarray_ext::NdArray;
-use std::mem;
 use ops;
+use tensor::Tensor;
 
 
 pub struct SparseSoftmaxCrossEntropy;
 pub struct SparseSoftmaxCrossEntropyGrad;
 
 impl ops::Op for SparseSoftmaxCrossEntropy {
-    fn name(&self) -> &str {
+    fn name(&self) -> &str
+    {
         "SparseSoftmaxCrossEntropy"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], train: bool) -> NdArray {
+    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    {
         let (x, t) = (xs[0], xs[1]);
         {
             assert_eq!(x.ndim(), 2);
@@ -37,7 +38,8 @@ impl ops::Op for SparseSoftmaxCrossEntropy {
         ret
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
+    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
         let x = inputs[0];
         let t = inputs[1];
 
@@ -56,11 +58,13 @@ impl ops::Op for SparseSoftmaxCrossEntropy {
 }
 
 impl ops::Op for SparseSoftmaxCrossEntropyGrad {
-    fn name(&self) -> &str {
+    fn name(&self) -> &str
+    {
         "SparseSoftmaxCrossEntropyGrad"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], train: bool) -> NdArray {
+    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    {
         let x = xs[0];
         let t = xs[1];
         let gy = xs[2];
@@ -76,7 +80,8 @@ impl ops::Op for SparseSoftmaxCrossEntropyGrad {
 
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
+    fn lop(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
         vec![None, None]
     }
 }

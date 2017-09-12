@@ -1,16 +1,17 @@
 extern crate ndarray;
 
 use ndarray_ext::NdArray;
-use tensor::Tensor;
-use std::f32;
 use ops;
+use std::f32;
+use tensor::Tensor;
 
 
 pub struct LogSoftmax {
     pub axis: isize,
 }
 
-pub fn logsumexp(x: &NdArray, axis: usize) -> NdArray {
+pub fn logsumexp(x: &NdArray, axis: usize) -> NdArray
+{
     let mut a = x.shape().to_vec();
     a[axis] = 1;
     let reduced_shape = a.as_slice();
@@ -39,16 +40,19 @@ pub fn logsumexp(x: &NdArray, axis: usize) -> NdArray {
     sum
 }
 
-pub fn log_softmax_forward(x: &NdArray, axis: usize) -> NdArray {
+pub fn log_softmax_forward(x: &NdArray, axis: usize) -> NdArray
+{
     x - &logsumexp(x, axis)
 }
 
 impl ops::Op for LogSoftmax {
-    fn name(&self) -> &str {
+    fn name(&self) -> &str
+    {
         "LogSoftmax"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], train: bool) -> NdArray {
+    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    {
         let x = xs[0];
         let axis = if self.axis >= 0 {
             self.axis as usize
@@ -58,7 +62,8 @@ impl ops::Op for LogSoftmax {
         log_softmax_forward(x, axis)
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
+    fn lop(&self, gy: &Tensor, _: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
+    {
         let sm = ops::exp(output);
         let sum = ops::reduce_sum(gy, 1, true);
         let mul = sm * sum;

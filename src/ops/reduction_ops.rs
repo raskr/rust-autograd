@@ -1,34 +1,75 @@
 extern crate ndarray;
 
-use std::f32;
-use std::mem;
 use self::ndarray::Zip;
-use tensor::Tensor;
-use ndarray_ext::NdArray;
 use ndarray_ext;
+use ndarray_ext::NdArray;
 use ops;
+use std::f32;
+use tensor::Tensor;
 
 
-pub struct ArgMax { pub axis: isize, pub keep_dim: bool, }
-pub struct ReduceMin { pub axis: isize, pub keep_dim: bool, }
-pub struct ReduceMax { pub axis: isize, pub keep_dim: bool, }
-pub struct ReduceSum { pub axis: isize, pub keep_dim: bool, }
-pub struct ReduceMean { pub axis: isize, pub keep_dim: bool, }
-pub struct ReduceMinGrad { pub axis: isize, pub keep_dim: bool, }
-pub struct ReduceMaxGrad { pub axis: isize, pub keep_dim: bool, }
-pub struct ReduceSumGrad { pub axis: isize, pub keep_dim: bool, }
-pub struct ReduceMeanGrad { pub axis: isize, pub keep_dim: bool, }
+pub struct ArgMax {
+    pub axis: isize,
+    pub keep_dim: bool,
+}
+
+pub struct ReduceMin {
+    pub axis: isize,
+    pub keep_dim: bool,
+}
+
+pub struct ReduceMax {
+    pub axis: isize,
+    pub keep_dim: bool,
+}
+
+pub struct ReduceSum {
+    pub axis: isize,
+    pub keep_dim: bool,
+}
+
+pub struct ReduceMean {
+    pub axis: isize,
+    pub keep_dim: bool,
+}
+
+pub struct ReduceMinGrad {
+    pub axis: isize,
+    pub keep_dim: bool,
+}
+
+pub struct ReduceMaxGrad {
+    pub axis: isize,
+    pub keep_dim: bool,
+}
+
+pub struct ReduceSumGrad {
+    pub axis: isize,
+    pub keep_dim: bool,
+}
+
+pub struct ReduceMeanGrad {
+    pub axis: isize,
+    pub keep_dim: bool,
+}
+
 
 
 impl ops::Op for ArgMax {
-    fn name(&self) -> &str {
+    fn name(&self) -> &str
+    {
         "ArgMax"
     }
 
     // cf. https://github.com/tensorflow/compiler/tf2xla/kernels/index_ops.cc
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray {
+    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    {
         let x = xs[0];
-        let axis = if -1 == self.axis { x.ndim() - 1 } else { self.axis as usize };
+        let axis = if -1 == self.axis {
+            x.ndim() - 1
+        } else {
+            self.axis as usize
+        };
         let x_shape = x.shape();
 
         // 1. Make binary mask tensor (maximum is 1)
@@ -37,9 +78,11 @@ impl ops::Op for ArgMax {
             let maxed = x.fold_axis(ndarray::Axis(axis), f32::MIN, move |&a, &b| max_fn(a, b));
             let maxed = ndarray_ext::expand_dims(maxed, axis);
             let mut mask = NdArray::zeros(x.shape());
-            Zip::from(&mut mask).and(x).and_broadcast(&maxed).apply(
-                |r, a, b| *r = ((a == b) as i32) as f32
-            );
+            Zip::from(&mut mask).and(x).and_broadcast(&maxed).apply(|r,
+             a,
+             b| {
+                *r = ((a == b) as i32) as f32
+            });
             mask
         };
 
@@ -77,30 +120,38 @@ impl ops::Op for ArgMax {
             }
             // unwrap is safe (95% confidence...)
             mat.into_dyn()
-               .into_shape(ndarray::IxDyn(final_shape.as_slice()))
-               .unwrap()
+                .into_shape(ndarray::IxDyn(final_shape.as_slice()))
+                .unwrap()
         };
 
         result
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
+    fn lop(&self, _:&Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
         vec![None]
     }
 }
 
+
 impl ops::Op for ReduceMin {
-    fn name(&self) -> &str {
+    fn name(&self) -> &str
+    {
         "ReduceMin"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], train: bool) -> NdArray {
+    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    {
         let x = xs[0];
 
-        let axis = if -1 == self.axis { x.ndim() - 1 } else { self.axis as usize };
+        let axis = if -1 == self.axis {
+            x.ndim() - 1
+        } else {
+            self.axis as usize
+        };
 
         let min_fn = f32::min;
-        let mut min = x.fold_axis(ndarray::Axis(axis), f32::MAX, move |&a, &b| min_fn(a, b));
+        let min = x.fold_axis(ndarray::Axis(axis), f32::MAX, move |&a, &b| min_fn(a, b));
 
         if self.keep_dim {
             ndarray_ext::expand_dims(min, axis)
@@ -109,7 +160,8 @@ impl ops::Op for ReduceMin {
         }
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
+    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
+    {
         let grad_op = ReduceMinGrad {
             axis: self.axis,
             keep_dim: self.keep_dim,
@@ -119,15 +171,21 @@ impl ops::Op for ReduceMin {
 }
 
 impl ops::Op for ReduceMinGrad {
-    fn name(&self) -> &str {
+    fn name(&self) -> &str
+    {
         "ReduceMinGrad"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], train: bool) -> NdArray {
+    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    {
         let x = xs[0].view();
         let y = xs[1].view();
         let gy = xs[2].view();
-        let axis = if -1 == self.axis { x.ndim() - 1 } else { self.axis as usize };
+        let axis = if -1 == self.axis {
+            x.ndim() - 1
+        } else {
+            self.axis as usize
+        };
 
         let (y, gy) = if self.keep_dim {
             (y, gy)
@@ -140,10 +198,8 @@ impl ops::Op for ReduceMinGrad {
 
         // compare x and y
         let mut mask = NdArray::zeros(x.shape());
-        Zip::from(&mut mask).and(x).and_broadcast(&y).apply(
-            |r, a, b| {
-                *r = ((a == b) as i32) as f32
-            },
+        Zip::from(&mut mask).and(x).and_broadcast(&y).apply(|r, a, b|
+            *r = ((a == b) as i32) as f32
         );
 
         mask *= &gy;
@@ -151,23 +207,30 @@ impl ops::Op for ReduceMinGrad {
     }
 
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
+    fn lop(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
         vec![None, None, None]
     }
 }
 
 impl ops::Op for ReduceMax {
-    fn name(&self) -> &str {
+    fn name(&self) -> &str
+    {
         "ReduceMax"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], train: bool) -> NdArray {
+    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    {
         let x = xs[0];
 
-        let axis = if -1 == self.axis { x.ndim() - 1 } else { self.axis as usize };
+        let axis = if -1 == self.axis {
+            x.ndim() - 1
+        } else {
+            self.axis as usize
+        };
 
         let max_fn = f32::max;
-        let mut maxed = x.fold_axis(ndarray::Axis(axis), f32::MIN, move |&a, &b| max_fn(a, b));
+        let maxed = x.fold_axis(ndarray::Axis(axis), f32::MIN, move |&a, &b| max_fn(a, b));
 
         if self.keep_dim {
             ndarray_ext::expand_dims(maxed, axis)
@@ -176,7 +239,8 @@ impl ops::Op for ReduceMax {
         }
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
+    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
+    {
         let grad_op = ReduceMaxGrad {
             axis: self.axis,
             keep_dim: self.keep_dim,
@@ -186,15 +250,21 @@ impl ops::Op for ReduceMax {
 }
 
 impl ops::Op for ReduceMaxGrad {
-    fn name(&self) -> &str {
+    fn name(&self) -> &str
+    {
         "ReduceMaxGrad"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], train: bool) -> NdArray {
+    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    {
         let x = xs[0].view();
         let y = xs[1].view();
         let gy = xs[2].view();
-        let axis = if -1 == self.axis { x.ndim() - 1 } else { self.axis as usize };
+        let axis = if -1 == self.axis {
+            x.ndim() - 1
+        } else {
+            self.axis as usize
+        };
 
         let (y, gy) = if self.keep_dim {
             (y, gy)
@@ -207,27 +277,28 @@ impl ops::Op for ReduceMaxGrad {
 
         // compare x and y
         let mut mask = NdArray::zeros(x.shape());
-        Zip::from(&mut mask).and(x).and_broadcast(&y).apply(
-            |r, a, b| {
-                *r = ((a == b) as i32) as f32
-            },
+        Zip::from(&mut mask).and(x).and_broadcast(&y).apply(|r, a, b|
+            *r = ((a == b) as i32) as f32
         );
 
         mask *= &gy;
         mask
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
+    fn lop(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
         vec![None, None, None]
     }
 }
 
 impl ops::Op for ReduceMean {
-    fn name(&self) -> &str {
+    fn name(&self) -> &str
+    {
         "ReduceMean"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray {
+    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    {
         let x: &NdArray = xs[0];
 
         // TODO
@@ -238,7 +309,11 @@ impl ops::Op for ReduceMean {
             )
         }
 
-        let axis = if -1 == self.axis { x.ndim() } else { self.axis as usize };
+        let axis = if -1 == self.axis {
+            x.ndim()
+        } else {
+            self.axis as usize
+        };
 
         if self.keep_dim {
             let ret = x.mean(ndarray::Axis(axis));
@@ -248,7 +323,8 @@ impl ops::Op for ReduceMean {
         }
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
+    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
         let grad_op = ReduceMeanGrad {
             axis: self.axis,
             keep_dim: self.keep_dim,
@@ -257,14 +333,21 @@ impl ops::Op for ReduceMean {
     }
 }
 
+
 impl ops::Op for ReduceMeanGrad {
-    fn name(&self) -> &str {
+    fn name(&self) -> &str
+    {
         "ReduceMeanGrad"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray {
+    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    {
         let x = xs[0];
-        let axis = if -1 == self.axis { x.ndim() - 1 } else { self.axis as usize };
+        let axis = if -1 == self.axis {
+            x.ndim() - 1
+        } else {
+            self.axis as usize
+        };
 
         // add dim for broadcast (the result is "view")
         let gy = if self.keep_dim {
@@ -284,20 +367,27 @@ impl ops::Op for ReduceMeanGrad {
         }
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
+    fn lop(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
         vec![None, None]
     }
 }
 
 impl ops::Op for ReduceSum {
-    fn name(&self) -> &str {
+    fn name(&self) -> &str
+    {
         "ReduceSum"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray {
+    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    {
         let x = &xs[0];
 
-        let axis = if -1 == self.axis { x.ndim() } else { self.axis as usize };
+        let axis = if -1 == self.axis {
+            x.ndim()
+        } else {
+            self.axis as usize
+        };
 
         if self.keep_dim {
             let ret = x.sum(ndarray::Axis(axis));
@@ -307,7 +397,8 @@ impl ops::Op for ReduceSum {
         }
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
+    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
         let grad_op = ReduceSumGrad {
             axis: self.axis,
             keep_dim: self.keep_dim,
@@ -317,13 +408,19 @@ impl ops::Op for ReduceSum {
 }
 
 impl ops::Op for ReduceSumGrad {
-    fn name(&self) -> &str {
+    fn name(&self) -> &str
+    {
         "ReduceSumGrad"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray {
+    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    {
         let x = xs[0];
-        let axis = if -1 == self.axis { x.ndim() - 1 } else { self.axis as usize };
+        let axis = if -1 == self.axis {
+            x.ndim() - 1
+        } else {
+            self.axis as usize
+        };
 
         // add dim for broadcast (the result is "view")
         let gy = if self.keep_dim {
@@ -340,7 +437,8 @@ impl ops::Op for ReduceSumGrad {
         }
     }
 
-    fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
+    fn lop(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
         vec![None, None]
     }
 }
