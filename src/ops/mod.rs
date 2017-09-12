@@ -35,15 +35,13 @@ mod squeeze;
 mod expand_dims;
 
 
-#[allow(dead_code)]
 /// Represents a operation node in a computation graph.
 /// `Tensor` wraps trait-object of this.
 pub trait Op {
     // Name of this op
     fn name(&self) -> &str;
 
-    // Computes "symbolic" Vector-Jacobian product, i.e. grads of
-    // input nodes using output grad.
+    // Returns gradient for each input node by use of output gradient.
     // (see http://deeplearning.net/software/theano/tutorial/gradients.html)
     fn lop(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>;
 
