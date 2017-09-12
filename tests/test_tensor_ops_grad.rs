@@ -131,7 +131,7 @@ fn cos()
 fn pow()
 {
     let ref v = ag::variable(ag::init::standard_normal(&[3]));
-    let ref z = ag::pow(v, 0.1);
+    let ref z = ag::pow(v, 1.2);
     let ref g = ag::gradients(z, &[v], Some(&&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3, 1e-3);
 }
@@ -149,7 +149,7 @@ fn exp()
 fn log()
 {
     let ref v = ag::variable(ag::init::standard_normal(&[3]));
-    let ref z = ag::log(v, 5.);
+    let ref z = ag::log(v, 0.3);
     let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3, 1e-2);
 }
