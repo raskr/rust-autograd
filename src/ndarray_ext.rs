@@ -48,8 +48,9 @@ pub fn roll_axis(arg: &mut NdArray, to: ndarray::Axis, from: ndarray::Axis)
 #[inline]
 pub fn into_mat(x: NdArray) -> ndarray::Array<f32, ndarray::Ix2>
 {
-    let shape = x.shape();
-    let a = shape[0];
-    let b = shape[1];
+    let (a, b) = {
+        let shape = x.shape();
+        (shape[0], shape[1])
+    };
     x.into_shape(ndarray::Ix2(a, b)).unwrap()
 }

@@ -332,6 +332,15 @@ fn mean_squared_error()
 }
 
 #[test]
+fn logsumexp()
+{
+    let ref v = ag::variable(ag::init::standard_normal(&[1, 3]));
+    let ref z = ag::logsumexp(v, 1);
+    let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[1, 3])));
+    ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3, 1e-3);
+}
+
+#[test]
 fn log_softmax()
 {
     let ref v = ag::variable(ag::init::standard_normal(&[1, 3]));

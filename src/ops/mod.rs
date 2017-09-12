@@ -9,6 +9,7 @@ pub mod dummy_op;
 pub mod random_ops;
 mod clip;
 mod add_n;
+mod logsumexp;
 mod log_softmax;
 mod identity;
 mod cmp_ops;
@@ -458,11 +459,19 @@ pub fn relu(x: &Tensor) -> Tensor
 
 
 #[inline]
-/// Log softmax function.
-///
-/// Take log.softmax along `axis`.
+/// Computes `log(sum(exp(x)))` along specified axis.
+pub fn logsumexp(x: &Tensor, axis: isize) -> Tensor
+{
+    let op = logsumexp::LogSumExp { axis: axis };
+    apply_op(op, &[x])
+}
+
+
+#[inline]
+/// Computes log(softmax(x)) along specified axis.
 pub fn log_softmax(x: &Tensor, axis: isize) -> Tensor
 {
+    // TODO: Composing from "node level" LogSumExp.
     let op = log_softmax::LogSoftmax { axis: axis };
     apply_op(op, &[x])
 }
