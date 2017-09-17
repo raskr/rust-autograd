@@ -1,7 +1,6 @@
-
 use ndarray_ext::NdArray;
-use ops;
 use tensor::Tensor;
+use ops;
 
 
 pub struct AddN;
@@ -12,20 +11,21 @@ impl ops::Op for AddN {
         "AddN"
     }
 
-    fn compute(&mut self, xs: &[&::NdArray], _: bool) -> NdArray
+    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
     {
-        let mut acc = NdArray::zeros(xs[0].shape());
-        for &x in xs.iter() {
-            acc += x;
+        if 0 == xs.len() {
+            panic!("empty input to AddN")
+        } else if 1 == xs.len() {
+            xs[0].clone()
+        } else {
+            let mut base = xs[0] + xs[1];
+            for &x in xs.iter() { base += x; }
+            base
         }
-        acc
     }
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
-        inputs
-            .iter()
-            .map(|_| Some((*gy).clone()))
-            .collect::<Vec<Option<Tensor>>>()
+        (0..inputs.len()).map(|_| Some(gy.clone())).collect::<Vec<Option<_>>>()
     }
 }
