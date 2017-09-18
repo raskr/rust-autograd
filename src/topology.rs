@@ -1,8 +1,9 @@
 extern crate ndarray;
+extern crate fnv;
 
+use self::fnv::FnvHashMap;
 use ndarray_ext::NdArray;
 use std::collections::binary_heap::BinaryHeap;
-use std::collections::hash_map::HashMap;
 use std::collections::hash_set::HashSet;
 use tensor::Tensor;
 
@@ -11,7 +12,7 @@ use tensor::Tensor;
 /// Performs actual graph traversal and its evaluation
 // TODO: loop-based rather than recursion (this would be difficult)
 #[inline]
-pub fn perform_eval(target: &Tensor, memo: &mut HashMap<Tensor, NdArray>, train: bool)
+pub fn perform_eval(target: &Tensor, memo: &mut FnvHashMap<Tensor, NdArray>, train: bool)
 {
     if memo.contains_key(target) {
         return;
@@ -43,9 +44,9 @@ pub fn perform_eval(target: &Tensor, memo: &mut HashMap<Tensor, NdArray>, train:
 #[inline]
 // make mapping of {node => the node contributed to gradient or not}
 // TODO: loop-based rather than recursion
-pub fn contributed_to_grads(objective: &Tensor, variables: &[&Tensor]) -> HashMap<Tensor, bool>
+pub fn contributed_to_grads(objective: &Tensor, variables: &[&Tensor]) -> FnvHashMap<Tensor, bool>
 {
-    fn rec(target: &Tensor, vars: &[&Tensor], memo: &mut HashMap<Tensor, bool>)
+    fn rec(target: &Tensor, vars: &[&Tensor], memo: &mut FnvHashMap<Tensor, bool>)
     {
         if memo.contains_key(target) {
             return;
@@ -67,7 +68,7 @@ pub fn contributed_to_grads(objective: &Tensor, variables: &[&Tensor]) -> HashMa
         memo.insert(target.clone(), contrib);
     }
 
-    let mut memo = HashMap::new();
+    let mut memo = FnvHashMap::default();
     rec(objective, variables, &mut memo);
     memo
 }
@@ -85,7 +86,7 @@ pub fn contributed_to_grads(objective: &Tensor, variables: &[&Tensor]) -> HashMa
 pub fn symbolic_gradients(
     objective: &Tensor,
     variables: &[&Tensor],
-    initial_grad: Option<&Tensor>
+    initial_grad: Option<&Tensor>,
 ) -> Vec<Tensor>
 {
     let initial_grad = initial_grad.map(|a| a.clone()).unwrap_or_else(|| {
@@ -93,7 +94,7 @@ pub fn symbolic_gradients(
     });
 
     // Mapping of {y => gy}
-    let mut grads = HashMap::new();
+    let mut grads = FnvHashMap::default();
 
     // Mapping of {node => must visit or not (boolean)}
     let contrib = contributed_to_grads(objective, variables);

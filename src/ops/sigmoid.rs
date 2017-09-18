@@ -1,4 +1,3 @@
-
 use ndarray_ext::NdArray;
 use ops;
 use tensor::Tensor;

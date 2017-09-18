@@ -73,4 +73,3 @@ impl ops::Op for ReshapeGrad {
         vec![None, Some(ops::apply_op(reshape, &[gy]))]
     }
 }
-

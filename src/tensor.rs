@@ -1,17 +1,18 @@
 extern crate ndarray;
+extern crate fnv;
 
+use self::fnv::FnvHashMap;
+use ndarray_ext::NdArray;
+use ops;
 use std::cell::RefCell;
 use std::cmp::Ordering;
-use std::collections::hash_map::HashMap;
 use std::collections::hash_set::HashSet;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
-use ndarray_ext::NdArray;
 use topology;
-use ops;
 
 
 /// Symbolic multi-dimensional array which supports
@@ -200,14 +201,14 @@ impl fmt::Display for Tensor {
 
 #[derive(Clone)]
 pub struct Input {
-    pub hash_map: HashMap<Tensor, NdArray>,
+    pub hash_map: FnvHashMap<Tensor, NdArray>,
 }
 
 impl Input {
     #[inline]
     pub fn new() -> Input
     {
-        Input { hash_map: HashMap::new() }
+        Input { hash_map: FnvHashMap::default() }
     }
 
     #[inline]

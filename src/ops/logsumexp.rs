@@ -20,15 +20,19 @@ impl ops::Op for LogSumExp {
     fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let x = xs[0];
-        let axis = if self.axis >= 0 { self.axis as usize } else { x.ndim() - 1 };
+        let axis = if self.axis >= 0 {
+            self.axis as usize
+        } else {
+            x.ndim() - 1
+        };
         let mut a = x.shape().to_vec();
         a[axis] = 1;
         let reduced_shape = a.as_slice();
 
         let max_fn = f32::max;
         let ref max = x.fold_axis(ndarray::Axis(axis), f32::MIN, move |&a, &b| max_fn(a, b))
-                       .into_shape(ndarray::IxDyn(reduced_shape))
-                       .unwrap();
+            .into_shape(ndarray::IxDyn(reduced_shape))
+            .unwrap();
 
         // subtract `max` to prevent overflow of exp
         let mut tmp = x - max;
@@ -40,8 +44,8 @@ impl ops::Op for LogSumExp {
 
         // unwrap is safe
         let mut sum = exp.sum(ndarray::Axis(axis))
-                         .into_shape(ndarray::IxDyn(reduced_shape))
-                         .unwrap();
+            .into_shape(ndarray::IxDyn(reduced_shape))
+            .unwrap();
 
         let e = f32::consts::E;
         sum.mapv_inplace(move |a| a.log(e));

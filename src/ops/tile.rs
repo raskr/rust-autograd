@@ -39,5 +39,3 @@ impl ops::Op for Tile {
         vec![Some(ops::reduce_sum(gy, self.axis, true))]
     }
 }
-
-

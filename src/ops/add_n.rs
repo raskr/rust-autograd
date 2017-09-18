@@ -1,6 +1,6 @@
 use ndarray_ext::NdArray;
-use tensor::Tensor;
 use ops;
+use tensor::Tensor;
 
 
 pub struct AddN;
@@ -19,13 +19,17 @@ impl ops::Op for AddN {
             xs[0].clone()
         } else {
             let mut base = xs[0] + xs[1];
-            for &x in xs.iter() { base += x; }
+            for &x in xs.iter() {
+                base += x;
+            }
             base
         }
     }
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
-        (0..inputs.len()).map(|_| Some(gy.clone())).collect::<Vec<Option<_>>>()
+        (0..inputs.len())
+            .map(|_| Some(gy.clone()))
+            .collect::<Vec<Option<_>>>()
     }
 }

@@ -22,7 +22,11 @@ impl ops::Op for Squeeze {
         for &i in self.axes.iter() {
             let axis = if i == -1 { x.ndim() } else { i as usize };
             let axis = axis - adjust;
-            assert_eq!(1, x.shape()[axis], "Can't squeeze the dim whose length != 1");
+            assert_eq!(
+                1,
+                x.shape()[axis],
+                "Can't squeeze the dim whose length != 1"
+            );
             x = x.remove_axis(ndarray::Axis(axis));
             adjust += 1;
         }

@@ -127,7 +127,7 @@ impl ops::Op for ArgMax {
         result
     }
 
-    fn grad(&self, _:&Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         vec![None]
     }
@@ -198,8 +198,10 @@ impl ops::Op for ReduceMinGrad {
 
         // compare x and y
         let mut mask = NdArray::zeros(x.shape());
-        Zip::from(&mut mask).and(x).and_broadcast(&y).apply(|r, a, b|
-            *r = ((a == b) as i32) as f32
+        Zip::from(&mut mask).and(x).and_broadcast(&y).apply(
+            |r, a, b| {
+                *r = ((a == b) as i32) as f32
+            },
         );
 
         mask *= &gy;
@@ -277,8 +279,10 @@ impl ops::Op for ReduceMaxGrad {
 
         // compare x and y
         let mut mask = NdArray::zeros(x.shape());
-        Zip::from(&mut mask).and(x).and_broadcast(&y).apply(|r, a, b|
-            *r = ((a == b) as i32) as f32
+        Zip::from(&mut mask).and(x).and_broadcast(&y).apply(
+            |r, a, b| {
+                *r = ((a == b) as i32) as f32
+            },
         );
 
         mask *= &gy;

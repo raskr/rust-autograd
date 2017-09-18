@@ -3,7 +3,8 @@ extern crate ndarray;
 
 
 #[test]
-fn tile() {
+fn tile()
+{
     let ref x = ag::constant(ndarray::arr2(&[[2., 2.], [3., 3.]]));
     let ref y = ag::tile(x, 0, 2);
     assert_eq!(
@@ -13,28 +14,32 @@ fn tile() {
 }
 
 #[test]
-fn clip() {
+fn clip()
+{
     let ref x = ag::constant(ndarray::arr1(&[2., 4., 6.]));
     let ref y = ag::clip(x, 3., 5.);
     assert_eq!(y.eval(), ndarray::arr1(&[3., 4., 5.]).into_dyn());
 }
 
 #[test]
-fn reduce_max() {
+fn reduce_max()
+{
     let x = ag::constant(ndarray::arr2(&[[2.], [4.], [6.]]));
     let y = ag::reduce_max(&x, 0, false);
     assert_eq!(y.eval()[0], 6.);
 }
 
 #[test]
-fn reduce_mean() {
+fn reduce_mean()
+{
     let x = ag::constant(ndarray::arr2(&[[2.], [4.], [6.]]));
     let y = ag::reduce_mean(&x, 0, false);
     assert_eq!(y.eval()[0], 4.);
 }
 
 #[test]
-fn argmax() {
+fn argmax()
+{
     let input_arr = ndarray::arr2(&[[1., 2.], [3., 4.], [6., 5.]]);
     let answer = ndarray::arr1(&[1., 1., 0.]).into_dyn();
     let input = ag::constant(input_arr);
@@ -43,7 +48,8 @@ fn argmax() {
 }
 
 #[test]
-fn argmax_keep() {
+fn argmax_keep()
+{
     let input_arr = ndarray::arr2(&[[1., 2.], [3., 4.], [6., 5.]]);
     let answer = ndarray::arr2(&[[1.], [1.], [0.]]).into_dyn();
     let input = ag::constant(input_arr);
@@ -52,7 +58,8 @@ fn argmax_keep() {
 }
 
 #[test]
-fn reshape() {
+fn reshape()
+{
     let input_arr = ag::init::standard_normal(&[3, 2, 2]);
     let answer = input_arr
         .clone()

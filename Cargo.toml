@@ -22,4 +22,5 @@ path = "examples/mlp_mnist.rs"
 rand = "0.3.15"
 ndarray = { version = "0.10.0" }
 glob = "0.2"
+fnv = "1.0.5"
 # blas-sys = { version = "0.6", default-features = true, features = ["openblas"] }
