@@ -124,6 +124,14 @@ impl Tensor {
             child.visit(f)
         }
     }
+
+    pub fn feed_array<T: ndarray::Dimension>(&self, arr: ndarray::Array<f32, T>)
+    {
+        if self.borrow().op.name() != "Placeholder" {
+            panic!("Can't feed array to non-placeholder");
+        }
+        self.borrow_mut().param = Some(arr.into_dyn());
+    }
 }
 
 impl Ord for Tensor {
