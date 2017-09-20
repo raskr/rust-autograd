@@ -491,21 +491,7 @@ pub fn softmax(x: &Tensor, axis: isize) -> Tensor
 
 
 #[inline]
-/// Just computes 0.5*(a-b)^2.
-///
-/// The performance is better than directly computing 0.5*(a-b)^2
-/// if the gradient computation is required.
-///
-/// # Panics
-/// When a.shape != b.shape.
-pub fn mean_squared_error(a: &Tensor, b: &Tensor) -> Tensor
-{
-    apply_op(mean_squared_error::MeanSquaredError, &[a, b])
-}
-
-
-#[inline]
-/// Computes `binary_cross_entropy(sigmoid(y))`.
+/// Computes `binary_cross_entropy(sigmoid(y), t)`.
 ///
 /// This function is better than that combination in that it can prevent
 /// underflow of `log(sigmoid)`.
@@ -514,8 +500,11 @@ pub fn mean_squared_error(a: &Tensor, b: &Tensor) -> Tensor
 /// * `y` - Tensor with arbitrary shape
 /// * `t` - Tensor with arbitrary shape
 ///
+/// # Panics
+/// When y.shape != t.shape.
+///
 /// # Returns
-/// Loss tensor with shape (batch_size, 1)
+/// Loss tensor with same shape as inputs's shapes
 pub fn sigmoid_cross_entropy(y: &Tensor, t: &Tensor) -> Tensor
 {
     let op = sigmoid_cross_entropy::SigmoidCrossEntropy;
@@ -524,7 +513,7 @@ pub fn sigmoid_cross_entropy(y: &Tensor, t: &Tensor) -> Tensor
 
 
 #[inline]
-/// Computes `categorical_cross_entropy(softmax(y))`.
+/// Computes `categorical_cross_entropy(softmax(y), t)`.
 ///
 /// This function is better than that combination in that it can prevent
 /// underflow of `log(softmax)`.
