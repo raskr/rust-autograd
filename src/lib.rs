@@ -1,6 +1,5 @@
 // == module declarations ==
 #[macro_use]
-#[doc(hidden)]
 pub mod test_helper;
 
 pub mod tensor;
@@ -14,10 +13,9 @@ pub mod nn_impl;
 
 pub mod sgd;
 
-pub mod graph_sources;
-
 pub mod initializers;
 
+#[doc(hidden)]
 pub mod ndarray_ext;
 
 // == re-exposures ==
@@ -25,8 +23,6 @@ pub mod ndarray_ext;
 pub use tensor::Tensor;
 
 pub use ops::*;
-
-pub use graph_sources::*;
 
 pub use initializers as init;
 

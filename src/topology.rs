@@ -6,6 +6,7 @@ use ndarray_ext::NdArray;
 use std::collections::binary_heap::BinaryHeap;
 use std::collections::hash_set::HashSet;
 use tensor::Tensor;
+use ops;
 
 
 
@@ -90,7 +91,7 @@ pub fn symbolic_gradients(
 ) -> Vec<Tensor>
 {
     let initial_grad = initial_grad.map(|a| a.clone()).unwrap_or_else(|| {
-        ::graph_sources::scalar(1.)
+        ops::scalar(1.)
     });
 
     // Mapping of {y => gy}

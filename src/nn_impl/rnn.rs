@@ -1,6 +1,5 @@
 extern crate ndarray;
 
-use graph_sources;
 use initializers;
 use ops;
 use tensor::Tensor;
@@ -30,13 +29,13 @@ impl LSTM {
         LSTM {
             state_size: state_size,
             batch_size: batch_size,
-            last_output: graph_sources::constant(initializers::zeros(&[batch_size, state_size])),
-            cell: graph_sources::constant(initializers::zeros(&[batch_size, state_size])),
-            wx: graph_sources::variable(initializers::glorot_uniform(&[input_dim, 4 * state_size])),
-            wh: graph_sources::variable(
+            last_output: ops::constant(initializers::zeros(&[batch_size, state_size])),
+            cell: ops::constant(initializers::zeros(&[batch_size, state_size])),
+            wx: ops::variable(initializers::glorot_uniform(&[input_dim, 4 * state_size])),
+            wh: ops::variable(
                 initializers::glorot_uniform(&[state_size, 4 * state_size]),
             ),
-            b: graph_sources::variable(initializers::zeros(&[1, 4 * state_size])),
+            b: ops::variable(initializers::zeros(&[1, 4 * state_size])),
         }
     }
 
@@ -84,9 +83,9 @@ impl RNN for LSTM {
     fn reset_state(&mut self)
     {
         self.last_output =
-            graph_sources::constant(initializers::zeros(&[self.batch_size, self.state_size]));
+            ops::constant(initializers::zeros(&[self.batch_size, self.state_size]));
 
         self.cell =
-            graph_sources::constant(initializers::zeros(&[self.batch_size, self.state_size]));
+            ops::constant(initializers::zeros(&[self.batch_size, self.state_size]));
     }
 }

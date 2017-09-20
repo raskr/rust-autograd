@@ -322,16 +322,6 @@ fn relu()
 }
 
 #[test]
-fn mean_squared_error()
-{
-    let ref t = ag::constant(ag::init::standard_normal(&[2, 3]));
-    let ref v = ag::variable(ag::init::standard_normal(&[2, 3]));
-    let ref z = ag::mean_squared_error(v, t);
-    let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[2, 3])));
-    ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3, 1e-3);
-}
-
-#[test]
 fn logsumexp()
 {
     let ref v = ag::variable(ag::init::standard_normal(&[1, 3]));

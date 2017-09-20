@@ -15,7 +15,7 @@ fn contributed_to_grads()
     // dummy graph
     let ref t = ag::constant(ag::initializers::standard_normal(&[2, 3]));
     let ref v = ag::variable(ag::initializers::standard_normal(&[2, 3]));
-    let ref z = ag::mean_squared_error(&v, &t);
+    let ref z = ag::sigmoid_cross_entropy(&v, &t);
     let booleans = ag::topology::contributed_to_grads(z, &[v]);
     assert_eq!(booleans.len(), 3);
     assert!(!booleans.get(t).unwrap());
