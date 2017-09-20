@@ -90,7 +90,7 @@ pub fn standard_normal(shape: &[usize]) -> ndarray::Array<f32, ndarray::IxDyn>
 }
 
 #[inline]
-/// Samples from standard normal distribution
+/// Samples from standard uniform distribution
 pub fn standard_uniform(shape: &[usize]) -> ndarray::Array<f32, ndarray::IxDyn>
 {
     let dist = rand::distributions::Range::new(0., 1.);

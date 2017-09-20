@@ -5,6 +5,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use tensor::{RawTensor, Tensor};
 
+#[doc(hidden)]
 pub mod dummy_op;
 pub mod random_ops;
 mod clip;
@@ -17,7 +18,6 @@ mod math_ops;
 mod concat;
 mod tile;
 mod binary_ops;
-mod mean_squared_error;
 mod softmax;
 mod sigmoid;
 mod elu;
@@ -41,7 +41,8 @@ pub trait Op {
     /// Name of this op
     fn name(&self) -> &str;
 
-    /// Returns gradient for each input node by use of output gradient.
+    /// Returns gradient for each input node by use of output gradient etc.
+    ///
     /// # Arguments
     /// * `gy` - Gradient of output of this op
     /// * `inputs` - `Tensor` level representation of `compute::xs`
@@ -77,6 +78,7 @@ fn apply_op<T: Op + 'static>(op: T, inputs: &[&Tensor]) -> Tensor
 // ---------------------------------------
 
 #[inline]
+/// Hyperbolic arcsin function
 pub fn asinh(x: &Tensor) -> Tensor
 {
     apply_op(math_ops::Asinh, &[x])
@@ -84,6 +86,7 @@ pub fn asinh(x: &Tensor) -> Tensor
 
 
 #[inline]
+/// Hyperbolic arccos function
 pub fn acosh(x: &Tensor) -> Tensor
 {
     apply_op(math_ops::Acosh, &[x])
@@ -91,6 +94,7 @@ pub fn acosh(x: &Tensor) -> Tensor
 
 
 #[inline]
+/// Hyperbolic arctan function
 pub fn atanh(x: &Tensor) -> Tensor
 {
     apply_op(math_ops::Atanh, &[x])
@@ -98,6 +102,7 @@ pub fn atanh(x: &Tensor) -> Tensor
 
 
 #[inline]
+/// Hyperbolic sine function
 pub fn sinh(x: &Tensor) -> Tensor
 {
     apply_op(math_ops::Sinh, &[x])
@@ -105,6 +110,7 @@ pub fn sinh(x: &Tensor) -> Tensor
 
 
 #[inline]
+/// Hyperbolic cosine function
 pub fn cosh(x: &Tensor) -> Tensor
 {
     apply_op(math_ops::Cosh, &[x])
@@ -112,6 +118,7 @@ pub fn cosh(x: &Tensor) -> Tensor
 
 
 #[inline]
+/// Hyperbolic tangent function
 pub fn tanh(x: &Tensor) -> Tensor
 {
     apply_op(math_ops::Tanh, &[x])
@@ -119,6 +126,7 @@ pub fn tanh(x: &Tensor) -> Tensor
 
 
 #[inline]
+/// Arcsin function
 pub fn asin(x: &Tensor) -> Tensor
 {
     apply_op(math_ops::Asin, &[x])
@@ -126,6 +134,7 @@ pub fn asin(x: &Tensor) -> Tensor
 
 
 #[inline]
+/// Arccos function
 pub fn acos(x: &Tensor) -> Tensor
 {
     apply_op(math_ops::Acos, &[x])
@@ -133,6 +142,7 @@ pub fn acos(x: &Tensor) -> Tensor
 
 
 #[inline]
+/// Arctan function
 pub fn atan(x: &Tensor) -> Tensor
 {
     apply_op(math_ops::Atan, &[x])
@@ -140,6 +150,7 @@ pub fn atan(x: &Tensor) -> Tensor
 
 
 #[inline]
+/// Sine function
 pub fn sin(x: &Tensor) -> Tensor
 {
     apply_op(math_ops::Sin, &[x])
@@ -147,6 +158,7 @@ pub fn sin(x: &Tensor) -> Tensor
 
 
 #[inline]
+/// Cosine function
 pub fn cos(x: &Tensor) -> Tensor
 {
     apply_op(math_ops::Cos, &[x])
@@ -154,6 +166,7 @@ pub fn cos(x: &Tensor) -> Tensor
 
 
 #[inline]
+/// Tangent function
 pub fn tan(x: &Tensor) -> Tensor
 {
     apply_op(math_ops::Tan, &[x])
@@ -161,6 +174,7 @@ pub fn tan(x: &Tensor) -> Tensor
 
 
 #[inline]
+/// Adds all inputs
 pub fn add_n(xs: &[&Tensor]) -> Tensor
 {
     apply_op(add_n::AddN, xs)
@@ -168,12 +182,15 @@ pub fn add_n(xs: &[&Tensor]) -> Tensor
 
 
 #[inline]
+/// Identity function
 pub fn identity(a: &Tensor) -> Tensor
 {
     apply_op(identity::Identity, &[a])
 }
 
+
 #[inline]
+/// Adds two tensors
 pub fn add(a: &Tensor, b: &Tensor) -> Tensor
 {
     apply_op(binary_ops::ElementwiseAdd, &[a, b])
@@ -181,6 +198,7 @@ pub fn add(a: &Tensor, b: &Tensor) -> Tensor
 
 
 #[inline]
+/// Subtracts `a` from `b`
 pub fn sub(a: &Tensor, b: &Tensor) -> Tensor
 {
     apply_op(binary_ops::ElementwiseSub, &[a, b])
@@ -188,6 +206,7 @@ pub fn sub(a: &Tensor, b: &Tensor) -> Tensor
 
 
 #[inline]
+/// Multiplies two tensors
 pub fn mul(a: &Tensor, b: &Tensor) -> Tensor
 {
     apply_op(binary_ops::ElementwiseMul, &[a, b])
@@ -195,6 +214,7 @@ pub fn mul(a: &Tensor, b: &Tensor) -> Tensor
 
 
 #[inline]
+/// Divides `a` with `b`
 pub fn div(a: &Tensor, b: &Tensor) -> Tensor
 {
     apply_op(binary_ops::ElementwiseDiv, &[a, b])
@@ -202,18 +222,22 @@ pub fn div(a: &Tensor, b: &Tensor) -> Tensor
 
 
 #[inline]
+/// Sqrt
 pub fn sqrt(x: &Tensor) -> Tensor
 {
     apply_op(math_ops::Sqrt, &[x])
 }
 
+
 #[inline]
+/// Pow
 pub fn pow(x: &Tensor, a: f32) -> Tensor
 {
     apply_op(math_ops::Pow { a: a }, &[x])
 }
 
 
+/// Log
 #[inline]
 pub fn log(x: &Tensor, a: f32) -> Tensor
 {
@@ -221,6 +245,7 @@ pub fn log(x: &Tensor, a: f32) -> Tensor
 }
 
 
+/// Exponential
 #[inline]
 pub fn exp(x: &Tensor) -> Tensor
 {

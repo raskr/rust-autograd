@@ -13,12 +13,6 @@ pub trait RNN {
 
 
 /// Standard LSTM unit without peephole.
-///
-/// # Arguments
-/// * `x` - Tensor with shape (batch_size, embedding_dim)
-///
-/// # Returns
-/// output tensor of this unit with shape (batch_size, state_size)
 pub struct LSTM {
     pub state_size: usize,
     pub batch_size: usize,

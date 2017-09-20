@@ -53,7 +53,7 @@ impl ops::Op for LogSumExp {
         sum
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         // let ref sum = ops::exp(output);
         // let ref exp = ops::exp(inputs[0]);
