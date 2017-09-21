@@ -1,6 +1,8 @@
 extern crate autograd as ag;
 extern crate ndarray;
 
+use std::collections::hash_set::HashSet;
+
 
 // initial gradient (ones)
 fn init_grad(val: f32, objective_shape: &[usize]) -> ag::Tensor
@@ -45,7 +47,7 @@ fn topological_ordering_on_reverse_mode()
     let ref z = ag::matmul(x, w) + b;
     let ref g = ag::gradients(z, &[w], Some(&init_grad(1., &[4, 3])))[0];
 
-    let collected = ag::topology::collect_nodes_from(g);
+    let collected = collect_nodes_from(g);
     // to vec
     let mut collected = collected.into_iter().collect::<Vec<ag::Tensor>>();
     // sort by rank
@@ -64,4 +66,13 @@ fn topological_ordering_on_reverse_mode()
             "MatMul".to_string(),
         ]; // MatMulGrad
     assert!(boolean);
+}
+
+
+// This is used for tests for now
+fn collect_nodes_from(end_point: &ag::Tensor) -> HashSet<ag::Tensor>
+{
+    let mut collected = HashSet::new();
+    end_point.visit_once(&mut |arg| { collected.insert(arg.clone()); });
+    collected
 }

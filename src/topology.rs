@@ -1,12 +1,13 @@
 extern crate ndarray;
 extern crate fnv;
 
-use self::fnv::FnvHashMap;
-use ndarray_ext::NdArray;
-use ops;
 use std::collections::binary_heap::BinaryHeap;
 use std::collections::hash_set::HashSet;
+use std::mem;
+use self::fnv::FnvHashMap;
 use tensor::Tensor;
+use ndarray_ext::NdArray;
+use ops;
 
 
 
@@ -90,11 +91,27 @@ pub fn symbolic_gradients(
     initial_grad: Option<&Tensor>,
 ) -> Vec<Tensor>
 {
+    #[inline]
+    fn accumulate_grad(gys: &mut Vec<Tensor>)
+    {
+        assert!(gys.len() >= 2);
+        let acc = {
+            let refs = gys.iter().map(|a| a).collect::<Vec<_>>();
+            if refs.len() == 2 {
+                refs[0] + refs[1]
+            } else {
+                // AddN is preferred for memory efficiency
+                ops::add_n(refs.as_slice())
+            }
+        };
+        mem::swap(&mut vec![acc], gys);
+    }
+
     let initial_grad = initial_grad.map(|a| a.clone()).unwrap_or_else(
         || ops::scalar(1.),
     );
 
-    // Mapping of {y => gy}
+    // Mapping of {y => [gy]}
     let mut grads = FnvHashMap::default();
 
     // Mapping of {node => must visit or not (boolean)}
@@ -104,21 +121,26 @@ pub fn symbolic_gradients(
     // topological sort.
     let mut heap = BinaryHeap::new();
     heap.push(objective.clone());
-    grads.insert(objective.clone(), initial_grad);
+    grads.insert(objective.clone(), vec![initial_grad]);
     let mut grad_done = HashSet::<Tensor>::new();
 
-    // BackProp implementation
+    // builds backward graph
     while let Some(target) = heap.pop() {
         let borrowed_target = target.borrow();
 
         // Vec<Tensor> to Vec<&Tensor>
-        let xs: Vec<&Tensor> = borrowed_target.inputs.iter().map(|a| a).collect();
+        let xs = borrowed_target.inputs.iter().map(|a| a).collect::<Vec<_>>();
 
-        // time to call grad
+        // time to call `grad`
         let gxs = {
-            // Safe unwrapping is guaranteed by topological ordering
-            let gy = grads.get(&target).unwrap();
-            borrowed_target.op.grad(gy, xs.as_slice(), &target)
+            if let Some(gys) = grads.get_mut(&target) {
+                if gys.len() >= 2 {
+                    accumulate_grad(gys);
+                }
+                borrowed_target.op.grad(&gys[0], xs.as_slice(), &target)
+            } else {
+                unreachable!("Safe unwrapping is guaranteed by topological ordering")
+            }
         };
 
         debug_assert_eq!(
@@ -128,17 +150,19 @@ pub fn symbolic_gradients(
             target
         );
 
-        // cuts the backward path if gx is None.
         for (x, maybe_gx) in xs.into_iter().zip(gxs) {
             if !contrib.contains_key(x) {
                 continue;
             }
+            // cuts the backward path if gx is None.
             if let Some(gx) = maybe_gx {
                 // memo gx
-                if let Some(g) = grads.remove(x) {
-                    grads.insert(x.clone(), g + &gx);
+                if let Some(mut gys) = grads.remove(x) {
+                    // gradient accumulation should be delayed here
+                    gys.push(gx);
+                    grads.insert(x.clone(), gys);
                 } else {
-                    grads.insert(x.clone(), gx);
+                    grads.insert(x.clone(), vec![gx]);
                 }
                 // update heap
                 if !x.is_source() && !grad_done.contains(x) {
@@ -152,18 +176,13 @@ pub fn symbolic_gradients(
     variables
         .iter()
         .map(|v| {
-            grads.remove(v).expect(
+            let mut gys = grads.remove(v).expect(
                 "Input variable(s) didn't contributed to gradient computation",
-            )
+            );
+            if gys.len() >= 2 {
+                accumulate_grad(&mut gys);
+            }
+            gys.remove(0)
         })
         .collect::<Vec<Tensor>>()
-}
-
-
-// This is used for tests for now
-pub fn collect_nodes_from(end_point: &Tensor) -> HashSet<Tensor>
-{
-    let mut collected = HashSet::new();
-    end_point.visit_once(&mut |arg| { collected.insert(arg.clone()); });
-    collected
 }

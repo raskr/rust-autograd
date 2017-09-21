@@ -17,9 +17,11 @@ impl ops::Op for AddN {
             panic!("empty input to AddN")
         } else if 1 == xs.len() {
             xs[0].clone()
+        } else if 2 == xs.len() {
+            xs[0] + xs[1]
         } else {
             let mut base = xs[0] + xs[1];
-            for &x in xs.iter() {
+            for &x in xs[2..].iter() {
                 base += x;
             }
             base
