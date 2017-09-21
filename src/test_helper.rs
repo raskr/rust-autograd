@@ -2,6 +2,7 @@ extern crate ndarray;
 extern crate rand;
 
 use sgd;
+use tensor;
 use tensor::{Feed, Tensor};
 
 
@@ -19,7 +20,7 @@ pub fn gradient_check(
 {
     assert_eq!(variables.len(), gradients.len());
 
-    let theoretical_grads = sgd::eval_gradients(gradients, feed_dict.clone());
+    let theoretical_grads = tensor::eval_tensors(gradients, feed_dict.clone());
 
     // for each variable nodes
     for (variable, theoretical_grad) in variables.iter().zip(theoretical_grads) {
