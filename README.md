@@ -15,7 +15,7 @@ Documentation: https://docs.rs/autograd/
 * Dynamic/static graph construction with shared variables
 
 ## Example
-Here we are computing partial derivatives of $z = 2x^2 + 3y + 1$.
+Here we are computing partial derivatives of `z = 2x^2 + 3y + 1`.
 
 ```rust
 
@@ -38,6 +38,7 @@ let ref gg = ag::gradients(g2, &[x], None)[0];
 // evaluation of symbolic gradients
 assert_eq!(3., g1.eval()[0]);
 assert_eq!(4., gg.eval()[0]);
+
 // dz/dx requires to fill the placeholder `x`
 let feed = ag::Feed::new().add(x, ndarray::arr1(&[2.]));
 assert_eq!(8., g2.eval_with_input(feed)[0]);
