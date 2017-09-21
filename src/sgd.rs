@@ -4,7 +4,7 @@ use ndarray_ext;
 use ndarray_ext::NdArray;
 use std::collections::hash_set::HashSet;
 use std::mem;
-use tensor::{Input, Tensor};
+use tensor::{Feed, Tensor};
 
 
 #[inline]
@@ -13,7 +13,7 @@ pub fn apply_gradients<T: optimizers::Optimizer>(
     optimizer: &mut T,
     variables: &[&Tensor],
     gradients: &[Tensor],
-    feed_dict: Input,
+    feed_dict: Feed,
 )
 {
     assert!(variables.len() == gradients.len());
@@ -27,7 +27,7 @@ pub fn apply_gradients<T: optimizers::Optimizer>(
 
 
 #[inline]
-pub fn eval_gradients(gradients: &[Tensor], feed_dict: Input) -> Vec<NdArray>
+pub fn eval_gradients(gradients: &[Tensor], feed_dict: Feed) -> Vec<NdArray>
 {
     // move internal dict
     let mut memo = feed_dict.hash_map;

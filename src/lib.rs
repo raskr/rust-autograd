@@ -25,7 +25,7 @@ pub use tensor::Tensor;
 
 pub use ops::*;
 
-pub use tensor::Input;
+pub use tensor::Feed;
 
 #[doc(hidden)]
 pub use ndarray_ext::NdArray;

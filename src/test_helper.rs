@@ -2,7 +2,7 @@ extern crate ndarray;
 extern crate rand;
 
 use sgd;
-use tensor::{Input, Tensor};
+use tensor::{Feed, Tensor};
 
 
 /// This computes partial derivatives of `objective` with `var_node` using
@@ -12,7 +12,7 @@ pub fn gradient_check(
     objective: &Tensor,
     variables: &[&Tensor],
     gradients: &[Tensor],
-    feed_dict: &Input,
+    feed_dict: &Feed,
     eps: f32,
     tol: f32,
 )

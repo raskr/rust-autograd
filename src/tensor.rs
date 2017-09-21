@@ -45,12 +45,12 @@ impl Tensor {
     #[inline]
     pub fn eval(&self) -> ndarray::Array<f32, ndarray::IxDyn>
     {
-        self.eval_with_input(Input::new())
+        self.eval_with_input(Feed::new())
     }
 
     #[inline]
     /// Returns a value of this node
-    pub fn eval_with_input(&self, feed_dict: Input) -> ndarray::Array<f32, ndarray::IxDyn>
+    pub fn eval_with_input(&self, feed_dict: Feed) -> ndarray::Array<f32, ndarray::IxDyn>
     {
         // pre process.
         // pack `feed_dict` in `memo` and collect shared variables
@@ -211,15 +211,15 @@ impl fmt::Display for Tensor {
 /// Dynamic input to the computation graph.
 ///
 /// This is used to set `ndarray`'s array object to a `Placeholder` tensor.
-pub struct Input {
+pub struct Feed {
     pub hash_map: FnvHashMap<Tensor, NdArray>,
 }
 
-impl Input {
+impl Feed {
     #[inline]
-    pub fn new() -> Input
+    pub fn new() -> Feed
     {
-        Input { hash_map: FnvHashMap::default() }
+        Feed { hash_map: FnvHashMap::default() }
     }
 
     /// Adds a pair of `(Placeholder, A feed to the placeholder)` to the input object.

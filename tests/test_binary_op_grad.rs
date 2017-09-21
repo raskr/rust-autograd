@@ -54,7 +54,7 @@ fn expr2()
     let ref x = ag::placeholder(&[1]);
     let ref y = 3 * x * x;
     let grads = ag::gradients(y, &[x], None);
-    let fd = ag::Input::new().add(
+    let fd = ag::Feed::new().add(
         x,
         ndarray::ArrayD::<f32>::from_elem(ndarray::IxDyn(&[1]), 3.),
     );
@@ -67,7 +67,7 @@ fn expr3()
     let ref x = ag::placeholder(&[1]);
     let ref y = 3 * x * x + 2;
     let grads = ag::gradients(y, &[x], None);
-    let fd = ag::Input::new().add(
+    let fd = ag::Feed::new().add(
         x,
         ndarray::ArrayD::<f32>::from_elem(ndarray::IxDyn(&[1]), 3.),
     );
@@ -80,7 +80,7 @@ fn expr4()
     let ref x = ag::placeholder(&[1]);
     let ref y = 3 * x * x + 2 * x + 1;
     let grads = ag::gradients(y, &[x], None);
-    let fd = ag::Input::new().add(
+    let fd = ag::Feed::new().add(
         x,
         ndarray::ArrayD::<f32>::from_elem(ndarray::IxDyn(&[1]), 3.),
     );
@@ -94,7 +94,7 @@ fn expr5()
     let ref x2 = ag::placeholder(&[1]);
     let ref y = 3 * x1 * x1 + 2 * x1 + x2 + 1;
     let grads = ag::gradients(y, &[x1], None);
-    let fd = ag::Input::new().add(
+    let fd = ag::Feed::new().add(
         x1,
         ndarray::ArrayD::<f32>::from_elem(ndarray::IxDyn(&[1]), 3.),
     );
@@ -121,7 +121,7 @@ fn differentiate_twice()
     let ref g1 = ag::gradients(y, &[x], None)[0];
     let ref g2 = ag::gradients(g1, &[x], None)[0];
 
-    let fd = ag::Input::new().add(
+    let fd = ag::Feed::new().add(
         x,
         ndarray::ArrayD::<f32>::from_elem(ndarray::IxDyn(&[1]), 2.),
     );
@@ -142,7 +142,7 @@ fn expr7()
 
     assert_eq!(
         8.,
-        g1.eval_with_input(ag::Input::new().add(x1, ag::init::from_scalar(2.)))[0]
+        g1.eval_with_input(ag::Feed::new().add(x1, ag::init::from_scalar(2.)))[0]
     ); // => [8.]
     assert_eq!(3., g2.eval()[0]); // => [3.]
     assert_eq!(4., gg1.eval()[0]); // => [4.]
@@ -162,7 +162,7 @@ fn expr8()
     println!("{}", g1.eval()); // => [3.]
 
     // dz/dx (necessary to feed the value to `x`)
-    let input = ag::Input::new().add(x, ag::init::from_scalar(2.));
+    let input = ag::Feed::new().add(x, ag::init::from_scalar(2.));
     println!("{}", g2.eval_with_input(input)); // => [8.]
 
     // ddz/dx

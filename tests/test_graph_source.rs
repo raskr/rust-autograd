@@ -29,6 +29,6 @@ fn placeholder()
     let p = ag::placeholder(&[2]);
     assert_eq!(
         arr,
-        p.eval_with_input(ag::Input::new().add(&p, arr.clone()))
+        p.eval_with_input(ag::Feed::new().add(&p, arr.clone()))
     )
 }

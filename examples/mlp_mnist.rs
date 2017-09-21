@@ -2,15 +2,14 @@
 extern crate ndarray;
 extern crate autograd as ag;
 
-use std::default::Default;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 
-// softmax regression with Adam optimizer for mnist.
+// Run "./download_mnist.sh" beforehand if you don't have dataset.
+//
+// This is softmax regression with Adam optimizer for mnist.
 // 0.91 test accuracy after 2 epochs,
 // 0.27 sec/epoch on 2.7GHz Intel Core i5
-//
-// Run "./download_mnist.sh" beforehand if you don't have dataset
 
 macro_rules! eval_with_time {
   ($x:expr) => {
@@ -24,15 +23,14 @@ macro_rules! eval_with_time {
   };
 }
 
-#[cfg(not(test))]
 fn main()
 {
     let ((x_train, y_train), (x_test, y_test)) = dataset::load();
 
     // -- graph def --
-    let ref x = ag::placeholder(&[-1, 28 * 28]);
+    let ref x = ag::placeholder(&[-1, 28*28]);
     let ref y = ag::placeholder(&[-1, 1]);
-    let ref w = ag::variable(ag::init::glorot_uniform(&[28 * 28, 10]));
+    let ref w = ag::variable(ag::init::glorot_uniform(&[28*28, 10]));
     let ref b = ag::variable(ag::init::zeros(&[1, 10]));
     let ref z = ag::matmul(x, w) + b;
     let ref loss = ag::sparse_softmax_cross_entropy(z, y);
@@ -48,19 +46,21 @@ fn main()
     let num_batches = num_samples / batch_size as usize;
 
     for epoch in 0..max_epoch {
+        eval_with_time!({
         let perm = ag::init::permutation(num_batches) * batch_size as usize;
         for i in perm.to_vec().into_iter() {
             let i = i as isize;
             let x_batch = x_train.slice(s![i..i + batch_size, ..]).to_owned();
             let y_batch = y_train.slice(s![i..i + batch_size, ..]).to_owned();
-            let feed_dict = ag::Input::new().add(x, x_batch).add(y, y_batch);
+            let feed_dict = ag::Feed::new().add(x, x_batch).add(y, y_batch);
             ag::sgd::apply_gradients(&mut optimizer, &[w, b], grads, feed_dict);
         }
+        });
         println!("finish epoch {}", epoch);
     }
 
     // -- test --
-    let feed_dict = ag::Input::new().add(x, x_test).add(y, y_test);
+    let feed_dict = ag::Feed::new().add(x, x_test).add(y, y_test);
     println!("test accuracy: {}", accuracy.eval_with_input(feed_dict));
 }
 
@@ -71,7 +71,6 @@ pub mod dataset {
     use std::io::Read;
     use std::mem;
     use std::path::Path;
-    use std::process;
 
     type NdArray = ndarray::Array<f32, ndarray::IxDyn>;
 
@@ -115,7 +114,7 @@ pub mod dataset {
 
         // read images
         let mut buf: Vec<u8> = vec![0u8; num_image * rows * cols];
-        buf_reader.read_exact(buf.as_mut());
+        let _ = buf_reader.read_exact(buf.as_mut());
         let ret = buf.into_iter().map(|x| (x as f32) / 255.).collect();
         (ret, num_image)
     }
@@ -130,7 +129,7 @@ pub mod dataset {
         let num_label = u32::from_be(read_u32(buf_reader)) as usize;
         // read labels
         let mut buf: Vec<u8> = vec![0u8; num_label];
-        buf_reader.read_exact(buf.as_mut());
+        let _ = buf_reader.read_exact(buf.as_mut());
         let ret: Vec<f32> = buf.into_iter().map(|x| x as f32).collect();
         (ret, num_label)
     }
@@ -138,7 +137,7 @@ pub mod dataset {
     fn read_u32<T: Read>(reader: &mut T) -> u32
     {
         let mut buf: [u8; 4] = [0, 0, 0, 0];
-        reader.read_exact(&mut buf);
+        let _ = reader.read_exact(&mut buf);
         unsafe { mem::transmute(buf) }
     }
 }
