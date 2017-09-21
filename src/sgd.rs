@@ -8,11 +8,11 @@ use tensor::{Feed, Tensor};
 
 
 #[inline]
-/// Update params with gradients
+/// Updates params with gradients
 pub fn apply_gradients<T: optimizers::Optimizer>(
-    optimizer: &mut T,
     variables: &[&Tensor],
     gradients: &[Tensor],
+    optimizer: &mut T,
     feed_dict: Feed,
 )
 {

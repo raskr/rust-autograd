@@ -39,7 +39,7 @@ pub fn gradient_check(
 
         // for each values
         for i in 0..var_size as isize {
-            let mut evacuated = 0.;
+            let evacuated;
 
             let head_ptr: *mut f32 = variable.borrow_mut().param.as_mut().unwrap().as_mut_ptr();
 
