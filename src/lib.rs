@@ -13,19 +13,19 @@ pub mod nn_impl;
 
 pub mod sgd;
 
-pub mod initializers;
-
-#[doc(hidden)]
 pub mod ndarray_ext;
 
 // == re-exposures ==
+
+pub use ndarray_ext::array_gen as initializers;
+
+pub use initializers as init;
 
 pub use tensor::Tensor;
 
 pub use ops::*;
 
-pub use initializers as init;
-
 pub use tensor::Input;
 
+#[doc(hidden)]
 pub use ndarray_ext::NdArray;

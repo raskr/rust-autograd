@@ -3,10 +3,10 @@ extern crate fnv;
 
 use self::fnv::FnvHashMap;
 use ndarray_ext::NdArray;
+use ops;
 use std::collections::binary_heap::BinaryHeap;
 use std::collections::hash_set::HashSet;
 use tensor::Tensor;
-use ops;
 
 
 
@@ -90,9 +90,9 @@ pub fn symbolic_gradients(
     initial_grad: Option<&Tensor>,
 ) -> Vec<Tensor>
 {
-    let initial_grad = initial_grad.map(|a| a.clone()).unwrap_or_else(|| {
-        ops::scalar(1.)
-    });
+    let initial_grad = initial_grad.map(|a| a.clone()).unwrap_or_else(
+        || ops::scalar(1.),
+    );
 
     // Mapping of {y => gy}
     let mut grads = FnvHashMap::default();
@@ -121,7 +121,12 @@ pub fn symbolic_gradients(
             borrowed_target.op.grad(gy, xs.as_slice(), &target)
         };
 
-        debug_assert_eq!(xs.len(), gxs.len(), "Bad grad from ({})", target);
+        debug_assert_eq!(
+            xs.len(),
+            gxs.len(),
+            "Wrong `grad` implementation of {}.",
+            target
+        );
 
         // cuts the backward path if gx is None.
         for (x, maybe_gx) in xs.into_iter().zip(gxs) {

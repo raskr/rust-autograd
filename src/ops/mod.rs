@@ -25,8 +25,8 @@ mod relu;
 mod slice;
 mod sigmoid_cross_entropy;
 mod softmax_cross_entropy;
-mod gather;
 mod sparse_softmax_cross_entropy;
+mod gather;
 mod matmul;
 mod swap_axes;
 mod reshape;
@@ -41,21 +41,25 @@ pub trait Op {
     /// Name of this op
     fn name(&self) -> &str;
 
-    /// Returns gradient for each input node by use of output gradient etc.
-    ///
-    /// # Arguments
-    /// * `gy` - Gradient of output of this op
-    /// * `inputs` - `Tensor` level representation of `compute::xs`
-    /// * `output` - `Tensor` level representation of `compute`'s return value
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>;
-
     /// Actually runs this op.
     /// num of inputs : N,
     /// num of outputs: 1
     fn compute(&mut self, xs: &[&NdArray], train: bool) -> NdArray;
+
+    /// Returns symbolic gradient for each input node by use of output gradient etc.
+    ///
+    /// # Arguments
+    /// * `gy` - Symbolic representation of the gradient of `compute`'s return value
+    /// * `inputs` - Symbolic representation of `compute::xs`
+    /// * `output` - Symbolic representation of `compute`'s return value
+    ///
+    /// NOTE:
+    /// The number of return values must be same as `inputs.len()`.
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>;
 }
 
 
+// Helper function to generate symbolic tensor
 #[inline]
 fn apply_op<T: Op + 'static>(op: T, inputs: &[&Tensor]) -> Tensor
 {
@@ -106,79 +110,7 @@ pub fn variable<T: ndarray::Dimension>(array: ndarray::Array<f32, T>) -> Tensor
 
 
 #[inline]
-/// Hyperbolic arcsin function
-pub fn asinh(x: &Tensor) -> Tensor
-{
-    apply_op(math_ops::Asinh, &[x])
-}
-
-
-#[inline]
-/// Hyperbolic arccos function
-pub fn acosh(x: &Tensor) -> Tensor
-{
-    apply_op(math_ops::Acosh, &[x])
-}
-
-
-#[inline]
-/// Hyperbolic arctan function
-pub fn atanh(x: &Tensor) -> Tensor
-{
-    apply_op(math_ops::Atanh, &[x])
-}
-
-
-#[inline]
-/// Hyperbolic sine function
-pub fn sinh(x: &Tensor) -> Tensor
-{
-    apply_op(math_ops::Sinh, &[x])
-}
-
-
-#[inline]
-/// Hyperbolic cosine function
-pub fn cosh(x: &Tensor) -> Tensor
-{
-    apply_op(math_ops::Cosh, &[x])
-}
-
-
-#[inline]
-/// Hyperbolic tangent function
-pub fn tanh(x: &Tensor) -> Tensor
-{
-    apply_op(math_ops::Tanh, &[x])
-}
-
-
-#[inline]
-/// Arcsin function
-pub fn asin(x: &Tensor) -> Tensor
-{
-    apply_op(math_ops::Asin, &[x])
-}
-
-
-#[inline]
-/// Arccos function
-pub fn acos(x: &Tensor) -> Tensor
-{
-    apply_op(math_ops::Acos, &[x])
-}
-
-
-#[inline]
-/// Arctan function
-pub fn atan(x: &Tensor) -> Tensor
-{
-    apply_op(math_ops::Atan, &[x])
-}
-
-
-#[inline]
-/// Sine function
+/// Elementwise sine
 pub fn sin(x: &Tensor) -> Tensor
 {
     apply_op(math_ops::Sin, &[x])
@@ -186,7 +118,7 @@ pub fn sin(x: &Tensor) -> Tensor
 
 
 #[inline]
-/// Cosine function
+/// Elementwise cosine
 pub fn cos(x: &Tensor) -> Tensor
 {
     apply_op(math_ops::Cos, &[x])
@@ -194,7 +126,7 @@ pub fn cos(x: &Tensor) -> Tensor
 
 
 #[inline]
-/// Tangent function
+/// Elementwise tangent
 pub fn tan(x: &Tensor) -> Tensor
 {
     apply_op(math_ops::Tan, &[x])
@@ -202,7 +134,81 @@ pub fn tan(x: &Tensor) -> Tensor
 
 
 #[inline]
+/// Elementwise arcsin
+pub fn asin(x: &Tensor) -> Tensor
+{
+    apply_op(math_ops::Asin, &[x])
+}
+
+
+#[inline]
+/// Elementwise arccos
+pub fn acos(x: &Tensor) -> Tensor
+{
+    apply_op(math_ops::Acos, &[x])
+}
+
+
+#[inline]
+/// Elementwise arctan
+pub fn atan(x: &Tensor) -> Tensor
+{
+    apply_op(math_ops::Atan, &[x])
+}
+
+
+#[inline]
+/// Elementwise hyperbolic sine
+pub fn sinh(x: &Tensor) -> Tensor
+{
+    apply_op(math_ops::Sinh, &[x])
+}
+
+
+#[inline]
+/// Elementwise hyperbolic cosine
+pub fn cosh(x: &Tensor) -> Tensor
+{
+    apply_op(math_ops::Cosh, &[x])
+}
+
+
+#[inline]
+/// Elementwise hyperbolic tangent
+pub fn tanh(x: &Tensor) -> Tensor
+{
+    apply_op(math_ops::Tanh, &[x])
+}
+
+
+#[inline]
+/// Elementwise hyperbolic arcsin
+pub fn asinh(x: &Tensor) -> Tensor
+{
+    apply_op(math_ops::Asinh, &[x])
+}
+
+
+#[inline]
+/// Elementwise hyperbolic arccos
+pub fn acosh(x: &Tensor) -> Tensor
+{
+    apply_op(math_ops::Acosh, &[x])
+}
+
+
+#[inline]
+/// Elementwise hyperbolic arctan
+pub fn atanh(x: &Tensor) -> Tensor
+{
+    apply_op(math_ops::Atanh, &[x])
+}
+
+
+#[inline]
 /// Adds all input tensors
+///
+/// All the input tensors must have same shapes
 pub fn add_n(xs: &[&Tensor]) -> Tensor
 {
     apply_op(add_n::AddN, xs)
@@ -250,7 +256,7 @@ pub fn div(a: &Tensor, b: &Tensor) -> Tensor
 
 
 #[inline]
-/// Sqrt
+/// Elementwise sqrt
 pub fn sqrt(x: &Tensor) -> Tensor
 {
     apply_op(math_ops::Sqrt, &[x])
@@ -258,14 +264,14 @@ pub fn sqrt(x: &Tensor) -> Tensor
 
 
 #[inline]
-/// Pow
+/// Elementwise pow
 pub fn pow(x: &Tensor, a: f32) -> Tensor
 {
     apply_op(math_ops::Pow { a: a }, &[x])
 }
 
 
-/// Log
+/// Elementwise log
 #[inline]
 pub fn log(x: &Tensor, a: f32) -> Tensor
 {
@@ -273,7 +279,7 @@ pub fn log(x: &Tensor, a: f32) -> Tensor
 }
 
 
-/// Exponential
+/// Elementwise exponential
 #[inline]
 pub fn exp(x: &Tensor) -> Tensor
 {
@@ -398,7 +404,7 @@ pub fn reduce_sum(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 /// # Arguments
 /// * `objective` - Target of differentiation.
 /// * `variables` - Variable tensors with which differentiate `objective`.
-/// * `initial_grad` - This is required "if objective is not a scalar". In most cases,
+/// * `initial_grad` - This is required **if objective is not a scalar**. In most cases,
 /// this is initialized with 1s.
 ///
 /// # Returns
@@ -498,7 +504,8 @@ pub fn sigmoid(x: &Tensor) -> Tensor
 
 #[inline]
 /// Elementwise exponential linear unit function.
-/// (https://arxiv.org/abs/1511.07289)
+///
+/// See https://arxiv.org/abs/1511.07289
 pub fn elu(x: &Tensor, alpha: f32) -> Tensor
 {
     apply_op(elu::ELU { alpha: alpha }, &[x])
@@ -523,7 +530,10 @@ pub fn logsumexp(x: &Tensor, axis: isize) -> Tensor
 
 
 #[inline]
-/// Computes log(softmax(x)) along specified axis.
+/// Log softmax function.
+///
+/// Computes `softmax(x)` along specified axis and
+/// take logarithm of it.
 pub fn log_softmax(x: &Tensor, axis: isize) -> Tensor
 {
     // TODO: Composing from "node level" LogSumExp.
@@ -533,9 +543,7 @@ pub fn log_softmax(x: &Tensor, axis: isize) -> Tensor
 
 
 #[inline]
-/// Softmax function.
-///
-/// Take softmax along `axis`.
+/// Take softmax along specified axis
 pub fn softmax(x: &Tensor, axis: isize) -> Tensor
 {
     let op = softmax::Softmax { axis: axis };
@@ -544,7 +552,7 @@ pub fn softmax(x: &Tensor, axis: isize) -> Tensor
 
 
 #[inline]
-/// Computes `binary_cross_entropy(sigmoid(y), t)`.
+/// Computes `cross_entropy(sigmoid(y), t)`.
 ///
 /// This function is better than that combination in that it can prevent
 /// underflow of `log(sigmoid)`.
@@ -606,7 +614,7 @@ pub fn sparse_softmax_cross_entropy(y: &Tensor, t: &Tensor) -> Tensor
 #[inline]
 /// Matrix multiplication.
 ///
-/// `a` and `b` must be 2-ranked tensors.
+/// Both `a` and `b` must be 2-ranked tensors.
 pub fn matmul(a: &Tensor, b: &Tensor) -> Tensor
 {
     apply_op(matmul::MatMul, &[a, b])
@@ -614,7 +622,7 @@ pub fn matmul(a: &Tensor, b: &Tensor) -> Tensor
 
 
 #[inline]
-/// Slice op.
+/// Slices input tensor with indices.
 ///
 /// # Arguments
 /// * `x` - Tensor with arbitrary shape.
@@ -638,7 +646,7 @@ pub fn slice(x: &Tensor, starts: &[isize], ends: &[isize]) -> Tensor
 
 
 #[inline]
-/// Concat input tensors.
+/// Concatenates input tensors along specified axis.
 pub fn concat(tensors: &[&Tensor], axis: usize) -> Tensor
 {
     apply_op(concat::Concat { axis: axis }, tensors)

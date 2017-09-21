@@ -23,10 +23,8 @@ pub struct RawTensor {
     // Operation of this node
     pub op: Box<ops::Op>,
 
-    // Shared variable of this node; this is `Some` if created by:
-    // - variable()
-    // - constant()
-    // - scalar()
+    // Shared variable of this node;
+    // this is `Some` if created by `variable()`, `constant()` etc.
     pub param: Option<NdArray>,
 
     // References to immediate predecessors.
@@ -135,6 +133,7 @@ impl Tensor {
 }
 
 impl Ord for Tensor {
+    /// Compares the ranks in topological ordering
     fn cmp(&self, other: &Self) -> Ordering
     {
         self.borrow().rank.cmp(&other.borrow().rank)
@@ -142,6 +141,7 @@ impl Ord for Tensor {
 }
 
 impl PartialOrd for Tensor {
+    /// Compares the ranks in topological ordering
     fn partial_cmp(&self, other: &Self) -> Option<Ordering>
     {
         Some(self.cmp(other))
@@ -208,6 +208,9 @@ impl fmt::Display for Tensor {
 }
 
 #[derive(Clone)]
+/// Dynamic input to the computation graph.
+///
+/// This is used to set `ndarray`'s array object to a `Placeholder` tensor.
 pub struct Input {
     pub hash_map: FnvHashMap<Tensor, NdArray>,
 }
@@ -219,15 +222,13 @@ impl Input {
         Input { hash_map: FnvHashMap::default() }
     }
 
+    /// Adds a pair of `(Placeholder, A feed to the placeholder)` to the input object.
     #[inline]
-    pub fn add<T>(mut self, symbolic_tensor: &Tensor, array: ndarray::Array<f32, T>) -> Self
+    pub fn add<T>(mut self, placeholder: &Tensor, array: ndarray::Array<f32, T>) -> Self
     where
         T: ndarray::Dimension,
     {
-        self.hash_map.insert(
-            symbolic_tensor.clone(),
-            array.into_dyn(),
-        );
+        self.hash_map.insert(placeholder.clone(), array.into_dyn());
         // move self
         self
     }

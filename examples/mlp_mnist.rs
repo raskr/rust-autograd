@@ -30,9 +30,9 @@ fn main()
     let ((x_train, y_train), (x_test, y_test)) = dataset::load();
 
     // -- graph def --
-    let ref x = ag::placeholder(&[-1, 28*28]);
+    let ref x = ag::placeholder(&[-1, 28 * 28]);
     let ref y = ag::placeholder(&[-1, 1]);
-    let ref w = ag::variable(ag::init::glorot_uniform(&[28*28, 10]));
+    let ref w = ag::variable(ag::init::glorot_uniform(&[28 * 28, 10]));
     let ref b = ag::variable(ag::init::zeros(&[1, 10]));
     let ref z = ag::matmul(x, w) + b;
     let ref loss = ag::sparse_softmax_cross_entropy(z, y);
@@ -49,10 +49,10 @@ fn main()
 
     for epoch in 0..max_epoch {
         let perm = ag::init::permutation(num_batches) * batch_size as usize;
-        for i in  perm.to_vec().into_iter() {
+        for i in perm.to_vec().into_iter() {
             let i = i as isize;
-            let x_batch = x_train.slice(s![i..i+batch_size, ..]).to_owned();
-            let y_batch = y_train.slice(s![i..i+batch_size, ..]).to_owned();
+            let x_batch = x_train.slice(s![i..i + batch_size, ..]).to_owned();
+            let y_batch = y_train.slice(s![i..i + batch_size, ..]).to_owned();
             let feed_dict = ag::Input::new().add(x, x_batch).add(y, y_batch);
             ag::sgd::apply_gradients(&mut optimizer, &[w, b], grads, feed_dict);
         }
