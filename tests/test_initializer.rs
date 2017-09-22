@@ -41,15 +41,15 @@ fn standard_uniform()
 #[test]
 fn glorot_normal()
 {
-    let a = ag::ndarray_ext::glorot_normal(&[3]);
-    let b = ag::ndarray_ext::glorot_normal(&[3]);
+    let a = ag::ndarray_ext::glorot_normal(&[3, 2]);
+    let b = ag::ndarray_ext::glorot_normal(&[3, 2]);
     assert_ne!(a, b);
 }
 
 #[test]
 fn glorot_uniform()
 {
-    let a = ag::ndarray_ext::glorot_uniform(&[3]);
-    let b = ag::ndarray_ext::glorot_uniform(&[3]);
+    let a = ag::ndarray_ext::glorot_uniform(&[3, 2]);
+    let b = ag::ndarray_ext::glorot_uniform(&[3, 2]);
     assert_ne!(a, b);
 }

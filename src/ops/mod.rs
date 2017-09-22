@@ -88,7 +88,7 @@ fn apply_op<T: Op + 'static>(op: T, inputs: &[&Tensor]) -> Tensor
 ///
 /// ```
 /// extern crate ndarray;
-/// use autograd as ag;
+/// extern crate autograd as ag;
 ///
 /// let ref x = ag::placeholder();
 /// let ref y = 3 * x;
