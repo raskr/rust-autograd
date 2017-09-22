@@ -5,34 +5,33 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use tensor::{RawTensor, Tensor};
 
-#[doc(hidden)]
 mod dummy_op;
-mod random_ops;
-mod clip;
-mod add_n;
-mod logsumexp;
-mod log_softmax;
-mod identity;
-mod cmp_ops;
-mod math_ops;
-mod concat;
-mod tile;
-mod binary_ops;
-mod softmax;
-mod sigmoid;
-mod elu;
-mod relu;
-mod slice;
-mod sigmoid_cross_entropy;
-mod softmax_cross_entropy;
-mod sparse_softmax_cross_entropy;
-mod gather;
-mod matmul;
-mod swap_axes;
-mod reshape;
-mod reduction_ops;
-mod squeeze;
-mod expand_dims;
+pub mod random_ops;
+pub mod clip;
+pub mod add_n;
+pub mod logsumexp;
+pub mod log_softmax;
+pub mod identity;
+pub mod cmp_ops;
+pub mod math_ops;
+pub mod concat;
+pub mod tile;
+pub mod binary_ops;
+pub mod softmax;
+pub mod sigmoid;
+pub mod elu;
+pub mod relu;
+pub mod slice;
+pub mod sigmoid_cross_entropy;
+pub mod softmax_cross_entropy;
+pub mod sparse_softmax_cross_entropy;
+pub mod gather;
+pub mod matmul;
+pub mod swap_axes;
+pub mod reshape;
+pub mod reduction_ops;
+pub mod squeeze;
+pub mod expand_dims;
 
 
 /// Represents a operation node in a computation graph.
@@ -59,7 +58,7 @@ pub trait Op {
 }
 
 
-// Helper function to generate symbolic tensor
+// Helper function to generate a symbolic tensor
 #[inline]
 fn apply_op<T: Op + 'static>(op: T, inputs: &[&Tensor]) -> Tensor
 {
@@ -81,7 +80,23 @@ fn apply_op<T: Op + 'static>(op: T, inputs: &[&Tensor]) -> Tensor
 // -- Ops to manipulate `Tensor` object --
 // ---------------------------------------
 
-/// Constructor of a tensor placeholder.
+/// Creates a placeholder tensor.
+///
+/// The placeholder tensor is a dynamic input node to the computation graph,
+/// which can be filled on evaluation time.
+/// To fill the placeholder, use `autograd::Feed`.
+///
+/// ```
+/// extern crate ndarray;
+/// use autograd as ag;
+///
+/// let ref x = ag::placeholder();
+/// let ref y = 3 * x;
+///
+/// // Fills placeholder `x`.
+/// let feed_dict = ag::Feed::new().add(x, ndarray::arr1(&[2.]));
+/// assert_eq!(6., y.eval_with_input(feed_dict)[0]);
+/// ```
 #[inline]
 pub fn placeholder() -> Tensor
 {
@@ -94,7 +109,12 @@ pub fn placeholder() -> Tensor
 }
 
 
-/// Creates a shared variable.
+/// Creates a shared variable tensor from rust-ndarray's array object.
+///
+/// The shared variable behaves like any other tensors, except that
+/// it can be optimized with gradient descent methods
+/// implemented in `autograd::sgd::optimizers`.
+/// For the usages, see https://github.com/perrier1034/rust-autograd/tree/master/examples
 #[inline]
 pub fn variable<T: ndarray::Dimension>(array: ndarray::Array<f32, T>) -> Tensor
 {
@@ -644,7 +664,7 @@ pub fn slice(x: &Tensor, starts: &[isize], ends: &[isize]) -> Tensor
 
 
 #[inline]
-/// Concatenates input tensors along specified axis.
+/// Concatenates (stacks) input tensors along specified axis.
 pub fn concat(tensors: &[&Tensor], axis: usize) -> Tensor
 {
     apply_op(concat::Concat { axis: axis }, tensors)
@@ -659,11 +679,11 @@ pub fn concat(tensors: &[&Tensor], axis: usize) -> Tensor
 ///
 /// # Arguments
 /// * `param` - Target of slicing.
-/// * `indices` - Index tensor with arbitrary shape.
+/// * `indices` - Index tensor with which slices `param`. This cab be arbitrary shape.
 /// * `axis` - Slices sub tensors along this axis.
 ///
 /// # Returns
-/// Tensor with shape `(param.shape[..axis] + indices.shape + param.shape[axis+1..])`
+/// Tensor with shape `param.shape[..axis] + indices.shape + param.shape[axis+1..]`
 pub fn gather(param: &Tensor, indices: &Tensor, axis: isize) -> Tensor
 {
     let op = gather::Gather { axis: axis };

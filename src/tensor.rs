@@ -1,9 +1,6 @@
 extern crate ndarray;
 extern crate fnv;
 
-use self::fnv::FnvHashMap;
-use ndarray_ext::NdArray;
-use ops;
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::hash_set::HashSet;
@@ -12,6 +9,9 @@ use std::hash::{Hash, Hasher};
 use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
+use self::fnv::FnvHashMap;
+use ndarray_ext::NdArray;
+use ops;
 
 
 /// Symbolic multi-dimensional array which supports
@@ -19,17 +19,17 @@ use std::rc::Rc;
 pub struct Tensor(pub Rc<RefCell<RawTensor>>);
 
 pub struct RawTensor {
-    // Operation of this node
+    /// Operation of this node
     pub op: Box<ops::Op>,
 
-    // Shared variable of this node;
-    // this is `Some` if created by `variable()`, `constant()` etc.
+    /// Shared variable of this node;
+    /// this is `Some` if created by `variable()`, `constant()` etc.
     pub param: Option<NdArray>,
 
-    // References to immediate predecessors.
+    /// References to immediate predecessors.
     pub inputs: Vec<Tensor>,
 
-    // rank number for topological ordering
+    /// rank number for topological ordering
     pub rank: usize,
 }
 
@@ -242,6 +242,19 @@ impl fmt::Display for Tensor {
 /// Dynamic input to the computation graph.
 ///
 /// This is used to set `ndarray`'s array object to a `Placeholder` tensor.
+/// Arbitrary number of inputs can be set to this object with builder-like usage.
+///
+/// ```
+/// extern crate ndarray;
+/// use autograd as ag;
+///
+/// let ref x = ag::placeholder();
+/// let ref y = 3 * x;
+///
+/// // Fills placeholder `x`.
+/// let feed_dict = ag::Feed::new().add(x, ndarray::arr1(&[2.]));
+/// assert_eq!(6., y.eval_with_input(feed_dict)[0]);
+/// ```
 pub struct Feed {
     pub hash_map: FnvHashMap<Tensor, NdArray>,
 }
