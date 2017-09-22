@@ -51,7 +51,7 @@ fn expr1()
 #[test]
 fn expr2()
 {
-    let ref x = ag::placeholder(&[1]);
+    let ref x = ag::placeholder();
     let ref y = 3 * x * x;
     let grads = ag::gradients(y, &[x], None);
     let fd = ag::Feed::new().add(
@@ -64,7 +64,7 @@ fn expr2()
 #[test]
 fn expr3()
 {
-    let ref x = ag::placeholder(&[1]);
+    let ref x = ag::placeholder();
     let ref y = 3 * x * x + 2;
     let grads = ag::gradients(y, &[x], None);
     let fd = ag::Feed::new().add(
@@ -77,7 +77,7 @@ fn expr3()
 #[test]
 fn expr4()
 {
-    let ref x = ag::placeholder(&[1]);
+    let ref x = ag::placeholder();
     let ref y = 3 * x * x + 2 * x + 1;
     let grads = ag::gradients(y, &[x], None);
     let fd = ag::Feed::new().add(
@@ -90,8 +90,8 @@ fn expr4()
 #[test]
 fn expr5()
 {
-    let ref x1 = ag::placeholder(&[1]);
-    let ref x2 = ag::placeholder(&[1]);
+    let ref x1 = ag::placeholder();
+    let ref x2 = ag::placeholder();
     let ref y = 3 * x1 * x1 + 2 * x1 + x2 + 1;
     let grads = ag::gradients(y, &[x1], None);
     let fd = ag::Feed::new().add(
@@ -106,7 +106,7 @@ fn expr5()
 // even if the value of `x1` is not given
 fn expr6()
 {
-    let ref x1 = ag::placeholder(&[1]);
+    let ref x1 = ag::placeholder();
     let ref x2 = ag::variable(ag::initializers::zeros(&[1]));
     let ref y = 3 * x1 * x1 + 5 * x2 + 1;
     let grads = ag::gradients(y, &[x2], None);
@@ -116,7 +116,7 @@ fn expr6()
 #[test]
 fn differentiate_twice()
 {
-    let ref x = ag::placeholder(&[1]);
+    let ref x = ag::placeholder();
     let ref y = x * x;
     let ref g1 = ag::gradients(y, &[x], None)[0];
     let ref g2 = ag::gradients(g1, &[x], None)[0];
@@ -133,7 +133,7 @@ fn differentiate_twice()
 #[test]
 fn expr7()
 {
-    let ref x1 = ag::placeholder(&[1]);
+    let ref x1 = ag::placeholder();
     let ref x2 = ag::variable(ag::init::zeros(&[1]));
     let ref y = 2 * x1 * x1 + 3 * x2 + 1;
     let ref g1 = ag::gradients(y, &[x1], None)[0];
@@ -151,7 +151,7 @@ fn expr7()
 #[test]
 fn expr8()
 {
-    let ref x = ag::placeholder(&[1]);
+    let ref x = ag::placeholder();
     let ref y = ag::variable(ag::init::zeros(&[1]));
     let ref z = 2 * x * x + 3 * y + 1;
     let ref g1 = ag::gradients(z, &[y], None)[0];

@@ -22,7 +22,7 @@ Here we are computing partial derivatives of `z = 2x^2 + 3y + 1`.
 extern crate ndarray;
 extern crate autograd as ag;
 
-let ref x = ag::placeholder(&[1]);
+let ref x = ag::placeholder();
 let ref y = ag::variable(ndarray::arr1(&[0]));
 let ref z = 2*x*x + 3*y + 1;
 

@@ -453,8 +453,8 @@ fn primitive_back_propagation_through_time()
 
     // -- build graph for BPTT --
     let mut loss_buf = vec![];
-    let mut h_buf = vec![ag::placeholder(&[-1, 3])];
-    let sentences = ag::placeholder(&[-1, 4]);
+    let mut h_buf = vec![ag::placeholder()];
+    let sentences = ag::placeholder();
 
     for i in 0..max_sent {
         // pick new word id
@@ -506,7 +506,7 @@ pub fn lstm_lm()
     // === graph def
     let ref tbl = ag::variable(ag::init::standard_normal(&[vocab_size, vec_dim]));
     let ref w = ag::variable(ag::init::standard_normal(&[state_size, vocab_size]));
-    let sentences = ag::placeholder(&[-1, 3]);
+    let sentences = ag::placeholder();
     let mut rnn = ag::nn_impl::rnn::LSTM::new(state_size, vec_dim, batch_size);
 
     let mut loss_buf = vec![];

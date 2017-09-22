@@ -82,10 +82,8 @@ fn apply_op<T: Op + 'static>(op: T, inputs: &[&Tensor]) -> Tensor
 // ---------------------------------------
 
 /// Constructor of a tensor placeholder.
-///
-/// `shape[*]` can be -1, which means dynamic dim size.
 #[inline]
-pub fn placeholder(shape: &[isize]) -> Tensor
+pub fn placeholder() -> Tensor
 {
     Tensor(Rc::new(RefCell::new(RawTensor {
         op: Box::new(dummy_op::DummyOp { name: "Placeholder".to_string() }),
@@ -552,7 +550,7 @@ pub fn softmax(x: &Tensor, axis: isize) -> Tensor
 
 
 #[inline]
-/// Computes `cross_entropy(sigmoid(y), t)`.
+/// Computes `binary_cross_entropy(sigmoid(y), t)`.
 ///
 /// This function is better than that combination in that it can prevent
 /// underflow of `log(sigmoid)`.

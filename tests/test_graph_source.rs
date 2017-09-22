@@ -26,6 +26,6 @@ fn constant()
 fn placeholder()
 {
     let arr = ndarray::ArrayD::<f32>::zeros(ndarray::IxDyn(&[2]));
-    let p = ag::placeholder(&[2]);
+    let p = ag::placeholder();
     assert_eq!(arr, p.eval_with_input(ag::Feed::new().add(&p, arr.clone())))
 }

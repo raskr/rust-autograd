@@ -1,13 +1,13 @@
 extern crate ndarray;
 extern crate fnv;
 
+use self::fnv::FnvHashMap;
+use ndarray_ext::NdArray;
+use ops;
 use std::collections::binary_heap::BinaryHeap;
 use std::collections::hash_set::HashSet;
 use std::mem;
-use self::fnv::FnvHashMap;
 use tensor::Tensor;
-use ndarray_ext::NdArray;
-use ops;
 
 
 
@@ -45,7 +45,6 @@ pub fn perform_eval(target: &Tensor, memo: &mut FnvHashMap<Tensor, NdArray>, tra
 
 #[inline]
 // make mapping of {node => the node contributed to gradient or not}
-// TODO: loop-based rather than recursion
 pub fn contributed_to_grads(objective: &Tensor, variables: &[&Tensor]) -> FnvHashMap<Tensor, bool>
 {
     fn rec(target: &Tensor, vars: &[&Tensor], memo: &mut FnvHashMap<Tensor, bool>)
@@ -92,15 +91,20 @@ pub fn symbolic_gradients(
 ) -> Vec<Tensor>
 {
     #[inline]
-    fn accumulate_grad(gys: &mut Vec<Tensor>)
+    fn maybe_reduce_grad(gys: &mut Vec<Tensor>)
     {
-        assert!(gys.len() >= 2);
+        if gys.len() < 2 {
+            return;
+        }
         let acc = {
+            // values to refs
             let refs = gys.iter().map(|a| a).collect::<Vec<_>>();
             if refs.len() == 2 {
+                // normal addition
                 refs[0] + refs[1]
             } else {
-                // AddN is preferred for memory efficiency
+                // For 3 or more gradients, AddN, i.e. inplace accumulation
+                // is preferred for performance
                 ops::add_n(refs.as_slice())
             }
         };
@@ -122,6 +126,8 @@ pub fn symbolic_gradients(
     let mut heap = BinaryHeap::new();
     heap.push(objective.clone());
     grads.insert(objective.clone(), vec![initial_grad]);
+
+    // This prevents calling `grad()` twice or more
     let mut grad_done = HashSet::<Tensor>::new();
 
     // builds backward graph
@@ -134,9 +140,7 @@ pub fn symbolic_gradients(
         // time to call `grad`
         let gxs = {
             if let Some(gys) = grads.get_mut(&target) {
-                if gys.len() >= 2 {
-                    accumulate_grad(gys);
-                }
+                maybe_reduce_grad(gys);
                 borrowed_target.op.grad(&gys[0], xs.as_slice(), &target)
             } else {
                 unreachable!("Safe unwrapping is guaranteed by topological ordering")
@@ -179,9 +183,7 @@ pub fn symbolic_gradients(
             let mut gys = grads.remove(v).expect(
                 "Input variable(s) didn't contributed to gradient computation",
             );
-            if gys.len() >= 2 {
-                accumulate_grad(&mut gys);
-            }
+            maybe_reduce_grad(&mut gys);
             gys.remove(0)
         })
         .collect::<Vec<Tensor>>()

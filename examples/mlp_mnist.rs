@@ -28,8 +28,8 @@ fn main()
     let ((x_train, y_train), (x_test, y_test)) = dataset::load();
 
     // -- graph def --
-    let ref x = ag::placeholder(&[-1, 28 * 28]);
-    let ref y = ag::placeholder(&[-1, 1]);
+    let ref x = ag::placeholder();
+    let ref y = ag::placeholder();
     let ref w = ag::variable(ag::init::glorot_uniform(&[28 * 28, 10]));
     let ref b = ag::variable(ag::init::zeros(&[1, 10]));
     let ref z = ag::matmul(x, w) + b;
