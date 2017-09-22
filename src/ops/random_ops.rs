@@ -1,4 +1,3 @@
-use initializers as init;
 use ops;
 use tensor::Tensor;
 
@@ -59,7 +58,7 @@ impl ops::Op for RandomNormal {
 
     fn compute(&mut self, _: &[&::NdArray], _: bool) -> ::NdArray
     {
-        init::random_normal(self.shape.as_slice(), self.mean, self.stddev)
+        ::ndarray_ext::random_normal(self.shape.as_slice(), self.mean, self.stddev)
     }
 }
 
@@ -76,7 +75,7 @@ impl ops::Op for RandomUniform {
 
     fn compute(&mut self, _: &[&::NdArray], _: bool) -> ::NdArray
     {
-        init::random_uniform(self.shape.as_slice(), self.min, self.max)
+        ::ndarray_ext::random_uniform(self.shape.as_slice(), self.min, self.max)
     }
 }
 
@@ -93,7 +92,7 @@ impl ops::Op for StandardNormal {
 
     fn compute(&mut self, _: &[&::NdArray], _: bool) -> ::NdArray
     {
-        init::standard_normal(self.shape.as_slice())
+        ::ndarray_ext::standard_normal(self.shape.as_slice())
     }
 }
 
@@ -110,7 +109,7 @@ impl ops::Op for StandardUniform {
 
     fn compute(&mut self, _: &[&::NdArray], _: bool) -> ::NdArray
     {
-        init::standard_uniform(self.shape.as_slice())
+        ::ndarray_ext::standard_uniform(self.shape.as_slice())
     }
 }
 
@@ -127,7 +126,7 @@ impl ops::Op for Bernoulli {
 
     fn compute(&mut self, _: &[&::NdArray], _: bool) -> ::NdArray
     {
-        init::bernoulli(self.shape.as_slice(), self.p)
+        ::ndarray_ext::bernoulli(self.shape.as_slice(), self.p)
     }
 }
 
@@ -144,7 +143,7 @@ impl ops::Op for Exponential {
 
     fn compute(&mut self, _: &[&::NdArray], _: bool) -> ::NdArray
     {
-        init::exponential(self.shape.as_slice(), self.lambda)
+        ::ndarray_ext::exponential(self.shape.as_slice(), self.lambda)
     }
 }
 
@@ -161,7 +160,7 @@ impl ops::Op for LogNormal {
 
     fn compute(&mut self, _: &[&::NdArray], _: bool) -> ::NdArray
     {
-        init::log_normal(self.shape.as_slice(), self.mean, self.stddev)
+        ::ndarray_ext::log_normal(self.shape.as_slice(), self.mean, self.stddev)
     }
 }
 
@@ -178,6 +177,6 @@ impl ops::Op for Gamma {
 
     fn compute(&mut self, _: &[&::NdArray], _: bool) -> ::NdArray
     {
-        init::gamma(self.shape.as_slice(), self.shape_param, self.scale)
+        ::ndarray_ext::gamma(self.shape.as_slice(), self.shape_param, self.scale)
     }
 }

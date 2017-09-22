@@ -58,14 +58,6 @@ impl ops::Op for Gather {
     }
 }
 
-#[test]
-fn gather()
-{
-    let ref param = ::constant(::init::zeros(&[5, 4, 8, 2]));
-    let ref indices = ::constant(ndarray::arr2(&[[5., 4., 3.], [2., 1., 0.]]));
-    let y = ::gather(param, indices, 2);
-    assert_eq!(y.eval().shape(), &[5, 4, 2, 3, 2])
-}
 
 impl ::Op for GatherGrad {
     fn name(&self) -> &str

@@ -720,7 +720,7 @@ pub fn zeros(shape: &[usize]) -> Tensor
     Tensor(Rc::new(RefCell::new(RawTensor {
         op: Box::new(dummy_op::DummyOp { name: "Zeros".to_string() }),
         inputs: vec![],
-        param: Some(::init::zeros(shape)),
+        param: Some(::ndarray_ext::zeros(shape)),
         rank: 0,
     })))
 }
@@ -732,7 +732,7 @@ pub fn ones(shape: &[usize]) -> Tensor
     Tensor(Rc::new(RefCell::new(RawTensor {
         op: Box::new(dummy_op::DummyOp { name: "Ones".to_string() }),
         inputs: vec![],
-        param: Some(::init::ones(shape)),
+        param: Some(::ndarray_ext::ones(shape)),
         rank: 0,
     })))
 }

@@ -14,6 +14,15 @@ fn tile()
 }
 
 #[test]
+fn gather()
+{
+    let ref param = ag::constant(ag::ndarray_ext::zeros(&[5, 4, 8, 2]));
+    let ref indices = ag::constant(ndarray::arr2(&[[5., 4., 3.], [2., 1., 0.]]));
+    let y = ag::gather(param, indices, 2);
+    assert_eq!(y.eval().shape(), &[5, 4, 2, 3, 2])
+}
+
+#[test]
 fn clip()
 {
     let ref x = ag::constant(ndarray::arr1(&[2., 4., 6.]));
@@ -60,7 +69,7 @@ fn argmax_keep()
 #[test]
 fn reshape()
 {
-    let input_arr = ag::init::standard_normal(&[3, 2, 2]);
+    let input_arr = ag::ndarray_ext::standard_normal(&[3, 2, 2]);
     let answer = input_arr
         .clone()
         .into_shape(ndarray::IxDyn(&[3, 4]))

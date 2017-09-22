@@ -6,11 +6,11 @@ extern crate ndarray;
 fn scalar_add()
 {
     // graph def
-    let ones = ag::constant(ndarray::ArrayD::<f32>::from_elem(ndarray::IxDyn(&[3]), 1.));
+    let ones = ag::constant(ndarray::arr1(&[1., 1., 1.]));
     let z: ag::Tensor = 3. + ones + 2;
     assert_eq!(
         z.eval(),
-        ndarray::ArrayD::<f32>::from_elem(ndarray::IxDyn(&[3]), 6.)
+        ndarray::arr1(&[6., 6., 6.]).into_dyn()
     );
 }
 
@@ -18,11 +18,11 @@ fn scalar_add()
 fn scalar_sub()
 {
     // graph def
-    let ones = ag::constant(ndarray::ArrayD::<f32>::from_elem(ndarray::IxDyn(&[3]), 1.));
+    let ones = ag::constant(ndarray::arr1(&[1., 1., 1.]));
     let z: ag::Tensor = 3. - ones - 2;
     assert_eq!(
         z.eval(),
-        ndarray::ArrayD::<f32>::zeros(ndarray::IxDyn(&[3]))
+        ndarray::arr1(&[0., 0., 0.]).into_dyn()
     );
 }
 
@@ -30,11 +30,11 @@ fn scalar_sub()
 fn scalar_mul()
 {
     // graph def
-    let ones = ag::constant(ndarray::ArrayD::<f32>::from_elem(ndarray::IxDyn(&[3]), 1.));
+    let ones = ag::constant(ndarray::arr1(&[1., 1., 1.]));
     let z: ag::Tensor = 3. * ones * 2;
     assert_eq!(
         z.eval(),
-        ndarray::ArrayD::<f32>::from_elem(ndarray::IxDyn(&[3]), 6.)
+        ndarray::arr1(&[6., 6., 6.]).into_dyn()
     );
 }
 
@@ -42,11 +42,11 @@ fn scalar_mul()
 fn scalar_div()
 {
     // graph def
-    let ones = ag::constant(ndarray::ArrayD::<f32>::from_elem(ndarray::IxDyn(&[3]), 1.));
+    let ones = ag::constant(ndarray::arr1(&[1., 1., 1.]));
     let z: ag::Tensor = 3. / &ones / 2;
     assert_eq!(
         z.eval(),
-        ndarray::ArrayD::<f32>::from_elem(ndarray::IxDyn(&[3]), 1.5)
+        ndarray::arr1(&[1.5, 1.5, 1.5]).into_dyn()
     );
 }
 
@@ -54,12 +54,12 @@ fn scalar_div()
 fn add()
 {
     // graph def
-    let zeros = ag::constant(ndarray::ArrayD::<f32>::zeros(ndarray::IxDyn(&[3])));
-    let ones = ag::constant(ndarray::ArrayD::<f32>::from_elem(ndarray::IxDyn(&[3]), 1.));
+    let zeros = ag::constant(ndarray::arr1(&[0., 0., 0.]));
+    let ones = ag::constant(ndarray::arr1(&[1., 1., 1.]));
     let z: ag::Tensor = zeros + &ones;
     assert_eq!(
         z.eval(),
-        ndarray::ArrayD::<f32>::from_elem(ndarray::IxDyn(&[3]), 1.)
+        ndarray::arr1(&[1., 1., 1.]).into_dyn()
     );
 }
 
@@ -67,12 +67,12 @@ fn add()
 fn sub()
 {
     // graph def
-    let zeros = ag::constant(ndarray::ArrayD::<f32>::zeros(ndarray::IxDyn(&[3])));
-    let ones = ag::constant(ndarray::ArrayD::<f32>::from_elem(ndarray::IxDyn(&[3]), 1.));
+    let zeros = ag::constant(ndarray::arr1(&[0., 0., 0.]));
+    let ones = ag::constant(ndarray::arr1(&[1., 1., 1.]));
     let z: ag::Tensor = ones - &zeros;
     assert_eq!(
         z.eval(),
-        ndarray::ArrayD::<f32>::from_elem(ndarray::IxDyn(&[3]), 1.)
+        ndarray::arr1(&[1., 1., 1.]).into_dyn()
     );
 }
 
@@ -80,12 +80,12 @@ fn sub()
 fn mul()
 {
     // graph def
-    let zeros = ag::constant(ndarray::ArrayD::<f32>::zeros(ndarray::IxDyn(&[3])));
-    let ones = ag::constant(ndarray::ArrayD::<f32>::from_elem(ndarray::IxDyn(&[3]), 1.));
+    let zeros = ag::constant(ndarray::arr1(&[0., 0., 0.]));
+    let ones = ag::constant(ndarray::arr1(&[1., 1., 1.]));
     let z: ag::Tensor = zeros * ones;
     assert_eq!(
         z.eval(),
-        ndarray::ArrayD::<f32>::zeros(ndarray::IxDyn(&[3]))
+        ndarray::arr1(&[0., 0., 0.]).into_dyn()
     );
 }
 
@@ -93,11 +93,11 @@ fn mul()
 fn div()
 {
     // graph def
-    let zeros = ag::constant(ndarray::ArrayD::<f32>::zeros(ndarray::IxDyn(&[3])));
-    let ones = ag::constant(ndarray::ArrayD::<f32>::from_elem(ndarray::IxDyn(&[3]), 1.));
+    let zeros = ag::constant(ndarray::arr1(&[0., 0., 0.]));
+    let ones = ag::constant(ndarray::arr1(&[1., 1., 1.]));
     let z: ag::Tensor = zeros / ones;
     assert_eq!(
         z.eval(),
-        ndarray::ArrayD::<f32>::zeros(ndarray::IxDyn(&[3]))
+        ndarray::arr1(&[0., 0., 0.]).into_dyn()
     );
 }

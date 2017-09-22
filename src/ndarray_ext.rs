@@ -4,9 +4,13 @@ extern crate ndarray;
 use std::f32;
 
 
-/// type alias for convenience
+
+/// type aliases for convenience
 pub type NdArray = ndarray::Array<f32, ndarray::IxDyn>;
 pub type NdArrayView<'a> = ndarray::ArrayView<'a, f32, ndarray::IxDyn>;
+
+/// exposes array_gen
+pub use array_gen::*;
 
 
 #[inline]
@@ -54,7 +58,6 @@ pub fn into_mat(x: NdArray) -> ndarray::Array<f32, ndarray::Ix2>
     };
     x.into_shape(ndarray::Ix2(a, b)).unwrap()
 }
-
 
 /// Generates ndarray which can be fed to ag::variable() etc.
 pub mod array_gen {

@@ -30,8 +30,8 @@ fn main()
     // -- graph def --
     let ref x = ag::placeholder();
     let ref y = ag::placeholder();
-    let ref w = ag::variable(ag::init::glorot_uniform(&[28 * 28, 10]));
-    let ref b = ag::variable(ag::init::zeros(&[1, 10]));
+    let ref w = ag::variable(ag::ndarray_ext::glorot_uniform(&[28 * 28, 10]));
+    let ref b = ag::variable(ag::ndarray_ext::zeros(&[1, 10]));
     let ref z = ag::matmul(x, w) + b;
     let ref loss = ag::sparse_softmax_cross_entropy(z, y);
     let ref grads = ag::gradients(loss, &[w, b], None);
@@ -47,7 +47,7 @@ fn main()
 
     for epoch in 0..max_epoch {
         eval_with_time!({
-            let perm = ag::init::permutation(num_batches) * batch_size as usize;
+            let perm = ag::ndarray_ext::permutation(num_batches) * batch_size as usize;
             for i in perm.to_vec().into_iter() {
                 let i = i as isize;
                 let x_batch = x_train.slice(s![i..i + batch_size, ..]).to_owned();

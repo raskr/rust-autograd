@@ -17,9 +17,7 @@ pub mod ndarray_ext;
 
 // == re-exposures ==
 
-pub use ndarray_ext::array_gen as initializers;
-
-pub use initializers as init;
+pub use ndarray_ext::array_gen;
 
 pub use tensor::Tensor;
 

@@ -1,6 +1,5 @@
 extern crate ndarray;
 
-use initializers;
 use ops;
 use tensor::Tensor;
 
@@ -29,11 +28,11 @@ impl LSTM {
         LSTM {
             state_size: state_size,
             batch_size: batch_size,
-            last_output: ops::constant(initializers::zeros(&[batch_size, state_size])),
-            cell: ops::constant(initializers::zeros(&[batch_size, state_size])),
-            wx: ops::variable(initializers::glorot_uniform(&[input_dim, 4 * state_size])),
-            wh: ops::variable(initializers::glorot_uniform(&[state_size, 4 * state_size])),
-            b: ops::variable(initializers::zeros(&[1, 4 * state_size])),
+            last_output: ops::constant(::ndarray_ext::zeros(&[batch_size, state_size])),
+            cell: ops::constant(::ndarray_ext::zeros(&[batch_size, state_size])),
+            wx: ops::variable(::ndarray_ext::glorot_uniform(&[input_dim, 4 * state_size])),
+            wh: ops::variable(::ndarray_ext::glorot_uniform(&[state_size, 4 * state_size])),
+            b: ops::variable(::ndarray_ext::zeros(&[1, 4 * state_size])),
         }
     }
 
@@ -80,8 +79,8 @@ impl RNN for LSTM {
     #[inline]
     fn reset_state(&mut self)
     {
-        self.last_output = ops::constant(initializers::zeros(&[self.batch_size, self.state_size]));
+        self.last_output = ops::constant(::ndarray_ext::zeros(&[self.batch_size, self.state_size]));
 
-        self.cell = ops::constant(initializers::zeros(&[self.batch_size, self.state_size]));
+        self.cell = ops::constant(::ndarray_ext::zeros(&[self.batch_size, self.state_size]));
     }
 }
