@@ -10,17 +10,18 @@ readme = "README.md"
 description = "A toy library to run computation graphs mimicking TensorFlow and Theano"
 # documentation = "http://perrier1034.github.io/rust-autograd/"
 
-[lib]
-name = "autograd"
-path = "src/lib.rs"
-
-[[bin]]
-name = "mlp_mnist"
-path = "examples/mlp_mnist.rs"
-
 [dependencies]
 rand = "0.3.15"
 ndarray = { version = "0.10.0" }
 glob = "0.2"
 fnv = "1.0.5"
 # blas-sys = { version = "0.6", default-features = true, features = ["openblas"] }
+
+[lib]
+name = "autograd"
+path = "src/lib.rs"
+
+[[example]]
+name = "mlp_mnist"
+path = "examples/mlp_mnist.rs"
+
