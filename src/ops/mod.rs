@@ -672,10 +672,12 @@ pub fn concat(tensors: &[&Tensor], axis: usize) -> Tensor
 
 
 #[inline]
-/// Gather slices.
+/// Gathers slices.
 ///
-/// For example, this can be used for vector lookup.
-/// See https://www.tensorflow.org/api_docs/python/tf/gather.
+/// Along `axis`, slices subviews from `param` with `indices`, and then gathers those.
+/// For example, this can be used for embedding vector lookup.
+///
+/// See also https://www.tensorflow.org/api_docs/python/tf/gather.
 ///
 /// # Arguments
 /// * `param` - Target of slicing.
