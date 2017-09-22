@@ -1,6 +1,9 @@
 extern crate ndarray;
 extern crate fnv;
 
+use self::fnv::FnvHashMap;
+use ndarray_ext::NdArray;
+use ops;
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::hash_set::HashSet;
@@ -9,9 +12,6 @@ use std::hash::{Hash, Hasher};
 use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
-use self::fnv::FnvHashMap;
-use ndarray_ext::NdArray;
-use ops;
 
 
 /// Symbolic multi-dimensional array which supports

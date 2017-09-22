@@ -63,6 +63,7 @@ pub mod array_gen {
     extern crate ndarray;
 
     // `Rng` trait must be included
+
     use self::rand::Rng;
     use self::rand::distributions::IndependentSample;
     use ndarray_ext::NdArray;
@@ -72,7 +73,7 @@ pub mod array_gen {
     where
         T: IndependentSample<f64>,
     {
-//        let mut rng = XorShiftRng::new_unseeded();
+        //        let mut rng = XorShiftRng::new_unseeded();
         let mut rng = rand::weak_rng();
         NdArray::from_shape_fn(shape, |_| dist.ind_sample(&mut rng) as f32)
     }
@@ -83,7 +84,7 @@ pub mod array_gen {
         T: IndependentSample<f64>,
         F: Fn(f64) -> f64,
     {
-//        let mut rng = XorShiftRng::new_unseeded();
+        //        let mut rng = XorShiftRng::new_unseeded();
         let mut rng = rand::weak_rng();
         NdArray::from_shape_fn(shape, |_| f(dist.ind_sample(&mut rng)) as f32)
     }

@@ -318,6 +318,16 @@ pub fn equals(a: &Tensor, b: &Tensor) -> Tensor
 
 #[inline]
 /// Takes argmax along specified axis.
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let input_arr = ndarray::arr2(&[[1., 2.], [3., 4.], [6., 5.]]);
+/// let answer = ndarray::arr1(&[1., 1., 0.]).into_dyn();
+/// let input = ag::constant(input_arr);
+/// let result = ag::argmax(&input, 1, false);
+/// assert_eq!(result.eval(), answer);
+/// ```
 pub fn argmax(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 {
     let op = reduction_ops::ArgMax {
@@ -350,6 +360,18 @@ pub fn squeeze(x: &Tensor, axes: &[isize]) -> Tensor
 
 #[inline]
 /// Tiles input tensor along specified axis.
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let ref x = ag::constant(ndarray::arr2(&[[2., 2.], [3., 3.]]));
+/// let ref y = ag::tile(x, 0, 2);
+/// assert_eq!(
+///     y.eval(),
+///     ndarray::arr2(&[[2., 2.], [3., 3.], [2., 2.], [3., 3.]]).into_dyn()
+/// );
+/// ```
 pub fn tile(x: &Tensor, axis: isize, num: usize) -> Tensor
 {
     let op = tile::Tile {
@@ -362,6 +384,15 @@ pub fn tile(x: &Tensor, axis: isize, num: usize) -> Tensor
 
 #[inline]
 /// Limits all elements so as to be within `[min, max]`
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let ref x = ag::constant(ndarray::arr1(&[2., 4., 6.]));
+/// let ref y = ag::clip(x, 3., 5.);
+/// assert_eq!(y.eval(), ndarray::arr1(&[3., 4., 5.]).into_dyn());
+/// ```
 pub fn clip(x: &Tensor, min: f32, max: f32) -> Tensor
 {
     let op = clip::Clip { min: min, max: max };
@@ -371,6 +402,15 @@ pub fn clip(x: &Tensor, min: f32, max: f32) -> Tensor
 
 #[inline]
 /// Take max along specified axis.
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let x = ag::constant(ndarray::arr2(&[[2.], [4.], [6.]]));
+/// let y = ag::reduce_max(&x, 0, false);
+/// assert_eq!(y.eval()[0], 6.);
+/// ```
 pub fn reduce_max(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 {
     let op = reduction_ops::ReduceMax {
@@ -395,6 +435,15 @@ pub fn reduce_min(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 
 #[inline]
 /// Take mean along specified axis.
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let x = ag::constant(ndarray::arr2(&[[2.], [4.], [6.]]));
+/// let y = ag::reduce_mean(&x, 0, false);
+/// assert_eq!(y.eval()[0], 4.);
+/// ```
 pub fn reduce_mean(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 {
     let op = reduction_ops::ReduceMean {
@@ -439,6 +488,15 @@ pub fn gradients(
 
 #[inline]
 /// Reshapes input tensor.
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let x = ag::zeros(&[3, 2, 2]);
+/// let y = ag::reshape(&x, &[3, 4]);
+/// assert_eq!(y.eval(), x.eval().into_shape(ndarray::IxDyn(&[3, 4])).unwrap());
+/// ```
 pub fn reshape(x: &Tensor, shape: &[isize]) -> Tensor
 {
     let mut minus_one_found = false;
@@ -686,6 +744,16 @@ pub fn concat(tensors: &[&Tensor], axis: usize) -> Tensor
 ///
 /// # Returns
 /// Tensor with shape `param.shape[..axis] + indices.shape + param.shape[axis+1..]`
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let ref param = ag::constant(ag::ndarray_ext::zeros(&[5, 4, 8, 2]));
+/// let ref indices = ag::constant(ndarray::arr2(&[[5., 4., 3.], [2., 1., 0.]]));
+/// let y = ag::gather(param, indices, 2);
+/// assert_eq!(y.eval().shape(), &[5, 4, 2, 3, 2])
+/// ```
 pub fn gather(param: &Tensor, indices: &Tensor, axis: isize) -> Tensor
 {
     let op = gather::Gather { axis: axis };

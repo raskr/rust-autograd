@@ -54,10 +54,7 @@ fn expr2()
     let ref x = ag::placeholder();
     let ref y = 3 * x * x;
     let grads = ag::gradients(y, &[x], None);
-    let fd = ag::Feed::new().add(
-        x,
-        ndarray::arr1(&[3.]),
-    );
+    let fd = ag::Feed::new().add(x, ndarray::arr1(&[3.]));
     assert_eq!(18., grads[0].eval_with_input(fd)[0]);
 }
 
@@ -67,10 +64,7 @@ fn expr3()
     let ref x = ag::placeholder();
     let ref y = 3 * x * x + 2;
     let grads = ag::gradients(y, &[x], None);
-    let fd = ag::Feed::new().add(
-        x,
-        ndarray::arr1(&[3.]),
-    );
+    let fd = ag::Feed::new().add(x, ndarray::arr1(&[3.]));
     assert_eq!(18., grads[0].eval_with_input(fd)[0]);
 }
 
@@ -80,10 +74,7 @@ fn expr4()
     let ref x = ag::placeholder();
     let ref y = 3 * x * x + 2 * x + 1;
     let grads = ag::gradients(y, &[x], None);
-    let fd = ag::Feed::new().add(
-        x,
-        ndarray::arr1(&[3.]),
-    );
+    let fd = ag::Feed::new().add(x, ndarray::arr1(&[3.]));
     assert_eq!(20., grads[0].eval_with_input(fd)[0]);
 }
 
@@ -94,10 +85,7 @@ fn expr5()
     let ref x2 = ag::placeholder();
     let ref y = 3 * x1 * x1 + 2 * x1 + x2 + 1;
     let grads = ag::gradients(y, &[x1], None);
-    let fd = ag::Feed::new().add(
-        x1,
-        ndarray::arr1(&[3.]),
-    );
+    let fd = ag::Feed::new().add(x1, ndarray::arr1(&[3.]));
     assert_eq!(20., grads[0].eval_with_input(fd)[0]);
 }
 
@@ -121,10 +109,7 @@ fn differentiate_twice()
     let ref g1 = ag::gradients(y, &[x], None)[0];
     let ref g2 = ag::gradients(g1, &[x], None)[0];
 
-    let fd = ag::Feed::new().add(
-        x,
-        ndarray::arr1(&[2.]),
-    );
+    let fd = ag::Feed::new().add(x, ndarray::arr1(&[2.]));
 
     assert_eq!(2., g2.eval_with_input(fd)[0]);
 }
@@ -143,7 +128,7 @@ fn expr7()
     assert_eq!(
         8.,
         g1.eval_with_input(ag::Feed::new().add(x1, ndarray::arr1(&[2.])))[0]
-    ); // => [8.]
+    );
     assert_eq!(3., g2.eval()[0]); // => [3.]
     assert_eq!(4., gg1.eval()[0]); // => [4.]
 }
