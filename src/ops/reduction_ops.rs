@@ -65,8 +65,8 @@ impl ops::Op for ArgMax {
     fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let x = xs[0];
-        let axis = if -1 == self.axis {
-            x.ndim() - 1
+        let axis = if self.axis < 0 {
+            (x.ndim() as isize + self.axis) as usize
         } else {
             self.axis as usize
         };
@@ -144,8 +144,8 @@ impl ops::Op for ReduceMin {
     {
         let x = xs[0];
 
-        let axis = if -1 == self.axis {
-            x.ndim() - 1
+        let axis = if self.axis < 0 {
+            (x.ndim() as isize + self.axis) as usize
         } else {
             self.axis as usize
         };
@@ -181,8 +181,9 @@ impl ops::Op for ReduceMinGrad {
         let x = xs[0].view();
         let y = xs[1].view();
         let gy = xs[2].view();
-        let axis = if -1 == self.axis {
-            x.ndim() - 1
+
+        let axis = if self.axis < 0 {
+            (x.ndim() as isize + self.axis) as usize
         } else {
             self.axis as usize
         };
@@ -225,8 +226,8 @@ impl ops::Op for ReduceMax {
     {
         let x = xs[0];
 
-        let axis = if -1 == self.axis {
-            x.ndim() - 1
+        let axis = if self.axis < 0 {
+            (x.ndim() as isize + self.axis) as usize
         } else {
             self.axis as usize
         };
@@ -262,8 +263,9 @@ impl ops::Op for ReduceMaxGrad {
         let x = xs[0].view();
         let y = xs[1].view();
         let gy = xs[2].view();
-        let axis = if -1 == self.axis {
-            x.ndim() - 1
+
+        let axis = if self.axis < 0 {
+            (x.ndim() as isize + self.axis) as usize
         } else {
             self.axis as usize
         };
@@ -313,8 +315,8 @@ impl ops::Op for ReduceMean {
             )
         }
 
-        let axis = if -1 == self.axis {
-            x.ndim()
+        let axis = if self.axis < 0 {
+            (x.ndim() as isize + self.axis) as usize
         } else {
             self.axis as usize
         };
@@ -347,8 +349,9 @@ impl ops::Op for ReduceMeanGrad {
     fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let x = xs[0];
-        let axis = if -1 == self.axis {
-            x.ndim() - 1
+
+        let axis = if self.axis < 0 {
+            (x.ndim() as isize + self.axis) as usize
         } else {
             self.axis as usize
         };
@@ -387,8 +390,8 @@ impl ops::Op for ReduceSum {
     {
         let x = &xs[0];
 
-        let axis = if -1 == self.axis {
-            x.ndim()
+        let axis = if self.axis < 0 {
+            (x.ndim() as isize + self.axis) as usize
         } else {
             self.axis as usize
         };
@@ -420,8 +423,9 @@ impl ops::Op for ReduceSumGrad {
     fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let x = xs[0];
-        let axis = if -1 == self.axis {
-            x.ndim() - 1
+
+        let axis = if self.axis < 0 {
+            (x.ndim() as isize + self.axis) as usize
         } else {
             self.axis as usize
         };

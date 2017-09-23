@@ -24,8 +24,8 @@ impl ops::Op for Gather {
         let indices = xs[0].map(|a| *a as usize);
         let param = &xs[1];
         let param_shape = param.shape();
-        let axis = if self.axis == -1 {
-            param.ndim()
+        let axis = if self.axis < 0 {
+            (param.ndim() as isize + self.axis) as usize
         } else {
             self.axis as usize
         };

@@ -5,11 +5,11 @@ use tensor::Tensor;
 
 
 pub struct Concat {
-    pub axis: usize,
+    pub axis: isize,
 }
 
 pub struct ConcatGrad {
-    pub axis: usize,
+    pub axis: isize,
     pub index: usize,
 }
 
@@ -25,7 +25,14 @@ impl ops::Op for Concat {
         for x in xs.iter() {
             views.push(x.view());
         }
-        if let Ok(y) = ndarray::stack(ndarray::Axis(self.axis), views.as_slice()) {
+
+        let axis = if self.axis < 0 {
+            (xs[0].ndim() as isize + self.axis) as usize
+        } else {
+            self.axis as usize
+        };
+
+        if let Ok(y) = ndarray::stack(ndarray::Axis(axis), views.as_slice()) {
             y
         } else {
             panic!("Can't concat arrays whose shapes are incompatible.");
@@ -43,7 +50,7 @@ impl ops::Op for Concat {
             .map(move |i| {
                 let grad_op = ConcatGrad {
                     index: i,
-                    axis: self.axis as usize,
+                    axis: self.axis,
                 };
                 Some(ops::apply_op(grad_op, merged_inputs))
             })
@@ -63,15 +70,21 @@ impl ops::Op for ConcatGrad {
         let gy = xs[0];
         let xs = xs[1..].to_vec();
 
+        let axis = if self.axis < 0 {
+            (xs[0].ndim() as isize + self.axis) as usize
+        } else {
+            self.axis as usize
+        };
+
         // make slice indices
         let mut start_idx = 0;
         for x in xs[..self.index].iter() {
-            start_idx += x.shape()[self.axis];
+            start_idx += x.shape()[axis];
         }
-        let region_len = xs[self.index].shape()[self.axis] as isize;
+        let region_len = xs[self.index].shape()[axis] as isize;
         let indices = (0..gy.ndim())
-            .map(move |axis| {
-                if axis == self.axis {
+            .map(move |_axis| {
+                if _axis == axis {
                     // partial region
                     ndarray::Si(start_idx as isize, Some(region_len), 1)
                 } else {

@@ -765,7 +765,7 @@ pub fn slice(x: &Tensor, starts: &[isize], ends: &[isize]) -> Tensor
 
 #[inline]
 /// Concatenates (stacks) input tensors along specified axis.
-pub fn concat(tensors: &[&Tensor], axis: usize) -> Tensor
+pub fn concat(tensors: &[&Tensor], axis: isize) -> Tensor
 {
     apply_op(concat::Concat { axis: axis }, tensors)
 }

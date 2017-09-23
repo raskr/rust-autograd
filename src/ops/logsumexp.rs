@@ -20,10 +20,10 @@ impl ops::Op for LogSumExp {
     fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let x = xs[0];
-        let axis = if self.axis >= 0 {
-            self.axis as usize
+        let axis = if self.axis < 0 {
+            (x.ndim() as isize + self.axis) as usize
         } else {
-            x.ndim() - 1
+            self.axis as usize
         };
         let mut a = x.shape().to_vec();
         a[axis] = 1;

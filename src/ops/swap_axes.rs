@@ -17,9 +17,9 @@ impl ops::Op for SwapAxes {
 
     fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
     {
-        let ndim = (&xs[0]).ndim();
-        let a = if self.a == -1 { ndim } else { self.a as usize };
-        let b = if self.b == -1 { ndim } else { self.b as usize };
+        let ndim = (&xs[0]).ndim() as isize;
+        let a = if self.a < 0 { (ndim + self.a) as usize } else { self.a as usize };
+        let b = if self.b < 0 { (ndim + self.b) as usize } else { self.b as usize };
         let mut ret: NdArray = xs[0].clone();
         ret.swap_axes(a, b);
         ret

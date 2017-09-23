@@ -10,8 +10,14 @@ pub struct LogSoftmax {
     pub axis: isize,
 }
 
-pub fn logsumexp(x: &NdArray, axis: usize) -> NdArray
+pub fn logsumexp(x: &NdArray, axis: isize) -> NdArray
 {
+    let axis = if axis < 0 {
+        (x.ndim() as isize + axis) as usize
+    } else {
+        axis as usize
+    };
+
     let mut a = x.shape().to_vec();
     a[axis] = 1;
     let reduced_shape = a.as_slice();
@@ -40,7 +46,7 @@ pub fn logsumexp(x: &NdArray, axis: usize) -> NdArray
     sum
 }
 
-pub fn log_softmax_forward(x: &NdArray, axis: usize) -> NdArray
+pub fn log_softmax_forward(x: &NdArray, axis: isize) -> NdArray
 {
     x - &logsumexp(x, axis)
 }
@@ -54,12 +60,7 @@ impl ops::Op for LogSoftmax {
     fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let x = xs[0];
-        let axis = if self.axis >= 0 {
-            self.axis as usize
-        } else {
-            x.ndim() - 1
-        };
-        log_softmax_forward(x, axis)
+        log_softmax_forward(x, self.axis)
     }
 
     fn grad(&self, gy: &Tensor, _: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>

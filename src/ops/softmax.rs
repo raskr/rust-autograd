@@ -11,13 +11,14 @@ pub struct Softmax {
 }
 
 #[inline]
-pub fn softmax_forward(x: &NdArray, axis_: isize) -> NdArray
+pub fn softmax_forward(x: &NdArray, axis: isize) -> NdArray
 {
-    let axis = if axis_ >= 0 {
-        axis_ as usize
+    let axis = if axis < 0 {
+        (x.ndim() as isize + axis) as usize
     } else {
-        x.ndim() - 1
+        axis as usize
     };
+
     let mut a = x.shape().to_vec();
     a[axis] = 1;
     let reduced_shape = a.as_slice();

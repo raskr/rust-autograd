@@ -19,7 +19,11 @@ impl ops::Op for ExpandDims {
         let ret = xs[0].clone();
         let mut output_shape = ret.shape().to_vec();
         for &i in self.axes.iter() {
-            let axis = if i == -1 { ret.ndim() } else { i as usize };
+            let axis = if i < 0 {
+                (ret.ndim() as isize + i) as usize
+            } else {
+                i as usize
+            };
             output_shape.insert(axis, 1);
         }
         ret.into_shape(output_shape).unwrap()
