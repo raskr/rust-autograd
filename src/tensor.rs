@@ -34,69 +34,9 @@ pub struct RawTensor {
 }
 
 
-#[inline]
-pub fn eval_tensors(tensors: &[Tensor], feed_dict: Feed) -> Vec<NdArray>
-{
-    // move internal dict
-    let mut memo = feed_dict.hash_map;
-
-    // collects variables in the whole graph
-    // and packs those in `memo`
-    let mut vars = HashSet::<Tensor>::new();
-    {
-        let mut seen = HashSet::new();
-        let mut stack = tensors.to_vec();
-        // DFS
-        while let Some(popped) = stack.pop() {
-            seen.insert(popped.clone());
-            // update stack
-            for input in popped.borrow().inputs.iter() {
-                if !seen.contains(input) {
-                    stack.push(input.clone());
-                }
-            }
-            // takes out `param` attr
-            let param = mem::replace(&mut popped.borrow_mut().param, None);
-            if let Some(v) = param {
-                vars.insert(popped.clone());
-                memo.insert(popped, v);
-            }
-        }
-    }
-
-    // run graph
-    for t in tensors.iter() {
-        ::topology::perform_eval(t, &mut memo, true);
-    }
-
-    // extracts target arrays
-    let mut evaluated_arrays = Vec::with_capacity(tensors.len());
-    for (i, t) in tensors.iter().enumerate() {
-        // Need to handle cases where multiple gradient nodes
-        // share an output array.
-        // (Safe unwrapping is guaranteed by ::topology::symbolic_gradients())
-        if tensors[i + 1..].contains(t) {
-            // need to preserve the array for following nodes
-            // => copy the array
-            evaluated_arrays.push(memo.get(t).unwrap().clone());
-        } else {
-            // do not need to preserve
-            // => move the array from memo
-            evaluated_arrays.push(memo.remove(t).unwrap());
-        }
-    }
-
-    // Don't forget to return param arrays to the original places
-    for v in vars.iter() {
-        mem::swap(&mut v.borrow_mut().param, &mut memo.remove(&v));
-    }
-
-    evaluated_arrays
-}
-
-
 impl Tensor {
     #[inline]
+    /// Returns true if this node has no incoming nodes.
     pub fn is_source(&self) -> bool
     {
         self.borrow().inputs.is_empty()
@@ -238,18 +178,82 @@ impl fmt::Display for Tensor {
     }
 }
 
+
+#[inline]
+pub fn eval_tensors(tensors: &[Tensor], feed_dict: Feed) -> Vec<NdArray>
+{
+    // move internal dict
+    let mut memo = feed_dict.hash_map;
+
+    // collects variables in the whole graph
+    // and packs those in `memo`
+    let mut vars = HashSet::<Tensor>::new();
+    {
+        let mut seen = HashSet::new();
+        let mut stack = tensors.to_vec();
+        // DFS
+        while let Some(popped) = stack.pop() {
+            seen.insert(popped.clone());
+            // update stack
+            for input in popped.borrow().inputs.iter() {
+                if !seen.contains(input) {
+                    stack.push(input.clone());
+                }
+            }
+            // takes out `param` attr
+            let param = mem::replace(&mut popped.borrow_mut().param, None);
+            if let Some(v) = param {
+                vars.insert(popped.clone());
+                memo.insert(popped, v);
+            }
+        }
+    }
+
+    // run graph
+    for t in tensors.iter() {
+        ::topology::perform_eval(t, &mut memo, true);
+    }
+
+    // extracts target arrays
+    let mut evaluated_arrays = Vec::with_capacity(tensors.len());
+    for (i, t) in tensors.iter().enumerate() {
+        // Need to handle cases where multiple gradient nodes
+        // share an output array.
+        // (Safe unwrapping is guaranteed by ::topology::symbolic_gradients())
+        if tensors[i + 1..].contains(t) {
+            // need to preserve the array for following nodes
+            // => copy the array
+            evaluated_arrays.push(memo.get(t).unwrap().clone());
+        } else {
+            // do not need to preserve
+            // => move the array from memo
+            evaluated_arrays.push(memo.remove(t).unwrap());
+        }
+    }
+
+    // Don't forget to return param arrays to the original places
+    for v in vars.iter() {
+        mem::swap(&mut v.borrow_mut().param, &mut memo.remove(&v));
+    }
+
+    evaluated_arrays
+}
+
+
 #[derive(Clone)]
 /// Dynamic input to the computation graph.
 ///
 /// This is used to set `ndarray`'s array object to a `Placeholder` tensor.
 /// Arbitrary number of inputs can be set to this object with builder-like usage.
 ///
+/// # Examples
+///
 /// ```
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref x = ag::placeholder();
-/// let ref y = 3 * x;
+/// let ref x: ag::Tensor = ag::placeholder();
+/// let ref y: ag::Tensor = 3 * x;
 ///
 /// // Fills placeholder `x`.
 /// let feed_dict = ag::Feed::new().add(x, ndarray::arr1(&[2.]));

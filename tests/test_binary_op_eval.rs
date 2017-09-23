@@ -25,7 +25,6 @@ fn scalar_mul()
 {
     // graph def
     let ones = ag::constant(ndarray::arr1(&[1., 1., 1.]));
-    let ones = ag::constant(ndarray::arr1(&[1., 1., 1.]));
     let z: ag::Tensor = 3. * ones * 2;
     assert_eq!(z.eval(), ndarray::arr1(&[6., 6., 6.]).into_dyn());
 }

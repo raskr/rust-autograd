@@ -11,6 +11,20 @@ pub trait RNN {
 
 
 /// Standard LSTM unit without peephole.
+///
+/// # Examples
+///
+/// ```
+/// extern crate autograd as ag;
+///
+/// let state_size = 128;
+/// let vec_dim  = 128;
+/// let batch_size  = 32;
+///
+/// let rnn = ag::nn_impl::rnn::LSTM::new(state_size, vec_dim, batch_size);
+/// ```
+///
+/// For more usage, see `lstm_lm()` in `tests/test_tensor_ops_grad.rs`
 pub struct LSTM {
     pub state_size: usize,
     pub batch_size: usize,

@@ -58,8 +58,22 @@ pub trait Op {
 }
 
 
-// Helper function to generate a symbolic tensor
 #[inline]
+/// Helper function to generate a symbolic tensor
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let ref a = ag::constant(ag::ndarray_ext::standard_normal(&[4, 2]));
+/// let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[2, 3]));
+/// let ref b = ag::variable(ag::ndarray_ext::zeros(&[4, 3]));
+/// let ref z = ag::matmul(a, v) + b;
+/// let mut vars = [a, v, b, z];
+/// // `sort_by_key` don't reverse the order of `a` and `v`
+/// vars.sort_by_key(|a| a.borrow().rank);
+/// assert!(vars == [a, v, b, z])
+/// ```
 fn apply_op<T: Op + 'static>(op: T, inputs: &[&Tensor]) -> Tensor
 {
     Tensor(Rc::new(RefCell::new(RawTensor {
@@ -84,18 +98,20 @@ fn apply_op<T: Op + 'static>(op: T, inputs: &[&Tensor]) -> Tensor
 ///
 /// The placeholder tensor is a dynamic input node to the computation graph,
 /// which can be filled on evaluation time.
-/// To fill the placeholder, use `autograd::Feed`.
+/// To fill the placeholders, use `autograd::Feed`.
+///
+/// # Examples
 ///
 /// ```
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref x = ag::placeholder();
-/// let ref y = 3 * x;
+/// let ref x: ag::Tensor = ag::placeholder();
+/// let ref y: ag::Tensor = 3 * x;
 ///
 /// // Fills placeholder `x`.
-/// let feed_dict = ag::Feed::new().add(x, ndarray::arr1(&[2.]));
-/// assert_eq!(6., y.eval_with_input(feed_dict)[0]);
+/// let feed = ag::Feed::new().add(x, ndarray::arr1(&[2.]));
+/// assert_eq!(6., y.eval_with_input(feed)[0]);
 /// ```
 #[inline]
 pub fn placeholder() -> Tensor
@@ -115,6 +131,18 @@ pub fn placeholder() -> Tensor
 /// it can be optimized with gradient descent methods
 /// implemented in `autograd::sgd::optimizers`.
 /// For the usages, see https://github.com/perrier1034/rust-autograd/tree/master/examples
+///
+/// # Examples
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let ref x: ag::Tensor = ag::variable(ndarray::arr1(&[2.]));
+/// let ref y: ag::Tensor = 3 * x;
+///
+/// assert_eq!(6., y.eval()[0]);
+/// ```
 #[inline]
 pub fn variable<T: ndarray::Dimension>(array: ndarray::Array<f32, T>) -> Tensor
 {
@@ -124,6 +152,27 @@ pub fn variable<T: ndarray::Dimension>(array: ndarray::Array<f32, T>) -> Tensor
         param: Some(array.into_dyn()),
         rank: 0,
     })))
+}
+
+
+#[inline]
+/// Returns gradient tensors wrt variables.
+///
+/// # Arguments
+/// * `objective` - Target of differentiation.
+/// * `variables` - Variable tensors with which differentiate `objective`.
+/// * `initial_grad` - This is required **if objective is not a scalar**. In most cases,
+/// this is initialized with 1s.
+///
+/// # Returns
+/// Symbolic gradient tensors corresponding to `variables` in the same order as `variables`
+pub fn gradients(
+    objective: &Tensor,
+    variables: &[&Tensor],
+    initial_grad: Option<&Tensor>,
+) -> Vec<Tensor>
+{
+    ::topology::symbolic_gradients(objective, variables, initial_grad)
 }
 
 
@@ -318,6 +367,9 @@ pub fn equals(a: &Tensor, b: &Tensor) -> Tensor
 
 #[inline]
 /// Takes argmax along specified axis.
+///
+/// # Examples
+///
 /// ```
 /// extern crate ndarray;
 /// extern crate autograd as ag;
@@ -361,6 +413,8 @@ pub fn squeeze(x: &Tensor, axes: &[isize]) -> Tensor
 #[inline]
 /// Tiles input tensor along specified axis.
 ///
+/// # Examples
+///
 /// ```
 /// extern crate ndarray;
 /// extern crate autograd as ag;
@@ -385,6 +439,8 @@ pub fn tile(x: &Tensor, axis: isize, num: usize) -> Tensor
 #[inline]
 /// Limits all elements so as to be within `[min, max]`
 ///
+/// # Examples
+///
 /// ```
 /// extern crate ndarray;
 /// extern crate autograd as ag;
@@ -402,6 +458,8 @@ pub fn clip(x: &Tensor, min: f32, max: f32) -> Tensor
 
 #[inline]
 /// Take max along specified axis.
+///
+/// # Examples
 ///
 /// ```
 /// extern crate ndarray;
@@ -436,6 +494,8 @@ pub fn reduce_min(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 #[inline]
 /// Take mean along specified axis.
 ///
+/// # Examples
+///
 /// ```
 /// extern crate ndarray;
 /// extern crate autograd as ag;
@@ -465,29 +525,11 @@ pub fn reduce_sum(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
     apply_op(op, &[x])
 }
 
-#[inline]
-/// Returns gradient tensors wrt variables.
-///
-/// # Arguments
-/// * `objective` - Target of differentiation.
-/// * `variables` - Variable tensors with which differentiate `objective`.
-/// * `initial_grad` - This is required **if objective is not a scalar**. In most cases,
-/// this is initialized with 1s.
-///
-/// # Returns
-/// Symbolic gradient tensors corresponding to `variables` in the same order as `variables`
-pub fn gradients(
-    objective: &Tensor,
-    variables: &[&Tensor],
-    initial_grad: Option<&Tensor>,
-) -> Vec<Tensor>
-{
-    ::topology::symbolic_gradients(objective, variables, initial_grad)
-}
-
 
 #[inline]
 /// Reshapes input tensor.
+///
+/// # Examples
 ///
 /// ```
 /// extern crate ndarray;
@@ -745,6 +787,8 @@ pub fn concat(tensors: &[&Tensor], axis: usize) -> Tensor
 /// # Returns
 /// Tensor with shape `param.shape[..axis] + indices.shape + param.shape[axis+1..]`
 ///
+/// # Examples
+///
 /// ```
 /// extern crate ndarray;
 /// extern crate autograd as ag;
@@ -773,6 +817,8 @@ pub fn gather(param: &Tensor, indices: &Tensor, axis: isize) -> Tensor
 ///
 /// # Returns
 /// Output of `rnn.step()`
+///
+/// For the usage, see `lstm_lm()` in `tests/test_tensor_ops_grad.rs` and `nn_impl::rnn`
 pub fn rnn_step<T>(x: &Tensor, rnn: &mut T, with_new_state: bool) -> Tensor
 where
     T: ::nn_impl::rnn::RNN,
@@ -788,7 +834,7 @@ where
 pub fn zeros(shape: &[usize]) -> Tensor
 {
     Tensor(Rc::new(RefCell::new(RawTensor {
-        op: Box::new(dummy_op::DummyOp { name: "Zeros".to_string() }),
+        op: Box::new(dummy_op::DummyOp { name: "Constant".to_string() }),
         inputs: vec![],
         param: Some(::ndarray_ext::zeros(shape)),
         rank: 0,
@@ -800,7 +846,7 @@ pub fn zeros(shape: &[usize]) -> Tensor
 pub fn ones(shape: &[usize]) -> Tensor
 {
     Tensor(Rc::new(RefCell::new(RawTensor {
-        op: Box::new(dummy_op::DummyOp { name: "Ones".to_string() }),
+        op: Box::new(dummy_op::DummyOp { name: "Constant".to_string() }),
         inputs: vec![],
         param: Some(::ndarray_ext::ones(shape)),
         rank: 0,
@@ -809,6 +855,16 @@ pub fn ones(shape: &[usize]) -> Tensor
 
 
 /// Creates a constant tensor.
+///
+/// # Examples
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let arr = ndarray::arr1(&[0., 0., 0.]).into_dyn();
+/// assert_eq!(arr.clone(), ag::constant(arr).eval())
+/// ```
 #[inline]
 pub fn constant<T: ndarray::Dimension>(array: ndarray::Array<f32, T>) -> Tensor
 {

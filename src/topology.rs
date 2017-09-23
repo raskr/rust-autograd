@@ -44,8 +44,8 @@ pub fn perform_eval(target: &Tensor, memo: &mut FnvHashMap<Tensor, NdArray>, tra
 
 
 #[inline]
-// make mapping of {node => the node contributed to gradient or not}
-pub fn contributed_to_grads(objective: &Tensor, variables: &[&Tensor]) -> FnvHashMap<Tensor, bool>
+/// Makes mapping of {node => the node contributed to gradient or not}
+fn contributed_to_grads(objective: &Tensor, variables: &[&Tensor]) -> FnvHashMap<Tensor, bool>
 {
     fn rec(target: &Tensor, vars: &[&Tensor], memo: &mut FnvHashMap<Tensor, bool>)
     {
@@ -72,6 +72,21 @@ pub fn contributed_to_grads(objective: &Tensor, variables: &[&Tensor]) -> FnvHas
     let mut memo = FnvHashMap::default();
     rec(objective, variables, &mut memo);
     memo
+}
+
+
+#[test]
+fn contributed_to_grads_test()
+{
+    // dummy graph
+    let ref t = ::constant(::ndarray_ext::standard_normal(&[2, 3]));
+    let ref v = ::variable(::ndarray_ext::standard_normal(&[2, 3]));
+    let ref z = ::sigmoid_cross_entropy(&v, &t);
+    let booleans = contributed_to_grads(z, &[v]);
+    assert_eq!(booleans.len(), 3);
+    assert!(!booleans.get(t).unwrap());
+    assert!(booleans.get(v).unwrap());
+    assert!(booleans.get(z).unwrap());
 }
 
 
@@ -187,4 +202,44 @@ pub fn symbolic_gradients(
             gys.remove(0)
         })
         .collect::<Vec<Tensor>>()
+}
+
+#[test]
+fn topological_ordering_on_reverse_mode()
+{
+    fn collect_parents_from(endpoint: &Tensor) -> HashSet<Tensor>
+    {
+        let mut collected = HashSet::new();
+        endpoint.visit_once(&mut |arg| { collected.insert(arg.clone()); });
+        collected
+    }
+
+    let ref x = ::constant(::ndarray_ext::standard_normal(&[4, 2]));
+    let ref w = ::variable(::ndarray_ext::standard_normal(&[2, 3]));
+    let ref b = ::variable(::ndarray_ext::zeros(&[4, 3]));
+    let ref z = ::matmul(x, w) + b;
+    let ref g = ::gradients(z, &[w], Some(&::ones(&[4, 3])))[0];
+
+    // to vec
+    let mut collected = collect_parents_from(g).into_iter().collect::<Vec<Tensor>>();
+
+    // sort by rank
+    collected.sort_by_key(|t| t.borrow().rank);
+
+    // tensor to name
+    let sorted_names = collected
+        .into_iter()
+        .map(|t| t.borrow().op.name().to_string())
+        .collect::<Vec<String>>();
+
+    // compare
+    let a = sorted_names;
+    let b = vec![
+        "Constant".to_string(), // one or x
+        "Constant".to_string(), // one or x
+        "SwapAxes".to_string(), // transpose for x
+        "MatMul".to_string(),
+    ]; // MatMulGrad
+
+    assert_eq!(a, b);
 }

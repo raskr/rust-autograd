@@ -33,7 +33,7 @@ fn clip()
 #[test]
 fn asinh()
 {
-    let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[3]));
+    let ref v = ag::variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
     let ref z = ag::asinh(v);
     let ref g = ag::gradients(z, &[v], Some(&&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Feed::new(), 1e-3, 1e-3);
@@ -42,7 +42,7 @@ fn asinh()
 #[test]
 fn acosh()
 {
-    let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[3]));
+    let ref v = ag::variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
     let ref z = ag::acosh(v);
     let ref g = ag::gradients(z, &[v], Some(&&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Feed::new(), 1e-3, 1e-3);
@@ -51,7 +51,7 @@ fn acosh()
 #[test]
 fn atanh()
 {
-    let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[3]));
+    let ref v = ag::variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
     let ref z = ag::atanh(v);
     let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Feed::new(), 1e-3, 1e-3);
@@ -60,7 +60,7 @@ fn atanh()
 #[test]
 fn sinh()
 {
-    let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[3]));
+    let ref v = ag::variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
     let ref z = ag::sinh(v);
     let ref g = ag::gradients(z, &[v], Some(&&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Feed::new(), 1e-3, 1e-3);
@@ -69,7 +69,7 @@ fn sinh()
 #[test]
 fn cosh()
 {
-    let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[3]));
+    let ref v = ag::variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
     let ref z = ag::cosh(v);
     let ref g = ag::gradients(z, &[v], Some(&&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Feed::new(), 1e-3, 1e-3);
@@ -78,7 +78,7 @@ fn cosh()
 #[test]
 fn tanh()
 {
-    let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[3]));
+    let ref v = ag::variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
     let ref z = ag::tanh(v);
     let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Feed::new(), 1e-3, 1e-3);
@@ -87,7 +87,7 @@ fn tanh()
 #[test]
 fn asin()
 {
-    let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[3]));
+    let ref v = ag::variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
     let ref z = ag::asin(v);
     let ref g = ag::gradients(z, &[v], Some(&&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Feed::new(), 1e-3, 1e-2);
@@ -96,7 +96,7 @@ fn asin()
 #[test]
 fn acos()
 {
-    let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[3]));
+    let ref v = ag::variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
     let ref z = ag::acos(v);
     let ref g = ag::gradients(z, &[v], Some(&&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Feed::new(), 1e-3, 1e-3);
@@ -105,7 +105,7 @@ fn acos()
 #[test]
 fn atan()
 {
-    let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[3]));
+    let ref v = ag::variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
     let ref z = ag::atan(v);
     let ref g = ag::gradients(z, &[v], Some(&&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Feed::new(), 1e-3, 1e-3);
@@ -114,7 +114,7 @@ fn atan()
 #[test]
 fn sin()
 {
-    let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[3]));
+    let ref v = ag::variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
     let ref z = ag::sin(v);
     let ref g = ag::gradients(z, &[v], Some(&&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Feed::new(), 1e-3, 1e-3);
@@ -123,25 +123,25 @@ fn sin()
 #[test]
 fn cos()
 {
-    let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[3]));
+    let ref v = ag::variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
     let ref z = ag::cos(v);
     let ref g = ag::gradients(z, &[v], Some(&&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Feed::new(), 1e-3, 1e-3);
 }
 
-// #[test]
-// fn tan()
-// {
-// let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[3]));
-// let ref z = ag::tan(v);
-// let ref g = ag::gradients(z, &[v], Some(&&init_grad(1., &[3])));
-// ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Input::new(), 1e-3, 1e-2);
-// }
+#[test]
+fn tan()
+{
+    let ref v = ag::variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
+    let ref z = ag::tan(v);
+    let ref g = ag::gradients(z, &[v], Some(&&init_grad(1., &[3])));
+    ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Feed::new(), 1e-3, 1e-2);
+}
 
 #[test]
 fn pow()
 {
-    let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[3]));
+    let ref v = ag::variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
     let ref z = ag::pow(v, 1.2);
     let ref g = ag::gradients(z, &[v], Some(&&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Feed::new(), 1e-3, 1e-3);
@@ -150,7 +150,7 @@ fn pow()
 #[test]
 fn exp()
 {
-    let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[3]));
+    let ref v = ag::variable(ag::ndarray_ext::random_uniform(&[3], 0.9, 1.1));
     let ref z = ag::exp(v);
     let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Feed::new(), 1e-3, 1e-2);
@@ -159,8 +159,9 @@ fn exp()
 #[test]
 fn log()
 {
-    let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[3]));
-    let ref z = ag::log(v, 0.3);
+    use std::f32;
+    let ref v = ag::variable(ag::ndarray_ext::random_uniform(&[3], 1., 1.1));
+    let ref z = ag::log(v, f32::consts::E);
     let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[3])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Feed::new(), 1e-3, 1e-2);
 }
