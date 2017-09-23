@@ -1,9 +1,7 @@
 extern crate ndarray;
 
-use ndarray_ext;
 use ndarray_ext::NdArray;
 use ops;
-use std::mem;
 use tensor::Tensor;
 
 
@@ -15,24 +13,17 @@ impl ops::Op for MatMul {
         "MatMul"
     }
 
-    #[allow(mutable_transmutes)]
     fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
     {
-        assert_eq!(xs[0].ndim(), 2);
-        assert_eq!(xs[1].ndim(), 2);
-        let (mut_a, mut_b) = unsafe {
-            (
-                mem::transmute::<&NdArray, &mut NdArray>(xs[0]),
-                mem::transmute::<&NdArray, &mut NdArray>(xs[1]),
-            )
-        };
-        let a = ndarray_ext::into_mat(mem::replace(mut_a, dummy_tensor()));
-        let b = ndarray_ext::into_mat(mem::replace(mut_b, dummy_tensor()));
-        // dot product
-        let y = a.dot(&b).into_dyn();
-        mem::replace(mut_a, a.into_dyn());
-        mem::replace(mut_b, b.into_dyn());
-        y
+        let x0 = xs[0];
+        let x1 = xs[1];
+        let x0_shape = x0.shape();
+        let x1_shape = x1.shape();
+        assert_eq!(x0_shape.len(), 2);
+        assert_eq!(x1_shape.len(), 2);
+        let a = x0.view().into_shape((x0_shape[0], x0_shape[1])).unwrap();
+        let b = x1.view().into_shape((x1_shape[0], x1_shape[1])).unwrap();
+        a.dot(&b).into_dyn()
     }
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
@@ -41,11 +32,4 @@ impl ops::Op for MatMul {
         let gb = ops::matmul(&ops::swap_axes(inputs[0], 0, 1), gy);
         vec![Some(ga), Some(gb)]
     }
-}
-
-
-#[inline(always)]
-fn dummy_tensor() -> NdArray
-{
-    NdArray::default(ndarray::IxDyn(&[]))
 }
