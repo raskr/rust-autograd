@@ -242,7 +242,7 @@ fn topological_ordering_on_reverse_mode()
     let b = vec![
         "Constant".to_string(), // one or x
         "Constant".to_string(), // one or x
-        "SwapAxes".to_string(), // transpose for x
+        "Transpose".to_string(), // transpose for x
         "MatMul".to_string(),
     ]; // MatMulGrad
 

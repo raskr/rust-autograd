@@ -28,8 +28,8 @@ impl ops::Op for MatMul {
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
-        let ga = ops::matmul(gy, &ops::swap_axes(inputs[1], 0, 1));
-        let gb = ops::matmul(&ops::swap_axes(inputs[0], 0, 1), gy);
+        let ga = ops::matmul(gy, &ops::transpose(inputs[1]));
+        let gb = ops::matmul(&ops::transpose(inputs[0]), gy);
         vec![Some(ga), Some(gb)]
     }
 }

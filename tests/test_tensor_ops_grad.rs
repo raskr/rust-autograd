@@ -291,7 +291,7 @@ fn reduce_sum_keep()
 fn swap_axes()
 {
     let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[2, 3]));
-    let ref z = ag::swap_axes(v, 0, 1);
+    let ref z = ag::transpose(v);
     let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[3, 2])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Feed::new(), 1e-3, 1e-3);
 }

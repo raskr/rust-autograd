@@ -28,7 +28,7 @@ pub mod sparse_softmax_cross_entropy;
 pub mod gather;
 pub mod matmul;
 pub mod batch_matmul;
-pub mod swap_axes;
+pub mod transpose;
 pub mod reshape;
 pub mod reduction_ops;
 pub mod squeeze;
@@ -604,9 +604,9 @@ pub fn lesser_equal(x: &Tensor, a: f32) -> Tensor
 
 
 #[inline]
-/// Swaps two axes.
+/// Transposes matrix.
 ///
-/// Swap axis `a` and axis `b` of `x`.
+/// Swaps axes of `x`. **`x`'s rank must be 2-ranked (i.e. matrix)**.
 ///
 /// # Examples
 ///
@@ -614,13 +614,13 @@ pub fn lesser_equal(x: &Tensor, a: f32) -> Tensor
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::constant(ag::ndarray_ext::zeros(&[2, 3, 4, 5]));
-/// let ref b = ag::swap_axes(a, -1, -2);
-/// assert_eq!(b.eval().shape(), &[2, 3, 5, 4]);
+/// let ref a = ag::constant(ag::ndarray_ext::zeros(&[2, 3]));
+/// let ref b = ag::transpose(a);
+/// assert_eq!(b.eval().shape(), &[3, 2]);
 /// ```
-pub fn swap_axes(x: &Tensor, a: isize, b: isize) -> Tensor
+pub fn transpose(x: &Tensor) -> Tensor
 {
-    apply_op(swap_axes::SwapAxes { a: a, b: b }, &[x])
+    apply_op(transpose::Transpose, &[x])
 }
 
 
