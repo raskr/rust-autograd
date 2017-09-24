@@ -1,3 +1,6 @@
+#[macro_use(s)]
+extern crate ndarray;
+
 // == module declarations ==
 #[macro_use]
 pub mod test_helper;

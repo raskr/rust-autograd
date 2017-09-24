@@ -195,6 +195,16 @@ fn matmul()
 }
 
 #[test]
+fn batch_matmul()
+{
+    let ref a = ag::constant(ag::ndarray_ext::standard_normal(&[2, 4, 2]));
+    let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[2, 2, 3]));
+    let ref z = ag::batch_matmul(a, v);
+    let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[2, 4, 3])));
+    ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Feed::new(), 1e-3, 1e-3);
+}
+
+#[test]
 fn wx_plus_b()
 {
     let ref a = ag::constant(ag::ndarray_ext::standard_normal(&[4, 2]));

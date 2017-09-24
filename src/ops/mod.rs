@@ -27,6 +27,7 @@ pub mod softmax_cross_entropy;
 pub mod sparse_softmax_cross_entropy;
 pub mod gather;
 pub mod matmul;
+pub mod batch_matmul;
 pub mod swap_axes;
 pub mod reshape;
 pub mod reduction_ops;
@@ -606,6 +607,17 @@ pub fn lesser_equal(x: &Tensor, a: f32) -> Tensor
 /// Swaps two axes.
 ///
 /// Swap axis `a` and axis `b` of `x`.
+///
+/// # Examples
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let ref a = ag::constant(ag::ndarray_ext::zeros(&[2, 3, 4, 5]));
+/// let ref b = ag::swap_axes(a, -1, -2);
+/// assert_eq!(b.eval().shape(), &[2, 3, 5, 4]);
+/// ```
 pub fn swap_axes(x: &Tensor, a: isize, b: isize) -> Tensor
 {
     apply_op(swap_axes::SwapAxes { a: a, b: b }, &[x])
@@ -736,6 +748,32 @@ pub fn sparse_softmax_cross_entropy(y: &Tensor, t: &Tensor) -> Tensor
 pub fn matmul(a: &Tensor, b: &Tensor) -> Tensor
 {
     apply_op(matmul::MatMul, &[a, b])
+}
+
+
+#[inline]
+/// Batched matrix multiplication.
+///
+/// Performs matrix multiplication between last two dimensions of `a` and `b`
+/// and gathers those. So the rank of `a` and `b` must be equals.
+/// # Examples
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let ref a = ag::variable(ag::ndarray_ext::zeros(&[2, 3, 4, 2]));
+/// let ref b = ag::variable(ag::ndarray_ext::zeros(&[2, 3, 2, 3]));
+/// let ref c = ag::batch_matmul(a, b);
+/// assert_eq!(c.eval().shape(), &[2, 3, 4, 3]);
+/// ```
+pub fn batch_matmul(a: &Tensor, b: &Tensor) -> Tensor
+{
+    let op = batch_matmul::BatchMatMul {
+        transpose_a: false,
+        transpose_b: false,
+    };
+    apply_op(op, &[a, b])
 }
 
 
