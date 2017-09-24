@@ -288,11 +288,20 @@ fn reduce_sum_keep()
 }
 
 #[test]
-fn swap_axes()
+fn transpose()
 {
     let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[2, 3]));
     let ref z = ag::transpose(v);
     let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[3, 2])));
+    ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Feed::new(), 1e-3, 1e-3);
+}
+
+#[test]
+fn reverse_axes()
+{
+    let ref v = ag::constant(ag::ndarray_ext::zeros(&[2, 3, 4, 5]));
+    let ref z = ag::reverse_axes(v);
+    let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[5, 4, 3, 2])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Feed::new(), 1e-3, 1e-3);
 }
 

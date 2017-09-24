@@ -29,6 +29,7 @@ pub mod gather;
 pub mod matmul;
 pub mod batch_matmul;
 pub mod transpose;
+pub mod reverse_axes;
 pub mod reshape;
 pub mod reduction_ops;
 pub mod squeeze;
@@ -607,6 +608,7 @@ pub fn lesser_equal(x: &Tensor, a: f32) -> Tensor
 /// Transposes matrix.
 ///
 /// Swaps axes of `x`. **`x`'s rank must be 2-ranked (i.e. matrix)**.
+/// To reverse whole axes of over 2-ranked tensor, use `reverse_axes`.
 ///
 /// # Examples
 ///
@@ -621,6 +623,25 @@ pub fn lesser_equal(x: &Tensor, a: f32) -> Tensor
 pub fn transpose(x: &Tensor) -> Tensor
 {
     apply_op(transpose::Transpose, &[x])
+}
+
+
+#[inline]
+/// Reverses axes of the input tensor.
+///
+/// # Examples
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let ref a = ag::constant(ag::ndarray_ext::zeros(&[2, 3, 4, 5]));
+/// let ref b = ag::reverse_axes(a);
+/// assert_eq!(b.eval().shape(), &[5, 4, 3, 2]);
+/// ```
+pub fn reverse_axes(x: &Tensor) -> Tensor
+{
+    apply_op(reverse_axes::ReverseAxes, &[x])
 }
 
 
