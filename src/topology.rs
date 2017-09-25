@@ -10,8 +10,6 @@ use std::mem;
 use tensor::Tensor;
 
 
-static mut COUNT: usize = 0;
-
 /// Performs actual graph traversal and its evaluation
 // TODO: loop-based rather than recursion (this would be difficult)
 #[inline]
@@ -33,11 +31,6 @@ pub fn perform_eval(target: &Tensor, memo: &mut FnvHashMap<Tensor, NdArray>, tra
                 // unwrap is safe
                 xs.push(memo.get(input).unwrap());
             }
-        }
-        // run op
-        unsafe {
-            println!("calling {}: {}", COUNT, target.borrow().op.name());
-            COUNT += 1;
         }
 
         target.borrow_mut().op.compute(xs.as_slice(), train)
