@@ -5,15 +5,15 @@ use ops;
 use tensor::Tensor;
 
 
-pub struct PermuteDims {
+pub struct Transpose {
     // This "must" be sorted by dst (second elem of the tuple)
     pub src_dst_sorted: Vec<(usize, usize)>,
 }
 
-impl ops::Op for PermuteDims {
+impl ops::Op for Transpose {
     fn name(&self) -> &str
     {
-        "PermuteDims"
+        "Transpose"
     }
 
     fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
@@ -60,7 +60,7 @@ impl ops::Op for PermuteDims {
         // Sorts by dst. This forces all axes to move "right to left".
         src_dst.sort_by_key(|sd| sd.1);
 
-        let op = PermuteDims {
+        let op = Transpose {
             src_dst_sorted: src_dst,
         };
 

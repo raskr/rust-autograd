@@ -29,7 +29,7 @@ pub mod gather;
 pub mod matmul;
 pub mod batch_matmul;
 pub mod reverse_axes;
-pub mod permute_dims;
+pub mod transpose;
 pub mod reshape;
 pub mod reduction_ops;
 pub mod squeeze;
@@ -786,13 +786,13 @@ pub fn batch_matmul(a: &Tensor, b: &Tensor) -> Tensor
 /// extern crate autograd as ag;
 ///
 /// let ref a = ag::variable(ag::ndarray_ext::zeros(&[1, 2, 3, 4, 5]));
-/// let ref b = ag::permute_dims(a, &[4, 2, 3, 0, 1]);
+/// let ref b = ag::transpose(a, &[4, 2, 3, 0, 1]);
 /// assert_eq!(b.eval().shape(), &[5, 3, 4, 1, 2]);
 /// ```
-pub fn permute_dims(x: &Tensor, perm: &[usize]) -> Tensor
+pub fn transpose(x: &Tensor, perm: &[usize]) -> Tensor
 {
     let src_dst = perm.iter().cloned().zip(0..perm.len()).collect::<Vec<_>>();
-    let op = permute_dims::PermuteDims {
+    let op = transpose::Transpose {
         src_dst_sorted: src_dst,
     };
     apply_op(op, &[x])

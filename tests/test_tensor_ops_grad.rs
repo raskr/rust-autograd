@@ -297,10 +297,10 @@ fn reverse_axes()
 }
 
 #[test]
-fn permute_dims()
+fn transpose()
 {
     let ref v = ag::constant(ag::ndarray_ext::zeros(&[1, 2, 3, 4, 5]));
-    let ref z = ag::permute_dims(v, &[4, 2, 3, 0, 1]);
+    let ref z = ag::transpose(v, &[4, 2, 3, 0, 1]);
     let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[5, 3, 4, 1, 2])));
     ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Feed::new(), 1e-3, 1e-3);
 }
