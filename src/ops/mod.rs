@@ -751,6 +751,96 @@ pub fn matmul(a: &Tensor, b: &Tensor) -> Tensor
 
 
 #[inline]
+/// Computes tensor dot product (tensor contraction) along specified axes.
+///
+/// For detailed description,
+/// see see https://docs.scipy.org/doc/numpy/reference/generated/numpy.tensordot.html.
+///
+/// # Panics
+/// When `axes[0].len()` != `axes[1].len()`
+///
+/// # Examples
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let ref a = ag::variable(ag::ndarray_ext::zeros(&[3, 4, 5]));
+/// let ref b = ag::variable(ag::ndarray_ext::zeros(&[4, 3, 2]));
+/// let ref c = ag::tensordot(a, b, &[3, 4, 5], &[4, 3, 2], [&[1, 0], &[0, 1]]);
+/// assert_eq!(c.eval().shape(), &[5, 2]);
+///
+/// // another example (simple matmul broadcast)
+/// let ref a = ag::variable(ag::ndarray_ext::zeros(&[2, 3, 4]));
+/// let ref b = ag::variable(ag::ndarray_ext::zeros(&[4, 2]));
+/// let ref c = ag::tensordot(a, b, &[2, 3, 4], &[4, 2], [&[2], &[0]]);
+/// assert_eq!(c.eval().shape(), &[2, 3, 2]);
+/// ```
+pub fn tensordot(
+    a: &Tensor,
+    b: &Tensor,
+    a_shape: &[usize],
+    b_shape: &[usize],
+    axes: [&[isize]; 2],
+) -> Tensor
+{
+    assert_eq!(axes[0].len(), axes[1].len());
+
+    fn preprocess(
+        x: &Tensor,
+        x_shape: &[usize],
+        axes: &[isize],
+        flip: bool,
+    ) -> (Tensor, Vec<isize>)
+    {
+        let axes = axes.iter()
+            .map(|&i| if i >= 0 {
+                i as usize
+            } else {
+                (i + x_shape.len() as isize) as usize
+            })
+            .collect::<Vec<_>>();
+
+        let mut free: Vec<usize> = vec![];
+        for i in 0..x_shape.len() {
+            if !axes.contains(&i) {
+                free.push(i);
+            }
+        }
+        let free_dims = free.clone()
+            .into_iter()
+            .map(|i| x_shape[i] as isize)
+            .collect::<Vec<_>>();
+        let prod_free: isize = free_dims.clone().into_iter().product();
+        let prod_axes: usize = axes.iter().cloned().map(|a| x_shape[a]).product();
+        let perm = if flip {
+            axes.into_iter().chain(free).collect::<Vec<_>>()
+        } else {
+            free.into_iter().chain(axes).collect::<Vec<_>>()
+        };
+        let new_shape = if flip {
+            [prod_axes as isize, prod_free]
+        } else {
+            [prod_free, prod_axes as isize]
+        };
+        let reshaped = reshape(&transpose(x, perm.as_slice()), &new_shape);
+        (reshaped, free_dims)
+    }
+
+    let (a_reshaped, a_free_dims) = preprocess(a, a_shape, axes[0], false);
+    let (b_reshaped, b_free_dims) = preprocess(b, b_shape, axes[1], true);
+
+    let ref dot = matmul(&a_reshaped, &b_reshaped);
+    let final_shape = a_free_dims
+        .into_iter()
+        .chain(b_free_dims.into_iter())
+        .collect::<Vec<isize>>();
+
+    reshape(dot, final_shape.as_slice())
+}
+
+
+#[inline]
 /// Batched matrix multiplication.
 ///
 /// Performs matrix multiplication between last two dimensions of `a` and `b`
