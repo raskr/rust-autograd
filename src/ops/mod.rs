@@ -30,6 +30,7 @@ pub mod matmul;
 pub mod batch_matmul;
 pub mod transpose;
 pub mod reverse_axes;
+pub mod permute_dims;
 pub mod reshape;
 pub mod reduction_ops;
 pub mod squeeze;
@@ -795,6 +796,29 @@ pub fn batch_matmul(a: &Tensor, b: &Tensor) -> Tensor
         transpose_b: false,
     };
     apply_op(op, &[a, b])
+}
+
+
+#[inline]
+/// Permutes dimensions.
+///
+/// # Examples
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let ref a = ag::variable(ag::ndarray_ext::zeros(&[1, 2, 3, 4, 5]));
+/// let ref b = ag::permute_dims(a, &[4, 2, 3, 0, 1]);
+/// assert_eq!(b.eval().shape(), &[5, 3, 4, 1, 2]);
+/// ```
+pub fn permute_dims(x: &Tensor, perm: &[usize]) -> Tensor
+{
+    let src_dst = perm.iter().cloned().zip(0..perm.len()).collect::<Vec<_>>();
+    let op = permute_dims::PermuteDims {
+        src_dst_sorted: src_dst,
+    };
+    apply_op(op, &[x])
 }
 
 
