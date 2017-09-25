@@ -306,6 +306,16 @@ fn transpose()
 }
 
 #[test]
+fn reshape_after_transpose()
+{
+    let ref v = ag::constant(ag::ndarray_ext::zeros(&[1, 2, 3, 4, 5]));
+    let ref z = ag::transpose(v, &[4, 2, 3, 0, 1]);
+    let ref z = ag::reshape(z, &[15, 8]);
+    let ref g = ag::gradients(z, &[v], Some(&init_grad(1., &[15, 8])));
+    ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Feed::new(), 1e-3, 1e-3);
+}
+
+#[test]
 fn add()
 {
     let ref a = ag::variable(ag::ndarray_ext::standard_normal(&[2, 2]));

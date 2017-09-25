@@ -792,9 +792,7 @@ pub fn batch_matmul(a: &Tensor, b: &Tensor) -> Tensor
 pub fn transpose(x: &Tensor, perm: &[usize]) -> Tensor
 {
     let src_dst = perm.iter().cloned().zip(0..perm.len()).collect::<Vec<_>>();
-    let op = transpose::Transpose {
-        src_dst_sorted: src_dst,
-    };
+    let op = transpose::Transpose { src_dst_sorted: src_dst };
     apply_op(op, &[x])
 }
 
