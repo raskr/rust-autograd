@@ -1,5 +1,7 @@
 extern crate ndarray;
+extern crate rayon;
 
+use self::rayon::iter::*;
 use ndarray_ext;
 use ndarray_ext::NdArray;
 use ops;
@@ -58,6 +60,7 @@ impl ops::Op for BatchMatMul {
 
         // parallel dot
         let dot = (0..x0_flattened.shape()[0] as isize)
+            .into_par_iter()
             .map(|i| {
                 let x0_mat = x0_flattened
                     .slice(s![i..i + 1, .., ..])

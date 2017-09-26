@@ -16,6 +16,7 @@ ndarray = { version = "0.10.0" }
 glob = "0.2"
 fnv = "1.0.5"
 # blas-sys = { version = "0.6", default-features = true, features = ["openblas"] }
+rayon = "0.8.2"
 
 [lib]
 name = "autograd"
