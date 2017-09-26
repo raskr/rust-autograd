@@ -6,36 +6,37 @@ use std::rc::Rc;
 use tensor::{RawTensor, Tensor};
 
 mod dummy_op;
-pub mod random_ops;
-pub mod clip;
-pub mod add_n;
-pub mod logsumexp;
-pub mod log_softmax;
-pub mod identity;
-pub mod cmp_ops;
-pub mod math_ops;
-pub mod concat;
-pub mod tile;
-pub mod binary_ops;
-pub mod softmax;
-pub mod sigmoid;
-pub mod elu;
-pub mod relu;
-pub mod slice;
-pub mod sigmoid_cross_entropy;
-pub mod softmax_cross_entropy;
-pub mod sparse_softmax_cross_entropy;
-pub mod gather;
-pub mod matmul;
-pub mod batch_matmul;
-pub mod reverse_axes;
-pub mod transpose;
-pub mod reshape;
-pub mod reduction_ops;
-pub mod squeeze;
-pub mod expand_dims;
+mod random_ops;
+mod clip;
+mod add_n;
+mod logsumexp;
+mod log_softmax;
+mod identity;
+mod cmp_ops;
+mod math_ops;
+mod concat;
+mod tile;
+mod binary_ops;
+mod softmax;
+mod sigmoid;
+mod elu;
+mod relu;
+mod slice;
+mod sigmoid_cross_entropy;
+mod softmax_cross_entropy;
+mod sparse_softmax_cross_entropy;
+mod gather;
+mod matmul;
+mod batch_matmul;
+mod reverse_axes;
+mod transpose;
+mod reshape;
+mod reduction_ops;
+mod squeeze;
+mod expand_dims;
 
 
+#[doc(hidden)]
 /// Represents a operation node in a computation graph.
 /// `Tensor` wraps trait-object of this.
 pub trait Op {
@@ -60,6 +61,7 @@ pub trait Op {
 }
 
 
+#[doc(hidden)]
 #[inline]
 /// Helper function to generate a symbolic tensor
 ///
@@ -67,9 +69,9 @@ pub trait Op {
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::constant(ag::ndarray_ext::standard_normal(&[4, 2]));
-/// let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[2, 3]));
-/// let ref b = ag::variable(ag::ndarray_ext::zeros(&[4, 3]));
+/// let ref a = ag::zeros(&[4, 2]);
+/// let ref v = ag::zeros(&[2, 3]);
+/// let ref b = ag::zeros(&[4, 3]);
 /// let ref z = ag::matmul(a, v) + b;
 /// let mut vars = [a, v, b, z];
 /// // `sort_by_key` don't reverse the order of `a` and `v`
@@ -131,7 +133,7 @@ pub fn placeholder() -> Tensor
 ///
 /// The shared variable behaves like any other tensors, except that
 /// it can be optimized with gradient descent methods
-/// implemented in `autograd::sgd::optimizers`.
+/// implemented in `autograd::sgd`.
 /// For the usages, see https://github.com/perrier1034/rust-autograd/tree/master/examples
 ///
 /// # Examples
@@ -168,6 +170,46 @@ pub fn variable<T: ndarray::Dimension>(array: ndarray::Array<f32, T>) -> Tensor
 ///
 /// # Returns
 /// Symbolic gradient tensors corresponding to `variables` in the same order as `variables`
+///
+/// # Example1
+/// Partial derivatives of `z = 2x^2 + 3y + 1`.
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let ref x = ag::placeholder();
+/// let ref y = ag::variable(ndarray::arr1(&[0.]));
+/// let ref z = 2*x*x + 3*y + 1;
+///
+/// // dz/dy
+/// let ref g1 = ag::gradients(z, &[y], None)[0];
+/// // dz/dx
+/// let ref g2 = ag::gradients(z, &[x], None)[0];
+///
+/// // ddz/dx (differentiates `z` again)
+/// let ref gg = ag::gradients(g2, &[x], None)[0];
+///
+/// // evaluation of symbolic gradients
+/// assert_eq!(3., g1.eval()[0]);
+/// assert_eq!(4., gg.eval()[0]);
+///
+/// // dz/dx requires to fill the placeholder `x`
+/// let feed = ag::Feed::new().add(x, ndarray::arr1(&[2.]));
+/// assert_eq!(8., g2.eval_with_input(feed)[0]);
+///
+/// ```
+///
+/// # Example2
+/// The case where objective is not a scalar
+/// ```
+/// extern crate autograd as ag;
+///
+/// let ref a = ag::variable(ag::ndarray_ext::zeros(&[4, 2]));
+/// let ref b = ag::zeros(&[2, 3]);
+/// let ref c = ag::matmul(a, b);
+/// let ref g = ag::gradients(c, &[a], Some(ag::ndarray_ext::ones(&[4, 2])))[0];
+/// ```
 pub fn gradients(
     objective: &Tensor,
     variables: &[&Tensor],
@@ -275,16 +317,6 @@ pub fn atanh(x: &Tensor) -> Tensor
 
 
 #[inline]
-/// Adds all input tensors
-///
-/// All the input tensors must have same shapes
-pub fn add_n(xs: &[&Tensor]) -> Tensor
-{
-    apply_op(add_n::AddN, xs)
-}
-
-
-#[inline]
 /// Identity function
 pub fn identity(a: &Tensor) -> Tensor
 {
@@ -357,10 +389,48 @@ pub fn exp(x: &Tensor) -> Tensor
 
 
 #[inline]
-/// Returns binary tensor.
+/// Adds all input tensors inplace
+///
+/// All the input tensors must have same shapes.
+///
+/// # Examples
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let ref a = ag::ones(&[2, 2]);
+/// let ref b = ag::ones(&[2, 2]);
+/// let ref c = ag::ones(&[2, 2]);
+/// let ref d = ag::add_n(&[a, b, c]);
+/// assert_eq!(d.eval().shape(), &[2, 2]);
+/// assert_eq!(d.eval(), ndarray::arr2(&[[3., 3.], [3., 3.]]).into_dyn());
+/// ```
+pub fn add_n(xs: &[&Tensor]) -> Tensor
+{
+    apply_op(add_n::AddN, xs)
+}
+
+
+#[inline]
+/// Compares two tensors and returns a binary tensor.
+///
+/// if `a[i] == b[i]` then `return_value[i]` will be 1 else 0
 ///
 /// # Panics
-/// When a.shape != b.shape.
+/// When `a's shape` != `b's shape`.
+///
+/// # Examples
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let ref a = ag::constant(ndarray::arr1(&[1., 2., 3.]));
+/// let ref b = ag::constant(ndarray::arr1(&[3., 2., 1.]));
+/// let ref c = ag::equals(a, b);
+/// assert_eq!(c.eval(), ndarray::arr1(&[0., 1., 0.]).into_dyn());
+/// ```
 pub fn equals(a: &Tensor, b: &Tensor) -> Tensor
 {
     apply_op(cmp_ops::Equals, &[a, b])
@@ -369,6 +439,8 @@ pub fn equals(a: &Tensor, b: &Tensor) -> Tensor
 
 #[inline]
 /// Takes argmax along specified axis.
+///
+/// `axis` can be negative.
 ///
 /// # Examples
 ///
@@ -394,6 +466,18 @@ pub fn argmax(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 
 #[inline]
 /// Expands dims.
+///
+/// Negative axes are acceptable.
+///
+/// # Examples
+///
+/// ```
+/// extern crate autograd as ag;
+///
+/// let ref a = ag::constant(ag::ndarray_ext::standard_normal(&[3]));
+/// let ref b = ag::expand_dims(a, &[0, 2]);
+/// assert_eq!(b.eval().shape(), &[1, 3, 1]);
+/// ```
 pub fn expand_dims(x: &Tensor, axes: &[isize]) -> Tensor
 {
     let mut axes = axes.to_vec();
@@ -404,6 +488,18 @@ pub fn expand_dims(x: &Tensor, axes: &[isize]) -> Tensor
 
 #[inline]
 /// Squeezes dims.
+///
+/// Negative axes are acceptable.
+///
+/// # Examples
+///
+/// ```
+/// extern crate autograd as ag;
+///
+/// let ref a = ag::constant(ag::ndarray_ext::standard_normal(&[1, 3, 1]));
+/// let ref b = ag::squeeze(a, &[0, 2]);
+/// assert_eq!(b.eval().shape(), &[3]);
+/// ```
 pub fn squeeze(x: &Tensor, axes: &[isize]) -> Tensor
 {
     let mut axes = axes.to_vec();
@@ -414,6 +510,8 @@ pub fn squeeze(x: &Tensor, axes: &[isize]) -> Tensor
 
 #[inline]
 /// Tiles input tensor along specified axis.
+///
+/// `axis` can be negative.
 ///
 /// # Examples
 ///
@@ -459,7 +557,9 @@ pub fn clip(x: &Tensor, min: f32, max: f32) -> Tensor
 
 
 #[inline]
-/// Take max along specified axis.
+/// Takes max along specified axis.
+///
+/// `axis` can be negative.
 ///
 /// # Examples
 ///
@@ -467,9 +567,9 @@ pub fn clip(x: &Tensor, min: f32, max: f32) -> Tensor
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let x = ag::constant(ndarray::arr2(&[[2.], [4.], [6.]]));
+/// let x = ag::constant(ndarray::arr2(&[[2., 4.], [3., 1.]]));
 /// let y = ag::reduce_max(&x, 0, false);
-/// assert_eq!(y.eval()[0], 6.);
+/// assert_eq!(y.eval(), ndarray::arr1(&[3., 4.]).into_dyn());
 /// ```
 pub fn reduce_max(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 {
@@ -482,7 +582,20 @@ pub fn reduce_max(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 
 
 #[inline]
-/// Take min along specified axis.
+/// Takes min along specified axis.
+///
+/// `axis` can be negative.
+///
+/// # Examples
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let x = ag::constant(ndarray::arr2(&[[2., 4.], [3., 1.]]));
+/// let y = ag::reduce_min(&x, 0, false);
+/// assert_eq!(y.eval(), ndarray::arr1(&[2., 1.]).into_dyn());
+/// ```
 pub fn reduce_min(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 {
     let op = reduction_ops::ReduceMin {
@@ -494,7 +607,9 @@ pub fn reduce_min(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 
 
 #[inline]
-/// Take mean along specified axis.
+/// Takes mean along specified axis.
+///
+/// `axis` can be negative.
 ///
 /// # Examples
 ///
@@ -502,9 +617,9 @@ pub fn reduce_min(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let x = ag::constant(ndarray::arr2(&[[2.], [4.], [6.]]));
-/// let y = ag::reduce_mean(&x, 0, false);
-/// assert_eq!(y.eval()[0], 4.);
+/// let x = ag::constant(ndarray::arr2(&[[2., 4.], [3., 1.]]));
+/// let y = ag::reduce_mean(&x, 1, false);
+/// assert_eq!(y.eval(), ndarray::arr1(&[3., 2.]).into_dyn());
 /// ```
 pub fn reduce_mean(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 {
@@ -517,7 +632,20 @@ pub fn reduce_mean(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 
 
 #[inline]
-/// Take sum along specified axis.
+/// Takes sum along specified axis.
+///
+/// `axis` can be negative.
+///
+/// # Examples
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let x = ag::constant(ndarray::arr2(&[[2., 4.], [3., 1.]]));
+/// let y = ag::reduce_sum(&x, 1, false);
+/// assert_eq!(y.eval(), ndarray::arr1(&[6., 4.]).into_dyn());
+/// ```
 pub fn reduce_sum(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 {
     let op = reduction_ops::ReduceSum {
@@ -530,6 +658,8 @@ pub fn reduce_sum(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 
 #[inline]
 /// Reshapes input tensor.
+///
+/// Only one dim in `shape` can be `-1`.
 ///
 /// # Examples
 ///
@@ -565,6 +695,15 @@ pub fn reshape(x: &Tensor, shape: &[isize]) -> Tensor
 
 #[inline]
 /// Returns 1-ranked tensor (vector)
+///
+/// # Examples
+///
+/// ```
+/// extern crate autograd as ag;
+///
+/// let ref x = ag::zeros(&[3, 2, 2]);
+/// assert_eq!(ag::flatten(x).eval().shape(), &[12]);
+/// ```
 pub fn flatten(x: &Tensor) -> Tensor
 {
     let op = reshape::Reshape { target_shape: vec![None] };
@@ -661,8 +800,10 @@ pub fn logsumexp(x: &Tensor, axis: isize) -> Tensor
 #[inline]
 /// Log softmax function.
 ///
+/// `axis` can be negative.
+///
 /// Computes `softmax(x)` along specified axis and
-/// take logarithm of it.
+/// takes logarithm of it.
 pub fn log_softmax(x: &Tensor, axis: isize) -> Tensor
 {
     // TODO: Composing from "node level" LogSumExp.
@@ -672,7 +813,9 @@ pub fn log_softmax(x: &Tensor, axis: isize) -> Tensor
 
 
 #[inline]
-/// Take softmax along specified axis
+/// Takes softmax along specified axis
+///
+/// `axis` can be negative.
 pub fn softmax(x: &Tensor, axis: isize) -> Tensor
 {
     let op = softmax::Softmax { axis: axis };
@@ -744,6 +887,17 @@ pub fn sparse_softmax_cross_entropy(y: &Tensor, t: &Tensor) -> Tensor
 /// Matrix multiplication.
 ///
 /// Both `a` and `b` must be 2-ranked tensors.
+///
+/// # Examples
+///
+/// ```
+/// extern crate autograd as ag;
+///
+/// let ref a = ag::zeros(&[4, 2]);
+/// let ref b = ag::zeros(&[2, 3]);
+/// let ref c = ag::matmul(a, b);
+/// assert_eq!(c.eval().shape(), &[4, 3]);
+/// ```
 pub fn matmul(a: &Tensor, b: &Tensor) -> Tensor
 {
     apply_op(matmul::MatMul, &[a, b])
@@ -753,8 +907,7 @@ pub fn matmul(a: &Tensor, b: &Tensor) -> Tensor
 #[inline]
 /// Computes tensor dot product (tensor contraction) along specified axes.
 ///
-/// For detailed description,
-/// see see https://docs.scipy.org/doc/numpy/reference/generated/numpy.tensordot.html.
+/// Negative axis is acceptable.
 ///
 /// # Panics
 /// When `axes[0].len()` != `axes[1].len()`
@@ -762,20 +915,22 @@ pub fn matmul(a: &Tensor, b: &Tensor) -> Tensor
 /// # Examples
 ///
 /// ```
-/// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::variable(ag::ndarray_ext::zeros(&[3, 4, 5]));
-/// let ref b = ag::variable(ag::ndarray_ext::zeros(&[4, 3, 2]));
+/// let ref a = ag::zeros(&[3, 4, 5]);
+/// let ref b = ag::zeros(&[4, 3, 2]);
 /// let ref c = ag::tensordot(a, b, &[3, 4, 5], &[4, 3, 2], [&[1, 0], &[0, 1]]);
 /// assert_eq!(c.eval().shape(), &[5, 2]);
 ///
 /// // another example (simple matmul broadcast)
-/// let ref a = ag::variable(ag::ndarray_ext::zeros(&[2, 3, 4]));
-/// let ref b = ag::variable(ag::ndarray_ext::zeros(&[4, 2]));
+/// let ref a = ag::zeros(&[2, 3, 4]);
+/// let ref b = ag::zeros(&[4, 2]);
 /// let ref c = ag::tensordot(a, b, &[2, 3, 4], &[4, 2], [&[2], &[0]]);
 /// assert_eq!(c.eval().shape(), &[2, 3, 2]);
 /// ```
+///
+/// For detailed description,
+/// see see https://docs.scipy.org/doc/numpy/reference/generated/numpy.tensordot.html.
 pub fn tensordot(
     a: &Tensor,
     b: &Tensor,
@@ -843,19 +998,21 @@ pub fn tensordot(
 #[inline]
 /// Batched matrix multiplication.
 ///
-/// Performs matrix multiplication between last two dimensions of `a` and `b`
-/// and gathers those. So the rank of `a` and `b` must be equals.
+/// Performs matrix multiplication between corresponding dimensions of `a` and `b`.
+/// So the rank of `a` and `b` must be equals.
+///
 /// # Examples
 ///
 /// ```
-/// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::variable(ag::ndarray_ext::zeros(&[2, 3, 4, 2]));
-/// let ref b = ag::variable(ag::ndarray_ext::zeros(&[2, 3, 2, 3]));
+/// let ref a = ag::zeros(&[2, 3, 4, 2]);
+/// let ref b = ag::zeros(&[2, 3, 2, 3]);
 /// let ref c = ag::batch_matmul(a, b);
 /// assert_eq!(c.eval().shape(), &[2, 3, 4, 3]);
 /// ```
+///
+/// For detailed description, see https://www.tensorflow.org/api_docs/python/tf/matmul
 pub fn batch_matmul(a: &Tensor, b: &Tensor) -> Tensor
 {
     let op = batch_matmul::BatchMatMul {
@@ -872,10 +1029,9 @@ pub fn batch_matmul(a: &Tensor, b: &Tensor) -> Tensor
 /// # Examples
 ///
 /// ```
-/// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::variable(ag::ndarray_ext::zeros(&[1, 2, 3, 4, 5]));
+/// let ref a = ag::zeros(&[1, 2, 3, 4, 5]);
 /// let ref b = ag::transpose(a, &[4, 2, 3, 0, 1]);
 /// assert_eq!(b.eval().shape(), &[5, 3, 4, 1, 2]);
 /// ```
@@ -894,6 +1050,16 @@ pub fn transpose(x: &Tensor, perm: &[usize]) -> Tensor
 /// * `x` - Tensor with arbitrary shape.
 /// * `starts` - Start indices for each dimensions
 /// * `ends` - End indices for each dimensions. `-1` representing the last index is acceptable.
+///
+/// # Examples
+///
+/// ```
+/// extern crate autograd as ag;
+///
+/// let ref a = ag::zeros(&[4, 4]);
+/// let ref b = ag::slice(a, &[0, 0], &[-1, 2]); // numpy equivalent is a[:, 0:2]
+/// assert_eq!(b.eval().shape(), &[4, 2]);
+/// ```
 pub fn slice(x: &Tensor, starts: &[isize], ends: &[isize]) -> Tensor
 {
     assert_eq!(starts.len(), ends.len());
@@ -913,6 +1079,20 @@ pub fn slice(x: &Tensor, starts: &[isize], ends: &[isize]) -> Tensor
 
 #[inline]
 /// Concatenates (stacks) input tensors along specified axis.
+///
+/// `axis` can be negative.
+///
+/// # Examples
+///
+/// ```
+/// extern crate autograd as ag;
+///
+/// let ref a = ag::zeros(&[3, 2]);
+/// let ref b = ag::zeros(&[3, 2]);
+/// let ref c = ag::zeros(&[3, 2]);
+/// let ref d = ag::concat(&[a, b, c], 0);
+/// assert_eq!(d.eval().shape(), &[9, 2]);
+/// ```
 pub fn concat(tensors: &[&Tensor], axis: isize) -> Tensor
 {
     apply_op(concat::Concat { axis: axis }, tensors)
@@ -924,6 +1104,7 @@ pub fn concat(tensors: &[&Tensor], axis: isize) -> Tensor
 ///
 /// Along `axis`, slices subviews from `param` with `indices`, and then gathers those.
 /// For example, this can be used for embedding vector lookup.
+/// `axis` can be negative.
 ///
 /// See also https://www.tensorflow.org/api_docs/python/tf/gather.
 ///
@@ -1127,7 +1308,7 @@ pub fn gamma(shape: &[usize], shape_param: f64, scale: f64) -> Tensor
 }
 
 
-/// Outputs values sampled from the log normal distribution.
+/// Outputs values sampled from the log-normal distribution.
 pub fn log_normal(shape: &[usize], mean: f64, stddev: f64) -> Tensor
 {
     let op = random_ops::LogNormal {

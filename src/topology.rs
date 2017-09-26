@@ -10,9 +10,10 @@ use std::mem;
 use tensor::Tensor;
 
 
+#[doc(hidden)]
+#[inline]
 /// Performs actual graph traversal and its evaluation
 // TODO: loop-based rather than recursion (this would be difficult)
-#[inline]
 pub fn perform_eval(target: &Tensor, memo: &mut FnvHashMap<Tensor, NdArray>, train: bool)
 {
     if memo.contains_key(target) {

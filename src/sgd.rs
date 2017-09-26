@@ -25,6 +25,7 @@ pub fn apply_gradients<T: optimizers::Optimizer>(
 }
 
 
+#[doc(hidden)]
 #[inline(always)]
 /// Reduces gradient's each dim by summation.
 /// This is used when parameter shape and

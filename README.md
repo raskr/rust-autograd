@@ -46,6 +46,34 @@ assert_eq!(8., g2.eval_with_input(feed)[0]);
 
 ```
 
+Another example: multi layer perceptron for MNIST.
+
+```rust
+// -- graph def --
+let ref x = ag::placeholder();
+let ref y = ag::placeholder();
+let ref w = ag::variable(ag::ndarray_ext::glorot_uniform(&[28 * 28, 10]));
+let ref b = ag::variable(ag::ndarray_ext::zeros(&[1, 10]));
+let ref z = ag::matmul(x, w) + b;
+let ref loss = ag::sparse_softmax_cross_entropy(z, y);
+let ref grads = ag::gradients(loss, &[w, b], None);
+let ref predictions = ag::argmax(z, -1, true);
+let ref accuracy = ag::reduce_mean(&ag::equals(predictions, y), 0, false);
+
+// -- dataset --
+let ((x_train, y_train), (x_test, y_test)) = dataset::load();
+
+// -- training method --
+let mut optimizer = ag::sgd::optimizers::Adam { ..Default::default() };
+
+// -- training loop --
+for epoch in 0..max_epoch {
+    ...
+}
+
+```
+Available operations in rust-autograd are listed [here](https://docs.rs/autograd/0.4.2/autograd/ops/index.html)
+
 For more, see 
 [examples](https://github.com/perrier1034/rust-autograd/tree/master/examples) or
 [tests](https://github.com/perrier1034/rust-autograd/tree/master/tests). 

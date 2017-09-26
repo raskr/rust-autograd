@@ -179,6 +179,7 @@ impl fmt::Display for Tensor {
 }
 
 
+#[doc(hidden)]
 #[inline]
 pub fn eval_tensors(tensors: &[Tensor], feed_dict: Feed) -> Vec<NdArray>
 {
@@ -241,7 +242,7 @@ pub fn eval_tensors(tensors: &[Tensor], feed_dict: Feed) -> Vec<NdArray>
 
 
 #[derive(Clone)]
-/// Dynamic input to the computation graph.
+/// What feeds `ndarray`s to the computation graph.
 ///
 /// This is used to set `ndarray`'s array object to a `Placeholder` tensor.
 /// Arbitrary number of inputs can be set to this object with builder-like usage.

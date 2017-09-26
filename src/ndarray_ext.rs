@@ -10,6 +10,7 @@ pub type NdArrayView<'a> = ndarray::ArrayView<'a, f32, ndarray::IxDyn>;
 pub use array_gen::*;
 
 
+#[doc(hidden)]
 #[inline]
 // TODO: remove unwrap
 pub fn expand_dims_view<'a>(x: NdArrayView<'a>, axis: usize) -> NdArrayView<'a>
@@ -19,6 +20,7 @@ pub fn expand_dims_view<'a>(x: NdArrayView<'a>, axis: usize) -> NdArrayView<'a>
     x.into_shape(shape).unwrap()
 }
 
+#[doc(hidden)]
 #[inline]
 // TODO: remove unwrap
 pub fn expand_dims(x: NdArray, axis: usize) -> NdArray
@@ -28,6 +30,7 @@ pub fn expand_dims(x: NdArray, axis: usize) -> NdArray
     x.into_shape(shape).unwrap()
 }
 
+#[doc(hidden)]
 #[inline]
 pub fn roll_axis(arg: &mut NdArray, to: ndarray::Axis, from: ndarray::Axis)
 {
@@ -46,6 +49,7 @@ pub fn roll_axis(arg: &mut NdArray, to: ndarray::Axis, from: ndarray::Axis)
     }
 }
 
+#[doc(hidden)]
 #[inline]
 pub fn into_mat(x: NdArray) -> ndarray::Array<f32, ndarray::Ix2>
 {

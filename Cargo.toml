@@ -8,7 +8,7 @@ keywords = ["numerics", "machine-learning", "ndarray", "multidimensional", "neur
 license-file = "LICENSE"
 readme = "README.md"
 description = "A toy library to run computation graphs mimicking TensorFlow and Theano"
-# documentation = "http://perrier1034.github.io/rust-autograd/"
+documentation = "https://docs.rs/autograd/"
 
 [dependencies]
 rand = "0.3.15"
