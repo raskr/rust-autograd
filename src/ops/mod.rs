@@ -244,6 +244,53 @@ pub fn gradients(
 
 
 #[inline]
+/// Computes jacobians for variables.
+///
+/// # Arguments
+/// * `objective` - Target of differentiation.
+/// * `variables` - Variable tensors with which differentiate `objective`.
+/// * `objective_len` - (flattened) Length of `objective`
+///
+/// # Returns
+/// Jacobians for each variable. Each one is matrix of shape `(objective_len, variable size)`.
+///
+/// # Examples
+///
+/// ```
+/// extern crate autograd as ag;
+///
+/// let ref a = ag::variable(ag::ndarray_ext::standard_normal(&[4, 2]));
+/// let ref b = ag::variable(ag::ndarray_ext::standard_normal(&[2, 3]));
+/// let ref c = ag::matmul(a, b);
+/// let ref j = ag::jacobians(c, &[a, b], 4*3);
+///
+/// assert_eq!(j[0].eval().shape(), &[4*3, 4*2]);
+/// assert_eq!(j[1].eval().shape(), &[4*3, 2*3]);
+/// ```
+pub fn jacobians(objective: &Tensor, variables: &[&Tensor], objective_len: usize) -> Vec<Tensor>
+{
+    let vec_vec = (0..objective_len as isize)
+        .map(|i| {
+            // For each scalar objective, computes gradients for all variables
+            ::topology::symbolic_gradients(&objective.get(i), variables, None)
+        })
+        .collect::<Vec<Vec<_>>>();
+
+    // post process gradients
+    (0..variables.len())
+        .map(|i| {
+            // jac is matrix
+            let jac = (0..objective_len)
+                .map(|j| expand_dims(&flatten(&vec_vec[j][i]), &[0]))
+                .collect::<Vec<_>>();
+            // (objective_len, variable size)
+            concat(jac.iter().map(|a| a).collect::<Vec<_>>().as_slice(), 0)
+        })
+        .collect::<Vec<_>>()
+}
+
+
+#[inline]
 /// Elementwise sine
 pub fn sin(x: &Tensor) -> Tensor
 {
