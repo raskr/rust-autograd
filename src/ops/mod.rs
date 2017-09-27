@@ -900,7 +900,39 @@ pub fn sparse_softmax_cross_entropy(y: &Tensor, t: &Tensor) -> Tensor
 /// ```
 pub fn matmul(a: &Tensor, b: &Tensor) -> Tensor
 {
-    apply_op(matmul::MatMul, &[a, b])
+    let op = matmul::MatMul {
+        transpose_a: false,
+        transpose_b: false,
+    };
+    apply_op(op, &[a, b])
+}
+
+
+#[inline]
+/// Matrix multiplication.
+///
+/// Similar specification as `matmul` but, if `transpose_a` is true, `a` is transposed
+/// before actual matrix multiplication. It is the same for `transpose_b`.
+///
+/// The performance is better than explicitly computing like `ag::transpose(ag::matmul)`.
+///
+/// # Examples
+///
+/// ```
+/// extern crate autograd as ag;
+///
+/// let ref a = ag::zeros(&[2, 4]);
+/// let ref b = ag::zeros(&[2, 3]);
+/// let ref c = ag::matmul_t(a, b, true, false);
+/// assert_eq!(c.eval().shape(), &[4, 3]);
+/// ```
+pub fn matmul_t(a: &Tensor, b: &Tensor, transpose_a: bool, transpose_b: bool) -> Tensor
+{
+    let op = matmul::MatMul {
+        transpose_a: transpose_a,
+        transpose_b: transpose_b,
+    };
+    apply_op(op, &[a, b])
 }
 
 
