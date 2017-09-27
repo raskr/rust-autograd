@@ -914,7 +914,7 @@ pub fn matmul(a: &Tensor, b: &Tensor) -> Tensor
 /// Similar specification as `matmul` but, if `transpose_a` is true, `a` is transposed
 /// before actual matrix multiplication. It is the same for `transpose_b`.
 ///
-/// The performance is better than explicitly computing like `ag::transpose(ag::matmul)`.
+/// The performance is better than explicitly computing like `ag::matmul(ag::transpose)`.
 ///
 /// # Examples
 ///
@@ -939,7 +939,7 @@ pub fn matmul_t(a: &Tensor, b: &Tensor, transpose_a: bool, transpose_b: bool) ->
 #[inline]
 /// Computes tensor dot product (tensor contraction) along specified axes.
 ///
-/// Negative axis is acceptable.
+/// Negative axes are acceptable.
 ///
 /// # Panics
 /// When `axes[0].len()` != `axes[1].len()`

@@ -5,11 +5,12 @@ extern crate autograd as ag;
 use std::time::Instant;
 
 
-// Run "./download_mnist.sh" beforehand if you don't have dataset.
-//
 // This is softmax regression with Adam optimizer for mnist.
-// 0.91 test accuracy after 2 epochs,
-// 0.27 sec/epoch on 2.7GHz Intel Core i5
+// 0.918 test accuracy after 3 epochs,
+// 0.25 sec/epoch on 2.7GHz Intel Core i5
+//
+// First, run "./download_mnist.sh" beforehand if you don't have dataset and then run
+// "cargo run --example mlp_mnist --release" in `examples` dicectory.
 
 macro_rules! eval_with_time {
   ($x:expr) => {
@@ -40,7 +41,7 @@ fn main()
 
     // -- actual training --
     let mut optimizer = ag::sgd::optimizers::Adam { ..Default::default() };
-    let max_epoch = 5;
+    let max_epoch = 3;
     let batch_size = 200isize;
     let num_samples = x_train.shape()[0];
     let num_batches = num_samples / batch_size as usize;
