@@ -10,6 +10,16 @@ fn init_grad(val: f32, objective_shape: &[usize]) -> ag::Tensor
 }
 
 #[test]
+fn get()
+{
+    let ref v = ag::variable(ndarray::arr1(&[1., 2., 3.]));
+    let ref a: ag::Tensor = 2 * v;
+    let ref z = a.get(1);
+    let ref g = ag::gradients(z, &[v], None);
+    ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Feed::new(), 1e-3, 1e-3);
+}
+
+#[test]
 fn add_n()
 {
     let ref v1 = ag::variable(ndarray::arr1(&[1., 2., 3.]));

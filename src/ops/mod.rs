@@ -6,6 +6,7 @@ use std::rc::Rc;
 use tensor::{RawTensor, Tensor};
 
 mod dummy_op;
+mod index;
 mod random_ops;
 mod clip;
 mod add_n;
@@ -58,6 +59,28 @@ pub trait Op {
     /// NOTE:
     /// The number of return values must be same as `inputs.len()`.
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>;
+}
+
+
+impl Tensor {
+    /// Gets a symbolic float32 element from a tensor.
+    ///
+    /// `idx` can be negative.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// extern crate ndarray;
+    /// extern crate autograd as ag;
+    ///
+    /// let ref a = ag::variable(ndarray::arr2(&[[2., 3.], [4., 5.]]));
+    /// let ref b = a.get(2);
+    /// assert_eq!(b.eval()[0], 4.);
+    /// ```
+    pub fn get(&self, idx: isize) -> Tensor
+    {
+        apply_op(index::IndexOp { index: idx }, &[self])
+    }
 }
 
 
@@ -973,12 +996,8 @@ pub fn tensordot(
 {
     assert_eq!(axes[0].len(), axes[1].len());
 
-    fn preprocess(
-        x: &Tensor,
-        x_shape: &[usize],
-        axes: &[isize],
-        flip: bool,
-    ) -> (Tensor, Vec<isize>)
+    fn preprocess(x: &Tensor, x_shape: &[usize], axes: &[isize], flip: bool)
+        -> (Tensor, Vec<isize>)
     {
         let axes = axes.iter()
             .map(|&i| if i >= 0 {

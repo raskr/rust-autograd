@@ -49,7 +49,9 @@ impl ops::Op for MatMul {
             transpose_a: true,
             transpose_b: false,
         };
-        vec![Some(ops::apply_op(opa, &[gy, inputs[1]])),
-             Some(ops::apply_op(opb, &[inputs[0], gy]))]
+        vec![
+            Some(ops::apply_op(opa, &[gy, inputs[1]])),
+            Some(ops::apply_op(opb, &[inputs[0], gy])),
+        ]
     }
 }
