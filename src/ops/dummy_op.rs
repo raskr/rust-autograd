@@ -18,7 +18,7 @@ impl ops::Op for DummyOp {
     fn compute(&mut self, _: &[&::NdArray], _: bool) -> ::NdArray
     {
         panic!(
-            "There exists placeholder(s) couldn't get initial value ({})",
+            "There exists placeholder(s) couldn't get initial value",
             self.name
         )
     }
