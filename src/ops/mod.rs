@@ -6,6 +6,7 @@ use std::rc::Rc;
 use tensor::{RawTensor, Tensor};
 
 mod dummy_op;
+mod stop_gradients;
 mod index;
 mod random_ops;
 mod clip;
@@ -287,6 +288,14 @@ pub fn jacobians(objective: &Tensor, variables: &[&Tensor], objective_len: usize
             concat(jac.iter().map(|a| a).collect::<Vec<_>>().as_slice(), 0)
         })
         .collect::<Vec<_>>()
+}
+
+
+#[inline]
+/// Stops gradients
+pub fn stop_gradients(x: &Tensor) -> Tensor
+{
+    apply_op(stop_gradients::StopGradients, &[x])
 }
 
 
