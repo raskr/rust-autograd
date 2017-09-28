@@ -207,12 +207,12 @@ pub fn variable<T: ndarray::Dimension>(array: ndarray::Array<f32, T>) -> Tensor
 /// let ref z = 2*x*x + 3*y + 1;
 ///
 /// // dz/dy
-/// let ref g1 = ag::gradients(z, &[y], None)[0];
+/// let ref g1 = ag::gradients(&[z], &[y], &[None])[0];
 /// // dz/dx
-/// let ref g2 = ag::gradients(z, &[x], None)[0];
+/// let ref g2 = ag::gradients(&[z], &[x], &[None])[0];
 ///
 /// // ddz/dx (differentiates `z` again)
-/// let ref gg = ag::gradients(g2, &[x], None)[0];
+/// let ref gg = ag::gradients(&[g2], &[x], &[None])[0];
 ///
 /// // evaluation of symbolic gradients
 /// assert_eq!(3., g1.eval()[0]);
@@ -232,15 +232,15 @@ pub fn variable<T: ndarray::Dimension>(array: ndarray::Array<f32, T>) -> Tensor
 /// let ref a = ag::variable(ag::ndarray_ext::zeros(&[4, 2]));
 /// let ref b = ag::zeros(&[2, 3]);
 /// let ref c = ag::matmul(a, b);
-/// let ref g = ag::gradients(c, &[a], Some(ag::ndarray_ext::ones(&[4, 2])))[0];
+/// let ref g = ag::gradients(c, &[a], &[Some(ag::ndarray_ext::ones(&[4, 2]))])[0];
 /// ```
 pub fn gradients(
-    objective: &Tensor,
+    objectives: &[&Tensor],
     variables: &[&Tensor],
-    initial_grad: Option<&Tensor>,
+    initial_gys: &[Option<&Tensor>],
 ) -> Vec<Tensor>
 {
-    ::topology::symbolic_gradients(objective, variables, initial_grad)
+    ::topology::symbolic_gradients(objectives, variables, initial_gys)
 }
 
 
@@ -270,10 +270,11 @@ pub fn gradients(
 /// ```
 pub fn jacobians(objective: &Tensor, variables: &[&Tensor], objective_len: usize) -> Vec<Tensor>
 {
+    // TODO: remove map
     let vec_vec = (0..objective_len as isize)
         .map(|i| {
             // For each scalar objective, computes gradients for all variables
-            ::topology::symbolic_gradients(&objective.get(i), variables, None)
+            ::topology::symbolic_gradients(&[&objective.get(i)], variables, &[None])
         })
         .collect::<Vec<Vec<_>>>();
 

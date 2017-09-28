@@ -44,7 +44,7 @@ pub fn perform_eval(target: &Tensor, memo: &mut FnvHashMap<Tensor, NdArray>, tra
 
 #[inline]
 /// Makes mapping of {node => the node contributed to gradient or not}
-fn contributed_to_grads(objective: &Tensor, variables: &[&Tensor]) -> FnvHashMap<Tensor, bool>
+fn contributed_to_grads(objectives: &[&Tensor], variables: &[&Tensor]) -> FnvHashMap<Tensor, bool>
 {
     fn rec(target: &Tensor, vars: &[&Tensor], memo: &mut FnvHashMap<Tensor, bool>)
     {
@@ -69,7 +69,9 @@ fn contributed_to_grads(objective: &Tensor, variables: &[&Tensor]) -> FnvHashMap
     }
 
     let mut memo = FnvHashMap::default();
-    rec(objective, variables, &mut memo);
+    for o in objectives.into_iter() {
+        rec(o, variables, &mut memo);
+    }
     memo
 }
 
@@ -81,7 +83,7 @@ fn contributed_to_grads_test()
     let ref t = ::constant(::ndarray_ext::standard_normal(&[2, 3]));
     let ref v = ::variable(::ndarray_ext::standard_normal(&[2, 3]));
     let ref z = ::sigmoid_cross_entropy(&v, &t);
-    let booleans = contributed_to_grads(z, &[v]);
+    let booleans = contributed_to_grads(&[z], &[v]);
     assert_eq!(booleans.len(), 3);
     assert!(!booleans.get(t).unwrap());
     assert!(booleans.get(v).unwrap());
@@ -99,9 +101,9 @@ fn contributed_to_grads_test()
 /// NOTE: Nodes that do not contribute to the gradient won't be included to avoid
 /// unnecessary computation.
 pub fn symbolic_gradients(
-    objective: &Tensor,
+    objectives: &[&Tensor],
     variables: &[&Tensor],
-    initial_grad: Option<&Tensor>,
+    initial_gys: &[Option<&Tensor>],
 ) -> Vec<Tensor>
 {
     #[inline]
@@ -125,21 +127,29 @@ pub fn symbolic_gradients(
         mem::swap(&mut vec![acc], gys);
     }
 
-    let initial_grad = initial_grad.map(|a| a.clone()).unwrap_or_else(
-        || ops::scalar(1.),
-    );
+    // Treats `None` in `initial_gys`
+    let initial_gys = initial_gys
+        .into_iter()
+        .map(|init_grad: &Option<&Tensor>| {
+            init_grad.map(|ig| ig.clone()).unwrap_or_else(
+                || ops::scalar(1.),
+            )
+        })
+        .collect::<Vec<Tensor>>();
 
     // Mapping of {y => [gy]}
-    let mut grads = FnvHashMap::default();
+    let mut grads: FnvHashMap<Tensor, Vec<Tensor>> = FnvHashMap::default();
 
     // Mapping of {node => must visit or not (boolean)}
-    let contrib = contributed_to_grads(objective, variables);
+    let contrib = contributed_to_grads(objectives, variables);
 
     // Prepare a heap with tensor's rank numbers for reversed
     // topological sort.
     let mut heap = BinaryHeap::new();
-    heap.push(objective.clone());
-    grads.insert(objective.clone(), vec![initial_grad]);
+    for (o, g) in objectives.into_iter().zip(initial_gys) {
+        heap.push((*o).clone());
+        grads.insert((*o).clone(), vec![g]);
+    }
 
     // This prevents calling `grad()` twice or more
     let mut grad_done = HashSet::<Tensor>::new();
