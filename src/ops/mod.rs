@@ -188,10 +188,12 @@ pub fn variable<T: ndarray::Dimension>(array: ndarray::Array<f32, T>) -> Tensor
 /// Returns gradient tensors wrt variables.
 ///
 /// # Arguments
-/// * `objective` - Target of differentiation.
-/// * `variables` - Variable tensors with which differentiate `objective`.
-/// * `initial_grad` - This is required **if objective is not a scalar**. In most cases,
-/// this is initialized with 1s.
+/// * `objectives` - Targets of differentiation.
+/// * `variables` - Variable tensors with which differentiate `objectives`.
+/// * `output_grads` - Optionals. These are already known gradients of `objectives`.
+/// So the length must be same as `objectives`'s.
+/// If **each objective is not a scalar**, you must pass the "Some" value. In most cases,
+/// it is initialized with 1s.
 ///
 /// # Returns
 /// Symbolic gradient tensors corresponding to `variables` in the same order as `variables`
@@ -227,6 +229,7 @@ pub fn variable<T: ndarray::Dimension>(array: ndarray::Array<f32, T>) -> Tensor
 ///
 /// # Example2
 /// The case where objective is not a scalar
+///
 /// ```
 /// extern crate autograd as ag;
 ///
@@ -325,10 +328,9 @@ pub fn stop_gradients(x: &Tensor) -> Tensor
 }
 
 
-/// Returns the symbolic shape of input tensor
+/// Returns symbolic shape of input tensor
 ///
-/// This is useful when the shape of `x` is dynamic so can't be resolved
-/// statically.
+/// This is useful when the shape of `x` is dynamic.
 ///
 /// # Examples
 ///
@@ -346,10 +348,9 @@ pub fn shape(x: &Tensor) -> Tensor
 }
 
 
-/// Returns the symbolic size (length) of input tensor
+/// Returns the (symbolic) length of input tensor
 ///
-/// This is useful when the size of `x` is dynamic so can't be resolved
-/// statically.
+/// This is useful when the size of `x` is dynamic.
 ///
 /// # Examples
 ///
@@ -367,10 +368,9 @@ pub fn size(x: &Tensor) -> Tensor
 }
 
 
-/// Returns the symbolic rank of input tensor
+/// Returns the (symbolic) rank of input tensor
 ///
-/// This is useful when the rank of `x` is dynamic so can't be resolved
-/// statically.
+/// This is useful when the rank of `x` is dynamic.
 ///
 /// # Examples
 ///
@@ -557,7 +557,7 @@ pub fn exp(x: &Tensor) -> Tensor
 
 
 #[inline]
-/// Adds all input tensors inplace
+/// Adds all input tensors inplace.
 ///
 /// All the input tensors must have same shapes.
 ///
@@ -635,7 +635,7 @@ pub fn argmax(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 #[inline]
 /// Expands dims.
 ///
-/// Negative axes are acceptable.
+/// Each axis can be negative.
 ///
 /// # Examples
 ///
@@ -657,7 +657,7 @@ pub fn expand_dims(x: &Tensor, axes: &[isize]) -> Tensor
 #[inline]
 /// Squeezes dims.
 ///
-/// Negative axes are acceptable.
+/// Each axis can be negative.
 ///
 /// # Examples
 ///
@@ -679,6 +679,7 @@ pub fn squeeze(x: &Tensor, axes: &[isize]) -> Tensor
 #[inline]
 /// Tiles input tensor along specified axis.
 ///
+/// Tiles input tensor `num` times along `axis`.
 /// `axis` can be negative.
 ///
 /// # Examples
@@ -837,7 +838,7 @@ pub fn reduce_sum(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 ///
 /// let x = ag::zeros(&[3, 2, 2]);
 /// let y = ag::reshape(&x, &[3, 4]);
-/// assert_eq!(y.eval(), x.eval().into_shape(ndarray::IxDyn(&[3, 4])).unwrap());
+/// assert_eq!(y.eval(), ag::ndarray_ext::zeros(&[3, 4]));
 /// ```
 pub fn reshape(x: &Tensor, shape: &[isize]) -> Tensor
 {
@@ -862,7 +863,7 @@ pub fn reshape(x: &Tensor, shape: &[isize]) -> Tensor
 
 
 #[inline]
-/// Returns 1-ranked tensor (vector)
+/// Flattens input tensor into 1-ranked (vector)
 ///
 /// # Examples
 ///
@@ -968,10 +969,9 @@ pub fn logsumexp(x: &Tensor, axis: isize) -> Tensor
 #[inline]
 /// Log softmax function.
 ///
-/// `axis` can be negative.
-///
 /// Computes `softmax(x)` along specified axis and
 /// takes logarithm of it.
+/// `axis` can be negative.
 pub fn log_softmax(x: &Tensor, axis: isize) -> Tensor
 {
     // TODO: Composing from "node level" LogSumExp.
@@ -1107,10 +1107,16 @@ pub fn matmul_t(a: &Tensor, b: &Tensor, transpose_a: bool, transpose_b: bool) ->
 #[inline]
 /// Computes tensor dot product (tensor contraction) along specified axes.
 ///
-/// Negative axes are acceptable.
+/// # Arguments
+/// * `a` - Input tensor
+/// * `b` - Input tensor
+/// * `a_shape` - Shape of a
+/// * `b_shape` - Shape of b
+/// * `axes` - `axes[0]` and `axes[1]` are `a`'s and `b`'s axes respectively.
+/// Contraction is computed along corresponding `a`'s and `b`'s axes.
+/// So the number of the axes must be equals.
 ///
-/// # Panics
-/// When `axes[0].len()` != `axes[1].len()`
+/// Note: each axis can be negative number.
 ///
 /// # Examples
 ///
@@ -1122,7 +1128,7 @@ pub fn matmul_t(a: &Tensor, b: &Tensor, transpose_a: bool, transpose_b: bool) ->
 /// let ref c = ag::tensordot(a, b, &[3, 4, 5], &[4, 3, 2], [&[1, 0], &[0, 1]]);
 /// assert_eq!(c.eval().shape(), &[5, 2]);
 ///
-/// // another example (simple matmul broadcast)
+/// // Another example (simple matmul broadcast)
 /// let ref a = ag::zeros(&[2, 3, 4]);
 /// let ref b = ag::zeros(&[4, 2]);
 /// let ref c = ag::tensordot(a, b, &[2, 3, 4], &[4, 2], [&[2], &[0]]);
@@ -1306,7 +1312,7 @@ pub fn concat(tensors: &[&Tensor], axis: isize) -> Tensor
 ///
 /// # Arguments
 /// * `param` - Target of slicing.
-/// * `indices` - Index tensor with which slices `param`. This cab be arbitrary shape.
+/// * `indices` - Index tensor with which slices `param`. This can be arbitrary shape.
 /// * `axis` - Slices sub tensors along this axis.
 ///
 /// # Returns
