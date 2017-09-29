@@ -268,13 +268,16 @@ pub fn gradients(
 /// assert_eq!(j[0].eval().shape(), &[4*3, 4*2]);
 /// assert_eq!(j[1].eval().shape(), &[4*3, 2*3]);
 /// ```
-pub fn jacobians(objective: &Tensor, variables: &[&Tensor], objective_len: usize) -> Vec<Tensor>
+pub fn jacobians(objective: &Tensor,
+                 variables: &[&Tensor],
+                 objective_len: usize,
+                 output_grads: Option<&Tensor>) -> Vec<Tensor>
 {
     // TODO: remove map
     let vec_vec = (0..objective_len as isize)
         .map(|i| {
             // For each scalar objective, computes gradients for all variables
-            ::topology::symbolic_gradients(&[&objective.get(i)], variables, &[None])
+            ::topology::symbolic_gradients(&[&objective.get(i)], variables, &[output_grads])
         })
         .collect::<Vec<Vec<_>>>();
 
@@ -293,10 +296,10 @@ pub fn jacobians(objective: &Tensor, variables: &[&Tensor], objective_len: usize
 
 
 #[inline]
-/// Computes hessian vector product
+/// (Experimental) Computes hessian vector product
 ///
 /// `objectives` must be scalars.
-pub fn hessian_vector_product(
+pub fn _hessian_vector_product(
     objectives: &[&Tensor],
     variables: &[&Tensor],
     vectors: &[&Tensor],
