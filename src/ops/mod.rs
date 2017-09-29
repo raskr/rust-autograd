@@ -269,16 +269,13 @@ pub fn gradients(
 /// assert_eq!(j[0].eval().shape(), &[4*3, 4*2]);
 /// assert_eq!(j[1].eval().shape(), &[4*3, 2*3]);
 /// ```
-pub fn jacobians(objective: &Tensor,
-                 variables: &[&Tensor],
-                 objective_len: usize,
-                 output_grads: Option<&Tensor>) -> Vec<Tensor>
+pub fn jacobians(objective: &Tensor, variables: &[&Tensor], objective_len: usize) -> Vec<Tensor>
 {
     // TODO: remove map
     let vec_vec = (0..objective_len as isize)
         .map(|i| {
             // For each scalar objective, computes gradients for all variables
-            ::topology::symbolic_gradients(&[&objective.get(i)], variables, &[output_grads])
+            ::topology::symbolic_gradients(&[&objective.get(i)], variables, &[None])
         })
         .collect::<Vec<Vec<_>>>();
 
