@@ -293,6 +293,26 @@ pub fn jacobians(objective: &Tensor, variables: &[&Tensor], objective_len: usize
 
 
 #[inline]
+/// Computes hessian vector product
+///
+/// `objectives` must be scalars.
+pub fn hessian_vector_product(objectives: &[&Tensor],
+                              variables: &[&Tensor],
+                              vectors: &[&Tensor]) -> Vec<Tensor>
+{
+    let grads = ::topology::symbolic_gradients(objectives, variables, &[None]);
+
+    let products = grads.iter().zip(vectors).map(|(g, &v)| {
+        g * v
+    }).collect::<Vec<_>>();
+
+    let products = products.iter().map(|a| a).collect::<Vec<_>>();
+
+    ::topology::symbolic_gradients(products.as_slice(), variables, &[None])
+}
+
+
+#[inline]
 /// Stops gradients
 pub fn stop_gradients(x: &Tensor) -> Tensor
 {
