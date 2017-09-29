@@ -6,6 +6,7 @@ use std::rc::Rc;
 use tensor::{RawTensor, Tensor};
 
 mod dummy_op;
+mod shape_ops;
 mod stop_gradients;
 mod index;
 mod random_ops;
@@ -263,7 +264,7 @@ pub fn gradients(
 /// let ref a = ag::variable(ag::ndarray_ext::standard_normal(&[4, 2]));
 /// let ref b = ag::variable(ag::ndarray_ext::standard_normal(&[2, 3]));
 /// let ref c = ag::matmul(a, b);
-/// let ref j = ag::jacobians(c, &[a, b], 4*3);
+/// let ref j = ag::jacobians(c, &[a, b], 4*3, );
 ///
 /// assert_eq!(j[0].eval().shape(), &[4*3, 4*2]);
 /// assert_eq!(j[1].eval().shape(), &[4*3, 2*3]);
@@ -324,6 +325,69 @@ pub fn _hessian_vector_product(
 pub fn stop_gradients(x: &Tensor) -> Tensor
 {
     apply_op(stop_gradients::StopGradients, &[x])
+}
+
+
+/// Returns the symbolic shape of input tensor
+///
+/// This is useful when the shape of `x` is dynamic so can't be resolved
+/// statically.
+///
+/// # Examples
+///
+/// ```
+/// extern crate autograd as ag;
+/// let ref x = ag::placeholder();
+/// let ref s = ag::shape(x);
+///
+/// let feed = ag::Feed::new().add(x, ag::ndarray_ext::zeros(&[2, 3]));
+/// assert_eq!(&[2., 3.], s.eval_with_input(feed).as_slice().unwrap());
+/// ```
+pub fn shape(x: &Tensor) -> Tensor
+{
+    apply_op(shape_ops::Shape, &[x])
+}
+
+
+/// Returns the symbolic size (length) of input tensor
+///
+/// This is useful when the size of `x` is dynamic so can't be resolved
+/// statically.
+///
+/// # Examples
+///
+/// ```
+/// extern crate autograd as ag;
+/// let ref x = ag::placeholder();
+/// let ref s = ag::size(x);
+///
+/// let feed = ag::Feed::new().add(x, ag::ndarray_ext::zeros(&[2, 3]));
+/// assert_eq!(6., s.eval_with_input(feed)[0]);
+/// ```
+pub fn size(x: &Tensor) -> Tensor
+{
+    apply_op(shape_ops::Size, &[x])
+}
+
+
+/// Returns the symbolic rank of input tensor
+///
+/// This is useful when the rank of `x` is dynamic so can't be resolved
+/// statically.
+///
+/// # Examples
+///
+/// ```
+/// extern crate autograd as ag;
+/// let ref x = ag::placeholder();
+/// let ref r = ag::rank(x);
+///
+/// let feed = ag::Feed::new().add(x, ag::ndarray_ext::zeros(&[2, 3]));
+/// assert_eq!(2., r.eval_with_input(feed)[0]);
+/// ```
+pub fn rank(x: &Tensor) -> Tensor
+{
+    apply_op(shape_ops::Rank, &[x])
 }
 
 
