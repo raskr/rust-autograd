@@ -827,6 +827,31 @@ pub fn reduce_sum(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 
 
 #[inline]
+/// Takes product along specified axis.
+///
+/// `axis` can be negative.
+///
+/// # Examples
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let x = ag::constant(ndarray::arr2(&[[2., 4.], [3., 1.]]));
+/// let y = ag::reduce_prod(&x, 1, false);
+/// assert_eq!(y.eval(), ndarray::arr1(&[8., 3.]).into_dyn());
+/// ```
+pub fn reduce_prod(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
+{
+    let op = reduction_ops::ReduceProd {
+        axis: axis,
+        keep_dim: keep_dim,
+    };
+    apply_op(op, &[x])
+}
+
+
+#[inline]
 /// Reshapes input tensor.
 ///
 /// Only one dim in `shape` can be `-1`.

@@ -28,6 +28,11 @@ pub struct ReduceSum {
     pub keep_dim: bool,
 }
 
+pub struct ReduceProd {
+    pub axis: isize,
+    pub keep_dim: bool,
+}
+
 pub struct ReduceMean {
     pub axis: isize,
     pub keep_dim: bool,
@@ -44,6 +49,11 @@ pub struct ReduceMaxGrad {
 }
 
 pub struct ReduceSumGrad {
+    pub axis: isize,
+    pub keep_dim: bool,
+}
+
+pub struct ReduceProdGrad {
     pub axis: isize,
     pub keep_dim: bool,
 }
@@ -371,6 +381,82 @@ impl ops::Op for ReduceMeanGrad {
             gx
         } else {
             panic!("grad implementation of immediate successor of ReduceMean is wrong")
+        }
+    }
+
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
+        vec![None, None]
+    }
+}
+
+impl ops::Op for ReduceProd {
+    fn name(&self) -> &str
+    {
+        "ReduceProd"
+    }
+
+    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    {
+        let x: &NdArray = &xs[0];
+
+        let axis = if self.axis < 0 {
+            (x.ndim() as isize + self.axis) as usize
+        } else {
+            self.axis as usize
+        };
+
+        if self.keep_dim {
+            let ret = x.fold_axis(ndarray::Axis(axis), 1., |acc, x| acc * x);
+            ndarray_ext::expand_dims(ret, axis)
+        } else {
+            x.fold_axis(ndarray::Axis(axis), 1., |acc, x| acc * x)
+        }
+    }
+
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
+    {
+        let grad_op = ReduceProdGrad {
+            axis: self.axis,
+            keep_dim: self.keep_dim,
+        };
+        vec![Some(ops::apply_op(grad_op, &[inputs[0], output, gy]))]
+    }
+}
+
+impl ops::Op for ReduceProdGrad {
+    fn name(&self) -> &str
+    {
+        "ReduceProdGrad"
+    }
+
+    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    {
+        let x: &NdArray = xs[0];
+        let y: &NdArray = xs[1];
+        let gy: &NdArray = xs[2];
+
+        let axis = if self.axis < 0 {
+            (x.ndim() as isize + self.axis) as usize
+        } else {
+            self.axis as usize
+        };
+
+        // add dim for broadcast (the result is "view")
+        let y_gy = if self.keep_dim {
+            gy * y
+        } else {
+            ndarray_ext::expand_dims(gy * y, axis)
+        };
+
+
+        // do broadcast
+        if let Some(y_gy_broadcast) = y_gy.broadcast(x.shape()) {
+            let mut owned: NdArray = y_gy_broadcast.to_owned();
+            owned.zip_mut_with(x, |a, &b| *a /= b);
+            owned
+        } else {
+            panic!("grad implementation of immediate successor of ReduceSum is wrong")
         }
     }
 

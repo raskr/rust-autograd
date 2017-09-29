@@ -298,6 +298,15 @@ fn reduce_sum_keep()
 }
 
 #[test]
+fn reduce_prod()
+{
+    let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[3, 2, 2]));
+    let ref z = ag::reduce_prod(v, 1, false); // keep_dims=false
+    let ref g = ag::gradients(&[z], &[v], &[Some(&init_grad(1., &[3, 2]))]);
+    ag::test_helper::gradient_check(z, &[v], g.as_slice(), &ag::Feed::new(), 1e-3, 1e-3);
+}
+
+#[test]
 fn reverse_axes()
 {
     let ref v = ag::constant(ag::ndarray_ext::zeros(&[2, 3, 4, 5]));
