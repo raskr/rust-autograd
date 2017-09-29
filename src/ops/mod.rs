@@ -24,6 +24,7 @@ mod softmax;
 mod sigmoid;
 mod elu;
 mod relu;
+mod split;
 mod slice;
 mod sigmoid_cross_entropy;
 mod softmax_cross_entropy;
@@ -1242,6 +1243,39 @@ pub fn transpose(x: &Tensor, perm: &[usize]) -> Tensor
     let src_dst = perm.iter().cloned().zip(0..perm.len()).collect::<Vec<_>>();
     let op = transpose::Transpose { src_dst_sorted: src_dst };
     apply_op(op, &[x])
+}
+
+
+#[inline]
+/// Splits input tensors into parts.
+///
+/// Splits `x` into `sizes.len()` parts along `axis`.
+/// The size of dimension of each part is `sizes[i]` on `axis`, but
+/// `x.shape[i]` on other axis.
+///
+/// # Examples
+///
+/// ```
+/// extern crate autograd as ag;
+///
+/// let ref a = ag::zeros(&[3, 7, 5]);
+/// let ref b = ag::split(a, &[2, 3, 2], 1);
+/// assert_eq!(b[0].eval().shape(), &[3, 2, 5]);
+/// assert_eq!(b[1].eval().shape(), &[3, 3, 5]);
+/// assert_eq!(b[2].eval().shape(), &[3, 2, 5]);
+/// ```
+pub fn split(x: &Tensor, sizes: &[usize], axis: isize) -> Vec<Tensor>
+{
+    (0..sizes.len())
+        .map(|i| {
+            let op = split::Split {
+                sizes: sizes.to_vec(),
+                index: i,
+                axis: axis,
+            };
+            apply_op(op, &[x])
+        })
+        .collect::<Vec<_>>()
 }
 
 

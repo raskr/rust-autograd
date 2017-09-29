@@ -452,6 +452,15 @@ fn slice()
 }
 
 #[test]
+fn split()
+{
+    let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[3, 7, 5]));
+    let ref z = ag::split(v, &[2, 3, 2], 1);
+    let ref g = ag::gradients(&[&z[1]], &[v], &[Some(&init_grad(1., &[3, 3, 5]))]);
+    ag::test_helper::gradient_check(&z[1], &[v], g.as_slice(), &ag::Feed::new(), 1e-3, 1e-3);
+}
+
+#[test]
 fn flatten()
 {
     let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[4, 4]));
