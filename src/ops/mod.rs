@@ -236,7 +236,7 @@ pub fn variable<T: ndarray::Dimension>(array: ndarray::Array<f32, T>) -> Tensor
 /// let ref a = ag::variable(ag::ndarray_ext::zeros(&[4, 2]));
 /// let ref b = ag::zeros(&[2, 3]);
 /// let ref c = ag::matmul(a, b);
-/// let ref g = ag::gradients(c, &[a], &[Some(ag::ndarray_ext::ones(&[4, 2]))])[0];
+/// let ref g = ag::gradients(&[c], &[a], &[Some(&ag::ones(&[4, 2]))])[0];
 /// ```
 pub fn gradients(
     objectives: &[&Tensor],

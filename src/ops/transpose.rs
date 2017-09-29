@@ -47,7 +47,11 @@ impl ops::Op for Transpose {
 
             src_dst[i].0 = dst;
         }
-        NdArray::from_shape_fn(x.shape(), |i| x[i])
+        if x.is_standard_layout() {
+            x.to_owned()
+        } else {
+            NdArray::from_shape_fn(x.shape(), |i| x[i])
+        }
     }
 
     fn grad(&self, gy: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
