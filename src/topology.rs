@@ -227,7 +227,7 @@ fn topological_ordering_on_reverse_mode()
     let ref w = ::variable(::ndarray_ext::standard_normal(&[2, 3]));
     let ref b = ::variable(::ndarray_ext::zeros(&[4, 3]));
     let ref z = ::matmul(x, w) + b;
-    let ref g = ::gradients(z, &[w], Some(&::ones(&[4, 3])))[0];
+    let ref g = ::gradients(&[z], &[w], &[Some(&::ones(&[4, 3]))])[0];
 
     // to vec
     let mut collected = collect_parents_from(g).into_iter().collect::<Vec<Tensor>>();

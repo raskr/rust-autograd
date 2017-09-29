@@ -35,7 +35,7 @@ fn main()
     let ref b = ag::variable(ag::ndarray_ext::zeros(&[1, 10]));
     let ref z = ag::matmul(x, w) + b;
     let ref loss = ag::sparse_softmax_cross_entropy(z, y);
-    let ref grads = ag::gradients(loss, &[w, b], None);
+    let ref grads = ag::gradients(&[loss], &[w, b], &[None]);
     let ref predictions = ag::argmax(z, -1, true);
     let ref accuracy = ag::reduce_mean(&ag::equals(predictions, y), 0, false);
 
