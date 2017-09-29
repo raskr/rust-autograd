@@ -237,10 +237,10 @@ pub fn variable<T: ndarray::Dimension>(array: ndarray::Array<f32, T>) -> Tensor
 pub fn gradients(
     objectives: &[&Tensor],
     variables: &[&Tensor],
-    initial_gys: &[Option<&Tensor>],
+    output_grads: &[Option<&Tensor>],
 ) -> Vec<Tensor>
 {
-    ::topology::symbolic_gradients(objectives, variables, initial_gys)
+    ::topology::symbolic_gradients(objectives, variables, output_grads)
 }
 
 
@@ -296,15 +296,19 @@ pub fn jacobians(objective: &Tensor, variables: &[&Tensor], objective_len: usize
 /// Computes hessian vector product
 ///
 /// `objectives` must be scalars.
-pub fn hessian_vector_product(objectives: &[&Tensor],
-                              variables: &[&Tensor],
-                              vectors: &[&Tensor]) -> Vec<Tensor>
+pub fn hessian_vector_product(
+    objectives: &[&Tensor],
+    variables: &[&Tensor],
+    vectors: &[&Tensor],
+) -> Vec<Tensor>
 {
     let grads = ::topology::symbolic_gradients(objectives, variables, &[None]);
 
-    let products = grads.iter().zip(vectors).map(|(g, &v)| {
-        g * v
-    }).collect::<Vec<_>>();
+    let products = grads
+        .iter()
+        .zip(vectors)
+        .map(|(g, &v)| g * v)
+        .collect::<Vec<_>>();
 
     let products = products.iter().map(|a| a).collect::<Vec<_>>();
 

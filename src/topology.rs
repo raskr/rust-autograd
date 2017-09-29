@@ -103,9 +103,10 @@ fn contributed_to_grads_test()
 pub fn symbolic_gradients(
     objectives: &[&Tensor],
     variables: &[&Tensor],
-    initial_gys: &[Option<&Tensor>],
+    output_grads: &[Option<&Tensor>],
 ) -> Vec<Tensor>
 {
+    assert_eq!(objectives.len(), output_grads.len());
     #[inline]
     fn maybe_reduce_grad(gys: &mut Vec<Tensor>)
     {
@@ -128,7 +129,7 @@ pub fn symbolic_gradients(
     }
 
     // Treats `None` in `initial_gys`
-    let initial_gys = initial_gys
+    let output_grads = output_grads
         .into_iter()
         .map(|init_grad: &Option<&Tensor>| {
             init_grad.map(|ig| ig.clone()).unwrap_or_else(
@@ -146,7 +147,7 @@ pub fn symbolic_gradients(
     // Prepare a heap with tensor's rank numbers for reversed
     // topological sort.
     let mut heap = BinaryHeap::new();
-    for (o, g) in objectives.into_iter().zip(initial_gys) {
+    for (o, g) in objectives.into_iter().zip(output_grads) {
         heap.push((*o).clone());
         grads.insert((*o).clone(), vec![g]);
     }
