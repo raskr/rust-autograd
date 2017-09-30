@@ -1,6 +1,5 @@
 extern crate ndarray;
 
-use ndarray_ext;
 use ndarray_ext::NdArray;
 use ops;
 use tensor::Tensor;

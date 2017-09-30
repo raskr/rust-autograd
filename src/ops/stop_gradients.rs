@@ -16,7 +16,7 @@ impl ops::Op for StopGradients {
         xs[0].clone()
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         vec![None]
     }

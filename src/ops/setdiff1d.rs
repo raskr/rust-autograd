@@ -1,9 +1,9 @@
 extern crate ndarray;
 
-use std::iter::FromIterator;
-use std::collections::hash_set::HashSet;
 use ndarray_ext::NdArray;
 use ops;
+use std::collections::hash_set::HashSet;
+use std::iter::FromIterator;
 use tensor::Tensor;
 
 

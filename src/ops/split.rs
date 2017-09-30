@@ -80,7 +80,7 @@ impl ops::Op for SplitGrad {
         gx
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         vec![None]
     }
