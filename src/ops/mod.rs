@@ -6,6 +6,7 @@ use std::rc::Rc;
 use tensor::{RawTensor, Tensor};
 
 mod dummy_op;
+mod setdiff1d;
 mod shape_ops;
 mod stop_gradients;
 mod index;
@@ -1247,6 +1248,29 @@ pub fn batch_matmul(a: &Tensor, b: &Tensor) -> Tensor
         transpose_a: false,
         transpose_b: false,
     };
+    apply_op(op, &[a, b])
+}
+
+
+#[inline]
+/// Takes diff between two tensor
+///
+/// Returns the sorted, unique values in a that are not in b.
+///
+/// # Examples
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let ref a = ag::constant(ndarray::arr1(&[4., 1., 5., 2., 3., 6.]));
+/// let ref b = ag::constant(ndarray::arr2(&[[2., 3.], [1., 4.]]));
+/// let ref c = ag::setdiff1d(a, b);
+/// assert_eq!(c.eval().as_slice().unwrap(), &[5., 6.])
+/// ```
+///
+pub fn setdiff1d(a: &Tensor, b: &Tensor) -> Tensor
+{
+    let op = setdiff1d::SetDiff1D;
     apply_op(op, &[a, b])
 }
 
