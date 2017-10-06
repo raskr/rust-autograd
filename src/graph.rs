@@ -4,7 +4,6 @@ extern crate ndarray;
 use self::fnv::FnvHashMap;
 use ndarray_ext::NdArray;
 use ops::dummy_op;
-use std::cell::RefCell;
 use std::mem;
 use std::rc::Rc;
 use tensor;
@@ -51,10 +50,10 @@ impl Graph {
     #[inline]
     pub fn feed<T: ndarray::Dimension>(&mut self, placeholder: &Tensor, arr: ndarray::Array<f32, T>)
     {
-        if "Placeholder" != placeholder.borrow().op.name() {
+        if "Placeholder" != placeholder.op.name() {
             panic!(
                 "Don't call `Graph::feed` with non placeholder, got: {}",
-                placeholder.borrow().op.name()
+                placeholder.op.name()
             )
         }
         self.memo
@@ -123,7 +122,7 @@ impl Graph {
 
         // Drain except for placeholder nodes and its feeds
         let memo = memo.into_iter()
-            .filter(|&(ref k, _)| k.borrow().op.name() == "Placeholder")
+            .filter(|&(ref k, _)| k.op.name() == "Placeholder")
             .collect::<M>();
 
         mem::swap(&mut Some(memo), unsafe {
@@ -159,11 +158,11 @@ impl Graph {
     where
         T: ndarray::Dimension,
     {
-        let t = Tensor(Rc::new(RefCell::new(RawTensor {
+        let t = Tensor(Rc::new(RawTensor {
             op: Box::new(dummy_op::DummyOp { name: "Variable".to_string() }),
             inputs: vec![],
-            rank: 0,
-        })));
+            top_rank: 0,
+        }));
         self.variables.insert(t.clone(), arr.into_dyn());
         t
     }
@@ -191,11 +190,11 @@ impl Graph {
     #[inline]
     pub fn placeholder(&self) -> Tensor
     {
-        Tensor(Rc::new(RefCell::new(RawTensor {
+        Tensor(Rc::new(RawTensor {
             op: Box::new(dummy_op::DummyOp { name: "Placeholder".to_string() }),
             inputs: vec![],
-            rank: 0,
-        })))
+            top_rank: 0,
+        }))
     }
 
 
@@ -250,11 +249,11 @@ impl Graph {
 // helper
 fn gen_source_op(arr: NdArray, name: &str, g: &mut Graph) -> Tensor
 {
-    let t = Tensor(Rc::new(RefCell::new(RawTensor {
+    let t = Tensor(Rc::new(RawTensor {
         op: Box::new(dummy_op::DummyOp { name: name.to_string() }),
         inputs: vec![],
-        rank: 0,
-    })));
+        top_rank: 0,
+    }));
     g.variables.insert(t.clone(), arr);
     t
 }

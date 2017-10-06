@@ -2,7 +2,6 @@ extern crate ndarray;
 
 use graph::Graph;
 use ndarray_ext::NdArray;
-use std::cell::RefCell;
 use std::rc::Rc;
 use tensor::{RawTensor, Tensor};
 
@@ -106,21 +105,21 @@ impl Tensor {
 /// let ref z = ag::matmul(a, v) + b;
 /// let mut vars = [a, v, b, z];
 /// // `sort_by_key` don't reverse the order of `a` and `v`
-/// vars.sort_by_key(|a| a.borrow().rank);
+/// vars.sort_by_key(|a| a.top_rank);
 /// assert!(vars == [a, v, b, z])
 /// ```
 pub fn apply_op<T: Op + 'static>(op: T, inputs: &[&Tensor]) -> Tensor
 {
-    Tensor(Rc::new(RefCell::new(RawTensor {
+    Tensor(Rc::new(RawTensor {
         op: Box::new(op),
         inputs: inputs.iter().map(|a| (*a).clone()).collect::<Vec<Tensor>>(),
-        rank: inputs
+        top_rank: inputs
             .iter()
-            .map(|a| a.borrow().rank)
+            .map(|a| a.top_rank)
             .max()
             .map(|a| a + 1)
             .unwrap_or(0),
-    })))
+    }))
 }
 
 

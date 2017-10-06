@@ -4,7 +4,6 @@ extern crate fnv;
 use self::fnv::FnvHashMap;
 use ndarray_ext::NdArray;
 use ops;
-use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::hash_set::HashSet;
 use std::fmt;
@@ -15,7 +14,7 @@ use std::rc::Rc;
 
 /// Symbolic multi-dimensional array which supports
 /// efficient gradient computation.
-pub struct Tensor(pub Rc<RefCell<RawTensor>>);
+pub struct Tensor(pub Rc<RawTensor>);
 
 pub struct RawTensor {
     /// Operation of this node
@@ -25,7 +24,7 @@ pub struct RawTensor {
     pub inputs: Vec<Tensor>,
 
     /// rank number for topological ordering
-    pub rank: usize,
+    pub top_rank: usize,
 }
 
 
@@ -34,7 +33,7 @@ impl Tensor {
     /// Returns true if this node has no incoming nodes.
     pub fn is_source(&self) -> bool
     {
-        self.borrow().inputs.is_empty()
+        self.inputs.is_empty()
     }
 
     #[inline]
@@ -58,7 +57,7 @@ impl Tensor {
 
         f(self);
 
-        for child in &(*self).borrow().inputs {
+        for child in &(*self).inputs {
             child.run_visit_once(f, visited)
         }
     }
@@ -70,7 +69,7 @@ impl Tensor {
     {
         f(self);
 
-        for child in &(*self).borrow().inputs {
+        for child in &(*self).inputs {
             child.visit(f)
         }
     }
@@ -80,7 +79,7 @@ impl Ord for Tensor {
     /// Compares the ranks in topological ordering
     fn cmp(&self, other: &Self) -> Ordering
     {
-        self.borrow().rank.cmp(&other.borrow().rank)
+        self.top_rank.cmp(&other.top_rank)
     }
 }
 
@@ -119,7 +118,7 @@ impl Clone for Tensor {
 }
 
 impl Deref for Tensor {
-    type Target = Rc<RefCell<RawTensor>>;
+    type Target = Rc<RawTensor>;
     fn deref(&self) -> &Self::Target
     {
         &self.0
@@ -127,7 +126,7 @@ impl Deref for Tensor {
 }
 
 impl DerefMut for Tensor {
-    fn deref_mut<'a>(&'a mut self) -> &'a mut Rc<RefCell<RawTensor>>
+    fn deref_mut<'a>(&'a mut self) -> &'a mut Rc<RawTensor>
     {
         &mut self.0
     }
@@ -136,16 +135,15 @@ impl DerefMut for Tensor {
 impl fmt::Display for Tensor {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result
     {
-        let ref_obj = &self.0.borrow();
-        let input_names = ref_obj
+        let input_names = self.0
             .inputs
             .iter()
-            .map(|a| a.borrow().op.name().to_string())
+            .map(|a| a.op.name().to_string())
             .collect::<Vec<String>>();
         write!(
             f,
             "op: {}\ninputs: {:?}\n",
-            ref_obj.op.name(),
+            self.0.op.name(),
             input_names.as_slice()
         )
     }

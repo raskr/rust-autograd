@@ -3,7 +3,6 @@ extern crate ndarray;
 
 use ndarray_ext::NdArray;
 use ops;
-use std::cell::RefCell;
 use std::ops::{Add, Div, Mul, Sub};
 use std::rc::Rc;
 use tensor::{RawTensor, Tensor};
@@ -134,11 +133,11 @@ impl ops::Op for ElementwiseDiv {
 #[inline]
 fn scalar_to_tensor(arg: f32) -> Tensor
 {
-    Tensor(Rc::new(RefCell::new(RawTensor {
+    Tensor(Rc::new(RawTensor {
         op: Box::new(ops::scalar::Scalar { val: arg }),
         inputs: vec![],
-        rank: 0,
-    })))
+        top_rank: 0,
+    }))
 }
 
 #[inline]

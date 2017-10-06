@@ -24,29 +24,25 @@ pub fn perform_eval(
     if vars.contains_key(target) || memo.contains_key(target) {
         return;
     }
+
+    let ref inputs = target.inputs;
+
+    // integrating loops below is impossible because of
+    // "memo is already mutably borrowed"
+    for x in inputs.iter() {
+        perform_eval(x, vars, memo, train);
+    }
+
     let y = {
-        let mut xs = vec![];
-        {
-            let ref inputs = target.borrow().inputs;
-            // integrating loops below is impossible because of
-            // "memo is already mutably borrowed"
-            for input in inputs.iter() {
-                perform_eval(input, vars, memo, train);
-            }
-            for input in inputs.iter() {
-                if let Some(a) = vars.get(input) {
-                    xs.push(a);
-                    continue;
-                }
-                if let Some(a) = memo.get(input) {
-                    xs.push(a);
-                    continue;
-                }
-                unreachable!("BUG! Please let me know about this")
+        let mut xs = Vec::with_capacity(inputs.len());
+        for x in inputs.iter() {
+            if let Some(a) = vars.get(x) {
+                xs.push(a);
+            } else {
+                xs.push(memo.get(x).unwrap());
             }
         }
-
-        target.borrow().op.compute(xs.as_slice(), train)
+        target.op.compute(xs.as_slice(), train)
     };
 
     // cache output
@@ -69,7 +65,7 @@ fn contributed_to_grads(objectives: &[&Tensor], variables: &[&Tensor]) -> FnvHas
         if vars.contains(&target) {
             contrib = true;
         } else {
-            for input in target.borrow().inputs.iter() {
+            for input in target.inputs.iter() {
                 // recurse
                 rec(input, vars, memo);
                 // unwrap is always safe
@@ -170,16 +166,14 @@ pub fn symbolic_gradients(
 
     // builds backward graph
     while let Some(target) = heap.pop() {
-        let borrowed_target = target.borrow();
-
         // Vec<Tensor> to Vec<&Tensor>
-        let xs = borrowed_target.inputs.iter().map(|a| a).collect::<Vec<_>>();
+        let xs = target.inputs.iter().map(|a| a).collect::<Vec<_>>();
 
         // time to call `grad`
         let gxs = {
             if let Some(gys) = grads.get_mut(&target) {
                 maybe_reduce_grad(gys);
-                borrowed_target.op.grad(&gys[0], xs.as_slice(), &target)
+                target.op.grad(&gys[0], xs.as_slice(), &target)
             } else {
                 unreachable!("Safe unwrapping is guaranteed by topological ordering")
             }
@@ -249,12 +243,12 @@ fn topological_ordering_on_reverse_mode()
     let mut collected = collect_parents_from(g).into_iter().collect::<Vec<Tensor>>();
 
     // sort by rank
-    collected.sort_by_key(|t| t.borrow().rank);
+    collected.sort_by_key(|t| t.top_rank);
 
     // tensor to name
     let sorted_names = collected
         .into_iter()
-        .map(|t| t.borrow().op.name().to_string())
+        .map(|t| t.op.name().to_string())
         .collect::<Vec<String>>();
 
     // compare
