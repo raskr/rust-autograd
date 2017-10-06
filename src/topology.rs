@@ -14,9 +14,14 @@ use tensor::Tensor;
 #[inline]
 /// Performs actual graph traversal and its evaluation
 // TODO: loop-based rather than recursion (this would be difficult)
-pub fn perform_eval(target: &Tensor, memo: &mut FnvHashMap<Tensor, NdArray>, train: bool)
+pub fn perform_eval(
+    target: &Tensor,
+    vars: &FnvHashMap<Tensor, NdArray>,
+    memo: &mut FnvHashMap<Tensor, NdArray>,
+    train: bool,
+)
 {
-    if memo.contains_key(target) {
+    if vars.contains_key(target) || memo.contains_key(target) {
         return;
     }
     let y = {
@@ -26,11 +31,18 @@ pub fn perform_eval(target: &Tensor, memo: &mut FnvHashMap<Tensor, NdArray>, tra
             // integrating loops below is impossible because of
             // "memo is already mutably borrowed"
             for input in inputs.iter() {
-                perform_eval(input, memo, train);
+                perform_eval(input, vars, memo, train);
             }
             for input in inputs.iter() {
-                // unwrap is safe
-                xs.push(memo.get(input).unwrap());
+                if let Some(a) = vars.get(input) {
+                    xs.push(a);
+                    continue;
+                }
+                if let Some(a) = memo.get(input) {
+                    xs.push(a);
+                    continue;
+                }
+                unreachable!("BUG! Please let me know about this")
             }
         }
 
@@ -80,8 +92,9 @@ fn contributed_to_grads(objectives: &[&Tensor], variables: &[&Tensor]) -> FnvHas
 fn contributed_to_grads_test()
 {
     // dummy graph
-    let ref t = ::constant(::ndarray_ext::standard_normal(&[2, 3]));
-    let ref v = ::variable(::ndarray_ext::standard_normal(&[2, 3]));
+    let mut graph = ::Graph::new();
+    let ref t = graph.constant(::ndarray_ext::standard_normal(&[2, 3]));
+    let ref v = graph.variable(::ndarray_ext::standard_normal(&[2, 3]));
     let ref z = ::sigmoid_cross_entropy(&v, &t);
     let booleans = contributed_to_grads(&[z], &[v]);
     assert_eq!(booleans.len(), 3);
@@ -214,6 +227,7 @@ pub fn symbolic_gradients(
         .collect::<Vec<Tensor>>()
 }
 
+
 #[test]
 fn topological_ordering_on_reverse_mode()
 {
@@ -224,11 +238,12 @@ fn topological_ordering_on_reverse_mode()
         collected
     }
 
-    let ref x = ::constant(::ndarray_ext::standard_normal(&[4, 2]));
-    let ref w = ::variable(::ndarray_ext::standard_normal(&[2, 3]));
-    let ref b = ::variable(::ndarray_ext::zeros(&[4, 3]));
+    let mut graph = ::Graph::new();
+    let ref x = graph.constant(::ndarray_ext::standard_normal(&[4, 2]));
+    let ref w = graph.variable(::ndarray_ext::standard_normal(&[2, 3]));
+    let ref b = graph.variable(::ndarray_ext::zeros(&[4, 3]));
     let ref z = ::matmul(x, w) + b;
-    let ref g = ::gradients(&[z], &[w], &[Some(&::ones(&[4, 3]))])[0];
+    let ref g = ::gradients(&[z], &[w], &[Some(&graph.ones(&[4, 3]))])[0];
 
     // to vec
     let mut collected = collect_parents_from(g).into_iter().collect::<Vec<Tensor>>();

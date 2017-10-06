@@ -1,12 +1,13 @@
 extern crate ndarray;
 
+use graph::Graph;
 use ops;
 use tensor::Tensor;
 
 
 pub trait RNN {
     fn step(&mut self, x: &Tensor) -> Tensor;
-    fn reset_state(&mut self);
+    fn reset_state(&mut self, g: &mut Graph);
 }
 
 
@@ -21,7 +22,8 @@ pub trait RNN {
 /// let vec_dim  = 128;
 /// let batch_size  = 32;
 ///
-/// let rnn = ag::nn_impl::rnn::LSTM::new(state_size, vec_dim, batch_size);
+/// let mut graph = ag::Graph::new();
+/// let rnn = ag::nn_impl::rnn::LSTM::new(state_size, vec_dim, batch_size, &mut graph);
 /// ```
 ///
 /// For more usage, see `lstm_lm()` in `tests/test_tensor_ops_grad.rs`
@@ -37,16 +39,16 @@ pub struct LSTM {
 
 impl LSTM {
     #[inline]
-    pub fn new(state_size: usize, input_dim: usize, batch_size: usize) -> LSTM
+    pub fn new(state_size: usize, input_dim: usize, batch_size: usize, g: &mut Graph) -> LSTM
     {
         LSTM {
             state_size: state_size,
             batch_size: batch_size,
-            last_output: ops::constant(::ndarray_ext::zeros(&[batch_size, state_size])),
-            cell: ops::constant(::ndarray_ext::zeros(&[batch_size, state_size])),
-            wx: ops::variable(::ndarray_ext::glorot_uniform(&[input_dim, 4 * state_size])),
-            wh: ops::variable(::ndarray_ext::glorot_uniform(&[state_size, 4 * state_size])),
-            b: ops::variable(::ndarray_ext::zeros(&[1, 4 * state_size])),
+            last_output: g.constant(::ndarray_ext::zeros(&[batch_size, state_size])),
+            cell: g.constant(::ndarray_ext::zeros(&[batch_size, state_size])),
+            wx: g.variable(::ndarray_ext::glorot_uniform(&[input_dim, 4 * state_size])),
+            wh: g.variable(::ndarray_ext::glorot_uniform(&[state_size, 4 * state_size])),
+            b: g.variable(::ndarray_ext::zeros(&[1, 4 * state_size])),
         }
     }
 
@@ -91,10 +93,10 @@ impl RNN for LSTM {
     }
 
     #[inline]
-    fn reset_state(&mut self)
+    fn reset_state(&mut self, g: &mut Graph)
     {
-        self.last_output = ops::constant(::ndarray_ext::zeros(&[self.batch_size, self.state_size]));
+        self.last_output = g.constant(::ndarray_ext::zeros(&[self.batch_size, self.state_size]));
 
-        self.cell = ops::constant(::ndarray_ext::zeros(&[self.batch_size, self.state_size]));
+        self.cell = g.constant(::ndarray_ext::zeros(&[self.batch_size, self.state_size]));
     }
 }

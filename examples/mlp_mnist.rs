@@ -29,10 +29,11 @@ fn main()
     let ((x_train, y_train), (x_test, y_test)) = dataset::load();
 
     // -- graph def --
-    let ref x = ag::placeholder();
-    let ref y = ag::placeholder();
-    let ref w = ag::variable(ag::ndarray_ext::glorot_uniform(&[28 * 28, 10]));
-    let ref b = ag::variable(ag::ndarray_ext::zeros(&[1, 10]));
+    let mut graph = ag::Graph::new();
+    let ref x = graph.placeholder();
+    let ref y = graph.placeholder();
+    let ref w = graph.variable(ag::ndarray_ext::glorot_uniform(&[28 * 28, 10]));
+    let ref b = graph.variable(ag::ndarray_ext::zeros(&[1, 10]));
     let ref z = ag::matmul(x, w) + b;
     let ref loss = ag::sparse_softmax_cross_entropy(z, y);
     let ref grads = ag::gradients(&[loss], &[w, b], &[None]);
@@ -53,16 +54,18 @@ fn main()
                 let i = i as isize;
                 let x_batch = x_train.slice(s![i..i + batch_size, ..]).to_owned();
                 let y_batch = y_train.slice(s![i..i + batch_size, ..]).to_owned();
-                let feed_dict = ag::Feed::new().add(x, x_batch).add(y, y_batch);
-                ag::sgd::apply_gradients(&[w, b], grads, &mut optimizer, feed_dict);
+                graph.feed(x, x_batch);
+                graph.feed(y, y_batch);
+                ag::sgd::apply_gradients(&[w, b], grads, &mut optimizer, &mut graph);
             }
         });
         println!("finish epoch {}", epoch);
     }
 
     // -- test --
-    let feed_dict = ag::Feed::new().add(x, x_test).add(y, y_test);
-    println!("test accuracy: {}", accuracy.eval_with_input(feed_dict));
+    graph.feed(x, x_test);
+    graph.feed(y, y_test);
+    println!("test accuracy: {}", graph.eval(&[accuracy])[0]);
 }
 
 pub mod dataset {

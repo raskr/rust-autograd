@@ -1,71 +1,68 @@
 extern crate ndarray;
 extern crate rand;
 
+use std::mem;
+use graph;
 use sgd;
-use tensor;
-use tensor::{Feed, Tensor};
+use tensor::Tensor;
+use ndarray_ext::NdArray;
 
 
+#[allow(mutable_transmutes)]
 /// This computes partial derivatives of `objective` with `var_node` using
 /// back propagation, and then checks those are close to numerically
 /// computed gradients (uses finite difference trick).
 pub fn gradient_check(
     objective: &Tensor,
-    variables: &[&Tensor],
     gradients: &[Tensor],
-    feed_dict: &Feed,
+    variables: &[&Tensor],
+    graph: graph::Graph,
     eps: f32,
     tol: f32,
 )
 {
-    assert_eq!(variables.len(), gradients.len());
-
-    let theoretical_grads = tensor::eval_tensors(gradients, feed_dict.clone());
+    // back prop
+    let gradients = gradients.iter().map(|a|a).collect::<Vec<_>>();
+    let theoretical_grads = graph.eval_keep_feeds(gradients.as_slice());
 
     // for each variable nodes
-    for (variable, theoretical_grad) in variables.iter().zip(theoretical_grads) {
+    for (v, th_grad) in variables.iter().zip(theoretical_grads) {
+        let v_arr = graph.variables.get(v).unwrap();
+        let mut v_arr = unsafe { mem::transmute::<&NdArray, &mut NdArray>(v_arr) };
 
         // reduce gradient if necessary
-        let theoretical_grad = sgd::maybe_reduce_grad(theoretical_grad, variable);
+        let th_grad = sgd::maybe_reduce_grad(th_grad, v_arr.shape());
 
-        let var_size = variable
-            .borrow()
-            .param
-            .as_ref()
-            .expect(&format!(
-                "{} is not shared variable",
-                variable.borrow().op.name()
-            ))
-            .len();
+        let head_ptr: *mut f32 = v_arr.as_mut_ptr();
 
         // for each values
-        for i in 0..var_size as isize {
+        for i in 0..v_arr.len() as isize {
             let evacuated;
 
-            let head_ptr: *mut f32 = variable.borrow_mut().param.as_mut().unwrap().as_mut_ptr();
-
+            // perturbation (+)
             unsafe {
-                // perturbation (+)
                 evacuated = *head_ptr.offset(i);
                 *head_ptr.offset(i) = evacuated + eps;
             }
 
-            let obj_pos = objective.eval_with_input(feed_dict.clone());
+            // eval
+            let ref obj_pos = graph.eval_keep_feeds(&[objective])[0];
 
+            // perturbation (-)
             unsafe {
-                // perturbation (-)
                 *head_ptr.offset(i) = evacuated - eps;
             }
 
-            let obj_neg = objective.eval_with_input(feed_dict.clone());
+            // eval
+            let ref obj_neg = graph.eval_keep_feeds(&[objective])[0];
 
+            // restore
             unsafe {
-                // restore
                 *head_ptr.offset(i) = evacuated;
             }
 
             let g_num = (obj_pos - obj_neg).scalar_sum() / (2. * eps);
-            let g_th = unsafe { *theoretical_grad.as_ptr().offset(i) };
+            let g_th = unsafe { *th_grad.as_ptr().offset(i) };
 
             // compare
             let diff = (g_num - g_th).abs();

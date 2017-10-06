@@ -1,11 +1,13 @@
 extern crate ndarray;
 
+use graph::Graph;
 use ndarray_ext::NdArray;
 use std::cell::RefCell;
 use std::rc::Rc;
 use tensor::{RawTensor, Tensor};
 
-mod dummy_op;
+pub mod dummy_op;
+mod scalar;
 mod setdiff1d;
 mod shape_ops;
 mod stop_gradients;
@@ -77,9 +79,10 @@ impl Tensor {
     /// extern crate ndarray;
     /// extern crate autograd as ag;
     ///
-    /// let ref a = ag::variable(ndarray::arr2(&[[2., 3.], [4., 5.]]));
+    /// let mut graph = ag::Graph::new();
+    /// let ref a = graph.variable(ndarray::arr2(&[[2., 3.], [4., 5.]]));
     /// let ref b = a.get(2);
-    /// assert_eq!(b.eval()[0], 4.);
+    /// assert_eq!(graph.eval(&[b])[0][0], 4.);
     /// ```
     pub fn get(&self, idx: isize) -> Tensor
     {
@@ -96,21 +99,21 @@ impl Tensor {
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::zeros(&[4, 2]);
-/// let ref v = ag::zeros(&[2, 3]);
-/// let ref b = ag::zeros(&[4, 3]);
+/// let mut graph = ag::Graph::new();
+/// let ref a = graph.zeros(&[4, 2]);
+/// let ref v = graph.zeros(&[2, 3]);
+/// let ref b = graph.zeros(&[4, 3]);
 /// let ref z = ag::matmul(a, v) + b;
 /// let mut vars = [a, v, b, z];
 /// // `sort_by_key` don't reverse the order of `a` and `v`
 /// vars.sort_by_key(|a| a.borrow().rank);
 /// assert!(vars == [a, v, b, z])
 /// ```
-fn apply_op<T: Op + 'static>(op: T, inputs: &[&Tensor]) -> Tensor
+pub fn apply_op<T: Op + 'static>(op: T, inputs: &[&Tensor]) -> Tensor
 {
     Tensor(Rc::new(RefCell::new(RawTensor {
         op: Box::new(op),
         inputs: inputs.iter().map(|a| (*a).clone()).collect::<Vec<Tensor>>(),
-        param: None,
         rank: inputs
             .iter()
             .map(|a| a.borrow().rank)
@@ -124,66 +127,6 @@ fn apply_op<T: Op + 'static>(op: T, inputs: &[&Tensor]) -> Tensor
 // ---------------------------------------
 // -- Ops to manipulate `Tensor` object --
 // ---------------------------------------
-
-/// Creates a placeholder tensor.
-///
-/// The placeholder tensor is a dynamic input node to the computation graph,
-/// which can be filled on evaluation time.
-/// To fill the placeholders, use `autograd::Feed`.
-///
-/// # Examples
-///
-/// ```
-/// extern crate ndarray;
-/// extern crate autograd as ag;
-///
-/// let ref x: ag::Tensor = ag::placeholder();
-/// let ref y: ag::Tensor = 3 * x;
-///
-/// // Fills placeholder `x`.
-/// let feed = ag::Feed::new().add(x, ndarray::arr1(&[2.]));
-/// assert_eq!(6., y.eval_with_input(feed)[0]);
-/// ```
-#[inline]
-pub fn placeholder() -> Tensor
-{
-    Tensor(Rc::new(RefCell::new(RawTensor {
-        op: Box::new(dummy_op::DummyOp { name: "Placeholder".to_string() }),
-        inputs: vec![],
-        param: None,
-        rank: 0,
-    })))
-}
-
-
-/// Creates a shared variable tensor from rust-ndarray's array object.
-///
-/// The shared variable behaves like any other tensors, except that
-/// it can be optimized with gradient descent methods
-/// implemented in `autograd::sgd`.
-/// For the usages, see https://github.com/perrier1034/rust-autograd/tree/master/examples
-///
-/// # Examples
-///
-/// ```
-/// extern crate ndarray;
-/// extern crate autograd as ag;
-///
-/// let ref x: ag::Tensor = ag::variable(ndarray::arr1(&[2.]));
-/// let ref y: ag::Tensor = 3 * x;
-///
-/// assert_eq!(6., y.eval()[0]);
-/// ```
-#[inline]
-pub fn variable<T: ndarray::Dimension>(array: ndarray::Array<f32, T>) -> Tensor
-{
-    Tensor(Rc::new(RefCell::new(RawTensor {
-        op: Box::new(dummy_op::DummyOp { name: "Variable".to_string() }),
-        inputs: vec![],
-        param: Some(array.into_dyn()),
-        rank: 0,
-    })))
-}
 
 
 #[inline]
@@ -207,8 +150,9 @@ pub fn variable<T: ndarray::Dimension>(array: ndarray::Array<f32, T>) -> Tensor
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref x = ag::placeholder();
-/// let ref y = ag::variable(ndarray::arr1(&[0.]));
+/// let mut graph = ag::Graph::new();
+/// let ref x = graph.placeholder();
+/// let ref y = graph.variable(ndarray::arr1(&[0.]));
 /// let ref z = 2*x*x + 3*y + 1;
 ///
 /// // dz/dy
@@ -220,12 +164,12 @@ pub fn variable<T: ndarray::Dimension>(array: ndarray::Array<f32, T>) -> Tensor
 /// let ref gg = ag::gradients(&[g2], &[x], &[None])[0];
 ///
 /// // evaluation of symbolic gradients
-/// assert_eq!(3., g1.eval()[0]);
-/// assert_eq!(4., gg.eval()[0]);
+/// assert_eq!(3., graph.eval(&[g1])[0][0]);
+/// assert_eq!(4., graph.eval(&[gg])[0][0]);
 ///
 /// // dz/dx requires to fill the placeholder `x`
-/// let feed = ag::Feed::new().add(x, ndarray::arr1(&[2.]));
-/// assert_eq!(8., g2.eval_with_input(feed)[0]);
+/// graph.feed(x, ndarray::arr1(&[2.]));
+/// assert_eq!(8., graph.eval(&[g2])[0][0]);
 ///
 /// ```
 ///
@@ -235,10 +179,11 @@ pub fn variable<T: ndarray::Dimension>(array: ndarray::Array<f32, T>) -> Tensor
 /// ```
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::variable(ag::ndarray_ext::zeros(&[4, 2]));
-/// let ref b = ag::zeros(&[2, 3]);
+/// let mut graph = ag::Graph::new();
+/// let ref a = graph.variable(ag::ndarray_ext::zeros(&[4, 2]));
+/// let ref b = graph.zeros(&[2, 3]);
 /// let ref c = ag::matmul(a, b);
-/// let ref g = ag::gradients(&[c], &[a], &[Some(&ag::ones(&[4, 2]))])[0];
+/// let ref g = ag::gradients(&[c], &[a], &[Some(&graph.ones(&[4, 2]))])[0];
 /// ```
 pub fn gradients(
     objectives: &[&Tensor],
@@ -266,13 +211,14 @@ pub fn gradients(
 /// ```
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::variable(ag::ndarray_ext::standard_normal(&[4, 2]));
-/// let ref b = ag::variable(ag::ndarray_ext::standard_normal(&[2, 3]));
+/// let mut graph = ag::Graph::new();
+/// let ref a = graph.variable(ag::ndarray_ext::standard_normal(&[4, 2]));
+/// let ref b = graph.variable(ag::ndarray_ext::standard_normal(&[2, 3]));
 /// let ref c = ag::matmul(a, b);
 /// let ref j = ag::jacobians(c, &[a, b], 4*3, );
 ///
-/// assert_eq!(j[0].eval().shape(), &[4*3, 4*2]);
-/// assert_eq!(j[1].eval().shape(), &[4*3, 2*3]);
+/// assert_eq!(graph.eval(&[&j[0]])[0].shape(), &[4*3, 4*2]);
+/// assert_eq!(graph.eval(&[&j[1]])[0].shape(), &[4*3, 2*3]);
 /// ```
 pub fn jacobians(objective: &Tensor, variables: &[&Tensor], objective_len: usize) -> Vec<Tensor>
 {
@@ -338,11 +284,13 @@ pub fn stop_gradients(x: &Tensor) -> Tensor
 ///
 /// ```
 /// extern crate autograd as ag;
-/// let ref x = ag::placeholder();
+/// 
+/// let mut graph = ag::Graph::new();
+/// let ref x = graph.placeholder();
 /// let ref s = ag::shape(x);
 ///
-/// let feed = ag::Feed::new().add(x, ag::ndarray_ext::zeros(&[2, 3]));
-/// assert_eq!(&[2., 3.], s.eval_with_input(feed).as_slice().unwrap());
+/// graph.feed(x, ag::ndarray_ext::zeros(&[2, 3]));
+/// assert_eq!(&[2., 3.], graph.eval(&[s])[0].as_slice().unwrap());
 /// ```
 pub fn shape(x: &Tensor) -> Tensor
 {
@@ -358,11 +306,16 @@ pub fn shape(x: &Tensor) -> Tensor
 ///
 /// ```
 /// extern crate autograd as ag;
-/// let ref x = ag::placeholder();
-/// let ref s = ag::size(x);
+/// 
+/// let mut graph = ag::Graph::new();
+/// let ref a = graph.placeholder();
+/// let ref b = graph.zeros(&[4, 3]);
+/// let ref c = ag::size(a);
+/// let ref d = ag::size(b);
 ///
-/// let feed = ag::Feed::new().add(x, ag::ndarray_ext::zeros(&[2, 3]));
-/// assert_eq!(6., s.eval_with_input(feed)[0]);
+/// graph.feed(a, ag::ndarray_ext::zeros(&[2, 3]));
+/// assert_eq!(6., graph.eval(&[c])[0][0]);
+/// assert_eq!(12., graph.eval(&[d])[0][0]);
 /// ```
 pub fn size(x: &Tensor) -> Tensor
 {
@@ -378,11 +331,13 @@ pub fn size(x: &Tensor) -> Tensor
 ///
 /// ```
 /// extern crate autograd as ag;
-/// let ref x = ag::placeholder();
+/// 
+/// let mut graph = ag::Graph::new();
+/// let ref x = graph.placeholder();
 /// let ref r = ag::rank(x);
 ///
-/// let feed = ag::Feed::new().add(x, ag::ndarray_ext::zeros(&[2, 3]));
-/// assert_eq!(2., r.eval_with_input(feed)[0]);
+/// graph.feed(x, ag::ndarray_ext::zeros(&[2, 3]));
+/// assert_eq!(2., graph.eval(&[r])[0][0]);
 /// ```
 pub fn rank(x: &Tensor) -> Tensor
 {
@@ -569,12 +524,13 @@ pub fn exp(x: &Tensor) -> Tensor
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::ones(&[2, 2]);
-/// let ref b = ag::ones(&[2, 2]);
-/// let ref c = ag::ones(&[2, 2]);
+/// let mut graph = ag::Graph::new();
+/// let ref a = graph.ones(&[2, 2]);
+/// let ref b = graph.ones(&[2, 2]);
+/// let ref c = graph.ones(&[2, 2]);
 /// let ref d = ag::add_n(&[a, b, c]);
-/// assert_eq!(d.eval().shape(), &[2, 2]);
-/// assert_eq!(d.eval(), ndarray::arr2(&[[3., 3.], [3., 3.]]).into_dyn());
+/// assert_eq!(graph.eval(&[d])[0].shape(), &[2, 2]);
+/// assert_eq!(graph.eval(&[d])[0], ndarray::arr2(&[[3., 3.], [3., 3.]]).into_dyn());
 /// ```
 pub fn add_n(xs: &[&Tensor]) -> Tensor
 {
@@ -596,10 +552,11 @@ pub fn add_n(xs: &[&Tensor]) -> Tensor
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::constant(ndarray::arr1(&[1., 2., 3.]));
-/// let ref b = ag::constant(ndarray::arr1(&[3., 2., 1.]));
+/// let mut graph = ag::Graph::new();
+/// let ref a = graph.constant(ndarray::arr1(&[1., 2., 3.]));
+/// let ref b = graph.constant(ndarray::arr1(&[3., 2., 1.]));
 /// let ref c = ag::equals(a, b);
-/// assert_eq!(c.eval(), ndarray::arr1(&[0., 1., 0.]).into_dyn());
+/// assert_eq!(graph.eval(&[c])[0], ndarray::arr1(&[0., 1., 0.]).into_dyn());
 /// ```
 pub fn equals(a: &Tensor, b: &Tensor) -> Tensor
 {
@@ -618,11 +575,12 @@ pub fn equals(a: &Tensor, b: &Tensor) -> Tensor
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
+/// let mut graph = ag::Graph::new();
 /// let input_arr = ndarray::arr2(&[[1., 2.], [3., 4.], [6., 5.]]);
 /// let answer = ndarray::arr1(&[1., 1., 0.]).into_dyn();
-/// let input = ag::constant(input_arr);
-/// let result = ag::argmax(&input, 1, false);
-/// assert_eq!(result.eval(), answer);
+/// let ref input = graph.constant(input_arr);
+/// let ref result = ag::argmax(&input, 1, false);
+/// assert_eq!(graph.eval(&[result])[0], answer);
 /// ```
 pub fn argmax(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 {
@@ -644,9 +602,10 @@ pub fn argmax(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 /// ```
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::constant(ag::ndarray_ext::standard_normal(&[3]));
+/// let mut graph = ag::Graph::new();
+/// let ref a = graph.constant(ag::ndarray_ext::standard_normal(&[3]));
 /// let ref b = ag::expand_dims(a, &[0, 2]);
-/// assert_eq!(b.eval().shape(), &[1, 3, 1]);
+/// assert_eq!(graph.eval(&[b])[0].shape(), &[1, 3, 1]);
 /// ```
 pub fn expand_dims(x: &Tensor, axes: &[isize]) -> Tensor
 {
@@ -666,9 +625,10 @@ pub fn expand_dims(x: &Tensor, axes: &[isize]) -> Tensor
 /// ```
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::constant(ag::ndarray_ext::standard_normal(&[1, 3, 1]));
+/// let mut graph = ag::Graph::new();
+/// let ref a = graph.constant(ag::ndarray_ext::standard_normal(&[1, 3, 1]));
 /// let ref b = ag::squeeze(a, &[0, 2]);
-/// assert_eq!(b.eval().shape(), &[3]);
+/// assert_eq!(graph.eval(&[b])[0].shape(), &[3]);
 /// ```
 pub fn squeeze(x: &Tensor, axes: &[isize]) -> Tensor
 {
@@ -690,10 +650,11 @@ pub fn squeeze(x: &Tensor, axes: &[isize]) -> Tensor
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref x = ag::constant(ndarray::arr2(&[[2., 2.], [3., 3.]]));
+/// let mut graph = ag::Graph::new();
+/// let ref x = graph.constant(ndarray::arr2(&[[2., 2.], [3., 3.]]));
 /// let ref y = ag::tile(x, 0, 2);
 /// assert_eq!(
-///     y.eval(),
+///     graph.eval(&[y])[0],
 ///     ndarray::arr2(&[[2., 2.], [3., 3.], [2., 2.], [3., 3.]]).into_dyn()
 /// );
 /// ```
@@ -716,9 +677,10 @@ pub fn tile(x: &Tensor, axis: isize, num: usize) -> Tensor
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref x = ag::constant(ndarray::arr1(&[2., 4., 6.]));
+/// let mut graph = ag::Graph::new();
+/// let ref x = graph.constant(ndarray::arr1(&[2., 4., 6.]));
 /// let ref y = ag::clip(x, 3., 5.);
-/// assert_eq!(y.eval(), ndarray::arr1(&[3., 4., 5.]).into_dyn());
+/// assert_eq!(graph.eval(&[y])[0], ndarray::arr1(&[3., 4., 5.]).into_dyn());
 /// ```
 pub fn clip(x: &Tensor, min: f32, max: f32) -> Tensor
 {
@@ -738,9 +700,10 @@ pub fn clip(x: &Tensor, min: f32, max: f32) -> Tensor
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let x = ag::constant(ndarray::arr2(&[[2., 4.], [3., 1.]]));
-/// let y = ag::reduce_max(&x, 0, false);
-/// assert_eq!(y.eval(), ndarray::arr1(&[3., 4.]).into_dyn());
+/// let mut graph = ag::Graph::new();
+/// let ref x = graph.constant(ndarray::arr2(&[[2., 4.], [3., 1.]]));
+/// let ref y = ag::reduce_max(&x, 0, false);
+/// assert_eq!(graph.eval(&[y])[0], ndarray::arr1(&[3., 4.]).into_dyn());
 /// ```
 pub fn reduce_max(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 {
@@ -763,9 +726,10 @@ pub fn reduce_max(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let x = ag::constant(ndarray::arr2(&[[2., 4.], [3., 1.]]));
-/// let y = ag::reduce_min(&x, 0, false);
-/// assert_eq!(y.eval(), ndarray::arr1(&[2., 1.]).into_dyn());
+/// let mut graph = ag::Graph::new();
+/// let ref x = graph.constant(ndarray::arr2(&[[2., 4.], [3., 1.]]));
+/// let ref y = ag::reduce_min(&x, 0, false);
+/// assert_eq!(graph.eval(&[y])[0], ndarray::arr1(&[2., 1.]).into_dyn());
 /// ```
 pub fn reduce_min(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 {
@@ -788,9 +752,10 @@ pub fn reduce_min(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let x = ag::constant(ndarray::arr2(&[[2., 4.], [3., 1.]]));
-/// let y = ag::reduce_mean(&x, 1, false);
-/// assert_eq!(y.eval(), ndarray::arr1(&[3., 2.]).into_dyn());
+/// let mut graph = ag::Graph::new();
+/// let ref x = graph.constant(ndarray::arr2(&[[2., 4.], [3., 1.]]));
+/// let ref y = ag::reduce_mean(x, 1, false);
+/// assert_eq!(graph.eval(&[y])[0], ndarray::arr1(&[3., 2.]).into_dyn());
 /// ```
 pub fn reduce_mean(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 {
@@ -813,9 +778,10 @@ pub fn reduce_mean(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let x = ag::constant(ndarray::arr2(&[[2., 4.], [3., 1.]]));
-/// let y = ag::reduce_sum(&x, 1, false);
-/// assert_eq!(y.eval(), ndarray::arr1(&[6., 4.]).into_dyn());
+/// let mut graph = ag::Graph::new();
+/// let ref x = graph.constant(ndarray::arr2(&[[2., 4.], [3., 1.]]));
+/// let ref y = ag::reduce_sum(&x, 1, false);
+/// assert_eq!(graph.eval(&[y])[0], ndarray::arr1(&[6., 4.]).into_dyn());
 /// ```
 pub fn reduce_sum(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 {
@@ -838,9 +804,10 @@ pub fn reduce_sum(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let x = ag::constant(ndarray::arr2(&[[2., 4.], [3., 1.]]));
-/// let y = ag::reduce_prod(&x, 1, false);
-/// assert_eq!(y.eval(), ndarray::arr1(&[8., 3.]).into_dyn());
+/// let mut graph = ag::Graph::new();
+/// let ref x = graph.constant(ndarray::arr2(&[[2., 4.], [3., 1.]]));
+/// let ref y = ag::reduce_prod(&x, 1, false);
+/// assert_eq!(graph.eval(&[y])[0], ndarray::arr1(&[8., 3.]).into_dyn());
 /// ```
 pub fn reduce_prod(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 {
@@ -863,9 +830,10 @@ pub fn reduce_prod(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let x = ag::zeros(&[3, 2, 2]);
-/// let y = ag::reshape(&x, &[3, 4]);
-/// assert_eq!(y.eval(), ag::ndarray_ext::zeros(&[3, 4]));
+/// let mut graph = ag::Graph::new();
+/// let ref x = graph.zeros(&[3, 2, 2]);
+/// let ref y = ag::reshape(&x, &[3, 4]);
+/// assert_eq!(graph.eval(&[y])[0], ag::ndarray_ext::zeros(&[3, 4]));
 /// ```
 pub fn reshape(x: &Tensor, shape: &[isize]) -> Tensor
 {
@@ -897,8 +865,10 @@ pub fn reshape(x: &Tensor, shape: &[isize]) -> Tensor
 /// ```
 /// extern crate autograd as ag;
 ///
-/// let ref x = ag::zeros(&[3, 2, 2]);
-/// assert_eq!(ag::flatten(x).eval().shape(), &[12]);
+/// let mut graph = ag::Graph::new();
+/// let ref x = graph.zeros(&[3, 2, 2]);
+/// let ref z = ag::flatten(x);
+/// assert_eq!(graph.eval(&[z])[0].shape(), &[12]);
 /// ```
 pub fn flatten(x: &Tensor) -> Tensor
 {
@@ -948,9 +918,10 @@ pub fn lesser_equal(x: &Tensor, a: f32) -> Tensor
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::constant(ag::ndarray_ext::zeros(&[2, 3, 4, 5]));
+/// let mut graph = ag::Graph::new();
+/// let ref a = graph.constant(ag::ndarray_ext::zeros(&[2, 3, 4, 5]));
 /// let ref b = ag::reverse_axes(a);
-/// assert_eq!(b.eval().shape(), &[5, 4, 3, 2]);
+/// assert_eq!(graph.eval(&[b])[0].shape(), &[5, 4, 3, 2]);
 /// ```
 pub fn reverse_axes(x: &Tensor) -> Tensor
 {
@@ -1088,10 +1059,12 @@ pub fn sparse_softmax_cross_entropy(y: &Tensor, t: &Tensor) -> Tensor
 /// ```
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::zeros(&[4, 2]);
-/// let ref b = ag::zeros(&[2, 3]);
+/// let mut graph = ag::Graph::new();
+///
+/// let ref a = graph.zeros(&[4, 2]);
+/// let ref b = graph.zeros(&[2, 3]);
 /// let ref c = ag::matmul(a, b);
-/// assert_eq!(c.eval().shape(), &[4, 3]);
+/// assert_eq!(graph.eval(&[c])[0].shape(), &[4, 3]);
 /// ```
 pub fn matmul(a: &Tensor, b: &Tensor) -> Tensor
 {
@@ -1116,10 +1089,11 @@ pub fn matmul(a: &Tensor, b: &Tensor) -> Tensor
 /// ```
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::zeros(&[2, 4]);
-/// let ref b = ag::zeros(&[2, 3]);
+/// let mut graph = ag::Graph::new();
+/// let ref a = graph.zeros(&[2, 4]);
+/// let ref b = graph.zeros(&[2, 3]);
 /// let ref c = ag::matmul_t(a, b, true, false);
-/// assert_eq!(c.eval().shape(), &[4, 3]);
+/// assert_eq!(graph.eval(&[c])[0].shape(), &[4, 3]);
 /// ```
 pub fn matmul_t(a: &Tensor, b: &Tensor, transpose_a: bool, transpose_b: bool) -> Tensor
 {
@@ -1150,16 +1124,18 @@ pub fn matmul_t(a: &Tensor, b: &Tensor, transpose_a: bool, transpose_b: bool) ->
 /// ```
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::zeros(&[3, 4, 5]);
-/// let ref b = ag::zeros(&[4, 3, 2]);
+/// let mut graph = ag::Graph::new();
+/// 
+/// let ref a = graph.zeros(&[3, 4, 5]);
+/// let ref b = graph.zeros(&[4, 3, 2]);
 /// let ref c = ag::tensordot(a, b, &[3, 4, 5], &[4, 3, 2], [&[1, 0], &[0, 1]]);
-/// assert_eq!(c.eval().shape(), &[5, 2]);
+/// assert_eq!(graph.eval(&[c])[0].shape(), &[5, 2]);
 ///
 /// // Another example (simple matmul broadcast)
-/// let ref a = ag::zeros(&[2, 3, 4]);
-/// let ref b = ag::zeros(&[4, 2]);
+/// let ref a = graph.zeros(&[2, 3, 4]);
+/// let ref b = graph.zeros(&[4, 2]);
 /// let ref c = ag::tensordot(a, b, &[2, 3, 4], &[4, 2], [&[2], &[0]]);
-/// assert_eq!(c.eval().shape(), &[2, 3, 2]);
+/// assert_eq!(graph.eval(&[c])[0].shape(), &[2, 3, 2]);
 /// ```
 ///
 /// For detailed description,
@@ -1235,10 +1211,11 @@ pub fn tensordot(
 /// ```
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::zeros(&[2, 3, 4, 2]);
-/// let ref b = ag::zeros(&[2, 3, 2, 3]);
+/// let mut graph = ag::Graph::new();
+/// let ref a = graph.zeros(&[2, 3, 4, 2]);
+/// let ref b = graph.zeros(&[2, 3, 2, 3]);
 /// let ref c = ag::batch_matmul(a, b);
-/// assert_eq!(c.eval().shape(), &[2, 3, 4, 3]);
+/// assert_eq!(graph.eval(&[c])[0].shape(), &[2, 3, 4, 3]);
 /// ```
 ///
 /// For detailed description, see https://www.tensorflow.org/api_docs/python/tf/matmul
@@ -1262,10 +1239,11 @@ pub fn batch_matmul(a: &Tensor, b: &Tensor) -> Tensor
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::constant(ndarray::arr1(&[4., 1., 5., 2., 3., 6.]));
-/// let ref b = ag::constant(ndarray::arr2(&[[2., 3.], [1., 4.]]));
+/// let mut graph = ag::Graph::new();
+/// let ref a = graph.constant(ndarray::arr1(&[4., 1., 5., 2., 3., 6.]));
+/// let ref b = graph.constant(ndarray::arr2(&[[2., 3.], [1., 4.]]));
 /// let ref c = ag::setdiff1d(a, b);
-/// assert_eq!(c.eval().as_slice().unwrap(), &[5., 6.])
+/// assert_eq!(graph.eval(&[c])[0].as_slice().unwrap(), &[5., 6.])
 /// ```
 ///
 pub fn setdiff1d(a: &Tensor, b: &Tensor) -> Tensor
@@ -1283,9 +1261,10 @@ pub fn setdiff1d(a: &Tensor, b: &Tensor) -> Tensor
 /// ```
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::zeros(&[1, 2, 3, 4, 5]);
+/// let mut graph = ag::Graph::new();
+/// let ref a = graph.zeros(&[1, 2, 3, 4, 5]);
 /// let ref b = ag::transpose(a, &[4, 2, 3, 0, 1]);
-/// assert_eq!(b.eval().shape(), &[5, 3, 4, 1, 2]);
+/// assert_eq!(graph.eval(&[b])[0].shape(), &[5, 3, 4, 1, 2]);
 /// ```
 pub fn transpose(x: &Tensor, perm: &[usize]) -> Tensor
 {
@@ -1307,11 +1286,12 @@ pub fn transpose(x: &Tensor, perm: &[usize]) -> Tensor
 /// ```
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::zeros(&[3, 7, 5]);
+/// let mut graph = ag::Graph::new();
+/// let ref a = graph.zeros(&[3, 7, 5]);
 /// let ref b = ag::split(a, &[2, 3, 2], 1);
-/// assert_eq!(b[0].eval().shape(), &[3, 2, 5]);
-/// assert_eq!(b[1].eval().shape(), &[3, 3, 5]);
-/// assert_eq!(b[2].eval().shape(), &[3, 2, 5]);
+/// assert_eq!(graph.eval(&[&b[0]])[0].shape(), &[3, 2, 5]);
+/// assert_eq!(graph.eval(&[&b[1]])[0].shape(), &[3, 3, 5]);
+/// assert_eq!(graph.eval(&[&b[2]])[0].shape(), &[3, 2, 5]);
 /// ```
 pub fn split(x: &Tensor, sizes: &[usize], axis: isize) -> Vec<Tensor>
 {
@@ -1341,9 +1321,10 @@ pub fn split(x: &Tensor, sizes: &[usize], axis: isize) -> Vec<Tensor>
 /// ```
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::zeros(&[4, 4]);
+/// let mut graph = ag::Graph::new();
+/// let ref a = graph.zeros(&[4, 4]);
 /// let ref b = ag::slice(a, &[0, 0], &[-1, 2]); // numpy equivalent is a[:, 0:2]
-/// assert_eq!(b.eval().shape(), &[4, 2]);
+/// assert_eq!(graph.eval(&[b])[0].shape(), &[4, 2]);
 /// ```
 pub fn slice(x: &Tensor, starts: &[isize], ends: &[isize]) -> Tensor
 {
@@ -1372,11 +1353,12 @@ pub fn slice(x: &Tensor, starts: &[isize], ends: &[isize]) -> Tensor
 /// ```
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::zeros(&[3, 2]);
-/// let ref b = ag::zeros(&[3, 2]);
-/// let ref c = ag::zeros(&[3, 2]);
+/// let mut graph = ag::Graph::new();
+/// let ref a = graph.zeros(&[3, 2]);
+/// let ref b = graph.zeros(&[3, 2]);
+/// let ref c = graph.zeros(&[3, 2]);
 /// let ref d = ag::concat(&[a, b, c], 0);
-/// assert_eq!(d.eval().shape(), &[9, 2]);
+/// assert_eq!(graph.eval(&[d])[0].shape(), &[9, 2]);
 /// ```
 pub fn concat(tensors: &[&Tensor], axis: isize) -> Tensor
 {
@@ -1407,10 +1389,11 @@ pub fn concat(tensors: &[&Tensor], axis: isize) -> Tensor
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref param = ag::constant(ag::ndarray_ext::zeros(&[5, 4, 8, 2]));
-/// let ref indices = ag::constant(ndarray::arr2(&[[5., 4., 3.], [2., 1., 0.]]));
-/// let y = ag::gather(param, indices, 2);
-/// assert_eq!(y.eval().shape(), &[5, 4, 2, 3, 2])
+/// let mut graph = ag::Graph::new();
+/// let ref param = graph.constant(ag::ndarray_ext::zeros(&[5, 4, 8, 2]));
+/// let ref indices = graph.constant(ndarray::arr2(&[[5., 4., 3.], [2., 1., 0.]]));
+/// let ref y = ag::gather(param, indices, 2);
+/// assert_eq!(graph.eval(&[y])[0].shape(), &[5, 4, 2, 3, 2])
 /// ```
 pub fn gather(param: &Tensor, indices: &Tensor, axis: isize) -> Tensor
 {
@@ -1433,89 +1416,23 @@ pub fn gather(param: &Tensor, indices: &Tensor, axis: isize) -> Tensor
 /// Output of `rnn.step()`
 ///
 /// For the usage, see `lstm_lm()` in `tests/test_tensor_ops_grad.rs` and `nn_impl::rnn`
-pub fn rnn_step<T>(x: &Tensor, rnn: &mut T, with_new_state: bool) -> Tensor
+pub fn rnn_step<T>(x: &Tensor, rnn: &mut T, with_new_state: bool, g: &mut Graph) -> Tensor
 where
     T: ::nn_impl::rnn::RNN,
 {
     if with_new_state {
-        rnn.reset_state();
+        rnn.reset_state(g);
     }
     rnn.step(x)
 }
 
 
-/// Returns a constant tensor
-pub fn zeros(shape: &[usize]) -> Tensor
-{
-    Tensor(Rc::new(RefCell::new(RawTensor {
-        op: Box::new(dummy_op::DummyOp { name: "Constant".to_string() }),
-        inputs: vec![],
-        param: Some(::ndarray_ext::zeros(shape)),
-        rank: 0,
-    })))
-}
-
-
-/// Returns a constant tensor
-pub fn ones(shape: &[usize]) -> Tensor
-{
-    Tensor(Rc::new(RefCell::new(RawTensor {
-        op: Box::new(dummy_op::DummyOp { name: "Constant".to_string() }),
-        inputs: vec![],
-        param: Some(::ndarray_ext::ones(shape)),
-        rank: 0,
-    })))
-}
-
-
-/// Creates a constant tensor.
-///
-/// # Examples
-///
-/// ```
-/// extern crate ndarray;
-/// extern crate autograd as ag;
-///
-/// let arr = ndarray::arr1(&[0., 0., 0.]).into_dyn();
-/// assert_eq!(arr.clone(), ag::constant(arr).eval())
-/// ```
-#[inline]
-pub fn constant<T: ndarray::Dimension>(array: ndarray::Array<f32, T>) -> Tensor
-{
-    Tensor(Rc::new(RefCell::new(RawTensor {
-        op: Box::new(dummy_op::DummyOp { name: "Constant".to_string() }),
-        inputs: vec![],
-        param: Some(array.into_dyn()),
-        rank: 0,
-    })))
-}
-
 
 /// Creates a constant tensor.
 #[inline]
-pub fn scalar(a: f32) -> Tensor
+pub fn scalar(val: f32) -> Tensor
 {
-    Tensor(Rc::new(RefCell::new(RawTensor {
-        op: Box::new(dummy_op::DummyOp { name: "Scalar".to_string() }),
-        inputs: vec![],
-        param: Some(NdArray::from_elem(ndarray::IxDyn(&[1]), a)),
-        rank: 0,
-    })))
-}
-
-
-/// Creates a constant tensor.
-#[inline]
-pub fn range(start: usize, end: usize, step: usize) -> Tensor
-{
-    Tensor(Rc::new(RefCell::new(RawTensor {
-        op: Box::new(dummy_op::DummyOp { name: "Scalar".to_string() }),
-        inputs: vec![],
-        param: Some(
-            ndarray::Array1::range(start as f32, end as f32, step as f32).into_dyn(),
-        ),
-        rank: 0,
-    })))
+    apply_op(scalar::Scalar { val: val }, &[])
 }
 
 

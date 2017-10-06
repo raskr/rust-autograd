@@ -131,84 +131,62 @@ impl ops::Op for ElementwiseDiv {
 }
 
 
+#[inline]
+fn scalar_to_tensor(arg: f32) -> Tensor
+{
+    Tensor(Rc::new(RefCell::new(RawTensor {
+        op: Box::new(ops::scalar::Scalar { val: arg }),
+        inputs: vec![],
+        rank: 0,
+    })))
+}
+
+#[inline]
 fn f32_to_tensor(arg: f32) -> Tensor
 {
-    Tensor(Rc::new(RefCell::new(RawTensor {
-        op: Box::new(ops::dummy_op::DummyOp { name: "from_f32".to_string() }),
-        inputs: vec![],
-        param: Some(NdArray::from_elem(ndarray::IxDyn(&[1]), arg)),
-        rank: 0,
-    })))
+    scalar_to_tensor(arg)
 }
 
+#[inline]
 fn f64_to_tensor(arg: f64) -> Tensor
 {
-    Tensor(Rc::new(RefCell::new(RawTensor {
-        op: Box::new(ops::dummy_op::DummyOp { name: "from_f64".to_string() }),
-        inputs: vec![],
-        param: Some(NdArray::from_elem(ndarray::IxDyn(&[1]), arg as f32)),
-        rank: 0,
-    })))
+    scalar_to_tensor(arg as f32)
 }
 
+#[inline]
 fn i32_to_tensor(arg: i32) -> Tensor
 {
-    Tensor(Rc::new(RefCell::new(RawTensor {
-        op: Box::new(ops::dummy_op::DummyOp { name: "from_i32".to_string() }),
-        inputs: vec![],
-        param: Some(NdArray::from_elem(ndarray::IxDyn(&[1]), arg as f32)),
-        rank: 0,
-    })))
+    scalar_to_tensor(arg as f32)
 }
 
+#[inline]
 fn i64_to_tensor(arg: i64) -> Tensor
 {
-    Tensor(Rc::new(RefCell::new(RawTensor {
-        op: Box::new(ops::dummy_op::DummyOp { name: "from_i64".to_string() }),
-        inputs: vec![],
-        param: Some(NdArray::from_elem(ndarray::IxDyn(&[1]), arg as f32)),
-        rank: 0,
-    })))
+    scalar_to_tensor(arg as f32)
 }
 
+#[inline]
 fn u32_to_tensor(arg: u32) -> Tensor
 {
-    Tensor(Rc::new(RefCell::new(RawTensor {
-        op: Box::new(ops::dummy_op::DummyOp { name: "from_u32".to_string() }),
-        inputs: vec![],
-        param: Some(NdArray::from_elem(ndarray::IxDyn(&[1]), arg as f32)),
-        rank: 0,
-    })))
+    scalar_to_tensor(arg as f32)
 }
 
+#[inline]
 fn u64_to_tensor(arg: u64) -> Tensor
 {
-    Tensor(Rc::new(RefCell::new(RawTensor {
-        op: Box::new(ops::dummy_op::DummyOp { name: "from_u64".to_string() }),
-        inputs: vec![],
-        param: Some(NdArray::from_elem(ndarray::IxDyn(&[1]), arg as f32)),
-        rank: 0,
-    })))
+    scalar_to_tensor(arg as f32)
 }
 
+#[inline]
 fn usize_to_tensor(arg: usize) -> Tensor
 {
-    Tensor(Rc::new(RefCell::new(RawTensor {
-        op: Box::new(ops::dummy_op::DummyOp { name: "from_usize".to_string() }),
-        inputs: vec![],
-        param: Some(NdArray::from_elem(ndarray::IxDyn(&[1]), arg as f32)),
-        rank: 0,
-    })))
+    scalar_to_tensor(arg as f32)
 }
 
+#[inline]
 fn isize_to_tensor(arg: isize) -> Tensor
 {
-    Tensor(Rc::new(RefCell::new(RawTensor {
-        op: Box::new(ops::dummy_op::DummyOp { name: "from_isize".to_string() }),
-        inputs: vec![],
-        param: Some(NdArray::from_elem(ndarray::IxDyn(&[1]), arg as f32)),
-        rank: 0,
-    })))
+    scalar_to_tensor(arg as f32)
 }
 
 
