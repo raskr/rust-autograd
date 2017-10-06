@@ -19,7 +19,7 @@ impl ops::Op for Slice {
         "Slice"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let y: NdArray = xs[0].slice(&*self.indices).to_owned();
         // TODO: for now, if the size of last axis is 1, removing it.
@@ -44,7 +44,7 @@ impl ops::Op for SliceGrad {
         "SliceGrad"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let x = xs[0];
         let gy = xs[1];

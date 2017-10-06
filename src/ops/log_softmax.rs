@@ -57,7 +57,7 @@ impl ops::Op for LogSoftmax {
         "LogSoftmax"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let x = xs[0];
         log_softmax_forward(x, self.axis)

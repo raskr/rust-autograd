@@ -21,7 +21,7 @@ impl ops::Op for Shape {
         vec![None]
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let shape = xs[0].shape().iter().map(|a| *a as f32).collect::<Vec<_>>();
         // safe unwrap
@@ -40,7 +40,7 @@ impl ops::Op for Rank {
         vec![None]
     }
 
-    fn compute(&mut self, xs: &[&::NdArray], _: bool) -> ::NdArray
+    fn compute(&self, xs: &[&::NdArray], _: bool) -> ::NdArray
     {
         let x: &NdArray = xs[0];
         NdArray::from_elem(ndarray::IxDyn(&[1]), x.ndim() as f32)
@@ -58,7 +58,7 @@ impl ops::Op for Size {
         vec![None]
     }
 
-    fn compute(&mut self, xs: &[&::NdArray], _: bool) -> ::NdArray
+    fn compute(&self, xs: &[&::NdArray], _: bool) -> ::NdArray
     {
         let x: &NdArray = xs[0];
         NdArray::from_elem(ndarray::IxDyn(&[1]), x.len() as f32)

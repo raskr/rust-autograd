@@ -13,7 +13,7 @@ impl ops::Op for SoftmaxCrossEntropy {
         "SoftmaxCrossEntropy"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         // `t` must be one-hot unlike KL-divergence
         let x = xs[0];

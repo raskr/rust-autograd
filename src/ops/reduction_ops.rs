@@ -72,7 +72,7 @@ impl ops::Op for ArgMax {
     }
 
     // cf. https://github.com/tensorflow/compiler/tf2xla/kernels/index_ops.cc
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let x = xs[0];
         let axis = if self.axis < 0 {
@@ -150,7 +150,7 @@ impl ops::Op for ReduceMin {
         "ReduceMin"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let x = xs[0];
 
@@ -186,7 +186,7 @@ impl ops::Op for ReduceMinGrad {
         "ReduceMinGrad"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let x = xs[0].view();
         let y = xs[1].view();
@@ -232,7 +232,7 @@ impl ops::Op for ReduceMax {
         "ReduceMax"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let x = xs[0];
 
@@ -268,7 +268,7 @@ impl ops::Op for ReduceMaxGrad {
         "ReduceMaxGrad"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let x = xs[0].view();
         let y = xs[1].view();
@@ -313,7 +313,7 @@ impl ops::Op for ReduceMean {
         "ReduceMean"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let x: &NdArray = xs[0];
 
@@ -356,7 +356,7 @@ impl ops::Op for ReduceMeanGrad {
         "ReduceMeanGrad"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let x = xs[0];
 
@@ -396,7 +396,7 @@ impl ops::Op for ReduceProd {
         "ReduceProd"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let x: &NdArray = &xs[0];
 
@@ -430,7 +430,7 @@ impl ops::Op for ReduceProdGrad {
         "ReduceProdGrad"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let x: &NdArray = xs[0];
         let y: &NdArray = xs[1];
@@ -472,7 +472,7 @@ impl ops::Op for ReduceSum {
         "ReduceSum"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let x = &xs[0];
 
@@ -506,7 +506,7 @@ impl ops::Op for ReduceSumGrad {
         "ReduceSumGrad"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let x = xs[0];
 

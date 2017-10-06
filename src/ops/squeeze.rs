@@ -15,7 +15,7 @@ impl ops::Op for Squeeze {
         "Squeeze"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let mut x = xs[0].view();
         let mut adjust = 0;

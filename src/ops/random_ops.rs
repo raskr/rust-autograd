@@ -56,7 +56,7 @@ impl ops::Op for RandomNormal {
         vec![None]
     }
 
-    fn compute(&mut self, _: &[&::NdArray], _: bool) -> ::NdArray
+    fn compute(&self, _: &[&::NdArray], _: bool) -> ::NdArray
     {
         ::ndarray_ext::random_normal(self.shape.as_slice(), self.mean, self.stddev)
     }
@@ -73,7 +73,7 @@ impl ops::Op for RandomUniform {
         vec![None]
     }
 
-    fn compute(&mut self, _: &[&::NdArray], _: bool) -> ::NdArray
+    fn compute(&self, _: &[&::NdArray], _: bool) -> ::NdArray
     {
         ::ndarray_ext::random_uniform(self.shape.as_slice(), self.min, self.max)
     }
@@ -90,7 +90,7 @@ impl ops::Op for StandardNormal {
         vec![None]
     }
 
-    fn compute(&mut self, _: &[&::NdArray], _: bool) -> ::NdArray
+    fn compute(&self, _: &[&::NdArray], _: bool) -> ::NdArray
     {
         ::ndarray_ext::standard_normal(self.shape.as_slice())
     }
@@ -107,7 +107,7 @@ impl ops::Op for StandardUniform {
         vec![None]
     }
 
-    fn compute(&mut self, _: &[&::NdArray], _: bool) -> ::NdArray
+    fn compute(&self, _: &[&::NdArray], _: bool) -> ::NdArray
     {
         ::ndarray_ext::standard_uniform(self.shape.as_slice())
     }
@@ -124,7 +124,7 @@ impl ops::Op for Bernoulli {
         vec![None]
     }
 
-    fn compute(&mut self, _: &[&::NdArray], _: bool) -> ::NdArray
+    fn compute(&self, _: &[&::NdArray], _: bool) -> ::NdArray
     {
         ::ndarray_ext::bernoulli(self.shape.as_slice(), self.p)
     }
@@ -141,7 +141,7 @@ impl ops::Op for Exponential {
         vec![None]
     }
 
-    fn compute(&mut self, _: &[&::NdArray], _: bool) -> ::NdArray
+    fn compute(&self, _: &[&::NdArray], _: bool) -> ::NdArray
     {
         ::ndarray_ext::exponential(self.shape.as_slice(), self.lambda)
     }
@@ -158,7 +158,7 @@ impl ops::Op for LogNormal {
         vec![None]
     }
 
-    fn compute(&mut self, _: &[&::NdArray], _: bool) -> ::NdArray
+    fn compute(&self, _: &[&::NdArray], _: bool) -> ::NdArray
     {
         ::ndarray_ext::log_normal(self.shape.as_slice(), self.mean, self.stddev)
     }
@@ -175,7 +175,7 @@ impl ops::Op for Gamma {
         vec![None]
     }
 
-    fn compute(&mut self, _: &[&::NdArray], _: bool) -> ::NdArray
+    fn compute(&self, _: &[&::NdArray], _: bool) -> ::NdArray
     {
         ::ndarray_ext::gamma(self.shape.as_slice(), self.shape_param, self.scale)
     }

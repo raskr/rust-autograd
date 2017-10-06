@@ -14,7 +14,7 @@ impl ops::Op for SparseSoftmaxCrossEntropy {
         "SparseSoftmaxCrossEntropy"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let (x, t) = (xs[0], xs[1]);
         {
@@ -63,7 +63,7 @@ impl ops::Op for SparseSoftmaxCrossEntropyGrad {
         "SparseSoftmaxCrossEntropyGrad"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let x = xs[0];
         let t = xs[1];

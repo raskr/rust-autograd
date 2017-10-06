@@ -43,7 +43,7 @@ impl ops::Op for Softmax {
         "Softmax"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         softmax_forward(xs[0], self.axis)
     }

@@ -15,7 +15,7 @@ impl ops::Op for ELU {
         "ELU"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         xs[0].mapv(move |a| if a > 0. {
             a
@@ -37,7 +37,7 @@ impl ops::Op for ELUGrad {
         "ELUGrad"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let x = xs[0];
         let gy = xs[1];

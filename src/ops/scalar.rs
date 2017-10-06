@@ -15,7 +15,7 @@ impl ops::Op for Scalar {
         "Scalar"
     }
 
-    fn compute(&mut self, _: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, _: &[&NdArray], _: bool) -> NdArray
     {
         NdArray::from_elem(ndarray::IxDyn(&[1]), self.val)
     }

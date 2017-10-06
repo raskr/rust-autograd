@@ -19,7 +19,7 @@ impl ops::Op for IndexOp {
         "IndexOp"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let x: &NdArray = xs[0];
         let i = if self.index < 0 {
@@ -49,7 +49,7 @@ impl ops::Op for IndexOpGrad {
         "IndexOpGrad"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let x = xs[0];
         let gy = xs[1];

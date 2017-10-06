@@ -11,7 +11,7 @@ impl ops::Op for Sigmoid {
         "Sigmoid"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let x = xs[0];
         let mut ret = x * 0.5;

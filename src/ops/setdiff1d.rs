@@ -15,7 +15,7 @@ impl ops::Op for SetDiff1D {
         "SetDiff1D"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let x0: &NdArray = xs[0];
         let x1: &NdArray = xs[1];

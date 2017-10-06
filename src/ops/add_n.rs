@@ -11,7 +11,7 @@ impl ops::Op for AddN {
         "AddN"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         if 0 == xs.len() {
             panic!("empty input to AddN")

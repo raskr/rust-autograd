@@ -53,7 +53,7 @@ pub trait Op {
     /// Actually runs this op.
     /// num of inputs : N,
     /// num of outputs: 1
-    fn compute(&mut self, xs: &[&NdArray], train: bool) -> NdArray;
+    fn compute(&self, xs: &[&NdArray], train: bool) -> NdArray;
 
     /// Returns symbolic gradient for each input node by use of output gradient etc.
     ///

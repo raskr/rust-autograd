@@ -15,7 +15,7 @@ impl ops::Op for DummyOp {
         panic!("must not be called (DummyOp::grad)")
     }
 
-    fn compute(&mut self, _: &[&::NdArray], _: bool) -> ::NdArray
+    fn compute(&self, _: &[&::NdArray], _: bool) -> ::NdArray
     {
         panic!(
             "There exists placeholder(s) couldn't get initial value, {}",

@@ -40,7 +40,7 @@ impl ops::Op for ElementwiseAdd {
         "ElementwiseAdd"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let a = xs[0];
         let b = xs[1];
@@ -60,7 +60,7 @@ impl ops::Op for ElementwiseSub {
         "ElementwiseSub"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let a = xs[0];
         let b = xs[1];
@@ -86,7 +86,7 @@ impl ops::Op for ElementwiseMul {
         "ElementwiseMul"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let a = xs[0];
         let b = xs[1];
@@ -107,7 +107,7 @@ impl ops::Op for ElementwiseDiv {
         "ElementwiseDiv"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let x0 = xs[0];
         let x1 = xs[1];

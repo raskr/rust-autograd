@@ -46,7 +46,7 @@ pub fn perform_eval(
             }
         }
 
-        target.borrow_mut().op.compute(xs.as_slice(), train)
+        target.borrow().op.compute(xs.as_slice(), train)
     };
 
     // cache output

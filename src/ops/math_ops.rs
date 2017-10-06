@@ -30,7 +30,7 @@ impl ops::Op for Pow {
         "Pow"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let x0: &NdArray = xs[0];
         x0.map(move |a| a.powf(self.a))
@@ -50,7 +50,7 @@ impl ops::Op for Sqrt {
         "Sqrt"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let x0: &NdArray = xs[0];
         x0.map(|a| a.sqrt())
@@ -70,7 +70,7 @@ impl ops::Op for Log {
         "Log"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         xs[0].map(move |a| a.log(self.a))
     }
@@ -87,7 +87,7 @@ impl ops::Op for Exp {
         "Exp"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         xs[0].map(|a| a.exp())
     }
@@ -111,7 +111,7 @@ impl ops::Op for Atanh {
         vec![Some(y * gy)]
     }
 
-    fn compute(&mut self, xs: &[&::NdArray], _: bool) -> ::NdArray
+    fn compute(&self, xs: &[&::NdArray], _: bool) -> ::NdArray
     {
         xs[0].map(|a| a.atanh())
     }
@@ -130,7 +130,7 @@ impl ops::Op for Acosh {
         vec![Some(y * gy)]
     }
 
-    fn compute(&mut self, xs: &[&::NdArray], _: bool) -> ::NdArray
+    fn compute(&self, xs: &[&::NdArray], _: bool) -> ::NdArray
     {
         xs[0].map(|a| a.acosh())
     }
@@ -149,7 +149,7 @@ impl ops::Op for Asinh {
         vec![Some(y * gy)]
     }
 
-    fn compute(&mut self, xs: &[&::NdArray], _: bool) -> ::NdArray
+    fn compute(&self, xs: &[&::NdArray], _: bool) -> ::NdArray
     {
         xs[0].map(|a| a.asinh())
     }
@@ -161,7 +161,7 @@ impl ops::Op for Tanh {
         "Tanh"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         xs[0].map(|a| a.tanh())
     }
@@ -183,7 +183,7 @@ impl ops::Op for Cosh {
         vec![Some(ops::sinh(inputs[0]) * gy)]
     }
 
-    fn compute(&mut self, xs: &[&::NdArray], _: bool) -> ::NdArray
+    fn compute(&self, xs: &[&::NdArray], _: bool) -> ::NdArray
     {
         xs[0].map(|a| a.cosh())
     }
@@ -200,7 +200,7 @@ impl ops::Op for Sinh {
         vec![Some(ops::cosh(inputs[0]) * gy)]
     }
 
-    fn compute(&mut self, xs: &[&::NdArray], _: bool) -> ::NdArray
+    fn compute(&self, xs: &[&::NdArray], _: bool) -> ::NdArray
     {
         xs[0].map(|a| a.sinh())
     }
@@ -219,7 +219,7 @@ impl ops::Op for Atan {
         vec![Some(y * gy)]
     }
 
-    fn compute(&mut self, xs: &[&::NdArray], _: bool) -> ::NdArray
+    fn compute(&self, xs: &[&::NdArray], _: bool) -> ::NdArray
     {
         xs[0].map(|a| a.atan())
     }
@@ -238,7 +238,7 @@ impl ops::Op for Acos {
         vec![Some(y * gy)]
     }
 
-    fn compute(&mut self, xs: &[&::NdArray], _: bool) -> ::NdArray
+    fn compute(&self, xs: &[&::NdArray], _: bool) -> ::NdArray
     {
         xs[0].map(|a| a.acos())
     }
@@ -257,7 +257,7 @@ impl ops::Op for Asin {
         vec![Some(y * gy)]
     }
 
-    fn compute(&mut self, xs: &[&::NdArray], _: bool) -> ::NdArray
+    fn compute(&self, xs: &[&::NdArray], _: bool) -> ::NdArray
     {
         xs[0].map(|a| a.asin())
     }
@@ -274,7 +274,7 @@ impl ops::Op for Sin {
         vec![Some(ops::cos(inputs[0]) * gy)]
     }
 
-    fn compute(&mut self, xs: &[&::NdArray], _: bool) -> ::NdArray
+    fn compute(&self, xs: &[&::NdArray], _: bool) -> ::NdArray
     {
         xs[0].map(|a| a.sin())
     }
@@ -291,7 +291,7 @@ impl ops::Op for Cos {
         vec![Some(-1 * ops::sin(inputs[0]) * gy)]
     }
 
-    fn compute(&mut self, xs: &[&::NdArray], _: bool) -> ::NdArray
+    fn compute(&self, xs: &[&::NdArray], _: bool) -> ::NdArray
     {
         xs[0].map(|a| a.cos())
     }
@@ -309,7 +309,7 @@ impl ops::Op for Tan {
         vec![Some(gy / (cos * cos))]
     }
 
-    fn compute(&mut self, xs: &[&::NdArray], _: bool) -> ::NdArray
+    fn compute(&self, xs: &[&::NdArray], _: bool) -> ::NdArray
     {
         xs[0].map(|a| a.tan())
     }

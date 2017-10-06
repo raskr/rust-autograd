@@ -19,7 +19,7 @@ impl ops::Op for Gather {
         "Gather"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let indices = xs[0].map(|a| *a as usize);
         let param = &xs[1];
@@ -65,7 +65,7 @@ impl ::Op for GatherGrad {
         "GatherGrad"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let indices: &NdArray = xs[0];
         let param: &NdArray = xs[1];

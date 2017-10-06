@@ -11,7 +11,7 @@ impl ops::Op for ReverseAxes {
         "ReverseAxes"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         xs[0].clone().reversed_axes()
     }

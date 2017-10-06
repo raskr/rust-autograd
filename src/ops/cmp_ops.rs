@@ -27,7 +27,7 @@ impl ops::Op for Equals {
         "Equals"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let x0 = xs[0];
         let x1 = xs[1];
@@ -52,7 +52,7 @@ impl ops::Op for Greater {
         "Greater"
     }
 
-    fn compute(&mut self, xs: &[&::NdArray], _: bool) -> ::NdArray
+    fn compute(&self, xs: &[&::NdArray], _: bool) -> ::NdArray
     {
         xs[0].mapv(move |a| ((a > self.a) as i32) as f32)
     }
@@ -69,7 +69,7 @@ impl ops::Op for Lesser {
         "Lesser"
     }
 
-    fn compute(&mut self, xs: &[&::NdArray], _: bool) -> ::NdArray
+    fn compute(&self, xs: &[&::NdArray], _: bool) -> ::NdArray
     {
         xs[0].mapv(move |a| ((a < self.a) as i32) as f32)
     }
@@ -86,7 +86,7 @@ impl ops::Op for GreaterEqual {
         "GreaterEqual"
     }
 
-    fn compute(&mut self, xs: &[&::NdArray], _: bool) -> ::NdArray
+    fn compute(&self, xs: &[&::NdArray], _: bool) -> ::NdArray
     {
         xs[0].mapv(move |a| ((a >= self.a) as i32) as f32)
     }
@@ -103,7 +103,7 @@ impl ops::Op for LesserEqual {
         "LesserEqual"
     }
 
-    fn compute(&mut self, xs: &[&::NdArray], _: bool) -> ::NdArray
+    fn compute(&self, xs: &[&::NdArray], _: bool) -> ::NdArray
     {
         xs[0].mapv(move |a| ((a <= self.a) as i32) as f32)
     }

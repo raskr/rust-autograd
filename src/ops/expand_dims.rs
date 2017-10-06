@@ -14,7 +14,7 @@ impl ops::Op for ExpandDims {
         "ExpandDims"
     }
 
-    fn compute(&mut self, xs: &[&::NdArray], _: bool) -> ::NdArray
+    fn compute(&self, xs: &[&::NdArray], _: bool) -> ::NdArray
     {
         let ret = xs[0].clone();
         let mut output_shape = ret.shape().to_vec();

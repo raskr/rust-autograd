@@ -20,7 +20,7 @@ impl ops::Op for Reshape {
         "Reshape"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let ret = xs[0].clone();
 
@@ -57,7 +57,7 @@ impl ops::Op for ReshapeGrad {
         "ReshapeGrad"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let x = xs[0];
         let gy: &NdArray = xs[1];

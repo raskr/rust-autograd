@@ -16,7 +16,7 @@ impl ops::Op for Tile {
         "Tile"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let x: &NdArray = xs[0];
 

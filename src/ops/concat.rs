@@ -19,7 +19,7 @@ impl ops::Op for Concat {
         "Concat"
     }
 
-    fn compute(&mut self, xs: &[&::NdArray], _: bool) -> ::NdArray
+    fn compute(&self, xs: &[&::NdArray], _: bool) -> ::NdArray
     {
         let mut views = vec![];
         for x in xs.iter() {
@@ -65,7 +65,7 @@ impl ops::Op for ConcatGrad {
         "ConcatGrad"
     }
 
-    fn compute(&mut self, xs: &[&::NdArray], _: bool) -> ::NdArray
+    fn compute(&self, xs: &[&::NdArray], _: bool) -> ::NdArray
     {
         let gy = xs[0];
         let xs = xs[1..].to_vec();

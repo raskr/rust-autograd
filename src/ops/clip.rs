@@ -19,7 +19,7 @@ impl ops::Op for Clip {
         "Clip"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         xs[0].mapv(move |a| a.min(self.max).max(self.min))
     }
@@ -42,7 +42,7 @@ impl ops::Op for ClipGrad {
     {
         "ClipGrad"
     }
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let mut ret = xs[0].mapv(move |x| {
             // x > min && x < max

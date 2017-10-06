@@ -16,7 +16,7 @@ impl ops::Op for Transpose {
         "Transpose"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let mut x = xs[0].view();
 

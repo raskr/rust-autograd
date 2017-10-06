@@ -24,7 +24,7 @@ impl ops::Op for Split {
         "Split"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let x = xs[0];
 
@@ -57,7 +57,7 @@ impl ops::Op for SplitGrad {
         "SplitGrad"
     }
 
-    fn compute(&mut self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let x = xs[0];
         let gy = xs[1];
