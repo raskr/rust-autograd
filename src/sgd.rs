@@ -10,7 +10,6 @@ use tensor::Tensor;
 
 
 #[inline]
-#[allow(mutable_transmutes)]
 /// Updates params with gradients
 pub fn apply_gradients<T: optimizers::Optimizer>(
     variables: &[&Tensor],
@@ -28,6 +27,7 @@ pub fn apply_gradients<T: optimizers::Optimizer>(
     mem::swap(&mut Some(memo), &mut graph.memo);
     for v in variables {
         // safe unwrap
+        assert_eq!(v.op.name(), "Variable", "Can't optimize non-variable");
         let mut v_arr = graph.variables.get_mut(v).unwrap();
         let g = maybe_reduce_grad(grad_arrays.remove(0), v_arr.shape());
         optimizer.update(v, v_arr, g);
