@@ -49,10 +49,30 @@ pub trait Op {
     /// Name of this op
     fn name(&self) -> &str;
 
+    /// Flag: inplace or not.
+    fn inplace(&self) -> bool
+    {
+        false
+    }
+
     /// Actually runs this op.
-    /// num of inputs : N,
-    /// num of outputs: 1
-    fn compute(&self, xs: &[&NdArray], train: bool) -> NdArray;
+    ///
+    /// Num of inputs : N,
+    /// Num of outputs: 1
+    #[allow(unused_variables)]
+    fn compute(&self, xs: &[&NdArray], train: bool) -> NdArray
+    {
+        unimplemented!()
+    }
+
+    /// Actually runs this op.
+    ///
+    /// Inplace operators such as AddAssign, MulAssign override this.
+    #[allow(unused_variables)]
+    fn compute_inplace(&self, xs: &mut [&mut NdArray], train: bool)
+    {
+        unimplemented!()
+    }
 
     /// Returns symbolic gradient for each input node by use of output gradient etc.
     ///
@@ -283,7 +303,7 @@ pub fn stop_gradients(x: &Tensor) -> Tensor
 ///
 /// ```
 /// extern crate autograd as ag;
-/// 
+///
 /// let mut graph = ag::Graph::new();
 /// let ref x = graph.placeholder();
 /// let ref s = ag::shape(x);
@@ -305,7 +325,7 @@ pub fn shape(x: &Tensor) -> Tensor
 ///
 /// ```
 /// extern crate autograd as ag;
-/// 
+///
 /// let mut graph = ag::Graph::new();
 /// let ref a = graph.placeholder();
 /// let ref b = graph.zeros(&[4, 3]);
@@ -330,7 +350,7 @@ pub fn size(x: &Tensor) -> Tensor
 ///
 /// ```
 /// extern crate autograd as ag;
-/// 
+///
 /// let mut graph = ag::Graph::new();
 /// let ref x = graph.placeholder();
 /// let ref r = ag::rank(x);
@@ -452,7 +472,7 @@ pub fn identity(a: &Tensor) -> Tensor
 /// Adds two tensors
 pub fn add(a: &Tensor, b: &Tensor) -> Tensor
 {
-    apply_op(binary_ops::ElementwiseAdd, &[a, b])
+    apply_op(binary_ops::AddOp, &[a, b])
 }
 
 
@@ -460,7 +480,7 @@ pub fn add(a: &Tensor, b: &Tensor) -> Tensor
 /// Subtracts `a` from `b`
 pub fn sub(a: &Tensor, b: &Tensor) -> Tensor
 {
-    apply_op(binary_ops::ElementwiseSub, &[a, b])
+    apply_op(binary_ops::SubOp, &[a, b])
 }
 
 
@@ -468,7 +488,7 @@ pub fn sub(a: &Tensor, b: &Tensor) -> Tensor
 /// Multiplies two tensors
 pub fn mul(a: &Tensor, b: &Tensor) -> Tensor
 {
-    apply_op(binary_ops::ElementwiseMul, &[a, b])
+    apply_op(binary_ops::MulOp, &[a, b])
 }
 
 
@@ -476,7 +496,7 @@ pub fn mul(a: &Tensor, b: &Tensor) -> Tensor
 /// Divides `a` with `b`
 pub fn div(a: &Tensor, b: &Tensor) -> Tensor
 {
-    apply_op(binary_ops::ElementwiseDiv, &[a, b])
+    apply_op(binary_ops::DivOp, &[a, b])
 }
 
 
@@ -1124,7 +1144,7 @@ pub fn matmul_t(a: &Tensor, b: &Tensor, transpose_a: bool, transpose_b: bool) ->
 /// extern crate autograd as ag;
 ///
 /// let mut graph = ag::Graph::new();
-/// 
+///
 /// let ref a = graph.zeros(&[3, 4, 5]);
 /// let ref b = graph.zeros(&[4, 3, 2]);
 /// let ref c = ag::tensordot(a, b, &[3, 4, 5], &[4, 3, 2], [&[1, 0], &[0, 1]]);

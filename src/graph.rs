@@ -82,24 +82,20 @@ impl Graph {
     ///
     /// assert_eq!(graph.eval(&[z])[0].shape(), &[4, 3])
     /// ```
-    pub fn eval(&self, xs: &[&Tensor]) -> Vec<ndarray::Array<f32, ndarray::IxDyn>>
+    pub fn eval(&mut self, xs: &[&Tensor]) -> Vec<ndarray::Array<f32, ndarray::IxDyn>>
     {
         let xs = xs.into_iter().map(|a| (*a).clone()).collect::<Vec<_>>();
 
-        type M = FnvHashMap<Tensor, NdArray>;
-        let mut memo: M = unsafe {
-            mem::replace(
-                mem::transmute::<&Option<M>, &mut Option<M>>(&self.memo),
-                None,
-            ).expect("Don't touch \"Graph.memo\" property")
-        };
+        let mut memo = self.memo.as_mut().unwrap();
 
-        let ret = tensor::eval_tensors(xs.as_slice(), &self.variables, &mut memo);
-
+        let ret = tensor::eval_tensors(
+            xs.as_slice(),
+            &mut self.variables,
+            &mut memo,
+        );
+        // clear all outputs (including feeds)
         memo.clear();
-        mem::swap(&mut Some(memo), unsafe {
-            mem::transmute::<&Option<M>, &mut Option<M>>(&self.memo)
-        });
+
         ret
     }
 
@@ -118,7 +114,11 @@ impl Graph {
             ).expect("Don't touch \"Graph.memo\" property")
         };
 
-        let ret = tensor::eval_tensors(xs.as_slice(), &self.variables, &mut memo);
+        let ret = tensor::eval_tensors(
+            xs.as_slice(),
+            unsafe { &mut mem::transmute::<&M, &mut M>(&self.variables) },
+            &mut memo
+        );
 
         // Drain except for placeholder nodes and its feeds
         let memo = memo.into_iter()

@@ -373,6 +373,18 @@ fn reshape_after_transpose()
 }
 
 #[test]
+fn add_inplace()
+{
+    let mut graph = ag::Graph::new();
+    let mut a = graph.variable(ag::ndarray_ext::standard_normal(&[2, 2]));
+    let b = graph.variable(ag::ndarray_ext::standard_normal(&[2, 2]));
+    a += b;
+    graph.eval(&[&a]);
+//    let ref g = ag::gradients(&[a], &[&b], &[Some(&graph.ones(&[2, 2]))]);
+//    ag::test_helper::gradient_check(a, g.as_slice(), &[&b], graph, 1e-3, 1e-3);
+}
+
+#[test]
 fn add()
 {
     let mut graph = ag::Graph::new();
@@ -594,7 +606,10 @@ fn primitive_back_propagation_through_time()
     let loss = loss_buf.last().unwrap();
 
     // inputs (batch_size=2, sentence_len=4)
-    graph.feed(&sentences, ndarray::arr2(&[[2., 3., 1., 3.], [0., 2., 0., 1.]]));
+    graph.feed(
+        &sentences,
+        ndarray::arr2(&[[2., 3., 1., 3.], [0., 2., 0., 1.]]),
+    );
     graph.feed(&h_buf[0], ag::ndarray_ext::zeros(&[batch_size, 3]));
     let params = &[lookup_table, wo, wh];
     let ref g = ag::gradients(&[loss], params, &[Some(&graph.ones(&[batch_size, 1]))]);
@@ -617,14 +632,16 @@ pub fn lstm_lm()
     let ref sentences = graph.placeholder();
     let ref mut rnn = ag::nn_impl::rnn::LSTM::new(state_size, vec_dim, batch_size, &mut graph);
 
-    let losses = (0..max_sent).map(|i| {
-        let ref cur_id = ag::slice(sentences, &[0, i], &[-1, i + 1]);
-        let ref nex_id = ag::slice(sentences, &[0, i + 1], &[-1, i + 2]);
-        let ref x = ag::gather(tbl, cur_id, 0);
-        let ref h = ag::rnn_step(x, rnn, i == max_sent - 1, &mut graph);
-        let ref prediction = ag::matmul(h, w);
-        ag::sparse_softmax_cross_entropy(prediction, nex_id)
-    }).collect::<Vec<_>>();
+    let losses = (0..max_sent)
+        .map(|i| {
+            let ref cur_id = ag::slice(sentences, &[0, i], &[-1, i + 1]);
+            let ref nex_id = ag::slice(sentences, &[0, i + 1], &[-1, i + 2]);
+            let ref x = ag::gather(tbl, cur_id, 0);
+            let ref h = ag::rnn_step(x, rnn, i == max_sent - 1, &mut graph);
+            let ref prediction = ag::matmul(h, w);
+            ag::sparse_softmax_cross_entropy(prediction, nex_id)
+        })
+        .collect::<Vec<_>>();
 
     let loss = losses.last().unwrap();
     let mut vars = rnn.list_vars();

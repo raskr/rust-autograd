@@ -10,7 +10,7 @@ fn scalar_add()
     let ref x = graph.variable(ndarray::arr1(&[]));
     let ref y = x + 2;
     let grads = ag::gradients(&[y], &[x], &[None]);
-    let grads = grads.iter().map(|a|a).collect::<Vec<_>>();
+    let grads = grads.iter().map(|a| a).collect::<Vec<_>>();
     assert_eq!(1., graph.eval(grads.as_slice())[0][0]);
 }
 
@@ -21,7 +21,7 @@ fn scalar_sub()
     let ref x = graph.variable(ndarray::arr1(&[]));
     let ref y = x - 2;
     let grads = ag::gradients(&[y], &[x], &[None]);
-    let grads = grads.iter().map(|a|a).collect::<Vec<_>>();
+    let grads = grads.iter().map(|a| a).collect::<Vec<_>>();
     assert_eq!(1., graph.eval(grads.as_slice())[0][0]);
 }
 
@@ -32,7 +32,7 @@ fn scalar_mul()
     let ref x = graph.variable(ndarray::arr1(&[]));
     let ref y = 3 * x;
     let grads = ag::gradients(&[y], &[x], &[None]);
-    let grads = grads.iter().map(|a|a).collect::<Vec<_>>();
+    let grads = grads.iter().map(|a| a).collect::<Vec<_>>();
     assert_eq!(3., graph.eval(grads.as_slice())[0][0]);
 }
 
@@ -43,7 +43,7 @@ fn scalar_div()
     let ref x = graph.variable(ndarray::arr1(&[]));
     let ref y = x / 3;
     let grads = ag::gradients(&[y], &[x], &[None]);
-    let grads = grads.iter().map(|a|a).collect::<Vec<_>>();
+    let grads = grads.iter().map(|a| a).collect::<Vec<_>>();
     assert_eq!(1. / 3., graph.eval(grads.as_slice())[0][0]);
 }
 
@@ -54,7 +54,7 @@ fn expr1()
     let ref x = graph.variable(ndarray::arr1(&[]));
     let ref y = 3 * x + 2;
     let grads = ag::gradients(&[y], &[x], &[None]);
-    let grads = grads.iter().map(|a|a).collect::<Vec<_>>();
+    let grads = grads.iter().map(|a| a).collect::<Vec<_>>();
     assert_eq!(3., graph.eval(grads.as_slice())[0][0]);
 }
 
@@ -65,7 +65,7 @@ fn expr2()
     let ref x = graph.placeholder();
     let ref y = 3 * x * x;
     let grads = ag::gradients(&[y], &[x], &[None]);
-    let grads = grads.iter().map(|a|a).collect::<Vec<_>>();
+    let grads = grads.iter().map(|a| a).collect::<Vec<_>>();
     graph.feed(x, ndarray::arr1(&[3.]));
     assert_eq!(18., graph.eval(grads.as_slice())[0][0]);
 }
@@ -77,7 +77,7 @@ fn expr3()
     let ref x = graph.placeholder();
     let ref y = 3 * x * x + 2;
     let grads = ag::gradients(&[y], &[x], &[None]);
-    let grads = grads.iter().map(|a|a).collect::<Vec<_>>();
+    let grads = grads.iter().map(|a| a).collect::<Vec<_>>();
     graph.feed(x, ndarray::arr1(&[3.]));
     assert_eq!(18., graph.eval(grads.as_slice())[0][0]);
 }
@@ -89,7 +89,7 @@ fn expr4()
     let ref x = graph.placeholder();
     let ref y = 3 * x * x + 2 * x + 1;
     let grads = ag::gradients(&[y], &[x], &[None]);
-    let grads = grads.iter().map(|a|a).collect::<Vec<_>>();
+    let grads = grads.iter().map(|a| a).collect::<Vec<_>>();
     graph.feed(x, ndarray::arr1(&[3.]));
     assert_eq!(20., graph.eval(grads.as_slice())[0][0]);
 }
@@ -102,7 +102,7 @@ fn expr5()
     let ref x2 = graph.placeholder();
     let ref y = 3 * x1 * x1 + 2 * x1 + x2 + 1;
     let grads = ag::gradients(&[y], &[x1], &[None]);
-    let grads = grads.iter().map(|a|a).collect::<Vec<_>>();
+    let grads = grads.iter().map(|a| a).collect::<Vec<_>>();
     graph.feed(x1, ndarray::arr1(&[3.]));
     assert_eq!(20., graph.eval(grads.as_slice())[0][0]);
 }
@@ -117,7 +117,7 @@ fn expr6()
     let ref x2 = graph.variable(ndarray::arr1(&[]));
     let ref y = 3 * x1 * x1 + 5 * x2 + 1;
     let grads = ag::gradients(&[y], &[x2], &[None]);
-    let grads = grads.iter().map(|a|a).collect::<Vec<_>>();
+    let grads = grads.iter().map(|a| a).collect::<Vec<_>>();
     assert_eq!(5., graph.eval(grads.as_slice())[0][0]);
 }
 

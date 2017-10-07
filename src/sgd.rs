@@ -22,7 +22,7 @@ pub fn apply_gradients<T: optimizers::Optimizer>(
     let mut memo =
         mem::replace(&mut graph.memo, None).expect("Don't touch \"Graph.memo\" property");
     // run graph and get gradient arrays
-    let mut grad_arrays = tensor::eval_tensors(gradients, &graph.variables, &mut memo);
+    let mut grad_arrays = tensor::eval_tensors(gradients, &mut graph.variables, &mut memo);
     memo.clear();
     mem::swap(&mut Some(memo), &mut graph.memo);
     for v in variables {

@@ -23,12 +23,13 @@ pub struct RawTensor {
     /// References to immediate predecessors.
     pub inputs: Vec<Tensor>,
 
-    /// rank number for topological ordering
+    /// Rank number for topological ordering
     pub top_rank: usize,
 }
 
 
 impl Tensor {
+    #[doc(hide)]
     #[inline]
     /// Returns true if this node has no incoming nodes.
     pub fn is_source(&self) -> bool
@@ -36,6 +37,7 @@ impl Tensor {
         self.inputs.is_empty()
     }
 
+    #[doc(hide)]
     #[inline]
     pub fn visit_once<F>(&self, f: &mut F)
     where
@@ -62,6 +64,7 @@ impl Tensor {
         }
     }
 
+    #[doc(hide)]
     #[inline]
     pub fn visit<F>(&self, f: &mut F)
     where
@@ -154,7 +157,7 @@ impl fmt::Display for Tensor {
 #[inline]
 pub fn eval_tensors(
     tensors: &[Tensor],
-    variables: &FnvHashMap<Tensor, NdArray>,
+    variables: &mut FnvHashMap<Tensor, NdArray>,
     memo: &mut FnvHashMap<Tensor, NdArray>,
 ) -> Vec<NdArray>
 {

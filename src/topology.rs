@@ -16,7 +16,7 @@ use tensor::Tensor;
 // TODO: loop-based rather than recursion (this would be difficult)
 pub fn perform_eval(
     target: &Tensor,
-    vars: &FnvHashMap<Tensor, NdArray>,
+    vars: &mut FnvHashMap<Tensor, NdArray>,
     memo: &mut FnvHashMap<Tensor, NdArray>,
     train: bool,
 )
@@ -37,12 +37,20 @@ pub fn perform_eval(
         let mut xs = Vec::with_capacity(inputs.len());
         for x in inputs.iter() {
             if let Some(a) = vars.get(x) {
+                // from variable set
                 xs.push(a);
             } else {
+                // from memo set
                 xs.push(memo.get(x).unwrap());
             }
         }
-        target.op.compute(xs.as_slice(), train)
+        if target.op.inplace() {
+            let mut xs: Vec<&mut NdArray> = unsafe { mem::transmute(xs) };
+            target.op.compute_inplace(xs.as_mut_slice(), train);
+            return;
+        } else {
+            target.op.compute(xs.as_slice(), train)
+        }
     };
 
     // cache output

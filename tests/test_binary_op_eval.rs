@@ -35,7 +35,10 @@ fn scalar_div()
     let mut graph = ag::Graph::new();
     let ref ones = graph.constant(ndarray::arr1(&[1., 1., 1.]));
     let ref z: ag::Tensor = 3. / ones / 2;
-    assert_eq!(graph.eval(&[z])[0], ndarray::arr1(&[1.5, 1.5, 1.5]).into_dyn());
+    assert_eq!(
+        graph.eval(&[z])[0],
+        ndarray::arr1(&[1.5, 1.5, 1.5]).into_dyn()
+    );
 }
 
 #[test]

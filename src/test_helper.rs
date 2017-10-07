@@ -1,11 +1,11 @@
 extern crate ndarray;
 extern crate rand;
 
-use std::mem;
 use graph;
-use sgd;
-use tensor::Tensor;
 use ndarray_ext::NdArray;
+use sgd;
+use std::mem;
+use tensor::Tensor;
 
 
 #[allow(mutable_transmutes)]
@@ -22,12 +22,12 @@ pub fn gradient_check(
 )
 {
     // back prop
-    let gradients = gradients.iter().map(|a|a).collect::<Vec<_>>();
+    let gradients = gradients.iter().map(|a| a).collect::<Vec<_>>();
     let theoretical_grads = graph.eval_keep_feeds(gradients.as_slice());
 
     // for each variable nodes
     for (v, th_grad) in variables.iter().zip(theoretical_grads) {
-        let v_arr = graph.variables.get(v).unwrap();
+        let v_arr = graph.variables.get(v).expect("You passed non-variable");
         let mut v_arr = unsafe { mem::transmute::<&NdArray, &mut NdArray>(v_arr) };
 
         // reduce gradient if necessary
