@@ -516,7 +516,22 @@ pub fn div(a: &Tensor, b: &Tensor) -> Tensor
 /// You can not use `a` after calling this function.
 ///
 /// # Panics
+///
 /// When `a` is from `graph#constant` or `graph#variable`.
+///
+/// # Examples
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let mut graph = ag::Graph::new();
+///
+/// let a = ag::zeros(&[2, 2]) + ag::ones(&[2, 2]);
+/// let ref b = ag::ones(&[2, 2]);
+/// let ref c = ag::add_inplace(a, b);
+/// assert_eq!(graph.eval(&[c])[0], ndarray::arr2(&[[2., 2.], [2., 2.]]).into_dyn());
+/// ```
 pub fn add_inplace(a: Tensor, b: &Tensor) -> Tensor
 {
     let a_name = a.op.name();
@@ -532,7 +547,22 @@ pub fn add_inplace(a: Tensor, b: &Tensor) -> Tensor
 /// You can not use `a` after calling this function.
 ///
 /// # Panics
+///
 /// When `a` is from `graph#constant` or `graph#variable`.
+///
+/// # Examples
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let mut graph = ag::Graph::new();
+///
+/// let a = ag::zeros(&[2, 2]) + ag::ones(&[2, 2]);
+/// let ref b = ag::ones(&[2, 2]);
+/// let ref c = ag::sub_inplace(a, b);
+/// assert_eq!(graph.eval(&[c])[0], ndarray::arr2(&[[0., 0.], [0., 0.]]).into_dyn());
+/// ```
 pub fn sub_inplace(a: Tensor, b: &Tensor) -> Tensor
 {
     let a_name = a.op.name();
