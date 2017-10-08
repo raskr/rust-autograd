@@ -1616,9 +1616,7 @@ pub fn log_normal(shape: &[usize], mean: f64, stddev: f64) -> Tensor
 /// Returns zeros with given shape
 pub fn zeros(shape: &[usize]) -> Tensor
 {
-    let op = generator_ops::Zeros {
-        shape: shape.to_vec()
-    };
+    let op = generator_ops::Zeros { shape: shape.to_vec() };
     apply_op(op, &[])
 }
 
@@ -1627,9 +1625,7 @@ pub fn zeros(shape: &[usize]) -> Tensor
 /// Returns ones with given shape
 pub fn ones(shape: &[usize]) -> Tensor
 {
-    let op = generator_ops::Ones {
-        shape: shape.to_vec()
-    };
+    let op = generator_ops::Ones { shape: shape.to_vec() };
     apply_op(op, &[])
 }
 

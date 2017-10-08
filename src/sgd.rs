@@ -55,8 +55,8 @@ pub fn maybe_reduce_grad(mut grad: NdArray, var_shape: &[usize]) -> NdArray
 
 pub mod optimizers {
     extern crate fnv;
-    use ndarray_ext::NdArray;
     use self::fnv::FnvHashMap;
+    use ndarray_ext::NdArray;
     use tensor::Tensor;
 
     /// Trait for any stochastic gradient descent optimizer

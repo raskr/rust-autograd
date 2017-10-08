@@ -20,7 +20,7 @@ pub fn perform_eval(
     vars: &mut FnvHashMap<Tensor, NdArray>,
     memo: &mut FnvHashMap<Tensor, NdArray>,
     train: bool,
-    mut count: usize,  // for debug
+    mut count: usize, // for debug
 )
 {
     if vars.contains_key(target) || memo.contains_key(target) {

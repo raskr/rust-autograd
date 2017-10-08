@@ -7,11 +7,11 @@ use tensor::Tensor;
 
 
 pub struct Zeros {
-    pub shape: Vec<usize>
+    pub shape: Vec<usize>,
 }
 
 pub struct Ones {
-    pub shape: Vec<usize>
+    pub shape: Vec<usize>,
 }
 
 pub struct Range {

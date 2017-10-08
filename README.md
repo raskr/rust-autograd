@@ -23,7 +23,7 @@ Here we are computing partial derivatives of `z = 2x^2 + 3y + 1`.
 extern crate ndarray;
 extern crate autograd as ag;
 
-let mut graph ag::Graph::new();
+let mut graph = ag::Graph::new();
 let ref x = graph.placeholder();
 let ref y = graph.variable(ndarray::arr1(&[0]));
 let ref z = 2*x*x + 3*y + 1;
@@ -76,7 +76,7 @@ for epoch in 0..max_epoch {
 }
 
 ```
-Available operations in rust-autograd are listed [here](https://docs.rs/autograd/0.4.5/autograd/ops/index.html)
+Available operations in rust-autograd are listed [here](https://docs.rs/autograd/0.4.6/autograd/ops/index.html)
 
 For more, see 
 [examples](https://github.com/perrier1034/rust-autograd/tree/master/examples) or
