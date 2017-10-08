@@ -10,6 +10,7 @@ use std::mem;
 use tensor::Tensor;
 
 
+#[allow(unused_mut)]
 #[doc(hidden)]
 #[inline]
 /// Performs actual graph traversal and its evaluation
@@ -236,45 +237,4 @@ pub fn symbolic_gradients(
             gys.remove(0)
         })
         .collect::<Vec<Tensor>>()
-}
-
-
-#[test]
-fn topological_ordering_on_reverse_mode()
-{
-    fn collect_parents_from(endpoint: &Tensor) -> HashSet<Tensor>
-    {
-        let mut collected = HashSet::new();
-        endpoint.visit_once(&mut |arg| { collected.insert(arg.clone()); });
-        collected
-    }
-
-    let mut graph = ::Graph::new();
-    let ref x = graph.constant(::ndarray_ext::standard_normal(&[4, 2]));
-    let ref w = graph.variable(::ndarray_ext::standard_normal(&[2, 3]));
-    let ref b = graph.variable(::ndarray_ext::zeros(&[4, 3]));
-    let ref z = ::matmul(x, w) + b;
-    let ref g = ::gradients(&[z], &[w], &[Some(&graph.ones(&[4, 3]))])[0];
-
-    // to vec
-    let mut collected = collect_parents_from(g).into_iter().collect::<Vec<Tensor>>();
-
-    // sort by rank
-    collected.sort_by_key(|t| t.top_rank);
-
-    // tensor to name
-    let sorted_names = collected
-        .into_iter()
-        .map(|t| t.op.name().to_string())
-        .collect::<Vec<String>>();
-
-    // compare
-    let a = sorted_names;
-    let b = vec![
-        "Constant".to_string(), // one or x
-        "Constant".to_string(), // one or x
-        "MatMul".to_string(),
-    ]; // MatMulGrad
-
-    assert_eq!(a, b);
 }

@@ -6,6 +6,7 @@ use std::rc::Rc;
 use tensor::{RawTensor, Tensor};
 
 pub mod dummy_op;
+mod generator_ops;
 mod scalar;
 mod setdiff1d;
 mod shape_ops;
@@ -67,7 +68,7 @@ pub trait Op {
 
     /// Actually runs this op.
     ///
-    /// Inplace operators such as AddAssign, MulAssign override this.
+    /// Inplace operators such as AddAssign override this.
     #[allow(unused_variables)]
     fn compute_inplace(&self, xs: &mut [&mut NdArray], train: bool)
     {
@@ -119,9 +120,9 @@ impl Tensor {
 /// extern crate autograd as ag;
 ///
 /// let mut graph = ag::Graph::new();
-/// let ref a = graph.zeros(&[4, 2]);
-/// let ref v = graph.zeros(&[2, 3]);
-/// let ref b = graph.zeros(&[4, 3]);
+/// let ref a = ag::zeros(&[4, 2]);
+/// let ref v = ag::zeros(&[2, 3]);
+/// let ref b = ag::zeros(&[4, 3]);
 /// let ref z = ag::matmul(a, v) + b;
 /// let mut vars = [a, v, b, z];
 /// // `sort_by_key` don't reverse the order of `a` and `v`
@@ -200,9 +201,9 @@ pub fn apply_op<T: Op + 'static>(op: T, inputs: &[&Tensor]) -> Tensor
 ///
 /// let mut graph = ag::Graph::new();
 /// let ref a = graph.variable(ag::ndarray_ext::zeros(&[4, 2]));
-/// let ref b = graph.zeros(&[2, 3]);
+/// let ref b = ag::zeros(&[2, 3]);
 /// let ref c = ag::matmul(a, b);
-/// let ref g = ag::gradients(&[c], &[a], &[Some(&graph.ones(&[4, 2]))])[0];
+/// let ref g = ag::gradients(&[c], &[a], &[Some(&ag::ones(&[4, 2]))])[0];
 /// ```
 pub fn gradients(
     objectives: &[&Tensor],
@@ -328,7 +329,7 @@ pub fn shape(x: &Tensor) -> Tensor
 ///
 /// let mut graph = ag::Graph::new();
 /// let ref a = graph.placeholder();
-/// let ref b = graph.zeros(&[4, 3]);
+/// let ref b = ag::zeros(&[4, 3]);
 /// let ref c = ag::size(a);
 /// let ref d = ag::size(b);
 ///
@@ -584,9 +585,9 @@ pub fn exp(x: &Tensor) -> Tensor
 /// extern crate autograd as ag;
 ///
 /// let mut graph = ag::Graph::new();
-/// let ref a = graph.ones(&[2, 2]);
-/// let ref b = graph.ones(&[2, 2]);
-/// let ref c = graph.ones(&[2, 2]);
+/// let ref a = ag::ones(&[2, 2]);
+/// let ref b = ag::ones(&[2, 2]);
+/// let ref c = ag::ones(&[2, 2]);
 /// let ref d = ag::add_n(&[a, b, c]);
 /// assert_eq!(graph.eval(&[d])[0].shape(), &[2, 2]);
 /// assert_eq!(graph.eval(&[d])[0], ndarray::arr2(&[[3., 3.], [3., 3.]]).into_dyn());
@@ -890,7 +891,7 @@ pub fn reduce_prod(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 /// extern crate autograd as ag;
 ///
 /// let mut graph = ag::Graph::new();
-/// let ref x = graph.zeros(&[3, 2, 2]);
+/// let ref x = ag::zeros(&[3, 2, 2]);
 /// let ref y = ag::reshape(&x, &[3, 4]);
 /// assert_eq!(graph.eval(&[y])[0], ag::ndarray_ext::zeros(&[3, 4]));
 /// ```
@@ -925,7 +926,7 @@ pub fn reshape(x: &Tensor, shape: &[isize]) -> Tensor
 /// extern crate autograd as ag;
 ///
 /// let mut graph = ag::Graph::new();
-/// let ref x = graph.zeros(&[3, 2, 2]);
+/// let ref x = ag::zeros(&[3, 2, 2]);
 /// let ref z = ag::flatten(x);
 /// assert_eq!(graph.eval(&[z])[0].shape(), &[12]);
 /// ```
@@ -1120,8 +1121,8 @@ pub fn sparse_softmax_cross_entropy(y: &Tensor, t: &Tensor) -> Tensor
 ///
 /// let mut graph = ag::Graph::new();
 ///
-/// let ref a = graph.zeros(&[4, 2]);
-/// let ref b = graph.zeros(&[2, 3]);
+/// let ref a = ag::zeros(&[4, 2]);
+/// let ref b = ag::zeros(&[2, 3]);
 /// let ref c = ag::matmul(a, b);
 /// assert_eq!(graph.eval(&[c])[0].shape(), &[4, 3]);
 /// ```
@@ -1149,8 +1150,8 @@ pub fn matmul(a: &Tensor, b: &Tensor) -> Tensor
 /// extern crate autograd as ag;
 ///
 /// let mut graph = ag::Graph::new();
-/// let ref a = graph.zeros(&[2, 4]);
-/// let ref b = graph.zeros(&[2, 3]);
+/// let ref a = ag::zeros(&[2, 4]);
+/// let ref b = ag::zeros(&[2, 3]);
 /// let ref c = ag::matmul_t(a, b, true, false);
 /// assert_eq!(graph.eval(&[c])[0].shape(), &[4, 3]);
 /// ```
@@ -1185,14 +1186,14 @@ pub fn matmul_t(a: &Tensor, b: &Tensor, transpose_a: bool, transpose_b: bool) ->
 ///
 /// let mut graph = ag::Graph::new();
 ///
-/// let ref a = graph.zeros(&[3, 4, 5]);
-/// let ref b = graph.zeros(&[4, 3, 2]);
+/// let ref a = ag::zeros(&[3, 4, 5]);
+/// let ref b = ag::zeros(&[4, 3, 2]);
 /// let ref c = ag::tensordot(a, b, &[3, 4, 5], &[4, 3, 2], [&[1, 0], &[0, 1]]);
 /// assert_eq!(graph.eval(&[c])[0].shape(), &[5, 2]);
 ///
 /// // Another example (simple matmul broadcast)
-/// let ref a = graph.zeros(&[2, 3, 4]);
-/// let ref b = graph.zeros(&[4, 2]);
+/// let ref a = ag::zeros(&[2, 3, 4]);
+/// let ref b = ag::zeros(&[4, 2]);
 /// let ref c = ag::tensordot(a, b, &[2, 3, 4], &[4, 2], [&[2], &[0]]);
 /// assert_eq!(graph.eval(&[c])[0].shape(), &[2, 3, 2]);
 /// ```
@@ -1271,8 +1272,8 @@ pub fn tensordot(
 /// extern crate autograd as ag;
 ///
 /// let mut graph = ag::Graph::new();
-/// let ref a = graph.zeros(&[2, 3, 4, 2]);
-/// let ref b = graph.zeros(&[2, 3, 2, 3]);
+/// let ref a = ag::zeros(&[2, 3, 4, 2]);
+/// let ref b = ag::zeros(&[2, 3, 2, 3]);
 /// let ref c = ag::batch_matmul(a, b);
 /// assert_eq!(graph.eval(&[c])[0].shape(), &[2, 3, 4, 3]);
 /// ```
@@ -1321,7 +1322,7 @@ pub fn setdiff1d(a: &Tensor, b: &Tensor) -> Tensor
 /// extern crate autograd as ag;
 ///
 /// let mut graph = ag::Graph::new();
-/// let ref a = graph.zeros(&[1, 2, 3, 4, 5]);
+/// let ref a = ag::zeros(&[1, 2, 3, 4, 5]);
 /// let ref b = ag::transpose(a, &[4, 2, 3, 0, 1]);
 /// assert_eq!(graph.eval(&[b])[0].shape(), &[5, 3, 4, 1, 2]);
 /// ```
@@ -1346,7 +1347,7 @@ pub fn transpose(x: &Tensor, perm: &[usize]) -> Tensor
 /// extern crate autograd as ag;
 ///
 /// let mut graph = ag::Graph::new();
-/// let ref a = graph.zeros(&[3, 7, 5]);
+/// let ref a = ag::zeros(&[3, 7, 5]);
 /// let ref b = ag::split(a, &[2, 3, 2], 1);
 /// assert_eq!(graph.eval(&[&b[0]])[0].shape(), &[3, 2, 5]);
 /// assert_eq!(graph.eval(&[&b[1]])[0].shape(), &[3, 3, 5]);
@@ -1381,7 +1382,7 @@ pub fn split(x: &Tensor, sizes: &[usize], axis: isize) -> Vec<Tensor>
 /// extern crate autograd as ag;
 ///
 /// let mut graph = ag::Graph::new();
-/// let ref a = graph.zeros(&[4, 4]);
+/// let ref a = ag::zeros(&[4, 4]);
 /// let ref b = ag::slice(a, &[0, 0], &[-1, 2]); // numpy equivalent is a[:, 0:2]
 /// assert_eq!(graph.eval(&[b])[0].shape(), &[4, 2]);
 /// ```
@@ -1413,9 +1414,9 @@ pub fn slice(x: &Tensor, starts: &[isize], ends: &[isize]) -> Tensor
 /// extern crate autograd as ag;
 ///
 /// let mut graph = ag::Graph::new();
-/// let ref a = graph.zeros(&[3, 2]);
-/// let ref b = graph.zeros(&[3, 2]);
-/// let ref c = graph.zeros(&[3, 2]);
+/// let ref a = ag::zeros(&[3, 2]);
+/// let ref b = ag::zeros(&[3, 2]);
+/// let ref c = ag::zeros(&[3, 2]);
 /// let ref d = ag::concat(&[a, b, c], 0);
 /// assert_eq!(graph.eval(&[d])[0].shape(), &[9, 2]);
 /// ```
@@ -1576,6 +1577,41 @@ pub fn log_normal(shape: &[usize], mean: f64, stddev: f64) -> Tensor
         shape: shape.to_vec(),
         mean: mean,
         stddev: stddev,
+    };
+    apply_op(op, &[])
+}
+
+
+#[inline]
+/// Returns zeros with given shape
+pub fn zeros(shape: &[usize]) -> Tensor
+{
+    let op = generator_ops::Zeros {
+        shape: shape.to_vec()
+    };
+    apply_op(op, &[])
+}
+
+
+#[inline]
+/// Returns ones with given shape
+pub fn ones(shape: &[usize]) -> Tensor
+{
+    let op = generator_ops::Ones {
+        shape: shape.to_vec()
+    };
+    apply_op(op, &[])
+}
+
+
+/// Creates a constant tensor.
+#[inline]
+pub fn range(start: usize, end: usize, step: usize) -> Tensor
+{
+    let op = generator_ops::Range {
+        start: start as f32,
+        end: end as f32,
+        step: step as f32,
     };
     apply_op(op, &[])
 }

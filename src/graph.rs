@@ -22,7 +22,7 @@ use tensor::{RawTensor, Tensor};
 /// let mut graph = ag::Graph::new();
 ///
 /// let ref a = graph.placeholder();
-/// let ref b = graph.ones(&[2]);
+/// let ref b = ag::ones(&[2]);
 /// let ref v = graph.variable(ndarray::arr1(&[2., 2.]));
 /// let ref z = a + b + v;
 ///
@@ -151,22 +151,6 @@ impl Graph {
     }
 
 
-    #[inline]
-    /// Returns zeros with given shape
-    pub fn zeros(&mut self, shape: &[usize]) -> Tensor
-    {
-        gen_source_op(::ndarray_ext::zeros(shape), "Constant", self)
-    }
-
-
-    #[inline]
-    /// Returns ones with given shape
-    pub fn ones(&mut self, shape: &[usize]) -> Tensor
-    {
-        gen_source_op(::ndarray_ext::ones(shape), "Constant", self)
-    }
-
-
     /// Creates a constant tensor.
     ///
     /// # Examples
@@ -185,28 +169,12 @@ impl Graph {
     where
         T: ndarray::Dimension,
     {
-        gen_source_op(arr.into_dyn(), "Constant", self)
+        let t = Tensor(Rc::new(RawTensor {
+            op: Box::new(dummy_op::DummyOp { name: "Constant".to_string() }),
+            inputs: vec![],
+            top_rank: 0,
+        }));
+        self.variables.insert(t.clone(), arr.into_dyn());
+        t
     }
-
-
-    /// Creates a constant tensor.
-    #[inline]
-    pub fn range(&mut self, start: usize, end: usize, step: usize) -> Tensor
-    {
-        let arr = ndarray::Array1::range(start as f32, end as f32, step as f32);
-        gen_source_op(arr.into_dyn(), "Constant", self)
-    }
-}
-
-#[inline]
-// helper
-fn gen_source_op(arr: NdArray, name: &str, g: &mut Graph) -> Tensor
-{
-    let t = Tensor(Rc::new(RawTensor {
-        op: Box::new(dummy_op::DummyOp { name: name.to_string() }),
-        inputs: vec![],
-        top_rank: 0,
-    }));
-    g.variables.insert(t.clone(), arr);
-    t
 }
