@@ -1,10 +1,13 @@
 extern crate ndarray;
 extern crate rand;
+extern crate fnv;
 
+use self::fnv::FnvHashMap;
 use graph;
 use ndarray_ext::NdArray;
 use sgd;
 use std::mem;
+use tensor;
 use tensor::Tensor;
 
 
@@ -23,7 +26,7 @@ pub fn gradient_check(
 {
     // back prop
     let gradients = gradients.iter().map(|a| a).collect::<Vec<_>>();
-    let theoretical_grads = graph.eval_keep_feeds(gradients.as_slice());
+    let theoretical_grads = eval_keep_feeds(&graph, gradients.as_slice());
 
     // for each variable nodes
     for (v, th_grad) in variables.iter().zip(theoretical_grads) {
@@ -46,7 +49,7 @@ pub fn gradient_check(
             }
 
             // eval
-            let ref obj_pos = graph.eval_keep_feeds(&[objective])[0];
+            let ref obj_pos = eval_keep_feeds(&graph, &[objective])[0];
 
             // perturbation (-)
             unsafe {
@@ -54,7 +57,7 @@ pub fn gradient_check(
             }
 
             // eval
-            let ref obj_neg = graph.eval_keep_feeds(&[objective])[0];
+            let ref obj_neg = eval_keep_feeds(&graph, &[objective])[0];
 
             // restore
             unsafe {
@@ -76,6 +79,32 @@ pub fn gradient_check(
         }
     }
 }
+
+#[allow(mutable_transmutes)]
+/// Almost same as `graph.eval`, but feeds remains after calling this.
+fn eval_keep_feeds(graph: &graph::Graph, xs: &[&Tensor])
+    -> Vec<ndarray::Array<f32, ndarray::IxDyn>>
+{
+    let xs = xs.into_iter().map(|a| (*a).clone()).collect::<Vec<_>>();
+
+    let mut memo = unsafe { mem::replace(mem::transmute(&graph.outputs), FnvHashMap::default()) };
+
+    type M = FnvHashMap<Tensor, NdArray>;
+    let ret = tensor::eval_tensors(
+        xs.as_slice(),
+        unsafe { &mut mem::transmute::<&M, &mut M>(&graph.variables) },
+        &mut memo,
+    );
+
+    // Drain except for placeholder nodes and its feeds
+    let mut memo = memo.into_iter()
+        .filter(|&(ref k, _)| k.op.name() == "Placeholder")
+        .collect::<FnvHashMap<Tensor, NdArray>>();
+
+    mem::swap(&mut memo, unsafe { mem::transmute(&graph.outputs) });
+    ret
+}
+
 
 #[doc(hidden)]
 #[macro_export]

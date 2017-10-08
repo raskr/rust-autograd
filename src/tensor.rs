@@ -17,7 +17,7 @@ use std::rc::Rc;
 pub struct Tensor(pub Rc<RawTensor>);
 
 pub struct RawTensor {
-    /// Operation of this node
+    /// Operation created this node
     pub op: Box<ops::Op>,
 
     /// References to immediate predecessors.
@@ -163,7 +163,7 @@ pub fn eval_tensors(
 {
     // run graph
     for t in tensors.iter() {
-        ::topology::perform_eval(t, variables, memo, true);
+        ::topology::perform_eval(t, variables, memo, true, 0);
     }
 
     // extracts target arrays

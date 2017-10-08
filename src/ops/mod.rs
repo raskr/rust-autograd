@@ -469,7 +469,9 @@ pub fn identity(a: &Tensor) -> Tensor
 
 
 #[inline]
-/// Adds two tensors
+/// Element-wise addition
+///
+/// You can use `+` operator instead.
 pub fn add(a: &Tensor, b: &Tensor) -> Tensor
 {
     apply_op(binary_ops::AddOp, &[a, b])
@@ -477,7 +479,9 @@ pub fn add(a: &Tensor, b: &Tensor) -> Tensor
 
 
 #[inline]
-/// Subtracts `a` from `b`
+/// Element-wise subtraction
+///
+/// You can use `-` operator instead.
 pub fn sub(a: &Tensor, b: &Tensor) -> Tensor
 {
     apply_op(binary_ops::SubOp, &[a, b])
@@ -485,7 +489,9 @@ pub fn sub(a: &Tensor, b: &Tensor) -> Tensor
 
 
 #[inline]
-/// Multiplies two tensors
+/// Element-wise multiplication
+///
+/// You can use `*` operator instead.
 pub fn mul(a: &Tensor, b: &Tensor) -> Tensor
 {
     apply_op(binary_ops::MulOp, &[a, b])
@@ -493,10 +499,44 @@ pub fn mul(a: &Tensor, b: &Tensor) -> Tensor
 
 
 #[inline]
-/// Divides `a` with `b`
+/// Element-wise division
+///
+/// You can use `/` operator instead.
 pub fn div(a: &Tensor, b: &Tensor) -> Tensor
 {
     apply_op(binary_ops::DivOp, &[a, b])
+}
+
+
+#[inline]
+/// Inplace addition
+///
+/// Returns a symbolic tensor for `a` after performing `a += b`
+/// You can not use `a` after calling this function.
+///
+/// # Panics
+/// When `a` is from `graph#constant` or `graph#variable`.
+pub fn add_inplace(a: Tensor, b: &Tensor) -> Tensor
+{
+    let a_name = a.op.name();
+    assert!(a_name != "Constant" && a_name != "Variable");
+    apply_op(binary_ops::InplaceAddOp, &[&a, b])
+}
+
+
+#[inline]
+/// Inplace subtraction
+///
+/// Returns a symbolic tensor for `a` after performing `a -= b`
+/// You can not use `a` after calling this function.
+///
+/// # Panics
+/// When `a` is from `graph#constant` or `graph#variable`.
+pub fn sub_inplace(a: Tensor, b: &Tensor) -> Tensor
+{
+    let a_name = a.op.name();
+    assert!(a_name != "Constant" && a_name != "Variable");
+    apply_op(binary_ops::InplaceSubOp, &[&a, b])
 }
 
 

@@ -4,7 +4,6 @@ extern crate fnv;
 use graph::Graph;
 use ndarray_ext;
 use ndarray_ext::NdArray;
-use std::mem;
 use tensor;
 use tensor::Tensor;
 
@@ -18,13 +17,10 @@ pub fn apply_gradients<T: optimizers::Optimizer>(
     graph: &mut Graph,
 )
 {
-    assert!(variables.len() == gradients.len());
-    let mut memo =
-        mem::replace(&mut graph.memo, None).expect("Don't touch \"Graph.memo\" property");
+    assert_eq!(variables.len(), gradients.len());
     // run graph and get gradient arrays
-    let mut grad_arrays = tensor::eval_tensors(gradients, &mut graph.variables, &mut memo);
-    memo.clear();
-    mem::swap(&mut Some(memo), &mut graph.memo);
+    let mut grad_arrays = tensor::eval_tensors(gradients, &mut graph.variables, &mut graph.outputs);
+    graph.outputs.clear();
     for v in variables {
         // safe unwrap
         assert_eq!(v.op.name(), "Variable", "Can't optimize non-variable");
@@ -58,8 +54,9 @@ pub fn maybe_reduce_grad(mut grad: NdArray, var_shape: &[usize]) -> NdArray
 
 
 pub mod optimizers {
+    extern crate fnv;
     use ndarray_ext::NdArray;
-    use std::collections::hash_map::HashMap;
+    use self::fnv::FnvHashMap;
     use tensor::Tensor;
 
     /// Trait for any stochastic gradient descent optimizer
@@ -96,7 +93,7 @@ pub mod optimizers {
         pub b1: f32,
         pub b2: f32,
         // dynamic params
-        pub states: HashMap<Tensor, AdamState>,
+        pub states: FnvHashMap<Tensor, AdamState>,
     }
 
     pub struct AdamState {
@@ -113,7 +110,7 @@ pub mod optimizers {
                 eps: 1e-08,
                 b1: 0.9,
                 b2: 0.999,
-                states: HashMap::new(),
+                states: FnvHashMap::default(),
             }
         }
     }

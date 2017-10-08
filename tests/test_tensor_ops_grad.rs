@@ -376,12 +376,22 @@ fn reshape_after_transpose()
 fn add_inplace()
 {
     let mut graph = ag::Graph::new();
-    let mut a = graph.variable(ag::ndarray_ext::standard_normal(&[2, 2]));
-    let b = graph.variable(ag::ndarray_ext::standard_normal(&[2, 2]));
-    a += b;
-    graph.eval(&[&a]);
-//    let ref g = ag::gradients(&[a], &[&b], &[Some(&graph.ones(&[2, 2]))]);
-//    ag::test_helper::gradient_check(a, g.as_slice(), &[&b], graph, 1e-3, 1e-3);
+    let a = graph.zeros(&[2, 2]) + graph.ones(&[2, 2]);
+    let ref b = graph.variable(ag::ndarray_ext::standard_normal(&[2, 2]));
+    let ref c = ag::add_inplace(a, b);
+    let ref g = ag::gradients(&[c], &[b], &[Some(&graph.ones(&[2, 2]))]);
+    ag::test_helper::gradient_check(c, g.as_slice(), &[b], graph, 1e-3, 1e-3);
+}
+
+#[test]
+fn sub_inplace()
+{
+    let mut graph = ag::Graph::new();
+    let a = graph.zeros(&[2, 2]) + graph.ones(&[2, 2]);
+    let ref b = graph.variable(ag::ndarray_ext::standard_normal(&[2, 2]));
+    let ref c = ag::sub_inplace(a, b);
+    let ref g = ag::gradients(&[c], &[b], &[Some(&graph.ones(&[2, 2]))]);
+    ag::test_helper::gradient_check(c, g.as_slice(), &[b], graph, 1e-3, 1e-3);
 }
 
 #[test]

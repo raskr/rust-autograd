@@ -19,6 +19,7 @@ pub fn perform_eval(
     vars: &mut FnvHashMap<Tensor, NdArray>,
     memo: &mut FnvHashMap<Tensor, NdArray>,
     train: bool,
+    mut count: usize,  // for debug
 )
 {
     if vars.contains_key(target) || memo.contains_key(target) {
@@ -30,7 +31,7 @@ pub fn perform_eval(
     // integrating loops below is impossible because of
     // "memo is already mutably borrowed"
     for x in inputs.iter() {
-        perform_eval(x, vars, memo, train);
+        perform_eval(x, vars, memo, train, count);
     }
 
     let y = {
@@ -47,14 +48,22 @@ pub fn perform_eval(
         if target.op.inplace() {
             let mut xs: Vec<&mut NdArray> = unsafe { mem::transmute(xs) };
             target.op.compute_inplace(xs.as_mut_slice(), train);
-            return;
+            None
         } else {
-            target.op.compute(xs.as_slice(), train)
+            Some(target.op.compute(xs.as_slice(), train))
         }
     };
 
     // cache output
-    memo.insert(target.clone(), y);
+    if let Some(a) = y {
+        memo.insert(target.clone(), a);
+    } else {
+        // desired array is always in `memo`
+        // because inplace ops don't accept variable/constant.
+        let y = memo.remove(&target.inputs[0]);
+        // safe unwrap
+        memo.insert(target.clone(), y.unwrap());
+    }
 }
 
 

@@ -4,7 +4,6 @@ extern crate ndarray;
 use self::fnv::FnvHashMap;
 use ndarray_ext::NdArray;
 use ops::dummy_op;
-use std::mem;
 use std::rc::Rc;
 use tensor;
 use tensor::{RawTensor, Tensor};
@@ -35,7 +34,7 @@ use tensor::{RawTensor, Tensor};
 /// ```
 pub struct Graph {
     pub variables: FnvHashMap<Tensor, NdArray>,
-    pub memo: Option<FnvHashMap<Tensor, NdArray>>,
+    pub outputs: FnvHashMap<Tensor, NdArray>,
 }
 
 impl Graph {
@@ -43,7 +42,7 @@ impl Graph {
     {
         Graph {
             variables: FnvHashMap::default(),
-            memo: Some(FnvHashMap::default()),
+            outputs: FnvHashMap::default(),
         }
     }
 
@@ -56,14 +55,9 @@ impl Graph {
                 placeholder.op.name()
             )
         }
-        self.memo
-            .as_mut()
-            .expect("Don't touch \"Graph.memo\" property")
-            .insert(placeholder.clone(), arr.into_dyn());
+        self.outputs.insert(placeholder.clone(), arr.into_dyn());
     }
 
-    // FIXME: test_helper::gradient_check forces "&self"
-    #[allow(mutable_transmutes)]
     /// Evaluates input symbolic tensors.
     ///
     /// # Examples
@@ -85,49 +79,8 @@ impl Graph {
     pub fn eval(&mut self, xs: &[&Tensor]) -> Vec<ndarray::Array<f32, ndarray::IxDyn>>
     {
         let xs = xs.into_iter().map(|a| (*a).clone()).collect::<Vec<_>>();
-
-        let mut memo = self.memo.as_mut().unwrap();
-
-        let ret = tensor::eval_tensors(
-            xs.as_slice(),
-            &mut self.variables,
-            &mut memo,
-        );
-        // clear all outputs (including feeds)
-        memo.clear();
-
-        ret
-    }
-
-    // FIXME: test_helper::gradient_check forces "&self"
-    #[allow(mutable_transmutes)]
-    /// Almost same as `graph.eval`, but feeds remains after calling this.
-    pub fn eval_keep_feeds(&self, xs: &[&Tensor]) -> Vec<ndarray::Array<f32, ndarray::IxDyn>>
-    {
-        let xs = xs.into_iter().map(|a| (*a).clone()).collect::<Vec<_>>();
-
-        type M = FnvHashMap<Tensor, NdArray>;
-        let mut memo: M = unsafe {
-            mem::replace(
-                mem::transmute::<&Option<M>, &mut Option<M>>(&self.memo),
-                None,
-            ).expect("Don't touch \"Graph.memo\" property")
-        };
-
-        let ret = tensor::eval_tensors(
-            xs.as_slice(),
-            unsafe { &mut mem::transmute::<&M, &mut M>(&self.variables) },
-            &mut memo
-        );
-
-        // Drain except for placeholder nodes and its feeds
-        let memo = memo.into_iter()
-            .filter(|&(ref k, _)| k.op.name() == "Placeholder")
-            .collect::<M>();
-
-        mem::swap(&mut Some(memo), unsafe {
-            mem::transmute::<&Option<M>, &mut Option<M>>(&self.memo)
-        });
+        let ret = tensor::eval_tensors(xs.as_slice(), &mut self.variables, &mut self.outputs);
+        self.outputs.clear();
         ret
     }
 
