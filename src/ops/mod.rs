@@ -1229,7 +1229,7 @@ pub fn matmul_t(a: &Tensor, b: &Tensor, transpose_a: bool, transpose_b: bool) ->
 /// ```
 ///
 /// For detailed description,
-/// see see https://docs.scipy.org/doc/numpy/reference/generated/numpy.tensordot.html.
+/// see https://docs.scipy.org/doc/numpy/reference/generated/numpy.tensordot.html.
 pub fn tensordot(
     a: &Tensor,
     b: &Tensor,
@@ -1634,7 +1634,7 @@ pub fn ones(shape: &[usize]) -> Tensor
 }
 
 
-/// Creates a constant tensor.
+/// Returns range
 #[inline]
 pub fn range(start: usize, end: usize, step: usize) -> Tensor
 {
