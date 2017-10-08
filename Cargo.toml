@@ -1,6 +1,6 @@
 [package]
 name = "autograd"
-version = "0.4.6"
+version = "0.4.7"
 authors = ["perrier1034 <janne.dc.ib.sa@gmail.com>"]
 
 repository = "https://github.com/perrier1034/rust-autograd"

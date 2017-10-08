@@ -29,7 +29,7 @@ pub struct RawTensor {
 
 
 impl Tensor {
-    #[doc(hide)]
+    #[doc(hidden)]
     #[inline]
     /// Returns true if this node has no incoming nodes.
     pub fn is_source(&self) -> bool
@@ -37,7 +37,7 @@ impl Tensor {
         self.inputs.is_empty()
     }
 
-    #[doc(hide)]
+    #[doc(hidden)]
     #[inline]
     pub fn visit_once<F>(&self, f: &mut F)
     where
@@ -64,7 +64,7 @@ impl Tensor {
         }
     }
 
-    #[doc(hide)]
+    #[doc(hidden)]
     #[inline]
     pub fn visit<F>(&self, f: &mut F)
     where

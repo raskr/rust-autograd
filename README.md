@@ -76,7 +76,7 @@ for epoch in 0..max_epoch {
 }
 
 ```
-Available operations in rust-autograd are listed [here](https://docs.rs/autograd/0.4.6/autograd/ops/index.html)
+Available operations in rust-autograd are listed [here](https://docs.rs/autograd/0.4.7/autograd/ops/index.html)
 
 For more, see 
 [examples](https://github.com/perrier1034/rust-autograd/tree/master/examples) or

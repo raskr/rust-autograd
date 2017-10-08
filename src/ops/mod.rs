@@ -5,6 +5,7 @@ use ndarray_ext::NdArray;
 use std::rc::Rc;
 use tensor::{RawTensor, Tensor};
 
+#[doc(hidden)]
 pub mod dummy_op;
 mod generator_ops;
 mod scalar;
