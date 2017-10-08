@@ -1494,6 +1494,58 @@ pub fn gather(param: &Tensor, indices: &Tensor, axis: isize) -> Tensor
 
 
 #[inline]
+/// Normalizes input tensor along specified axis.
+///
+/// # Examples
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let mut graph = ag::Graph::new();
+/// let ref x = ag::standard_normal(&[3, 4]);
+/// let ref y1 = ag::normalize(x, 0);
+/// let ref y2 = ag::normalize(x, 1);
+///
+/// assert_eq!(graph.eval(&[y1])[0].shape(), &[3, 4]);
+/// assert_eq!(graph.eval(&[y2])[0].shape(), &[3, 4]);
+/// ```
+pub fn normalize(x: &Tensor, axis: isize) -> Tensor
+{
+    let ref mean = reduce_mean(x, axis, true);
+    let ref centered = x - mean;
+    let ref variance = reduce_mean(&(centered * centered), axis, true);
+    (x - mean) / sqrt(&(variance + 1e-5))
+}
+
+
+#[inline]
+/// Applies batch normalization.
+///
+/// `gamma` and `beta` should be shared variables.
+/// Since normalization is performed along 1st axis of `x`,
+/// both of them should have shape `(1, x.shape[1])`
+///
+/// # Examples
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let mut graph = ag::Graph::new();
+/// let ref x = ag::standard_normal(&[3, 4]);
+/// let ref gamma = graph.variable(ag::ndarray_ext::ones(&[1, 4]));
+/// let ref beta = graph.variable(ag::ndarray_ext::zeros(&[1, 4]));
+/// let ref norm = ag::batch_norm(x, gamma, beta);
+/// assert_eq!(graph.eval(&[norm])[0].shape(), &[3, 4]);
+/// ```
+pub fn batch_norm(x: &Tensor, beta: &Tensor, gamma: &Tensor) -> Tensor
+{
+    gamma * normalize(x, 0) + beta
+}
+
+
+#[inline]
 /// Applies recurrent net unit to the input.
 ///
 /// This func processes a time step in the batch of sequences in parallel.
