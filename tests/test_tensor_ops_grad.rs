@@ -342,21 +342,22 @@ fn reduce_prod()
 }
 
 #[test]
-fn reverse_axes()
-{
-    let mut graph = ag::Graph::new();
-    let ref v = graph.constant(ag::ndarray_ext::zeros(&[2, 3, 4, 5]));
-    let ref z = ag::reverse_axes(v);
-    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[5, 4, 3, 2]))]);
-    ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
-}
-
-#[test]
 fn transpose()
 {
     let mut graph = ag::Graph::new();
     let ref v = graph.constant(ag::ndarray_ext::zeros(&[1, 2, 3, 4, 5]));
     let ref z = ag::transpose(v, &[4, 2, 3, 0, 1]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[5, 3, 4, 1, 2]))]);
+    ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
+}
+
+#[test]
+fn transpose_dynamic()
+{
+    let mut graph = ag::Graph::new();
+    let ref v = graph.variable(ag::ndarray_ext::standard_normal(&[1, 2, 3, 4, 5]));
+    let ref perm = graph.constant(ndarray::arr1(&[4., 2., 3., 0., 1.]));
+    let ref z = ag::transpose_dynamic(v, perm);
     let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[5, 3, 4, 1, 2]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }

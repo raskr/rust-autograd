@@ -8,6 +8,7 @@ use tensor::{RawTensor, Tensor};
 #[doc(hidden)]
 pub mod dummy_op;
 mod generator_ops;
+mod transpose_ops;
 mod scalar;
 mod setdiff1d;
 mod shape_ops;
@@ -36,8 +37,6 @@ mod sparse_softmax_cross_entropy;
 mod gather;
 mod matmul;
 mod batch_matmul;
-mod reverse_axes;
-mod transpose;
 mod reshape;
 mod reduction_ops;
 mod squeeze;
@@ -103,6 +102,7 @@ impl Tensor {
     /// let mut graph = ag::Graph::new();
     /// let ref a = graph.variable(ndarray::arr2(&[[2., 3.], [4., 5.]]));
     /// let ref b = a.get(2);
+    ///
     /// assert_eq!(graph.eval(&[b])[0][0], 4.);
     /// ```
     pub fn get(&self, idx: isize) -> Tensor
@@ -311,6 +311,7 @@ pub fn stop_gradients(x: &Tensor) -> Tensor
 /// let ref s = ag::shape(x);
 ///
 /// graph.feed(x, ag::ndarray_ext::zeros(&[2, 3]));
+///
 /// assert_eq!(&[2., 3.], graph.eval(&[s])[0].as_slice().unwrap());
 /// ```
 pub fn shape(x: &Tensor) -> Tensor
@@ -335,6 +336,7 @@ pub fn shape(x: &Tensor) -> Tensor
 /// let ref d = ag::size(b);
 ///
 /// graph.feed(a, ag::ndarray_ext::zeros(&[2, 3]));
+///
 /// assert_eq!(6., graph.eval(&[c])[0][0]);
 /// assert_eq!(12., graph.eval(&[d])[0][0]);
 /// ```
@@ -358,6 +360,7 @@ pub fn size(x: &Tensor) -> Tensor
 /// let ref r = ag::rank(x);
 ///
 /// graph.feed(x, ag::ndarray_ext::zeros(&[2, 3]));
+///
 /// assert_eq!(2., graph.eval(&[r])[0][0]);
 /// ```
 pub fn rank(x: &Tensor) -> Tensor
@@ -531,6 +534,7 @@ pub fn div(a: &Tensor, b: &Tensor) -> Tensor
 /// let a = ag::zeros(&[2, 2]) + ag::ones(&[2, 2]);
 /// let ref b = ag::ones(&[2, 2]);
 /// let ref c = ag::add_inplace(a, b);
+///
 /// assert_eq!(graph.eval(&[c])[0], ndarray::arr2(&[[2., 2.], [2., 2.]]).into_dyn());
 /// ```
 pub fn add_inplace(a: Tensor, b: &Tensor) -> Tensor
@@ -562,6 +566,7 @@ pub fn add_inplace(a: Tensor, b: &Tensor) -> Tensor
 /// let a = ag::zeros(&[2, 2]) + ag::ones(&[2, 2]);
 /// let ref b = ag::ones(&[2, 2]);
 /// let ref c = ag::sub_inplace(a, b);
+///
 /// assert_eq!(graph.eval(&[c])[0], ndarray::arr2(&[[0., 0.], [0., 0.]]).into_dyn());
 /// ```
 pub fn sub_inplace(a: Tensor, b: &Tensor) -> Tensor
@@ -620,6 +625,7 @@ pub fn exp(x: &Tensor) -> Tensor
 /// let ref b = ag::ones(&[2, 2]);
 /// let ref c = ag::ones(&[2, 2]);
 /// let ref d = ag::add_n(&[a, b, c]);
+///
 /// assert_eq!(graph.eval(&[d])[0].shape(), &[2, 2]);
 /// assert_eq!(graph.eval(&[d])[0], ndarray::arr2(&[[3., 3.], [3., 3.]]).into_dyn());
 /// ```
@@ -647,6 +653,7 @@ pub fn add_n(xs: &[&Tensor]) -> Tensor
 /// let ref a = graph.constant(ndarray::arr1(&[1., 2., 3.]));
 /// let ref b = graph.constant(ndarray::arr1(&[3., 2., 1.]));
 /// let ref c = ag::equals(a, b);
+///
 /// assert_eq!(graph.eval(&[c])[0], ndarray::arr1(&[0., 1., 0.]).into_dyn());
 /// ```
 pub fn equals(a: &Tensor, b: &Tensor) -> Tensor
@@ -671,6 +678,7 @@ pub fn equals(a: &Tensor, b: &Tensor) -> Tensor
 /// let answer = ndarray::arr1(&[1., 1., 0.]).into_dyn();
 /// let ref input = graph.constant(input_arr);
 /// let ref result = ag::argmax(&input, 1, false);
+///
 /// assert_eq!(graph.eval(&[result])[0], answer);
 /// ```
 pub fn argmax(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
@@ -696,6 +704,7 @@ pub fn argmax(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 /// let mut graph = ag::Graph::new();
 /// let ref a = graph.constant(ag::ndarray_ext::standard_normal(&[3]));
 /// let ref b = ag::expand_dims(a, &[0, 2]);
+///
 /// assert_eq!(graph.eval(&[b])[0].shape(), &[1, 3, 1]);
 /// ```
 pub fn expand_dims(x: &Tensor, axes: &[isize]) -> Tensor
@@ -719,6 +728,7 @@ pub fn expand_dims(x: &Tensor, axes: &[isize]) -> Tensor
 /// let mut graph = ag::Graph::new();
 /// let ref a = graph.constant(ag::ndarray_ext::standard_normal(&[1, 3, 1]));
 /// let ref b = ag::squeeze(a, &[0, 2]);
+///
 /// assert_eq!(graph.eval(&[b])[0].shape(), &[3]);
 /// ```
 pub fn squeeze(x: &Tensor, axes: &[isize]) -> Tensor
@@ -744,6 +754,7 @@ pub fn squeeze(x: &Tensor, axes: &[isize]) -> Tensor
 /// let mut graph = ag::Graph::new();
 /// let ref x = graph.constant(ndarray::arr2(&[[2., 2.], [3., 3.]]));
 /// let ref y = ag::tile(x, 0, 2);
+///
 /// assert_eq!(
 ///     graph.eval(&[y])[0],
 ///     ndarray::arr2(&[[2., 2.], [3., 3.], [2., 2.], [3., 3.]]).into_dyn()
@@ -771,6 +782,7 @@ pub fn tile(x: &Tensor, axis: isize, num: usize) -> Tensor
 /// let mut graph = ag::Graph::new();
 /// let ref x = graph.constant(ndarray::arr1(&[2., 4., 6.]));
 /// let ref y = ag::clip(x, 3., 5.);
+///
 /// assert_eq!(graph.eval(&[y])[0], ndarray::arr1(&[3., 4., 5.]).into_dyn());
 /// ```
 pub fn clip(x: &Tensor, min: f32, max: f32) -> Tensor
@@ -794,6 +806,7 @@ pub fn clip(x: &Tensor, min: f32, max: f32) -> Tensor
 /// let mut graph = ag::Graph::new();
 /// let ref x = graph.constant(ndarray::arr2(&[[2., 4.], [3., 1.]]));
 /// let ref y = ag::reduce_max(&x, 0, false);
+///
 /// assert_eq!(graph.eval(&[y])[0], ndarray::arr1(&[3., 4.]).into_dyn());
 /// ```
 pub fn reduce_max(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
@@ -820,6 +833,7 @@ pub fn reduce_max(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 /// let mut graph = ag::Graph::new();
 /// let ref x = graph.constant(ndarray::arr2(&[[2., 4.], [3., 1.]]));
 /// let ref y = ag::reduce_min(&x, 0, false);
+///
 /// assert_eq!(graph.eval(&[y])[0], ndarray::arr1(&[2., 1.]).into_dyn());
 /// ```
 pub fn reduce_min(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
@@ -846,6 +860,7 @@ pub fn reduce_min(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 /// let mut graph = ag::Graph::new();
 /// let ref x = graph.constant(ndarray::arr2(&[[2., 4.], [3., 1.]]));
 /// let ref y = ag::reduce_mean(x, 1, false);
+///
 /// assert_eq!(graph.eval(&[y])[0], ndarray::arr1(&[3., 2.]).into_dyn());
 /// ```
 pub fn reduce_mean(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
@@ -872,6 +887,7 @@ pub fn reduce_mean(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 /// let mut graph = ag::Graph::new();
 /// let ref x = graph.constant(ndarray::arr2(&[[2., 4.], [3., 1.]]));
 /// let ref y = ag::reduce_sum(&x, 1, false);
+///
 /// assert_eq!(graph.eval(&[y])[0], ndarray::arr1(&[6., 4.]).into_dyn());
 /// ```
 pub fn reduce_sum(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
@@ -898,6 +914,7 @@ pub fn reduce_sum(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 /// let mut graph = ag::Graph::new();
 /// let ref x = graph.constant(ndarray::arr2(&[[2., 4.], [3., 1.]]));
 /// let ref y = ag::reduce_prod(&x, 1, false);
+///
 /// assert_eq!(graph.eval(&[y])[0], ndarray::arr1(&[8., 3.]).into_dyn());
 /// ```
 pub fn reduce_prod(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
@@ -924,6 +941,7 @@ pub fn reduce_prod(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 /// let mut graph = ag::Graph::new();
 /// let ref x = ag::zeros(&[3, 2, 2]);
 /// let ref y = ag::reshape(&x, &[3, 4]);
+///
 /// assert_eq!(graph.eval(&[y])[0], ag::ndarray_ext::zeros(&[3, 4]));
 /// ```
 pub fn reshape(x: &Tensor, shape: &[isize]) -> Tensor
@@ -959,6 +977,7 @@ pub fn reshape(x: &Tensor, shape: &[isize]) -> Tensor
 /// let mut graph = ag::Graph::new();
 /// let ref x = ag::zeros(&[3, 2, 2]);
 /// let ref z = ag::flatten(x);
+///
 /// assert_eq!(graph.eval(&[z])[0].shape(), &[12]);
 /// ```
 pub fn flatten(x: &Tensor) -> Tensor
@@ -997,26 +1016,6 @@ pub fn lesser(x: &Tensor, a: f32) -> Tensor
 pub fn lesser_equal(x: &Tensor, a: f32) -> Tensor
 {
     apply_op(cmp_ops::LesserEqual { a: a }, &[x])
-}
-
-
-#[inline]
-/// Reverses axes of the input tensor.
-///
-/// # Examples
-///
-/// ```
-/// extern crate ndarray;
-/// extern crate autograd as ag;
-///
-/// let mut graph = ag::Graph::new();
-/// let ref a = graph.constant(ag::ndarray_ext::zeros(&[2, 3, 4, 5]));
-/// let ref b = ag::reverse_axes(a);
-/// assert_eq!(graph.eval(&[b])[0].shape(), &[5, 4, 3, 2]);
-/// ```
-pub fn reverse_axes(x: &Tensor) -> Tensor
-{
-    apply_op(reverse_axes::ReverseAxes, &[x])
 }
 
 
@@ -1155,6 +1154,7 @@ pub fn sparse_softmax_cross_entropy(y: &Tensor, t: &Tensor) -> Tensor
 /// let ref a = ag::zeros(&[4, 2]);
 /// let ref b = ag::zeros(&[2, 3]);
 /// let ref c = ag::matmul(a, b);
+///
 /// assert_eq!(graph.eval(&[c])[0].shape(), &[4, 3]);
 /// ```
 pub fn matmul(a: &Tensor, b: &Tensor) -> Tensor
@@ -1184,6 +1184,7 @@ pub fn matmul(a: &Tensor, b: &Tensor) -> Tensor
 /// let ref a = ag::zeros(&[2, 4]);
 /// let ref b = ag::zeros(&[2, 3]);
 /// let ref c = ag::matmul_t(a, b, true, false);
+///
 /// assert_eq!(graph.eval(&[c])[0].shape(), &[4, 3]);
 /// ```
 pub fn matmul_t(a: &Tensor, b: &Tensor, transpose_a: bool, transpose_b: bool) -> Tensor
@@ -1306,6 +1307,7 @@ pub fn tensordot(
 /// let ref a = ag::zeros(&[2, 3, 4, 2]);
 /// let ref b = ag::zeros(&[2, 3, 2, 3]);
 /// let ref c = ag::batch_matmul(a, b);
+///
 /// assert_eq!(graph.eval(&[c])[0].shape(), &[2, 3, 4, 3]);
 /// ```
 ///
@@ -1334,6 +1336,7 @@ pub fn batch_matmul(a: &Tensor, b: &Tensor) -> Tensor
 /// let ref a = graph.constant(ndarray::arr1(&[4., 1., 5., 2., 3., 6.]));
 /// let ref b = graph.constant(ndarray::arr2(&[[2., 3.], [1., 4.]]));
 /// let ref c = ag::setdiff1d(a, b);
+///
 /// assert_eq!(graph.eval(&[c])[0].as_slice().unwrap(), &[5., 6.])
 /// ```
 ///
@@ -1347,6 +1350,8 @@ pub fn setdiff1d(a: &Tensor, b: &Tensor) -> Tensor
 #[inline]
 /// Permutes dimensions.
 ///
+/// If `perm.len() == 0`, simply reverses axes of `x`.
+///
 /// # Examples
 ///
 /// ```
@@ -1355,13 +1360,45 @@ pub fn setdiff1d(a: &Tensor, b: &Tensor) -> Tensor
 /// let mut graph = ag::Graph::new();
 /// let ref a = ag::zeros(&[1, 2, 3, 4, 5]);
 /// let ref b = ag::transpose(a, &[4, 2, 3, 0, 1]);
+/// let ref c = ag::transpose(a, &[]);
+///
 /// assert_eq!(graph.eval(&[b])[0].shape(), &[5, 3, 4, 1, 2]);
+/// assert_eq!(graph.eval(&[c])[0].shape(), &[5, 4, 3, 2, 1]);
 /// ```
 pub fn transpose(x: &Tensor, perm: &[usize]) -> Tensor
 {
-    let src_dst = perm.iter().cloned().zip(0..perm.len()).collect::<Vec<_>>();
-    let op = transpose::Transpose { src_dst_sorted: src_dst };
-    apply_op(op, &[x])
+    if perm.is_empty() {
+        apply_op(transpose_ops::ReverseAxes, &[x])
+    } else {
+        let src_dst = perm.iter().cloned().zip(0..perm.len()).collect::<Vec<_>>();
+        let op = transpose_ops::TransposeStatic { src_dst_sorted: src_dst };
+        apply_op(op, &[x])
+    }
+}
+
+
+#[inline]
+/// Permutes dimensions.
+///
+/// Similar to `transpose`, but `perm` is a symbolic tensor.
+///
+/// # Examples
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let mut graph = ag::Graph::new();
+/// let ref a = ag::zeros(&[1, 2, 3, 4, 5]);
+/// let ref perm = graph.constant(ndarray::arr1(&[4., 2., 3., 0., 1.]));
+/// let ref b = ag::transpose_dynamic(a, perm);
+///
+/// assert_eq!(graph.eval(&[b])[0].shape(), &[5, 3, 4, 1, 2]);
+/// ```
+pub fn transpose_dynamic(x: &Tensor, perm: &Tensor) -> Tensor
+{
+    let op = transpose_ops::TransposeDynamic { zip: true };
+    apply_op(op, &[x, perm])
 }
 
 
@@ -1380,6 +1417,7 @@ pub fn transpose(x: &Tensor, perm: &[usize]) -> Tensor
 /// let mut graph = ag::Graph::new();
 /// let ref a = ag::zeros(&[3, 7, 5]);
 /// let ref b = ag::split(a, &[2, 3, 2], 1);
+///
 /// assert_eq!(graph.eval(&[&b[0]])[0].shape(), &[3, 2, 5]);
 /// assert_eq!(graph.eval(&[&b[1]])[0].shape(), &[3, 3, 5]);
 /// assert_eq!(graph.eval(&[&b[2]])[0].shape(), &[3, 2, 5]);
@@ -1415,6 +1453,7 @@ pub fn split(x: &Tensor, sizes: &[usize], axis: isize) -> Vec<Tensor>
 /// let mut graph = ag::Graph::new();
 /// let ref a = ag::zeros(&[4, 4]);
 /// let ref b = ag::slice(a, &[0, 0], &[-1, 2]); // numpy equivalent is a[:, 0:2]
+///
 /// assert_eq!(graph.eval(&[b])[0].shape(), &[4, 2]);
 /// ```
 pub fn slice(x: &Tensor, starts: &[isize], ends: &[isize]) -> Tensor
@@ -1449,6 +1488,7 @@ pub fn slice(x: &Tensor, starts: &[isize], ends: &[isize]) -> Tensor
 /// let ref b = ag::zeros(&[3, 2]);
 /// let ref c = ag::zeros(&[3, 2]);
 /// let ref d = ag::concat(&[a, b, c], 0);
+///
 /// assert_eq!(graph.eval(&[d])[0].shape(), &[9, 2]);
 /// ```
 pub fn concat(tensors: &[&Tensor], axis: isize) -> Tensor
@@ -1484,6 +1524,7 @@ pub fn concat(tensors: &[&Tensor], axis: isize) -> Tensor
 /// let ref param = graph.constant(ag::ndarray_ext::zeros(&[5, 4, 8, 2]));
 /// let ref indices = graph.constant(ndarray::arr2(&[[5., 4., 3.], [2., 1., 0.]]));
 /// let ref y = ag::gather(param, indices, 2);
+///
 /// assert_eq!(graph.eval(&[y])[0].shape(), &[5, 4, 2, 3, 2])
 /// ```
 pub fn gather(param: &Tensor, indices: &Tensor, axis: isize) -> Tensor
@@ -1537,6 +1578,7 @@ pub fn normalize(x: &Tensor, axis: isize) -> Tensor
 /// let ref gamma = graph.variable(ag::ndarray_ext::ones(&[1, 4]));
 /// let ref beta = graph.variable(ag::ndarray_ext::zeros(&[1, 4]));
 /// let ref norm = ag::batch_norm(x, gamma, beta);
+///
 /// assert_eq!(graph.eval(&[norm])[0].shape(), &[3, 4]);
 /// ```
 pub fn batch_norm(x: &Tensor, beta: &Tensor, gamma: &Tensor) -> Tensor
