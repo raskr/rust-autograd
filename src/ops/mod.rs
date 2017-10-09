@@ -1680,7 +1680,7 @@ pub fn bernoulli(shape: &[usize], p: f64) -> Tensor
 {
     let op = random_ops::Bernoulli {
         shape: shape.to_vec(),
-        p: p,
+        p,
     };
     apply_op(op, &[])
 }
@@ -1691,7 +1691,7 @@ pub fn random_exp(shape: &[usize], lambda: f64) -> Tensor
 {
     let op = random_ops::Exponential {
         shape: shape.to_vec(),
-        lambda: lambda,
+        lambda,
     };
     apply_op(op, &[])
 }
@@ -1702,8 +1702,8 @@ pub fn gamma(shape: &[usize], shape_param: f64, scale: f64) -> Tensor
 {
     let op = random_ops::Gamma {
         shape: shape.to_vec(),
-        shape_param: shape_param,
-        scale: scale,
+        shape_param,
+        scale,
     };
     apply_op(op, &[])
 }
@@ -1714,9 +1714,35 @@ pub fn log_normal(shape: &[usize], mean: f64, stddev: f64) -> Tensor
 {
     let op = random_ops::LogNormal {
         shape: shape.to_vec(),
-        mean: mean,
-        stddev: stddev,
+        mean,
+        stddev,
     };
+    apply_op(op, &[])
+}
+
+
+#[inline]
+/// Converts rust-ndarray's array object to a `ag::Tensor` object.
+///
+/// If you won't apply inplace ops to this, `Graph#constant` method is preferred
+/// for performance.
+///
+/// # Examples
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let mut graph = ag::Graph::new();
+/// let arr = ndarray::arr1(&[2., 3.]);
+/// let tensor = ag::convert_to_tensor(arr.clone());
+/// assert_eq!(graph.eval(&[&tensor])[0], arr.into_dyn());
+/// ```
+pub fn convert_to_tensor<T>(arr: ndarray::Array<f32, T>) -> Tensor
+where
+    T: ndarray::Dimension,
+{
+    let op = generator_ops::ConvertToTensor { arr: arr.into_dyn() };
     apply_op(op, &[])
 }
 

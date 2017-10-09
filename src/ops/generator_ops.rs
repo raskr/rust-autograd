@@ -20,6 +20,10 @@ pub struct Range {
     pub step: f32,
 }
 
+pub struct ConvertToTensor {
+    pub arr: NdArray,
+}
+
 impl ops::Op for Zeros {
     fn name(&self) -> &str
     {
@@ -33,7 +37,7 @@ impl ops::Op for Zeros {
 
     fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
-        vec![None]
+        vec![]
     }
 }
 
@@ -50,7 +54,7 @@ impl ops::Op for Ones {
 
     fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
-        vec![None]
+        vec![]
     }
 }
 
@@ -67,6 +71,23 @@ impl ops::Op for Range {
 
     fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
-        vec![None]
+        vec![]
+    }
+}
+
+impl ops::Op for ConvertToTensor {
+    fn name(&self) -> &str
+    {
+        "ConvertToTensor"
+    }
+
+    fn compute(&self, _: &[&NdArray], _: bool) -> NdArray
+    {
+        self.arr.clone()
+    }
+
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
+        vec![]
     }
 }
