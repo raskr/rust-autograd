@@ -31,9 +31,7 @@ mod elu;
 mod relu;
 mod split;
 mod slice;
-mod sigmoid_cross_entropy;
-mod softmax_cross_entropy;
-mod sparse_softmax_cross_entropy;
+mod xent_ops;
 mod gather;
 mod matmul;
 mod batch_matmul;
@@ -1119,8 +1117,7 @@ pub fn softmax(x: &Tensor, axis: isize) -> Tensor
 /// Loss tensor with same shape as inputs's shapes
 pub fn sigmoid_cross_entropy(y: &Tensor, t: &Tensor) -> Tensor
 {
-    let op = sigmoid_cross_entropy::SigmoidCrossEntropy;
-    apply_op(op, &[y, t])
+    apply_op(xent_ops::SigmoidCrossEntropy, &[y, t])
 }
 
 
@@ -1138,8 +1135,7 @@ pub fn sigmoid_cross_entropy(y: &Tensor, t: &Tensor) -> Tensor
 /// Loss tensor with shape (batch_size, 1)
 pub fn softmax_cross_entropy(y: &Tensor, t: &Tensor) -> Tensor
 {
-    let op = softmax_cross_entropy::SoftmaxCrossEntropy;
-    apply_op(op, &[y, t])
+    apply_op(xent_ops::SoftmaxCrossEntropy, &[y, t])
 }
 
 
@@ -1157,8 +1153,7 @@ pub fn softmax_cross_entropy(y: &Tensor, t: &Tensor) -> Tensor
 /// Loss tensor with shape (batch_size, 1)
 pub fn sparse_softmax_cross_entropy(y: &Tensor, t: &Tensor) -> Tensor
 {
-    let op = sparse_softmax_cross_entropy::SparseSoftmaxCrossEntropy;
-    apply_op(op, &[y, t])
+    apply_op(xent_ops::SparseSoftmaxCrossEntropy, &[y, t])
 }
 
 
