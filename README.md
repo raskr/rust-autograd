@@ -43,7 +43,7 @@ assert_eq!(4., gg.eval(&mut graph)[0]);
 
 // dz/dx requires to fill the placeholder `x`
 graph.feed(x, ndarray::arr1(&[2.]));
-assert_eq!(8., g2.eval(&mut graph)[0][0]);
+assert_eq!(8., g2.eval(&mut graph)[0]);
 ```
 
 Another example: multi layer perceptron for MNIST.
