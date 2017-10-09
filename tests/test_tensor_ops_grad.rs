@@ -159,8 +159,8 @@ fn tan()
 fn pow()
 {
     let mut graph = ag::Graph::new();
-    let ref v = graph.variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
-    let ref z = ag::pow(v, 1.2);
+    let ref v = graph.variable(ag::ndarray_ext::random_uniform(&[3], 0.9, 1.1));
+    let ref z = ag::pow(v, 1.1);
     let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[3]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }

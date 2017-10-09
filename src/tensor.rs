@@ -10,6 +10,7 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
+use graph;
 
 
 /// Symbolic multi-dimensional array which supports
@@ -29,6 +30,30 @@ pub struct RawTensor {
 
 
 impl Tensor {
+
+    /// Evaluates this tensor as a ndarray's array object.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// extern crate ndarray;
+    /// extern crate autograd as ag;
+    ///
+    ///
+    /// let mut g = ag::Graph::new();
+    ///
+    /// let ref x = g.constant(ag::ndarray_ext::standard_normal(&[4, 2]));
+    /// let ref w = g.variable(ag::ndarray_ext::standard_normal(&[2, 3]));
+    /// let ref b = g.variable(ag::ndarray_ext::zeros(&[1, 3]));
+    /// let ref z = ag::matmul(x, w) + b;
+    ///
+    /// assert_eq!(z.eval(&mut g).shape(), &[4, 3])
+    /// ```
+    pub fn eval(&self, graph: &mut graph::Graph) -> NdArray
+    {
+        graph.eval(&[self]).remove(0)
+    }
+
     #[doc(hidden)]
     #[inline]
     /// Returns true if this node has no incoming nodes.
