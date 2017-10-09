@@ -565,6 +565,17 @@ fn reshape()
 }
 
 #[test]
+fn reshape_dynamic()
+{
+    let mut graph = ag::Graph::new();
+    let ref v = graph.variable(ag::ndarray_ext::standard_normal(&[3, 4]));
+    let ref shape = ag::shape(&ag::zeros(&[3, 2, 2]));
+    let ref z = ag::reshape_dynamic(&v, shape);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[3, 2, 2]))]);
+    ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
+}
+
+#[test]
 fn reshape_grad()
 {
     let mut graph = ag::Graph::new();

@@ -37,7 +37,6 @@ mod sparse_softmax_cross_entropy;
 mod gather;
 mod matmul;
 mod batch_matmul;
-mod reshape;
 mod reduction_ops;
 mod squeeze;
 mod expand_dims;
@@ -961,8 +960,32 @@ pub fn reshape(x: &Tensor, shape: &[isize]) -> Tensor
             Some(len as usize)
         })
         .collect::<Vec<_>>();
-    let op = reshape::Reshape { target_shape: shape };
+    let op = shape_ops::ReshapeStatic { target_shape: shape };
     apply_op(op, &[x])
+}
+
+
+#[inline]
+/// Reshapes input tensor.
+///
+/// Unlike `reshape`, target shape is a symbolic tensor.
+///
+/// # Examples
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let mut graph = ag::Graph::new();
+/// let ref x = ag::zeros(&[3, 2, 2]);
+/// let ref shape = ag::shape(&ag::zeros(&[3, 4]));
+/// let ref y = ag::reshape_dynamic(&x, shape);
+///
+/// assert_eq!(graph.eval(&[y])[0], ag::ndarray_ext::zeros(&[3, 4]));
+/// ```
+pub fn reshape_dynamic(x: &Tensor, shape: &Tensor) -> Tensor
+{
+    apply_op(shape_ops::ReshapeDynamic, &[x, shape])
 }
 
 
@@ -982,7 +1005,7 @@ pub fn reshape(x: &Tensor, shape: &[isize]) -> Tensor
 /// ```
 pub fn flatten(x: &Tensor) -> Tensor
 {
-    let op = reshape::Reshape { target_shape: vec![None] };
+    let op = shape_ops::ReshapeStatic { target_shape: vec![None] };
     apply_op(op, &[x])
 }
 
