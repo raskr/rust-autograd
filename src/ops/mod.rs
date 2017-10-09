@@ -1217,9 +1217,10 @@ pub fn matmul_t(a: &Tensor, b: &Tensor, transpose_a: bool, transpose_b: bool) ->
 /// # Arguments
 /// * `a` - Input tensor
 /// * `b` - Input tensor
-/// * `a_shape` - Shape of a
-/// * `b_shape` - Shape of b
-/// * `axes` - `axes[0]` and `axes[1]` are `a`'s and `b`'s axes respectively.
+/// * `a_axes` - Contraction axes
+/// * `b_axes` - Contraction axes
+/// * `input_shapes` - `a`'s and `b`'s shapes. This is optional but hint for performance.
+///
 /// Contraction is computed along corresponding `a`'s and `b`'s axes.
 /// So the number of the axes must be equals.
 ///
@@ -1234,13 +1235,13 @@ pub fn matmul_t(a: &Tensor, b: &Tensor, transpose_a: bool, transpose_b: bool) ->
 ///
 /// let ref a = ag::zeros(&[3, 4, 5]);
 /// let ref b = ag::zeros(&[4, 3, 2]);
-/// let ref c = ag::tensordot(a, b, &[3, 4, 5], &[4, 3, 2], [&[1, 0], &[0, 1]]);
+/// let ref c = ag::tensordot(a, b, &[1, 0], &[0, 1], None);
 /// assert_eq!(graph.eval(&[c])[0].shape(), &[5, 2]);
 ///
 /// // Another example (simple matmul broadcast)
 /// let ref a = ag::zeros(&[2, 3, 4]);
 /// let ref b = ag::zeros(&[4, 2]);
-/// let ref c = ag::tensordot(a, b, &[2, 3, 4], &[4, 2], [&[2], &[0]]);
+/// let ref c = ag::tensordot(a, b, &[2], &[0], Some((&[2, 3, 4], &[4, 2])));
 /// assert_eq!(graph.eval(&[c])[0].shape(), &[2, 3, 2]);
 /// ```
 ///
@@ -1249,15 +1250,64 @@ pub fn matmul_t(a: &Tensor, b: &Tensor, transpose_a: bool, transpose_b: bool) ->
 pub fn tensordot(
     a: &Tensor,
     b: &Tensor,
-    a_shape: &[usize],
-    b_shape: &[usize],
-    axes: [&[isize]; 2],
+    a_axes: &[isize],
+    b_axes: &[isize],
+    input_shapes: Option<(&[usize], &[usize])>,
 ) -> Tensor
 {
-    assert_eq!(axes[0].len(), axes[1].len());
+    assert_eq!(a_axes.len(), b_axes.len());
 
-    fn preprocess(x: &Tensor, x_shape: &[usize], axes: &[isize], flip: bool)
-        -> (Tensor, Vec<isize>)
+    fn preprocess_dynamic(x: &Tensor, axes: &[isize], flip: bool) -> (Tensor, Tensor)
+    {
+        let ref x_shape = shape(x);
+        let ref x_rank = rank(x);
+
+        // unwrap is safe
+        let ref axes = convert_to_tensor(
+            NdArray::from_shape_vec(
+                ndarray::IxDyn(&[axes.len()]),
+                axes.into_iter().map(|&a| a as f32).collect::<Vec<_>>(),
+            ).unwrap(),
+        );
+
+        let ref axes = greater_equal(axes, 0.) * axes + lesser(axes, 0.) * (axes + x_rank);
+
+        let ref free = setdiff1d(
+            &range_dynamic(
+                &convert_to_tensor(NdArray::from_elem(ndarray::IxDyn(&[1]), 0.)),
+                x_rank,
+                &convert_to_tensor(NdArray::from_elem(ndarray::IxDyn(&[1]), 1.)),
+            ),
+            axes,
+        );
+
+        let free_dims = gather(x_shape, free, 0);
+        let ref axes_dims = gather(x_shape, axes, 0);
+        let ref prod_free_dims = reduce_prod(&free_dims, 0, true);
+        let ref prod_axes_dims = reduce_prod(axes_dims, 0, true);
+
+        let (perm, new_shape) = if flip {
+            (
+                concat(&[axes, free], 0),
+                concat(&[prod_axes_dims, prod_free_dims], 0),
+            )
+        } else {
+            (
+                concat(&[free, axes], 0),
+                concat(&[prod_free_dims, prod_axes_dims], 0),
+            )
+        };
+
+        let reshaped = reshape_dynamic(&transpose_dynamic(x, &perm), &new_shape);
+        (reshaped, free_dims)
+    }
+
+    fn preprocess_static(
+        x: &Tensor,
+        x_shape: &[usize],
+        axes: &[isize],
+        flip: bool,
+    ) -> (Tensor, Vec<isize>)
     {
         let axes = axes.iter()
             .map(|&i| if i >= 0 {
@@ -1293,16 +1343,32 @@ pub fn tensordot(
         (reshaped, free_dims)
     }
 
-    let (a_reshaped, a_free_dims) = preprocess(a, a_shape, axes[0], false);
-    let (b_reshaped, b_free_dims) = preprocess(b, b_shape, axes[1], true);
-
-    let ref dot = matmul(&a_reshaped, &b_reshaped);
-    let final_shape = a_free_dims
-        .into_iter()
-        .chain(b_free_dims.into_iter())
-        .collect::<Vec<isize>>();
-
-    reshape(dot, final_shape.as_slice())
+    // main procedure
+    if let Some((a_shape, b_shape)) = input_shapes {
+        // static
+        let ((a_reshaped, a_free_dims), (b_reshaped, b_free_dims)) =
+            (
+                preprocess_static(a, a_shape, a_axes, false),
+                preprocess_static(b, b_shape, b_axes, true),
+            );
+        let ref dot = matmul(&a_reshaped, &b_reshaped);
+        let final_shape = a_free_dims
+            .into_iter()
+            .chain(b_free_dims.into_iter())
+            .collect::<Vec<isize>>();
+        reshape(dot, final_shape.as_slice())
+    } else {
+        // dynamic
+        let ((a_reshaped, a_free_dims), (b_reshaped, b_free_dims)) =
+            (
+                preprocess_dynamic(a, a_axes, false),
+                preprocess_dynamic(b, b_axes, true),
+            );
+        // CRASH (5, 12) x (2, 12)
+        let ref dot = matmul(&a_reshaped, &b_reshaped);
+        let final_shape = concat(&[&a_free_dims, &b_free_dims], 0);
+        reshape_dynamic(dot, &final_shape)
+    }
 }
 
 
@@ -1775,4 +1841,30 @@ pub fn range(start: usize, end: usize, step: usize) -> Tensor
         step: step as f32,
     };
     apply_op(op, &[])
+}
+
+
+/// Returns range
+///
+/// Unlike `range`, inputs are symbolic tensors.
+///
+/// # Examples
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let mut graph = ag::Graph::new();
+///
+/// let ref start = ag::convert_to_tensor(ndarray::arr1(&[0.]));
+/// let ref end = ag::convert_to_tensor(ndarray::arr1(&[5.]));
+/// let ref step = ag::convert_to_tensor(ndarray::arr1(&[1.]));
+/// let ref z = ag::range_dynamic(start, end, step);
+///
+/// assert_eq!(graph.eval(&[z])[0], ndarray::Array1::range(0., 5., 1.).into_dyn());
+/// ```
+#[inline]
+pub fn range_dynamic(start: &Tensor, end: &Tensor, step: &Tensor) -> Tensor
+{
+    apply_op(generator_ops::RangeDynamic, &[start, end, step])
 }

@@ -14,6 +14,8 @@ pub struct Ones {
     pub shape: Vec<usize>,
 }
 
+pub struct RangeDynamic;
+
 pub struct Range {
     pub start: f32,
     pub end: f32,
@@ -67,6 +69,36 @@ impl ops::Op for Range {
     fn compute(&self, _: &[&NdArray], _: bool) -> NdArray
     {
         ndarray::Array1::range(self.start, self.end, self.step).into_dyn()
+    }
+
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
+        vec![]
+    }
+}
+
+impl ops::Op for RangeDynamic {
+    fn name(&self) -> &str
+    {
+        "RangeDynamic"
+    }
+
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
+    {
+        let x0 = xs[0];
+        let x1 = xs[1];
+        let x2 = xs[2];
+
+        assert_eq!(x0.len(), 1);
+        assert_eq!(x1.len(), 1);
+        assert_eq!(x2.len(), 1);
+
+        // safe unwrap
+        let start = *x0.get(0).unwrap();
+        let end = *x1.get(0).unwrap();
+        let step = *x2.get(0).unwrap();
+
+        ndarray::Array1::range(start, end, step).into_dyn()
     }
 
     fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
