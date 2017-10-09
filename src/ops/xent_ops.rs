@@ -26,7 +26,9 @@ impl ops::Op for SigmoidCrossEntropy {
 
         let e = f32::consts::E;
         let max_fn = f32::max;
-        x.map(move |a| ((-a.abs()).exp() + 1.).log(e) + max_fn(0., *a)) - t * x
+        let mut tmp = x.map(move |a| ((-a.abs()).exp() + 1.).log(e) + max_fn(0., *a));
+        tmp -= &(t * x);
+        tmp
     }
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
@@ -36,7 +38,7 @@ impl ops::Op for SigmoidCrossEntropy {
 
         let gx1 = {
             let ref exp = ops::exp(x);
-            ((exp / (exp + 1)) - t) * gy
+            ops::sub_inplace((exp / (exp + 1)), t) * gy
         };
 
         let gx2 = -1 * gy * t;
@@ -60,7 +62,7 @@ impl ops::Op for SparseSoftmaxCrossEntropy {
             assert!(1 == t_ndim || 2 == t_ndim);
         }
 
-        let log_x = ops::log_softmax::log_softmax_forward(xs[0], 1);
+        let mut log_x = ops::log_softmax::log_softmax_forward(xs[0], 1);
 
         let mut t_iter = t.iter();
 
@@ -87,7 +89,7 @@ impl ops::Op for SparseSoftmaxCrossEntropy {
             let ref log_x = ops::log_softmax(inputs[0], -1);
             let ref x = ops::exp(log_x);
             let sum = ops::reduce_sum(&(x * log_x), 1, true);
-            x * gy * (sum - log_x)
+            x * gy * (ops::sub_inplace(sum, log_x))
         };
 
         vec![Some(gx1), Some(gx2)]
@@ -108,8 +110,8 @@ impl ops::Op for SparseSoftmaxCrossEntropyGrad {
 
         let mut x = ops::activation_ops::softmax_forward(x, 1);
 
-        for (mut row, t_) in x.axis_iter_mut(ndarray::Axis(0)).zip(t) {
-            row[*t_ as usize] -= 1.;
+        for (mut row, &t_) in x.axis_iter_mut(ndarray::Axis(0)).zip(t) {
+            row[t_ as usize] -= 1.;
         }
 
         x *= gy;
@@ -152,13 +154,13 @@ impl ops::Op for SoftmaxCrossEntropy {
         // = {-t/x - Σ(x * -t/x)} * x
         // = {-t/x + Σt} * x
         // = -t + x
-        let gx1 = gy * (x - t);
+        let gx1 = ops::apply_op(ops::binary_ops::InplaceSubOp, &[x, t]) * gy;
 
         // gx2 won't be used
         let gx2 = {
-            let log_x = ops::log_softmax(inputs[0], -1);
-            let ref sum = ops::reduce_sum(&(x * &log_x), -1, true);
-            gy * (sum - log_x) * output
+            let ref log_x = ops::log_softmax(inputs[0], -1);
+            let sum = ops::reduce_sum(&(x * log_x), -1, true);
+            gy * (ops::sub_inplace(sum, log_x)) * output
         };
 
         vec![Some(gx1), Some(gx2)]

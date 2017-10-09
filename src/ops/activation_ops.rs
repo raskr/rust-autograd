@@ -17,6 +17,8 @@ pub struct Identity;
 
 pub struct ReLU;
 
+pub struct ReLUGrad;
+
 pub struct Sigmoid;
 
 pub struct Softmax {
@@ -47,7 +49,8 @@ pub fn softmax_forward(x: &NdArray, axis: isize) -> NdArray
     let sum = tmp.sum(ndarray::Axis(axis))
         .into_shape(ndarray::IxDyn(reduced_shape))
         .unwrap();
-    tmp / &sum
+    tmp /= &sum;
+    tmp
 }
 
 impl ops::Op for Softmax {
@@ -63,8 +66,9 @@ impl ops::Op for Softmax {
 
     fn grad(&self, gy: &Tensor, _: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
     {
-        let sum = ops::reduce_sum(&(output * gy), self.axis, true);
-        vec![Some((gy - sum) * output)]
+        let ref sum = ops::reduce_sum(&(output * gy), self.axis, true);
+
+        vec![Some(ops::apply_op(ops::binary_ops::InplaceSubOp, &[gy, sum]) * output)]
     }
 }
 
@@ -76,12 +80,7 @@ impl ops::Op for Sigmoid {
 
     fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
-        let x = xs[0];
-        let mut ret = x * 0.5;
-        ret.mapv_inplace(|a| a.tanh());
-        ret *= 0.5;
-        ret += 0.5;
-        ret
+        xs[0].mapv(|a| ((a*0.5).tanh() * 0.5) + 0.5)
     }
 
     fn grad(&self, gy: &Tensor, _: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
@@ -103,7 +102,26 @@ impl ops::Op for ReLU {
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
-        vec![Some(ops::greater(inputs[0], 0.) * gy)]
+        vec![Some(ops::apply_op(ReLUGrad, &[inputs[0], gy]))]
+    }
+}
+
+impl ops::Op for ReLUGrad {
+    fn name(&self) -> &str
+    {
+        "ReLUGrad"
+    }
+
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
+    {
+        let mut bin = xs[0].mapv(move |a| ((a > 0.) as i32) as f32);
+        bin *= xs[1];
+        bin
+    }
+
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
+        vec![None]
     }
 }
 

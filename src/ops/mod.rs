@@ -228,8 +228,8 @@ pub fn gradients(
 /// let ref c = ag::matmul(a, b);
 /// let ref j = ag::jacobians(c, &[a, b], 4*3);
 ///
-/// assert_eq!(j[0].eval(&[&mut graph]).shape(), &[4*3, 4*2]);
-/// assert_eq!(j[1].eval(&[&mut graph]).shape(), &[4*3, 2*3]);
+/// assert_eq!(j[0].eval(&mut graph).shape(), &[4*3, 4*2]);
+/// assert_eq!(j[1].eval(&mut graph).shape(), &[4*3, 2*3]);
 /// ```
 pub fn jacobians(objective: &Tensor, variables: &[&Tensor], objective_len: usize) -> Vec<Tensor>
 {
@@ -1413,7 +1413,7 @@ pub fn transpose_dynamic(x: &Tensor, perm: &Tensor) -> Tensor
 /// let ref a = ag::zeros(&[3, 7, 5]);
 /// let ref b = ag::split(a, &[2, 3, 2], 1);
 ///
-/// let evaluated = graph.eval(&[b[0], b[1], b[2]]);
+/// let evaluated = graph.eval(&[&b[0], &b[1], &b[2]]);
 /// assert_eq!(evaluated[0].shape(), &[3, 2, 5]);
 /// assert_eq!(evaluated[1].shape(), &[3, 3, 5]);
 /// assert_eq!(evaluated[2].shape(), &[3, 2, 5]);
