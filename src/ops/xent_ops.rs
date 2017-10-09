@@ -106,7 +106,7 @@ impl ops::Op for SparseSoftmaxCrossEntropyGrad {
         let t = xs[1];
         let gy = xs[2];
 
-        let mut x = ops::softmax::softmax_forward(x, 1);
+        let mut x = ops::activation_ops::softmax_forward(x, 1);
 
         for (mut row, t_) in x.axis_iter_mut(ndarray::Axis(0)).zip(t) {
             row[*t_ as usize] -= 1.;

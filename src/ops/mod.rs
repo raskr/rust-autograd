@@ -19,16 +19,12 @@ mod clip;
 mod add_n;
 mod logsumexp;
 mod log_softmax;
-mod identity;
+mod activation_ops;
 mod cmp_ops;
 mod math_ops;
 mod concat;
 mod tile;
 mod binary_ops;
-mod softmax;
-mod sigmoid;
-mod elu;
-mod relu;
 mod split;
 mod slice;
 mod xent_ops;
@@ -466,7 +462,7 @@ pub fn atanh(x: &Tensor) -> Tensor
 /// Identity function
 pub fn identity(a: &Tensor) -> Tensor
 {
-    apply_op(identity::Identity, &[a])
+    apply_op(activation_ops::Identity, &[a])
 }
 
 
@@ -1044,7 +1040,7 @@ pub fn lesser_equal(x: &Tensor, a: f32) -> Tensor
 /// Elementwise logistic sigmoid function.
 pub fn sigmoid(x: &Tensor) -> Tensor
 {
-    apply_op(sigmoid::Sigmoid, &[x])
+    apply_op(activation_ops::Sigmoid, &[x])
 }
 
 
@@ -1054,7 +1050,7 @@ pub fn sigmoid(x: &Tensor) -> Tensor
 /// See https://arxiv.org/abs/1511.07289
 pub fn elu(x: &Tensor, alpha: f32) -> Tensor
 {
-    apply_op(elu::ELU { alpha: alpha }, &[x])
+    apply_op(activation_ops::ELU { alpha }, &[x])
 }
 
 
@@ -1062,7 +1058,7 @@ pub fn elu(x: &Tensor, alpha: f32) -> Tensor
 /// Elementwise rectified linear unit function.
 pub fn relu(x: &Tensor) -> Tensor
 {
-    apply_op(relu::ReLU, &[x])
+    apply_op(activation_ops::ReLU, &[x])
 }
 
 
@@ -1084,7 +1080,7 @@ pub fn logsumexp(x: &Tensor, axis: isize) -> Tensor
 pub fn log_softmax(x: &Tensor, axis: isize) -> Tensor
 {
     // TODO: Composing from "node level" LogSumExp.
-    let op = log_softmax::LogSoftmax { axis: axis };
+    let op = log_softmax::LogSoftmax { axis };
     apply_op(op, &[x])
 }
 
@@ -1095,7 +1091,7 @@ pub fn log_softmax(x: &Tensor, axis: isize) -> Tensor
 /// `axis` can be negative.
 pub fn softmax(x: &Tensor, axis: isize) -> Tensor
 {
-    let op = softmax::Softmax { axis: axis };
+    let op = activation_ops::Softmax { axis };
     apply_op(op, &[x])
 }
 
