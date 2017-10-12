@@ -51,8 +51,7 @@ pub trait Op {
 
     /// Actually runs this op.
     ///
-    /// Num of inputs : N,
-    /// Num of outputs: 1
+    /// N inputs, 1 output.
     #[allow(unused_variables)]
     fn compute(&self, xs: &[&NdArray], train: bool) -> NdArray
     {
@@ -61,28 +60,28 @@ pub trait Op {
 
     /// Actually runs this op.
     ///
-    /// Inplace operators such as AddAssign override this.
+    /// Inplace operators such as InplaceAddOp override this.
     #[allow(unused_variables)]
     fn compute_inplace(&self, xs: &mut [&mut NdArray], train: bool)
     {
         unimplemented!()
     }
 
-    /// Returns symbolic gradient for each input node by use of output gradient etc.
+    /// Returns symbolic gradients for input nodes by use of output gradient etc.
     ///
     /// # Arguments
     /// * `gy` - Symbolic representation of the gradient of `compute`'s return value
     /// * `inputs` - Symbolic representation of `compute::xs`
-    /// * `output` - Symbolic representation of `compute`'s return value
+    /// * `y` - Symbolic representation of `compute`'s return value
     ///
     /// NOTE:
     /// The number of return values must be same as `inputs.len()`.
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>;
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], y: &Tensor) -> Vec<Option<Tensor>>;
 }
 
 
 impl Tensor {
-    /// Gets a symbolic float32 element from a tensor.
+    /// Gets a symbolic element from a tensor with shape `[1]`.
     ///
     /// `idx` can be negative.
     ///
@@ -285,7 +284,7 @@ pub fn stop_gradients(x: &Tensor) -> Tensor
 }
 
 
-/// Returns symbolic shape of input tensor
+/// Returns the (symbolic) shape of input tensor
 ///
 /// This is useful when the shape of `x` is dynamic.
 ///
@@ -448,7 +447,7 @@ pub fn identity(a: &Tensor) -> Tensor
 }
 
 
-/// Element-wise addition
+/// Elementwise addition
 ///
 /// You can use `+` operator instead.
 pub fn add(a: &Tensor, b: &Tensor) -> Tensor
@@ -457,7 +456,7 @@ pub fn add(a: &Tensor, b: &Tensor) -> Tensor
 }
 
 
-/// Element-wise subtraction
+/// Elementwise subtraction
 ///
 /// You can use `-` operator instead.
 pub fn sub(a: &Tensor, b: &Tensor) -> Tensor
@@ -466,7 +465,7 @@ pub fn sub(a: &Tensor, b: &Tensor) -> Tensor
 }
 
 
-/// Element-wise multiplication
+/// Elementwise multiplication
 ///
 /// You can use `*` operator instead.
 pub fn mul(a: &Tensor, b: &Tensor) -> Tensor
@@ -475,7 +474,7 @@ pub fn mul(a: &Tensor, b: &Tensor) -> Tensor
 }
 
 
-/// Element-wise division
+/// Elementwise division
 ///
 /// You can use `/` operator instead.
 pub fn div(a: &Tensor, b: &Tensor) -> Tensor
@@ -486,8 +485,8 @@ pub fn div(a: &Tensor, b: &Tensor) -> Tensor
 
 /// Inplace addition
 ///
-/// Returns a symbolic tensor for `a` after performing `a += b`
-/// You can not use `a` after calling this function.
+/// Returns `a` after performing `a += b`.
+/// This function requires the move of `a`.
 ///
 /// # Panics
 ///
@@ -517,8 +516,8 @@ pub fn add_inplace(a: Tensor, b: &Tensor) -> Tensor
 
 /// Inplace subtraction
 ///
-/// Returns a symbolic tensor for `a` after performing `a -= b`
-/// You can not use `a` after calling this function.
+/// Returns `a` after performing `a -= b`.
+/// This function requires the move of `a`.
 ///
 /// # Panics
 ///
@@ -574,7 +573,7 @@ pub fn exp(x: &Tensor) -> Tensor
 }
 
 
-/// Adds all input tensors inplace.
+/// Adds all input tensors.
 ///
 /// All the input tensors must have same shapes.
 ///
@@ -650,7 +649,7 @@ pub fn argmax(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 }
 
 
-/// Expands dims.
+/// Expands specified dims.
 ///
 /// Each axis can be negative.
 ///
@@ -673,7 +672,7 @@ pub fn expand_dims(x: &Tensor, axes: &[isize]) -> Tensor
 }
 
 
-/// Squeezes dims.
+/// Squeezes specified dims.
 ///
 /// Each axis can be negative.
 ///
@@ -940,28 +939,28 @@ pub fn flatten(x: &Tensor) -> Tensor
 }
 
 
-/// Returns binary tensor.
+/// Compares two tensors and returns a binary tensor.
 pub fn greater(x: &Tensor, a: f32) -> Tensor
 {
     apply_op(cmp_ops::Greater { a }, &[x])
 }
 
 
-/// Returns binary tensor.
+/// Compares two tensors and returns a binary tensor.
 pub fn greater_equal(x: &Tensor, a: f32) -> Tensor
 {
     apply_op(cmp_ops::GreaterEqual { a }, &[x])
 }
 
 
-/// Returns binary tensor.
+/// Compares two tensors and returns a binary tensor.
 pub fn lesser(x: &Tensor, a: f32) -> Tensor
 {
     apply_op(cmp_ops::Lesser { a }, &[x])
 }
 
 
-/// Returns binary tensor.
+/// Compares two tensors and returns a binary tensor.
 pub fn lesser_equal(x: &Tensor, a: f32) -> Tensor
 {
     apply_op(cmp_ops::LesserEqual { a }, &[x])
@@ -1012,7 +1011,7 @@ pub fn log_softmax(x: &Tensor, axis: isize) -> Tensor
 }
 
 
-/// Takes softmax along specified axis
+/// Computes softmax along specified axis
 ///
 /// `axis` can be negative.
 pub fn softmax(x: &Tensor, axis: isize) -> Tensor
@@ -1103,7 +1102,7 @@ pub fn matmul(a: &Tensor, b: &Tensor) -> Tensor
 }
 
 
-/// Matrix multiplication.
+/// Matrix multiplication with inputs's transposition.
 ///
 /// Similar specification as `matmul` but, if `transpose_a` is true, `a` is transposed
 /// before actual matrix multiplication. It is the same for `transpose_b`.
@@ -1142,7 +1141,7 @@ pub fn matmul_t(a: &Tensor, b: &Tensor, transpose_a: bool, transpose_b: bool) ->
 /// * `input_shapes` - `a`'s and `b`'s shapes. This is optional but hint for performance.
 ///
 /// Contraction is computed along corresponding `a`'s and `b`'s axes.
-/// So the number of the axes must be equals.
+/// The number of the axes must be equals.
 ///
 /// Note: each axis can be negative number.
 ///
@@ -1321,7 +1320,7 @@ pub fn batch_matmul(a: &Tensor, b: &Tensor) -> Tensor
 }
 
 
-/// Takes diff between two tensor
+/// Takes diff between two tensors
 ///
 /// Returns the sorted, unique values in a that are not in b.
 ///
@@ -1491,13 +1490,14 @@ pub fn concat(tensors: &[&Tensor], axis: isize) -> Tensor
 }
 
 
-/// Gathers slices.
+/// Gathers subviews from the input tensor.
 ///
-/// Along `axis`, slices subviews from `param` with `indices`, and then gathers those.
-/// For example, this can be used for embedding vector lookup.
+/// Along `axis`, slices subviews from `param` with `indices` and then gathers those.
 /// `axis` can be negative.
+/// For detailed description, see https://www.tensorflow.org/api_docs/python/tf/gather.
 ///
-/// See also https://www.tensorflow.org/api_docs/python/tf/gather.
+/// For example, this can be used for embedding vector lookup etc.
+///
 ///
 /// # Arguments
 /// * `param` - Target of slicing.
@@ -1527,7 +1527,7 @@ pub fn gather(param: &Tensor, indices: &Tensor, axis: isize) -> Tensor
 }
 
 
-/// Normalizes input tensor along specified axis.
+/// Normalizes input tensor along specified axis with the mean and variance.
 ///
 /// # Examples
 ///
@@ -1603,7 +1603,7 @@ where
 }
 
 
-/// Creates a constant tensor.
+/// Generates a tensor with shape `[1]` from a scalar value.
 pub fn scalar(val: f32) -> Tensor
 {
     apply_op(scalar::Scalar { val }, &[])
@@ -1698,7 +1698,7 @@ pub fn log_normal(shape: &[usize], mean: f64, stddev: f64) -> Tensor
 
 /// Converts rust-ndarray's array object to a `ag::Tensor` object.
 ///
-/// If you won't apply inplace ops to this, `Graph#constant` method is preferred
+/// If you won't apply inplace ops to this, `Graph#constant` is better
 /// for performance.
 ///
 /// # Examples
@@ -1737,7 +1737,7 @@ pub fn ones(shape: &[usize]) -> Tensor
 }
 
 
-/// Returns range
+/// Returns a range
 pub fn range(start: usize, end: usize, step: usize) -> Tensor
 {
     let op = generator_ops::Range {
@@ -1749,7 +1749,7 @@ pub fn range(start: usize, end: usize, step: usize) -> Tensor
 }
 
 
-/// Returns range
+/// Returns a range
 ///
 /// Unlike `range`, inputs are symbolic tensors.
 ///

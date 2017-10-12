@@ -1,7 +1,6 @@
 #[macro_use(s)]
 extern crate ndarray;
 
-// == module declarations ==
 #[macro_use]
 pub mod test_helper;
 
@@ -19,8 +18,6 @@ pub mod nn_impl;
 pub mod sgd;
 
 pub mod ndarray_ext;
-
-// == re-exposures ==
 
 pub use ndarray_ext::array_gen;
 

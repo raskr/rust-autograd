@@ -2,8 +2,10 @@
 extern crate ndarray;
 
 
-/// type aliases for convenience
+/// type alias for convenience
 pub type NdArray = ndarray::Array<f32, ndarray::IxDyn>;
+
+/// type alias for convenience
 pub type NdArrayView<'a> = ndarray::ArrayView<'a, f32, ndarray::IxDyn>;
 
 /// exposes array_gen

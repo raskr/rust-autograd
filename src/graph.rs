@@ -30,7 +30,7 @@ use tensor::{RawTensor, Tensor};
 /// graph.feed(a, ndarray::arr1(&[1., 1.]));
 ///
 /// // eval
-/// assert_eq!(graph.eval(&[z])[0].as_slice().unwrap(), &[4., 4.]);
+/// assert_eq!(z.eval(&mut graph).as_slice().unwrap(), &[4., 4.]);
 /// ```
 pub struct Graph {
     pub variables: FnvHashMap<Tensor, NdArray>,

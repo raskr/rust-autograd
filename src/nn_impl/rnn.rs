@@ -42,8 +42,8 @@ impl LSTM {
     pub fn new(state_size: usize, input_dim: usize, batch_size: usize, g: &mut Graph) -> LSTM
     {
         LSTM {
-            state_size: state_size,
-            batch_size: batch_size,
+            state_size,
+            batch_size,
             last_output: g.constant(::ndarray_ext::zeros(&[batch_size, state_size])),
             cell: g.constant(::ndarray_ext::zeros(&[batch_size, state_size])),
             wx: g.variable(::ndarray_ext::glorot_uniform(&[input_dim, 4 * state_size])),
@@ -96,7 +96,6 @@ impl RNN for LSTM {
     fn reset_state(&mut self, g: &mut Graph)
     {
         self.last_output = g.constant(::ndarray_ext::zeros(&[self.batch_size, self.state_size]));
-
         self.cell = g.constant(::ndarray_ext::zeros(&[self.batch_size, self.state_size]));
     }
 }

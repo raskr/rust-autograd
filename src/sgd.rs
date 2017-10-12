@@ -9,7 +9,10 @@ use tensor::Tensor;
 
 
 #[inline]
-/// Updates params with gradients
+/// Updates shared variables with its gradients
+///
+/// This actually runs the computation graph.
+/// For the usage, see `examples` dir in repo.
 pub fn apply_gradients<T: optimizers::Optimizer>(
     variables: &[&Tensor],
     gradients: &[Tensor],
@@ -35,7 +38,7 @@ pub fn apply_gradients<T: optimizers::Optimizer>(
 #[inline(always)]
 /// Reduces gradient's each dim by summation.
 /// This is used when parameter shape and
-/// gradient shape are not same due to broadcast.
+/// gradient shape don't match due to broadcast.
 pub fn maybe_reduce_grad(mut grad: NdArray, var_shape: &[usize]) -> NdArray
 {
     let grad_shape = grad.shape().to_vec();
@@ -64,7 +67,7 @@ pub mod optimizers {
         #[inline]
         /// Updates the variable tensor
         ///
-        /// Updates `var` with `grad`
+        /// Updates `param` with `grad`
         fn update(&mut self, node: &Tensor, param: &mut NdArray, grad: NdArray);
     }
 
