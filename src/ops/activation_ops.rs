@@ -68,7 +68,7 @@ impl ops::Op for Softmax {
     {
         let ref sum = ops::reduce_sum(&(output * gy), self.axis, true);
 
-        vec![Some(ops::apply_op(ops::binary_ops::InplaceSubOp, &[gy, sum]) * output)]
+        vec![Some((gy - sum) * output)]
     }
 }
 

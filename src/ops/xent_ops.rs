@@ -38,7 +38,7 @@ impl ops::Op for SigmoidCrossEntropy {
 
         let gx1 = {
             let ref exp = ops::exp(x);
-            ops::sub_inplace((exp / (exp + 1)), t) * gy
+            ((exp / (exp + 1)) - t) * gy
         };
 
         let gx2 = -1 * gy * t;
@@ -89,7 +89,7 @@ impl ops::Op for SparseSoftmaxCrossEntropy {
             let ref log_x = ops::log_softmax(inputs[0], -1);
             let ref x = ops::exp(log_x);
             let sum = ops::reduce_sum(&(x * log_x), 1, true);
-            x * gy * (ops::sub_inplace(sum, log_x))
+            x * gy * (sum - log_x)
         };
 
         vec![Some(gx1), Some(gx2)]
@@ -160,7 +160,7 @@ impl ops::Op for SoftmaxCrossEntropy {
         let gx2 = {
             let ref log_x = ops::log_softmax(inputs[0], -1);
             let sum = ops::reduce_sum(&(x * log_x), -1, true);
-            gy * (ops::sub_inplace(sum, log_x)) * output
+            gy * (sum - log_x) * output
         };
 
         vec![Some(gx1), Some(gx2)]
