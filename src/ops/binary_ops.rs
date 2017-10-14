@@ -180,63 +180,17 @@ impl ops::Op for InplaceSubOp {
     }
 }
 
-
-#[inline]
-fn scalar_to_tensor(arg: f32) -> Tensor
-{
-    Tensor(Rc::new(RawTensor {
-        op: Box::new(ops::scalar::Scalar { val: arg }),
-        inputs: vec![],
-        top_rank: 0,
-    }))
-}
-
-#[inline]
-fn f32_to_tensor(arg: f32) -> Tensor
-{
-    scalar_to_tensor(arg)
-}
-
-#[inline]
-fn f64_to_tensor(arg: f64) -> Tensor
-{
-    scalar_to_tensor(arg as f32)
-}
-
-#[inline]
-fn i32_to_tensor(arg: i32) -> Tensor
-{
-    scalar_to_tensor(arg as f32)
-}
-
-#[inline]
-fn i64_to_tensor(arg: i64) -> Tensor
-{
-    scalar_to_tensor(arg as f32)
-}
-
-#[inline]
-fn u32_to_tensor(arg: u32) -> Tensor
-{
-    scalar_to_tensor(arg as f32)
-}
-
-#[inline]
-fn u64_to_tensor(arg: u64) -> Tensor
-{
-    scalar_to_tensor(arg as f32)
-}
-
-#[inline]
-fn usize_to_tensor(arg: usize) -> Tensor
-{
-    scalar_to_tensor(arg as f32)
-}
-
-#[inline]
-fn isize_to_tensor(arg: isize) -> Tensor
-{
-    scalar_to_tensor(arg as f32)
+macro_rules! impl_scalar_to_tensor {
+    ($func_name:ident, $scalar_type:ty) => {
+        fn $func_name(val: $scalar_type) -> Tensor
+        {
+            Tensor(Rc::new(RawTensor {
+                op: Box::new(ops::scalar::Scalar { val: val as f32 }),
+                inputs: vec![],
+                top_rank: 0,
+            }))
+        }
+    };
 }
 
 
@@ -335,6 +289,15 @@ macro_rules! impl_elementwise_between_two_tensors {
     };
 }
 
+
+impl_scalar_to_tensor!(isize_to_tensor, isize);
+impl_scalar_to_tensor!(usize_to_tensor, usize);
+impl_scalar_to_tensor!(i32_to_tensor, i32);
+impl_scalar_to_tensor!(i64_to_tensor, i64);
+impl_scalar_to_tensor!(u32_to_tensor, u32);
+impl_scalar_to_tensor!(u64_to_tensor, u64);
+impl_scalar_to_tensor!(f32_to_tensor, f32);
+impl_scalar_to_tensor!(f64_to_tensor, f64);
 
 
 impl_elementwise_between_two_tensors!(Add, add, AddOp);
