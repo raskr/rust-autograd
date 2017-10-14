@@ -80,7 +80,7 @@ impl ops::Op for Sigmoid {
 
     fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
-        xs[0].mapv(|a| ((a*0.5).tanh() * 0.5) + 0.5)
+        xs[0].mapv(|a| ((a * 0.5).tanh() * 0.5) + 0.5)
     }
 
     fn grad(&self, gy: &Tensor, _: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>

@@ -2,6 +2,7 @@ extern crate ndarray;
 extern crate fnv;
 
 use self::fnv::FnvHashMap;
+use graph;
 use ndarray_ext::NdArray;
 use ops;
 use std::cmp::Ordering;
@@ -10,7 +11,6 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
-use graph;
 
 
 /// Symbolic multi-dimensional array which supports
@@ -30,7 +30,6 @@ pub struct RawTensor {
 
 
 impl Tensor {
-
     /// Evaluates this tensor as a ndarray's array object.
     ///
     /// # Examples
@@ -210,3 +209,80 @@ pub fn eval_tensors(
 
     evaluated_arrays
 }
+
+
+// == Shape and its impl ==
+
+pub trait Shape {
+    fn convert_to_tensor(self) -> Tensor;
+}
+
+impl Shape for Tensor {
+    fn convert_to_tensor(self) -> Tensor
+    {
+        self
+    }
+}
+
+impl<'a> Shape for &'a Tensor {
+    fn convert_to_tensor(self) -> Tensor
+    {
+        self.clone()
+    }
+}
+
+macro_rules! impl_unsigned_slice_to_shape {
+    ($scalar_type:ty) => {
+        impl<'a> Shape for &'a [$scalar_type] {
+            fn convert_to_tensor(self) -> Tensor
+            {
+                // unwrap is safe
+                let arr = NdArray::from_shape_vec(
+                    ndarray::IxDyn(&[self.len()]),
+                    self.iter().map(|&a| a as f32).collect::<Vec<f32>>(),
+                ).unwrap();
+
+                ops::convert_to_tensor(arr)
+            }
+        }
+    };
+}
+
+macro_rules! impl_signed_slice_to_shape {
+    ($scalar_type:ty, $placeholder:expr) => {
+        impl<'a> Shape for &'a [$scalar_type] {
+            fn convert_to_tensor(self) -> Tensor
+            {
+                // validation
+                let mut minus_one_found = false;
+                let shape = self
+                    .iter()
+                    .map(|&len| if len == $placeholder {
+                        if minus_one_found {
+                            panic!("`shape` has two or more `-1` dim.");
+                        }
+                        minus_one_found = true;
+                        len as f32
+                    } else if len < $placeholder {
+                        panic!("`shape` contains invalid dim size: {}", len);
+                    } else {
+                        len as f32
+                    })
+                    .collect::<Vec<f32>>();
+
+                // unwrap is safe
+                let arr = NdArray::from_shape_vec(ndarray::IxDyn(&[self.len()]), shape).unwrap();
+                ops::convert_to_tensor(arr)
+            }
+        }
+    };
+}
+
+impl_unsigned_slice_to_shape!(usize);
+impl_unsigned_slice_to_shape!(u32);
+impl_unsigned_slice_to_shape!(u64);
+impl_signed_slice_to_shape!(isize, -1);
+impl_signed_slice_to_shape!(i32, -1);
+impl_signed_slice_to_shape!(i64, -1);
+impl_signed_slice_to_shape!(f32, -1.);
+impl_signed_slice_to_shape!(f64, -1.);

@@ -168,7 +168,12 @@ impl ops::Op for Tanh {
 
     fn grad(&self, gy: &Tensor, _: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
     {
-        vec![Some(ops::apply_op(ops::binary_ops::InplaceSubOp, &[gy, &(output * output * gy)]))]
+        vec![
+            Some(ops::apply_op(
+                ops::binary_ops::InplaceSubOp,
+                &[gy, &(output * output * gy)],
+            )),
+        ]
     }
 }
 
