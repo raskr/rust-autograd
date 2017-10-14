@@ -46,7 +46,7 @@ pub fn softmax_forward(x: &NdArray, axis: isize) -> NdArray
     let mut tmp = x - max;
     tmp.mapv_inplace(|a| a.exp());
     // unwrap is safe
-    let sum = tmp.sum(ndarray::Axis(axis))
+    let sum = tmp.sum_axis(ndarray::Axis(axis))
         .into_shape(ndarray::IxDyn(reduced_shape))
         .unwrap();
     tmp /= &sum;

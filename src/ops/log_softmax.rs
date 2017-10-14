@@ -36,7 +36,7 @@ pub fn logsumexp(x: &NdArray, axis: isize) -> NdArray
     };
 
     // unwrap is safe
-    let mut sum = exp.sum(ndarray::Axis(axis))
+    let mut sum = exp.sum_axis(ndarray::Axis(axis))
         .into_shape(ndarray::IxDyn(reduced_shape))
         .unwrap();
 

@@ -332,10 +332,10 @@ impl ops::Op for ReduceMean {
         };
 
         if self.keep_dim {
-            let ret = x.mean(ndarray::Axis(axis));
+            let ret = x.mean_axis(ndarray::Axis(axis));
             ndarray_ext::expand_dims(ret, axis)
         } else {
-            x.mean(ndarray::Axis(axis))
+            x.mean_axis(ndarray::Axis(axis))
         }
     }
 
@@ -483,10 +483,10 @@ impl ops::Op for ReduceSum {
         };
 
         if self.keep_dim {
-            let ret = x.sum(ndarray::Axis(axis));
+            let ret = x.sum_axis(ndarray::Axis(axis));
             ndarray_ext::expand_dims(ret, axis)
         } else {
-            x.sum(ndarray::Axis(axis))
+            x.sum_axis(ndarray::Axis(axis))
         }
     }
 

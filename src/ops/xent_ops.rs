@@ -62,7 +62,7 @@ impl ops::Op for SparseSoftmaxCrossEntropy {
             assert!(1 == t_ndim || 2 == t_ndim);
         }
 
-        let mut log_x = ops::log_softmax::log_softmax_forward(xs[0], 1);
+        let log_x = ops::log_softmax::log_softmax_forward(xs[0], 1);
 
         let mut t_iter = t.iter();
 
@@ -142,7 +142,7 @@ impl ops::Op for SoftmaxCrossEntropy {
         let log_x = ops::log_softmax::log_softmax_forward(x, 1);
         // TODO: replace "sum" with "select"
         // unwrap is safe
-        (t * &log_x).sum(ndarray::Axis(1)) * -1. // summing class dim.
+        (t * &log_x).sum_axis(ndarray::Axis(1)) * -1. // summing class dim.
     }
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>

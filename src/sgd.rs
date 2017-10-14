@@ -49,7 +49,7 @@ pub fn maybe_reduce_grad(mut grad: NdArray, var_shape: &[usize]) -> NdArray
         } else if g < v {
             panic!("bad gradient")
         } else {
-            grad = ndarray_ext::expand_dims(grad.sum(ndarray::Axis(i)), i);
+            grad = ndarray_ext::expand_dims(grad.sum_axis(ndarray::Axis(i)), i);
         }
     }
     grad
