@@ -346,18 +346,7 @@ fn transpose()
 {
     let mut graph = ag::Graph::new();
     let ref v = graph.constant(ag::ndarray_ext::zeros(&[1, 2, 3, 4, 5]));
-    let ref z = ag::transpose(v, &[4, 2, 3, 0, 1]);
-    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[5, 3, 4, 1, 2]))]);
-    ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
-}
-
-#[test]
-fn transpose_dynamic()
-{
-    let mut graph = ag::Graph::new();
-    let ref v = graph.variable(ag::ndarray_ext::standard_normal(&[1, 2, 3, 4, 5]));
-    let ref perm = graph.constant(ndarray::arr1(&[4., 2., 3., 0., 1.]));
-    let ref z = ag::transpose_dynamic(v, perm);
+    let ref z = ag::transpose(v, [4, 2, 3, 0, 1]);
     let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[5, 3, 4, 1, 2]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
@@ -367,8 +356,8 @@ fn reshape_after_transpose()
 {
     let mut graph = ag::Graph::new();
     let ref v = graph.constant(ag::ndarray_ext::zeros(&[1, 2, 3, 4, 5]));
-    let ref z = ag::transpose(v, &[4, 2, 3, 0, 1]);
-    let ref z = ag::reshape(z, &[15, 8]);
+    let ref z = ag::transpose(v, [4, 2, 3, 0, 1]);
+    let ref z = ag::reshape(z, [15, 8]);
     let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[15, 8]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
@@ -559,19 +548,8 @@ fn reshape()
 {
     let mut graph = ag::Graph::new();
     let ref v = graph.variable(ag::ndarray_ext::standard_normal(&[4, 4]));
-    let ref z = ag::reshape(v, &[4, 2, 2]);
+    let ref z = ag::reshape(v, [4, 2, 2]);
     let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[4, 2, 2]))]);
-    ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
-}
-
-#[test]
-fn reshape_dynamic()
-{
-    let mut graph = ag::Graph::new();
-    let ref v = graph.variable(ag::ndarray_ext::standard_normal(&[3, 4]));
-    let ref shape = ag::shape(&ag::zeros(&[3, 2, 2]));
-    let ref z = ag::reshape_dynamic(&v, shape);
-    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[3, 2, 2]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
 
@@ -580,7 +558,7 @@ fn reshape_grad()
 {
     let mut graph = ag::Graph::new();
     let ref v = graph.variable(ag::ndarray_ext::standard_normal(&[4, 4]));
-    let ref z = ag::reshape(&(v * v), &[4, 2, 2]);
+    let ref z = ag::reshape(&(v * v), [4, 2, 2]);
     let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[4, 2, 2]))])[0];
     let ref gg = ag::gradients(&[g], &[v], &[Some(&ag::ones(&[4, 4]))]);
     ag::test_helper::gradient_check(g, gg.as_slice(), &[v], graph, 1e-3, 1e-3);

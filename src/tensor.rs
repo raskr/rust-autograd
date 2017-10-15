@@ -196,9 +196,9 @@ pub fn eval_tensors(
     for (i, t) in tensors.iter().enumerate() {
         // Need to handle cases where multiple gradient nodes
         // share an output array, and `t` is a variable.
-        // (Safe unwrapping is guaranteed by ::topology::symbolic_gradients)
         let contains = tensors[i + 1..].contains(t);
         let in_memo = memo.contains_key(t);
+        // Safe unwrapping is guaranteed by ::topology::symbolic_gradients
         match (contains, in_memo) {
             (true, true) => evaluated_arrays.push(memo.get(t).unwrap().clone()),
             (true, false) => evaluated_arrays.push(variables.get(t).unwrap().clone()),
@@ -211,30 +211,30 @@ pub fn eval_tensors(
 }
 
 
-// == Shape and its impl ==
+// == ArrayType and its impl ==
 
-pub trait Shape {
-    fn convert_to_tensor(self) -> Tensor;
+pub trait ArrayType {
+    fn as_tensor(&self) -> Tensor;
 }
 
-impl Shape for Tensor {
-    fn convert_to_tensor(self) -> Tensor
-    {
-        self
-    }
-}
-
-impl<'a> Shape for &'a Tensor {
-    fn convert_to_tensor(self) -> Tensor
+impl ArrayType for Tensor {
+    fn as_tensor(&self) -> Tensor
     {
         self.clone()
     }
 }
 
+impl<'a> ArrayType for &'a Tensor {
+    fn as_tensor(&self) -> Tensor
+    {
+        (*self).clone()
+    }
+}
+
 macro_rules! impl_unsigned_slice_to_shape {
     ($scalar_type:ty) => {
-        impl<'a> Shape for &'a [$scalar_type] {
-            fn convert_to_tensor(self) -> Tensor
+        impl<'a> ArrayType for &'a [$scalar_type] {
+            fn as_tensor(&self) -> Tensor
             {
                 // unwrap is safe
                 let arr = NdArray::from_shape_vec(
@@ -250,8 +250,8 @@ macro_rules! impl_unsigned_slice_to_shape {
 
 macro_rules! impl_signed_slice_to_shape {
     ($scalar_type:ty, $placeholder:expr) => {
-        impl<'a> Shape for &'a [$scalar_type] {
-            fn convert_to_tensor(self) -> Tensor
+        impl<'a> ArrayType for &'a [$scalar_type] {
+            fn as_tensor(&self) -> Tensor
             {
                 // validation
                 let mut minus_one_found = false;
@@ -278,11 +278,116 @@ macro_rules! impl_signed_slice_to_shape {
     };
 }
 
+macro_rules! impl_signed_array_to_shape {
+    ($scalar_type:ty, $placeholder:expr, $num_elems:expr) => {
+        impl ArrayType for [$scalar_type; $num_elems] {
+            fn as_tensor(&self) -> Tensor
+            {
+                // validation
+                let mut minus_one_found = false;
+                let shape = self
+                    .iter()
+                    .map(|&len| if len == $placeholder {
+                        if minus_one_found {
+                            panic!("`shape` has two or more `-1` dim.");
+                        }
+                        minus_one_found = true;
+                        len as f32
+                    } else if len < $placeholder {
+                        panic!("`shape` contains invalid dim size: {}", len);
+                    } else {
+                        len as f32
+                    })
+                    .collect::<Vec<f32>>();
+
+                // unwrap is safe
+                let arr = NdArray::from_shape_vec(ndarray::IxDyn(&[self.len()]), shape).unwrap();
+                ops::convert_to_tensor(arr)
+            }
+        }
+    };
+}
+
+macro_rules! impl_unsigned_array_to_shape {
+    ($scalar_type:ty, $num_elems:expr) => {
+        impl ArrayType for [$scalar_type; $num_elems] {
+            fn as_tensor(&self) -> Tensor
+            {
+                // unwrap is safe
+                let arr = NdArray::from_shape_vec(
+                    ndarray::IxDyn(&[self.len()]),
+                    self.iter().map(|&a| a as f32).collect::<Vec<f32>>(),
+                ).unwrap();
+
+                ops::convert_to_tensor(arr)
+            }
+        }
+    };
+}
+
 impl_unsigned_slice_to_shape!(usize);
 impl_unsigned_slice_to_shape!(u32);
 impl_unsigned_slice_to_shape!(u64);
+
 impl_signed_slice_to_shape!(isize, -1);
 impl_signed_slice_to_shape!(i32, -1);
 impl_signed_slice_to_shape!(i64, -1);
 impl_signed_slice_to_shape!(f32, -1.);
 impl_signed_slice_to_shape!(f64, -1.);
+
+// --- array ---
+impl_signed_array_to_shape!(f32, -1., 1);
+impl_signed_array_to_shape!(f32, -1., 2);
+impl_signed_array_to_shape!(f32, -1., 3);
+impl_signed_array_to_shape!(f32, -1., 4);
+impl_signed_array_to_shape!(f32, -1., 5);
+impl_signed_array_to_shape!(f32, -1., 6);
+
+impl_signed_array_to_shape!(f64, -1., 1);
+impl_signed_array_to_shape!(f64, -1., 2);
+impl_signed_array_to_shape!(f64, -1., 3);
+impl_signed_array_to_shape!(f64, -1., 4);
+impl_signed_array_to_shape!(f64, -1., 5);
+impl_signed_array_to_shape!(f64, -1., 6);
+
+impl_signed_array_to_shape!(i32, -1, 1);
+impl_signed_array_to_shape!(i32, -1, 2);
+impl_signed_array_to_shape!(i32, -1, 3);
+impl_signed_array_to_shape!(i32, -1, 4);
+impl_signed_array_to_shape!(i32, -1, 5);
+impl_signed_array_to_shape!(i32, -1, 6);
+
+impl_signed_array_to_shape!(i64, -1, 1);
+impl_signed_array_to_shape!(i64, -1, 2);
+impl_signed_array_to_shape!(i64, -1, 3);
+impl_signed_array_to_shape!(i64, -1, 4);
+impl_signed_array_to_shape!(i64, -1, 5);
+impl_signed_array_to_shape!(i64, -1, 6);
+
+impl_signed_array_to_shape!(isize, -1, 1);
+impl_signed_array_to_shape!(isize, -1, 2);
+impl_signed_array_to_shape!(isize, -1, 3);
+impl_signed_array_to_shape!(isize, -1, 4);
+impl_signed_array_to_shape!(isize, -1, 5);
+impl_signed_array_to_shape!(isize, -1, 6);
+
+impl_unsigned_array_to_shape!(usize, 1);
+impl_unsigned_array_to_shape!(usize, 2);
+impl_unsigned_array_to_shape!(usize, 3);
+impl_unsigned_array_to_shape!(usize, 4);
+impl_unsigned_array_to_shape!(usize, 5);
+impl_unsigned_array_to_shape!(usize, 6);
+
+impl_unsigned_array_to_shape!(u32, 1);
+impl_unsigned_array_to_shape!(u32, 2);
+impl_unsigned_array_to_shape!(u32, 3);
+impl_unsigned_array_to_shape!(u32, 4);
+impl_unsigned_array_to_shape!(u32, 5);
+impl_unsigned_array_to_shape!(u32, 6);
+
+impl_unsigned_array_to_shape!(u64, 1);
+impl_unsigned_array_to_shape!(u64, 2);
+impl_unsigned_array_to_shape!(u64, 3);
+impl_unsigned_array_to_shape!(u64, 4);
+impl_unsigned_array_to_shape!(u64, 5);
+impl_unsigned_array_to_shape!(u64, 6);

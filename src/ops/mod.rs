@@ -8,7 +8,7 @@ use tensor::{RawTensor, Tensor};
 #[doc(hidden)]
 pub mod dummy_op;
 mod generator_ops;
-mod transpose_ops;
+mod transpose;
 mod scalar;
 mod setdiff1d;
 mod shape_ops;
@@ -870,52 +870,13 @@ pub fn reduce_prod(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 ///
 /// let mut graph = ag::Graph::new();
 /// let ref x = ag::zeros(&[3, 2, 2]);
-/// let ref y = ag::reshape(&x, &[3, 4]);
+/// let ref y = ag::reshape(&x, [3, -1]);
 ///
 /// assert_eq!(y.eval(&mut graph), ag::ndarray_ext::zeros(&[3, 4]));
 /// ```
-pub fn reshape(x: &Tensor, shape: &[isize]) -> Tensor
+pub fn reshape<T: ::tensor::ArrayType>(x: &Tensor, shape: T) -> Tensor
 {
-    let mut minus_one_found = false;
-    let shape = shape
-        .iter()
-        .map(|&len| if len == -1 {
-            if minus_one_found {
-                panic!("`shape` has two or more `-1` dim.");
-            }
-            minus_one_found = true;
-            None
-        } else if len < -1 {
-            panic!("`shape` contains invalid dim size: {}", len);
-        } else {
-            Some(len as usize)
-        })
-        .collect::<Vec<_>>();
-    let op = shape_ops::ReshapeStatic { target_shape: shape };
-    apply_op(op, &[x])
-}
-
-
-/// Reshapes input tensor.
-///
-/// Unlike `reshape`, target shape is a symbolic tensor.
-///
-/// # Examples
-///
-/// ```
-/// extern crate ndarray;
-/// extern crate autograd as ag;
-///
-/// let mut graph = ag::Graph::new();
-/// let ref x = ag::zeros(&[3, 2, 2]);
-/// let ref shape = ag::shape(&ag::zeros(&[3, 4]));
-/// let ref y = ag::reshape_dynamic(&x, shape);
-///
-/// assert_eq!(y.eval(&mut graph), ag::ndarray_ext::zeros(&[3, 4]));
-/// ```
-pub fn reshape_dynamic(x: &Tensor, shape: &Tensor) -> Tensor
-{
-    apply_op(shape_ops::ReshapeDynamic, &[x, shape])
+    apply_op(shape_ops::Reshape, &[x, &shape.as_tensor()])
 }
 
 
@@ -934,33 +895,32 @@ pub fn reshape_dynamic(x: &Tensor, shape: &Tensor) -> Tensor
 /// ```
 pub fn flatten(x: &Tensor) -> Tensor
 {
-    let op = shape_ops::ReshapeStatic { target_shape: vec![None] };
-    apply_op(op, &[x])
+    apply_op(shape_ops::Reshape, &[x, &scalar(-1.)])
 }
 
 
-/// Compares two tensors and returns a binary tensor.
+/// Returns a binary tensor.
 pub fn greater(x: &Tensor, a: f32) -> Tensor
 {
     apply_op(cmp_ops::Greater { a }, &[x])
 }
 
 
-/// Compares two tensors and returns a binary tensor.
+/// Returns a binary tensor.
 pub fn greater_equal(x: &Tensor, a: f32) -> Tensor
 {
     apply_op(cmp_ops::GreaterEqual { a }, &[x])
 }
 
 
-/// Compares two tensors and returns a binary tensor.
+/// Returns a binary tensor.
 pub fn lesser(x: &Tensor, a: f32) -> Tensor
 {
     apply_op(cmp_ops::Lesser { a }, &[x])
 }
 
 
-/// Compares two tensors and returns a binary tensor.
+/// Returns a binary tensor.
 pub fn lesser_equal(x: &Tensor, a: f32) -> Tensor
 {
     apply_op(cmp_ops::LesserEqual { a }, &[x])
@@ -974,7 +934,7 @@ pub fn sigmoid(x: &Tensor) -> Tensor
 }
 
 
-/// Elementwise exponential linear unit function.
+/// Elementwise exponential linear unit.
 ///
 /// See https://arxiv.org/abs/1511.07289
 pub fn elu(x: &Tensor, alpha: f32) -> Tensor
@@ -983,7 +943,7 @@ pub fn elu(x: &Tensor, alpha: f32) -> Tensor
 }
 
 
-/// Elementwise rectified linear unit function.
+/// Elementwise rectified linear unit.
 pub fn relu(x: &Tensor) -> Tensor
 {
     apply_op(activation_ops::ReLU, &[x])
@@ -1217,7 +1177,7 @@ pub fn tensordot(
             )
         };
 
-        let reshaped = reshape_dynamic(&transpose_dynamic(x, &perm), &new_shape);
+        let reshaped = reshape(&transpose(x, &perm), &new_shape);
         (reshaped, free_dims)
     }
 
@@ -1254,11 +1214,11 @@ pub fn tensordot(
             free.into_iter().chain(axes).collect::<Vec<_>>()
         };
         let new_shape = if flip {
-            [prod_axes as isize, prod_free]
+            vec![prod_axes as isize, prod_free]
         } else {
-            [prod_free, prod_axes as isize]
+            vec![prod_free, prod_axes as isize]
         };
-        let reshaped = reshape(&transpose(x, perm.as_slice()), &new_shape);
+        let reshaped = reshape(&transpose(x, perm.as_slice()), new_shape.as_slice());
         (reshaped, free_dims)
     }
 
@@ -1286,7 +1246,7 @@ pub fn tensordot(
         // CRASH (5, 12) x (2, 12)
         let ref dot = matmul(&a_reshaped, &b_reshaped);
         let final_shape = concat(&[&a_free_dims, &b_free_dims], 0);
-        reshape_dynamic(dot, &final_shape)
+        reshape(dot, &final_shape)
     }
 }
 
@@ -1346,7 +1306,7 @@ pub fn setdiff1d(a: &Tensor, b: &Tensor) -> Tensor
 
 /// Permutes dimensions.
 ///
-/// If `perm.len() == 0`, simply reverses axes of `x`.
+/// If length of `perm` == 0, simply reverses axes of `x`.
 ///
 /// # Examples
 ///
@@ -1355,45 +1315,14 @@ pub fn setdiff1d(a: &Tensor, b: &Tensor) -> Tensor
 ///
 /// let mut graph = ag::Graph::new();
 /// let ref a = ag::zeros(&[1, 2, 3, 4, 5]);
-/// let ref b = ag::transpose(a, &[4, 2, 3, 0, 1]);
-/// let ref c = ag::transpose(a, &[]);
-///
-/// assert_eq!(b.eval(&mut graph).shape(), &[5, 3, 4, 1, 2]);
-/// assert_eq!(c.eval(&mut graph).shape(), &[5, 4, 3, 2, 1]);
-/// ```
-pub fn transpose(x: &Tensor, perm: &[usize]) -> Tensor
-{
-    if perm.is_empty() {
-        apply_op(transpose_ops::ReverseAxes, &[x])
-    } else {
-        let src_dst = perm.iter().cloned().zip(0..perm.len()).collect::<Vec<_>>();
-        let op = transpose_ops::TransposeStatic { src_dst_sorted: src_dst };
-        apply_op(op, &[x])
-    }
-}
-
-
-/// Permutes dimensions.
-///
-/// Similar to `transpose`, but `perm` is a symbolic tensor.
-///
-/// # Examples
-///
-/// ```
-/// extern crate ndarray;
-/// extern crate autograd as ag;
-///
-/// let mut graph = ag::Graph::new();
-/// let ref a = ag::zeros(&[1, 2, 3, 4, 5]);
-/// let ref perm = graph.constant(ndarray::arr1(&[4., 2., 3., 0., 1.]));
-/// let ref b = ag::transpose_dynamic(a, perm);
+/// let ref b = ag::transpose(a, [4, 2, 3, 0, 1]);
 ///
 /// assert_eq!(b.eval(&mut graph).shape(), &[5, 3, 4, 1, 2]);
 /// ```
-pub fn transpose_dynamic(x: &Tensor, perm: &Tensor) -> Tensor
+pub fn transpose<T: ::tensor::ArrayType>(x: &Tensor, perm: T) -> Tensor
 {
-    let op = transpose_ops::TransposeDynamic { zip: true };
-    apply_op(op, &[x, perm])
+    let op = transpose::Transpose { zip: true };
+    apply_op(op, &[x, &perm.as_tensor()])
 }
 
 
