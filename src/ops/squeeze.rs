@@ -5,9 +5,7 @@ use ops;
 use tensor::Tensor;
 
 
-pub struct Squeeze {
-    pub axes: Vec<isize>,
-}
+pub struct Squeeze;
 
 impl ops::Op for Squeeze {
     fn name(&self) -> &str
@@ -18,10 +16,12 @@ impl ops::Op for Squeeze {
     fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
         let mut x = xs[0].view();
+        let mut axes = xs[1].iter().map(|&a| a as isize).collect::<Vec<_>>();
+        axes.sort();
         let mut adjust = 0;
-        for &i in self.axes.iter() {
+        for &i in axes.iter() {
             let axis = if i < 0 {
-                (x.ndim() as isize + i) as usize
+                (x.ndim() as isize + i as isize) as usize
             } else {
                 i as usize
             };
@@ -38,8 +38,8 @@ impl ops::Op for Squeeze {
         x.to_owned()
     }
 
-    fn grad(&self, gy: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
-        vec![Some(ops::expand_dims(gy, self.axes.as_slice()))]
+        vec![Some(ops::expand_dims(gy, inputs[1])), None]
     }
 }

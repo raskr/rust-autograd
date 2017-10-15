@@ -6,21 +6,9 @@ use ops;
 use tensor::Tensor;
 
 
-pub struct Zeros {
-    pub shape: Vec<usize>,
-}
-
-pub struct Ones {
-    pub shape: Vec<usize>,
-}
-
-pub struct RangeDynamic;
-
-pub struct Range {
-    pub start: f32,
-    pub end: f32,
-    pub step: f32,
-}
+pub struct Zeros;
+pub struct Ones;
+pub struct Range;
 
 pub struct ConvertToTensor {
     pub arr: NdArray,
@@ -32,14 +20,25 @@ impl ops::Op for Zeros {
         "Zeros"
     }
 
-    fn compute(&self, _: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
-        ndarray_ext::zeros(self.shape.as_slice())
+        let shape: &NdArray = xs[0];
+        if let Some(a) = shape.as_slice() {
+            ndarray_ext::zeros(a.iter().map(|&b| b as usize).collect::<Vec<_>>().as_slice())
+        } else {
+            ndarray_ext::zeros(
+                shape
+                    .iter()
+                    .map(|&b| b as usize)
+                    .collect::<Vec<_>>()
+                    .as_slice(),
+            )
+        }
     }
 
     fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
-        vec![]
+        vec![None]
     }
 }
 
@@ -49,14 +48,25 @@ impl ops::Op for Ones {
         "Ones"
     }
 
-    fn compute(&self, _: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
     {
-        ndarray_ext::ones(self.shape.as_slice())
+        let shape: &NdArray = xs[0];
+        if let Some(a) = shape.as_slice() {
+            ndarray_ext::ones(a.iter().map(|&b| b as usize).collect::<Vec<_>>().as_slice())
+        } else {
+            ndarray_ext::ones(
+                shape
+                    .iter()
+                    .map(|&b| b as usize)
+                    .collect::<Vec<_>>()
+                    .as_slice(),
+            )
+        }
     }
 
     fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
-        vec![]
+        vec![None]
     }
 }
 
@@ -64,23 +74,6 @@ impl ops::Op for Range {
     fn name(&self) -> &str
     {
         "Range"
-    }
-
-    fn compute(&self, _: &[&NdArray], _: bool) -> NdArray
-    {
-        ndarray::Array1::range(self.start, self.end, self.step).into_dyn()
-    }
-
-    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
-        vec![]
-    }
-}
-
-impl ops::Op for RangeDynamic {
-    fn name(&self) -> &str
-    {
-        "RangeDynamic"
     }
 
     fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
@@ -103,7 +96,7 @@ impl ops::Op for RangeDynamic {
 
     fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
-        vec![]
+        vec![None, None, None]
     }
 }
 

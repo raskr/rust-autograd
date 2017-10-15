@@ -21,7 +21,7 @@ fn add_n()
     let ref v2 = graph.variable(ndarray::arr1(&[1., 2., 3.]));
     let ref v3 = graph.variable(ndarray::arr1(&[1., 2., 3.]));
     let ref z = ag::add_n(&[v1, v2, v3]);
-    let ref g = ag::gradients(&[z], &[v2], &[Some(&ag::ones(&[3]))]);
+    let ref g = ag::gradients(&[z], &[v2], &[Some(&ag::ones([3]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v2], graph, 1e-3, 1e-3);
 }
 
@@ -31,7 +31,7 @@ fn clip()
     let mut graph = ag::Graph::new();
     let ref v = graph.variable(ndarray::arr1(&[1., 2., 3.]));
     let ref z = ag::clip(v, 1.5, 2.5);
-    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[3]))]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones([3]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
 
@@ -41,7 +41,7 @@ fn asinh()
     let mut graph = ag::Graph::new();
     let ref v = graph.variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
     let ref z = ag::asinh(v);
-    let ref g = ag::gradients(&[z], &[v], &[Some(&&ag::ones(&[3]))]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&&ag::ones([3]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
 
@@ -51,7 +51,7 @@ fn acosh()
     let mut graph = ag::Graph::new();
     let ref v = graph.variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
     let ref z = ag::acosh(v);
-    let ref g = ag::gradients(&[z], &[v], &[Some(&&ag::ones(&[3]))]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&&ag::ones([3]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
 
@@ -61,7 +61,7 @@ fn atanh()
     let mut graph = ag::Graph::new();
     let ref v = graph.variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
     let ref z = ag::atanh(v);
-    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[3]))]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones([3]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
 
@@ -71,7 +71,7 @@ fn sinh()
     let mut graph = ag::Graph::new();
     let ref v = graph.variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
     let ref z = ag::sinh(v);
-    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[3]))]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones([3]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
 
@@ -81,7 +81,7 @@ fn cosh()
     let mut graph = ag::Graph::new();
     let ref v = graph.variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
     let ref z = ag::cosh(v);
-    let ref g = ag::gradients(&[z], &[v], &[Some(&&ag::ones(&[3]))]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&&ag::ones([3]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
 
@@ -91,7 +91,7 @@ fn tanh()
     let mut graph = ag::Graph::new();
     let ref v = graph.variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
     let ref z = ag::tanh(v);
-    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[3]))]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones([3]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
 
@@ -101,7 +101,7 @@ fn asin()
     let mut graph = ag::Graph::new();
     let ref v = graph.variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
     let ref z = ag::asin(v);
-    let ref g = ag::gradients(&[z], &[v], &[Some(&&ag::ones(&[3]))]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&&ag::ones([3]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-2);
 }
 
@@ -111,7 +111,7 @@ fn acos()
     let mut graph = ag::Graph::new();
     let ref v = graph.variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
     let ref z = ag::acos(v);
-    let ref g = ag::gradients(&[z], &[v], &[Some(&&ag::ones(&[3]))]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&&ag::ones([3]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
 
@@ -121,7 +121,7 @@ fn atan()
     let mut graph = ag::Graph::new();
     let ref v = graph.variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
     let ref z = ag::atan(v);
-    let ref g = ag::gradients(&[z], &[v], &[Some(&&ag::ones(&[3]))]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&&ag::ones([3]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
 
@@ -131,7 +131,7 @@ fn sin()
     let mut graph = ag::Graph::new();
     let ref v = graph.variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
     let ref z = ag::sin(v);
-    let ref g = ag::gradients(&[z], &[v], &[Some(&&ag::ones(&[3]))]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&&ag::ones([3]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
 
@@ -141,7 +141,7 @@ fn cos()
     let mut graph = ag::Graph::new();
     let ref v = graph.variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
     let ref z = ag::cos(v);
-    let ref g = ag::gradients(&[z], &[v], &[Some(&&ag::ones(&[3]))]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&&ag::ones([3]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
 
@@ -151,7 +151,7 @@ fn tan()
     let mut graph = ag::Graph::new();
     let ref v = graph.variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
     let ref z = ag::tan(v);
-    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[3]))]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones([3]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-2);
 }
 
@@ -161,7 +161,7 @@ fn pow()
     let mut graph = ag::Graph::new();
     let ref v = graph.variable(ag::ndarray_ext::random_uniform(&[3], 0.9, 1.1));
     let ref z = ag::pow(v, 1.1);
-    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[3]))]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones([3]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
 
@@ -171,7 +171,7 @@ fn exp()
     let mut graph = ag::Graph::new();
     let ref v = graph.variable(ag::ndarray_ext::random_uniform(&[3], 0.9, 1.1));
     let ref z = ag::exp(v);
-    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[3]))]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones([3]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-2);
 }
 
@@ -182,7 +182,7 @@ fn log()
     let mut graph = ag::Graph::new();
     let ref v = graph.variable(ag::ndarray_ext::random_uniform(&[3], 1., 1.1));
     let ref z = ag::log(v, f32::consts::E);
-    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[3]))]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones([3]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-2);
 }
 
@@ -191,8 +191,8 @@ fn expand_dims()
 {
     let mut graph = ag::Graph::new();
     let ref v = graph.variable(ag::ndarray_ext::standard_normal(&[3]));
-    let ref z = ag::expand_dims(v, &[0, 2]);
-    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[1, 3, 1]))]);
+    let ref z = ag::expand_dims(v, [0, 2]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones([1, 3, 1]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
 
@@ -201,8 +201,8 @@ fn squeeze()
 {
     let mut graph = ag::Graph::new();
     let ref v = graph.variable(ag::ndarray_ext::standard_normal(&[3, 1, 2, 1]));
-    let ref z = ag::squeeze(v, &[3, 1]);
-    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[3, 2]))]);
+    let ref z = ag::squeeze(v, [3, 1]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones([3, 2]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
 
@@ -213,7 +213,7 @@ fn matmul()
     let ref a = graph.constant(ag::ndarray_ext::standard_normal(&[4, 2]));
     let ref v = graph.variable(ag::ndarray_ext::standard_normal(&[2, 3]));
     let ref z = ag::matmul(a, v);
-    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[4, 3]))]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones([4, 3]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
 
@@ -224,7 +224,7 @@ fn batch_matmul()
     let ref a = graph.constant(ag::ndarray_ext::standard_normal(&[2, 4, 2]));
     let ref v = graph.variable(ag::ndarray_ext::standard_normal(&[2, 2, 3]));
     let ref z = ag::batch_matmul(a, v);
-    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[2, 4, 3]))]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones([2, 4, 3]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
 
@@ -235,7 +235,7 @@ fn implicit_broadcast()
     let ref x = graph.constant(ag::ndarray_ext::standard_normal(&[4, 3]));
     let ref b = graph.variable(ag::ndarray_ext::zeros(&[1, 3]));
     let ref z = x + b;
-    let ref g = ag::gradients(&[z], &[b], &[Some(&ag::ones(&[4, 3]))]);
+    let ref g = ag::gradients(&[z], &[b], &[Some(&ag::ones([4, 3]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[b], graph, 1e-3, 1e-3);
 }
 
@@ -247,7 +247,7 @@ fn xw_plus_b()
     let ref w = graph.variable(ag::ndarray_ext::standard_normal(&[2, 3]));
     let ref b = graph.variable(ag::ndarray_ext::zeros(&[1, 3]));
     let ref z = ag::matmul(x, w) + b;
-    let ref g = ag::gradients(&[z], &[b], &[Some(&ag::ones(&[4, 3]))]);
+    let ref g = ag::gradients(&[z], &[b], &[Some(&ag::ones([4, 3]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[b], graph, 1e-3, 1e-3);
 }
 
@@ -257,7 +257,7 @@ fn reduce_min()
     let mut graph = ag::Graph::new();
     let ref v = graph.variable(ag::ndarray_ext::standard_normal(&[3, 2, 2]));
     let ref z = ag::reduce_min(v, 1, false); // keep_dims=false
-    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[3, 2]))]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones([3, 2]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
 
@@ -267,7 +267,7 @@ fn reduce_min_keep()
     let mut graph = ag::Graph::new();
     let ref v = graph.variable(ag::ndarray_ext::standard_normal(&[3, 2, 2]));
     let ref z = ag::reduce_min(v, 1, true); // keep_dims=true
-    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[3, 1, 2]))]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones([3, 1, 2]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
 
@@ -277,7 +277,7 @@ fn reduce_max()
     let mut graph = ag::Graph::new();
     let ref v = graph.variable(ag::ndarray_ext::standard_normal(&[3, 2, 2]));
     let ref z = ag::reduce_max(v, 1, false); // keep_dims=false
-    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[3, 2]))]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones([3, 2]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
 
@@ -287,7 +287,7 @@ fn reduce_max_keep()
     let mut graph = ag::Graph::new();
     let ref v = graph.variable(ag::ndarray_ext::standard_normal(&[3, 2, 2]));
     let ref z = ag::reduce_max(v, 1, true); // keep_dims=true
-    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[3, 1, 2]))]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones([3, 1, 2]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
 
@@ -297,7 +297,7 @@ fn reduce_mean()
     let mut graph = ag::Graph::new();
     let ref v = graph.variable(ag::ndarray_ext::standard_normal(&[3, 2, 2]));
     let ref z = ag::reduce_mean(v, 1, false); // keep_dims=false
-    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[3, 2]))]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones([3, 2]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
 
@@ -307,7 +307,7 @@ fn reduce_mean_keep()
     let mut graph = ag::Graph::new();
     let ref v = graph.variable(ag::ndarray_ext::standard_normal(&[3, 2, 2]));
     let ref z = ag::reduce_mean(v, 1, true); // keep_dims=true
-    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[3, 1, 2]))]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones([3, 1, 2]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
 
@@ -317,7 +317,7 @@ fn reduce_sum()
     let mut graph = ag::Graph::new();
     let ref v = graph.variable(ag::ndarray_ext::standard_normal(&[3, 2, 2]));
     let ref z = ag::reduce_sum(v, 1, false); // keep_dims=false
-    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[3, 2]))]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones([3, 2]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
 
@@ -327,7 +327,7 @@ fn reduce_sum_keep()
     let mut graph = ag::Graph::new();
     let ref v = graph.variable(ag::ndarray_ext::standard_normal(&[3, 2, 2]));
     let ref z = ag::reduce_sum(v, 1, true); // keep_dims=true
-    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[3, 1, 2]))]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones([3, 1, 2]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
 
@@ -337,7 +337,7 @@ fn reduce_prod()
     let mut graph = ag::Graph::new();
     let ref v = graph.variable(ag::ndarray_ext::standard_normal(&[3, 2, 2]));
     let ref z = ag::reduce_prod(v, 1, false); // keep_dims=false
-    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[3, 2]))]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones([3, 2]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
 
@@ -347,7 +347,7 @@ fn transpose()
     let mut graph = ag::Graph::new();
     let ref v = graph.constant(ag::ndarray_ext::zeros(&[1, 2, 3, 4, 5]));
     let ref z = ag::transpose(v, [4, 2, 3, 0, 1]);
-    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[5, 3, 4, 1, 2]))]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones([5, 3, 4, 1, 2]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
 
@@ -358,7 +358,7 @@ fn reshape_after_transpose()
     let ref v = graph.constant(ag::ndarray_ext::zeros(&[1, 2, 3, 4, 5]));
     let ref z = ag::transpose(v, [4, 2, 3, 0, 1]);
     let ref z = ag::reshape(z, [15, 8]);
-    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[15, 8]))]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones([15, 8]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
 
@@ -366,10 +366,10 @@ fn reshape_after_transpose()
 fn add_inplace()
 {
     let mut graph = ag::Graph::new();
-    let a = ag::zeros(&[2, 2]) + ag::ones(&[2, 2]);
+    let a = ag::zeros([2, 2]) + ag::ones([2, 2]);
     let ref b = graph.variable(ag::ndarray_ext::standard_normal(&[2, 2]));
     let ref c = ag::add_inplace(a, b);
-    let ref g = ag::gradients(&[c], &[b], &[Some(&ag::ones(&[2, 2]))]);
+    let ref g = ag::gradients(&[c], &[b], &[Some(&ag::ones([2, 2]))]);
     ag::test_helper::gradient_check(c, g.as_slice(), &[b], graph, 1e-3, 1e-3);
 }
 
@@ -377,10 +377,10 @@ fn add_inplace()
 fn sub_inplace()
 {
     let mut graph = ag::Graph::new();
-    let a = ag::zeros(&[2, 2]) + ag::ones(&[2, 2]);
+    let a = ag::zeros([2, 2]) + ag::ones([2, 2]);
     let ref b = graph.variable(ag::ndarray_ext::standard_normal(&[2, 2]));
     let ref c = ag::sub_inplace(a, b);
-    let ref g = ag::gradients(&[c], &[b], &[Some(&ag::ones(&[2, 2]))]);
+    let ref g = ag::gradients(&[c], &[b], &[Some(&ag::ones([2, 2]))]);
     ag::test_helper::gradient_check(c, g.as_slice(), &[b], graph, 1e-3, 1e-3);
 }
 
@@ -391,7 +391,7 @@ fn add()
     let ref a = graph.variable(ag::ndarray_ext::standard_normal(&[2, 2]));
     let ref b = graph.variable(ag::ndarray_ext::standard_normal(&[2, 2]));
     let ref z = a + b;
-    let ref g = ag::gradients(&[z], &[a, b], &[Some(&ag::ones(&[2, 2]))]);
+    let ref g = ag::gradients(&[z], &[a, b], &[Some(&ag::ones([2, 2]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[a], graph, 1e-3, 1e-3);
 }
 
@@ -402,7 +402,7 @@ fn mul()
     let ref a = graph.variable(ag::ndarray_ext::standard_normal(&[2, 2]));
     let ref b = graph.variable(ag::ndarray_ext::standard_normal(&[2, 2]));
     let ref z = a * b;
-    let ref g = ag::gradients(&[z], &[a, b], &[Some(&ag::ones(&[2, 2]))]);
+    let ref g = ag::gradients(&[z], &[a, b], &[Some(&ag::ones([2, 2]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[a], graph, 1e-3, 1e-3);
 }
 
@@ -412,7 +412,7 @@ fn sigmoid()
     let mut graph = ag::Graph::new();
     let ref v = graph.variable(ag::ndarray_ext::standard_normal(&[2, 2]));
     let ref z = ag::sigmoid(v);
-    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[2, 2]))]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones([2, 2]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
 
@@ -422,7 +422,7 @@ fn elu()
     let mut graph = ag::Graph::new();
     let ref v = graph.variable(ag::ndarray_ext::standard_normal(&[2, 2]));
     let ref z = ag::elu(v, 1.);
-    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[2, 2]))]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones([2, 2]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
 
@@ -432,7 +432,7 @@ fn relu()
     let mut graph = ag::Graph::new();
     let ref v = graph.variable(ag::ndarray_ext::standard_normal(&[2, 2]));
     let ref z = ag::relu(v);
-    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[2, 2]))]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones([2, 2]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
 
@@ -442,7 +442,7 @@ fn logsumexp()
     let mut graph = ag::Graph::new();
     let ref v = graph.variable(ag::ndarray_ext::standard_normal(&[1, 3]));
     let ref z = ag::logsumexp(v, 1);
-    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[1, 3]))]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones([1, 3]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
 
@@ -452,7 +452,7 @@ fn log_softmax()
     let mut graph = ag::Graph::new();
     let ref v = graph.variable(ag::ndarray_ext::standard_normal(&[1, 3]));
     let ref z = ag::log_softmax(v, 1);
-    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[1, 3]))]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones([1, 3]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
 
@@ -474,7 +474,7 @@ fn sigmoid_cross_entropy()
     let ref t = graph.constant(ag::ndarray_ext::standard_normal(&[1, 3]));
     let ref v = graph.variable(ag::ndarray_ext::standard_normal(&[1, 3]));
     let ref z = ag::sigmoid_cross_entropy(v, t);
-    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[1]))]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones([1]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
 
@@ -496,7 +496,7 @@ fn gather()
     let ref v = graph.variable(ag::ndarray_ext::zeros(&[5, 4, 8, 2]));
     let ref x = graph.constant(ndarray::arr2(&[[5., 4., 3.], [2., 1., 0.]]));
     let ref z = ag::gather(v, x, 2);
-    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[5, 4, 2, 3, 2]))]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones([5, 4, 2, 3, 2]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
 
@@ -507,7 +507,7 @@ fn concat()
     let ref v1 = graph.variable(ag::ndarray_ext::standard_normal(&[1, 2]));
     let ref v2 = graph.variable(ag::ndarray_ext::standard_normal(&[1, 2]));
     let ref z = ag::concat(&[v1, v2], 1);
-    let ref g = ag::gradients(&[z], &[v1], &[Some(&ag::ones(&[1, 4]))]);
+    let ref g = ag::gradients(&[z], &[v1], &[Some(&ag::ones([1, 4]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v1], graph, 1e-3, 1e-3);
     // FIXME: uncommenting below causes SEGV
     // ag::helper::gradient_check(z, &[v1, v2], g.as_slice(), &ag::Input::new(), 1e-3, 1e-3);
@@ -519,7 +519,7 @@ fn slice()
     let mut graph = ag::Graph::new();
     let ref v = graph.variable(ag::ndarray_ext::standard_normal(&[4, 4]));
     let ref z = ag::slice(v, &[0, 0], &[-1, 2]); // numpy equivalent is v[:, 0:2]
-    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[4, 2]))]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones([4, 2]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
 
@@ -529,7 +529,7 @@ fn split()
     let mut graph = ag::Graph::new();
     let ref v = graph.variable(ag::ndarray_ext::standard_normal(&[3, 7, 5]));
     let ref z = ag::split(v, &[2, 3, 2], 1);
-    let ref g = ag::gradients(&[&z[1]], &[v], &[Some(&ag::ones(&[3, 3, 5]))]);
+    let ref g = ag::gradients(&[&z[1]], &[v], &[Some(&ag::ones([3, 3, 5]))]);
     ag::test_helper::gradient_check(&z[1], g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
 
@@ -539,7 +539,7 @@ fn flatten()
     let mut graph = ag::Graph::new();
     let ref v = graph.variable(ag::ndarray_ext::standard_normal(&[4, 4]));
     let ref z = ag::flatten(v);
-    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[16]))]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones([16]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
 
@@ -549,7 +549,7 @@ fn reshape()
     let mut graph = ag::Graph::new();
     let ref v = graph.variable(ag::ndarray_ext::standard_normal(&[4, 4]));
     let ref z = ag::reshape(v, [4, 2, 2]);
-    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[4, 2, 2]))]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones([4, 2, 2]))]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
 
@@ -559,8 +559,8 @@ fn reshape_grad()
     let mut graph = ag::Graph::new();
     let ref v = graph.variable(ag::ndarray_ext::standard_normal(&[4, 4]));
     let ref z = ag::reshape(&(v * v), [4, 2, 2]);
-    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones(&[4, 2, 2]))])[0];
-    let ref gg = ag::gradients(&[g], &[v], &[Some(&ag::ones(&[4, 4]))]);
+    let ref g = ag::gradients(&[z], &[v], &[Some(&ag::ones([4, 2, 2]))])[0];
+    let ref gg = ag::gradients(&[g], &[v], &[Some(&ag::ones([4, 4]))]);
     ag::test_helper::gradient_check(g, gg.as_slice(), &[v], graph, 1e-3, 1e-3);
 }
 
@@ -612,7 +612,7 @@ fn primitive_back_propagation_through_time()
     );
     graph.feed(&h_buf[0], ag::ndarray_ext::zeros(&[batch_size, 3]));
     let params = &[lookup_table, wo, wh];
-    let ref g = ag::gradients(&[loss], params, &[Some(&ag::ones(&[batch_size, 1]))]);
+    let ref g = ag::gradients(&[loss], params, &[Some(&ag::ones([batch_size, 1]))]);
     ag::test_helper::gradient_check(loss, g.as_slice(), params, graph, 1e-3, 1e-3);
 }
 

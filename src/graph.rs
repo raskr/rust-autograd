@@ -22,7 +22,7 @@ use tensor::{RawTensor, Tensor};
 /// let mut graph = ag::Graph::new();
 ///
 /// let ref a = graph.placeholder();
-/// let ref b = ag::ones(&[2]);
+/// let ref b = ag::ones([2]);
 /// let ref v = graph.variable(ndarray::arr1(&[2., 2.]));
 /// let ref z = a + b + v;
 ///

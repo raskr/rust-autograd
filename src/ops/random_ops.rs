@@ -1,45 +1,36 @@
+use ndarray_ext;
 use ops;
 use tensor::Tensor;
 
 
-pub struct RandomNormal {
-    pub shape: Vec<usize>,
-    pub mean: f64,
-    pub stddev: f64,
-}
+pub struct StandardNormal;
+
+pub struct StandardUniform;
 
 pub struct RandomUniform {
-    pub shape: Vec<usize>,
     pub max: f64,
     pub min: f64,
 }
 
-pub struct StandardNormal {
-    pub shape: Vec<usize>,
-}
-
-pub struct StandardUniform {
-    pub shape: Vec<usize>,
+pub struct RandomNormal {
+    pub mean: f64,
+    pub stddev: f64,
 }
 
 pub struct Bernoulli {
-    pub shape: Vec<usize>,
     pub p: f64,
 }
 
 pub struct Exponential {
-    pub shape: Vec<usize>,
     pub lambda: f64,
 }
 
 pub struct LogNormal {
-    pub shape: Vec<usize>,
     pub mean: f64,
     pub stddev: f64,
 }
 
 pub struct Gamma {
-    pub shape: Vec<usize>,
     pub shape_param: f64,
     pub scale: f64,
 }
@@ -56,9 +47,10 @@ impl ops::Op for RandomNormal {
         vec![None]
     }
 
-    fn compute(&self, _: &[&::NdArray], _: bool) -> ::NdArray
+    fn compute(&self, xs: &[&::NdArray], _: bool) -> ::NdArray
     {
-        ::ndarray_ext::random_normal(self.shape.as_slice(), self.mean, self.stddev)
+        let shape = ndarray_ext::arr_to_shape(xs[0]);
+        ::ndarray_ext::random_normal(shape.as_slice(), self.mean, self.stddev)
     }
 }
 
@@ -73,9 +65,10 @@ impl ops::Op for RandomUniform {
         vec![None]
     }
 
-    fn compute(&self, _: &[&::NdArray], _: bool) -> ::NdArray
+    fn compute(&self, xs: &[&::NdArray], _: bool) -> ::NdArray
     {
-        ::ndarray_ext::random_uniform(self.shape.as_slice(), self.min, self.max)
+        let shape = ndarray_ext::arr_to_shape(xs[0]);
+        ::ndarray_ext::random_uniform(shape.as_slice(), self.min, self.max)
     }
 }
 
@@ -90,9 +83,10 @@ impl ops::Op for StandardNormal {
         vec![None]
     }
 
-    fn compute(&self, _: &[&::NdArray], _: bool) -> ::NdArray
+    fn compute(&self, xs: &[&::NdArray], _: bool) -> ::NdArray
     {
-        ::ndarray_ext::standard_normal(self.shape.as_slice())
+        let shape = ndarray_ext::arr_to_shape(xs[0]);
+        ::ndarray_ext::standard_normal(shape.as_slice())
     }
 }
 
@@ -107,9 +101,10 @@ impl ops::Op for StandardUniform {
         vec![None]
     }
 
-    fn compute(&self, _: &[&::NdArray], _: bool) -> ::NdArray
+    fn compute(&self, xs: &[&::NdArray], _: bool) -> ::NdArray
     {
-        ::ndarray_ext::standard_uniform(self.shape.as_slice())
+        let shape = ndarray_ext::arr_to_shape(xs[0]);
+        ::ndarray_ext::standard_uniform(shape.as_slice())
     }
 }
 
@@ -124,9 +119,10 @@ impl ops::Op for Bernoulli {
         vec![None]
     }
 
-    fn compute(&self, _: &[&::NdArray], _: bool) -> ::NdArray
+    fn compute(&self, xs: &[&::NdArray], _: bool) -> ::NdArray
     {
-        ::ndarray_ext::bernoulli(self.shape.as_slice(), self.p)
+        let shape = ndarray_ext::arr_to_shape(xs[0]);
+        ::ndarray_ext::bernoulli(shape.as_slice(), self.p)
     }
 }
 
@@ -141,9 +137,10 @@ impl ops::Op for Exponential {
         vec![None]
     }
 
-    fn compute(&self, _: &[&::NdArray], _: bool) -> ::NdArray
+    fn compute(&self, xs: &[&::NdArray], _: bool) -> ::NdArray
     {
-        ::ndarray_ext::exponential(self.shape.as_slice(), self.lambda)
+        let shape = ndarray_ext::arr_to_shape(xs[0]);
+        ::ndarray_ext::exponential(shape.as_slice(), self.lambda)
     }
 }
 
@@ -158,9 +155,10 @@ impl ops::Op for LogNormal {
         vec![None]
     }
 
-    fn compute(&self, _: &[&::NdArray], _: bool) -> ::NdArray
+    fn compute(&self, xs: &[&::NdArray], _: bool) -> ::NdArray
     {
-        ::ndarray_ext::log_normal(self.shape.as_slice(), self.mean, self.stddev)
+        let shape = ndarray_ext::arr_to_shape(xs[0]);
+        ::ndarray_ext::log_normal(shape.as_slice(), self.mean, self.stddev)
     }
 }
 
@@ -175,8 +173,9 @@ impl ops::Op for Gamma {
         vec![None]
     }
 
-    fn compute(&self, _: &[&::NdArray], _: bool) -> ::NdArray
+    fn compute(&self, xs: &[&::NdArray], _: bool) -> ::NdArray
     {
-        ::ndarray_ext::gamma(self.shape.as_slice(), self.shape_param, self.scale)
+        let shape = ndarray_ext::arr_to_shape(xs[0]);
+        ::ndarray_ext::gamma(shape.as_slice(), self.shape_param, self.scale)
     }
 }

@@ -12,6 +12,14 @@ pub type NdArrayView<'a> = ndarray::ArrayView<'a, f32, ndarray::IxDyn>;
 pub use array_gen::*;
 
 
+
+#[inline]
+pub fn arr_to_shape(arr: &NdArray) -> Vec<usize>
+{
+    arr.iter().map(|&a| a as usize).collect::<Vec<_>>()
+}
+
+
 #[doc(hidden)]
 #[inline]
 // TODO: remove unwrap
