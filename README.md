@@ -50,13 +50,12 @@ Another example: multi layer perceptron for MNIST.
 
 ```rust
 // -- graph def --
-let mut graph = ag::Graph::new();
+let mut g = ag::Graph::new();
 
-let ref x = graph.placeholder();
-let ref y = graph.placeholder();
-let ref w = graph.variable(ag::ndarray_ext::glorot_uniform(&[28 * 28, 10]));
-let ref b = graph.variable(ag::ndarray_ext::zeros(&[1, 10]));
-
+let ref x = g.placeholder();
+let ref y = g.placeholder();
+let ref w = g.variable(ag::ndarray_ext::glorot_uniform(&[28 * 28, 10]));
+let ref b = g.variable(ag::ndarray_ext::zeros(&[1, 10]));
 let ref z = ag::matmul(x, w) + b;
 let ref loss = ag::sparse_softmax_cross_entropy(z, y);
 let ref grads = ag::gradients(loss, &[w, b], None);
