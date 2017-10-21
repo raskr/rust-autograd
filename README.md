@@ -3,7 +3,7 @@
 [![Build Status](https://travis-ci.org/perrier1034/rust-autograd.svg?branch=master)](https://travis-ci.org/perrier1034/rust-autograd)
 [![](http://meritbadge.herokuapp.com/autograd)](https://crates.io/crates/autograd)
 
-A library to run the computation graphs whose backend is 
+A library to run the computation graphs, whose current backend is 
 [rust-ndarray](https://github.com/bluss/rust-ndarray).
 
 Documentation: https://docs.rs/autograd/

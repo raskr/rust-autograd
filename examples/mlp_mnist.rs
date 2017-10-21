@@ -7,7 +7,7 @@ use std::time::Instant;
 
 // This is softmax regression with Adam optimizer for mnist.
 // 0.918 test accuracy after 3 epochs,
-// 0.25 sec/epoch on 2.7GHz Intel Core i5
+// 0.25 sec/epoch on 2.7GHz Intel Core i5 (blas feature is disabled)
 //
 // First, run "./download_mnist.sh" beforehand if you don't have dataset and then run
 // "cargo run --example mlp_mnist --release" in `examples` dicectory.
@@ -65,7 +65,7 @@ fn main()
     // -- test --
     graph.feed(x, x_test);
     graph.feed(y, y_test);
-    println!("test accuracy: {}", graph.eval(&[accuracy])[0]);
+    println!("test accuracy: {}", accuracy.eval(&mut graph));
 }
 
 pub mod dataset {
