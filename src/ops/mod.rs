@@ -1094,7 +1094,6 @@ pub fn matmul_t(a: &Tensor, b: &Tensor, transpose_a: bool, transpose_b: bool) ->
 /// * `b` - Input tensor
 /// * `a_axes` - Contraction axes
 /// * `b_axes` - Contraction axes
-/// * `input_shapes` - `a`'s and `b`'s shapes. This is optional but hint for performance.
 ///
 /// Contraction is computed along corresponding `a`'s and `b`'s axes.
 /// The number of the axes must be equals.
@@ -1110,29 +1109,23 @@ pub fn matmul_t(a: &Tensor, b: &Tensor, transpose_a: bool, transpose_b: bool) ->
 ///
 /// let ref a = ag::zeros([3, 4, 5]);
 /// let ref b = ag::zeros([4, 3, 2]);
-/// let ref c = ag::tensordot(a, b, &[1, 0], &[0, 1], None);
+/// let ref c = ag::tensordot(a, b, &[1, 0], &[0, 1]);
 /// assert_eq!(c.eval(&mut graph).shape(), &[5, 2]);
 ///
 /// // Another example (simple matmul broadcast)
 /// let ref a = ag::zeros([2, 3, 4]);
 /// let ref b = ag::zeros([4, 2]);
-/// let ref c = ag::tensordot(a, b, &[2], &[0], Some((&[2, 3, 4], &[4, 2])));
+/// let ref c = ag::tensordot(a, b, &[2], &[0]);
 /// assert_eq!(c.eval(&mut graph).shape(), &[2, 3, 2]);
 /// ```
 ///
 /// For detailed description,
 /// see https://docs.scipy.org/doc/numpy/reference/generated/numpy.tensordot.html.
-pub fn tensordot(
-    a: &Tensor,
-    b: &Tensor,
-    a_axes: &[isize],
-    b_axes: &[isize],
-    input_shapes: Option<(&[usize], &[usize])>,
-) -> Tensor
+pub fn tensordot(a: &Tensor, b: &Tensor, a_axes: &[isize], b_axes: &[isize]) -> Tensor
 {
     assert_eq!(a_axes.len(), b_axes.len());
 
-    fn preprocess_dynamic(x: &Tensor, axes: &[isize], flip: bool) -> (Tensor, Tensor)
+    fn preprocess(x: &Tensor, axes: &[isize], flip: bool) -> (Tensor, Tensor)
     {
         let ref x_shape = shape(x);
         let ref x_rank = rank(x);
@@ -1177,73 +1170,12 @@ pub fn tensordot(
         (reshaped, free_dims)
     }
 
-    fn preprocess_static(
-        x: &Tensor,
-        x_shape: &[usize],
-        axes: &[isize],
-        flip: bool,
-    ) -> (Tensor, Vec<isize>)
-    {
-        let axes = axes.iter()
-            .map(|&i| if i >= 0 {
-                i as usize
-            } else {
-                (i + x_shape.len() as isize) as usize
-            })
-            .collect::<Vec<_>>();
-
-        let mut free: Vec<usize> = vec![];
-        for i in 0..x_shape.len() {
-            if !axes.contains(&i) {
-                free.push(i);
-            }
-        }
-        let free_dims = free.clone()
-            .into_iter()
-            .map(|i| x_shape[i] as isize)
-            .collect::<Vec<_>>();
-        let prod_free: isize = free_dims.clone().into_iter().product();
-        let prod_axes: usize = axes.iter().cloned().map(|a| x_shape[a]).product();
-        let perm = if flip {
-            axes.into_iter().chain(free).collect::<Vec<_>>()
-        } else {
-            free.into_iter().chain(axes).collect::<Vec<_>>()
-        };
-        let new_shape = if flip {
-            vec![prod_axes as isize, prod_free]
-        } else {
-            vec![prod_free, prod_axes as isize]
-        };
-        let reshaped = reshape(&transpose(x, perm.as_slice()), new_shape.as_slice());
-        (reshaped, free_dims)
-    }
-
     // main procedure
-    if let Some((a_shape, b_shape)) = input_shapes {
-        // static
-        let ((a_reshaped, a_free_dims), (b_reshaped, b_free_dims)) =
-            (
-                preprocess_static(a, a_shape, a_axes, false),
-                preprocess_static(b, b_shape, b_axes, true),
-            );
-        let ref dot = matmul(&a_reshaped, &b_reshaped);
-        let final_shape = a_free_dims
-            .into_iter()
-            .chain(b_free_dims.into_iter())
-            .collect::<Vec<isize>>();
-        reshape(dot, final_shape.as_slice())
-    } else {
-        // dynamic
-        let ((a_reshaped, a_free_dims), (b_reshaped, b_free_dims)) =
-            (
-                preprocess_dynamic(a, a_axes, false),
-                preprocess_dynamic(b, b_axes, true),
-            );
-        // CRASH (5, 12) x (2, 12)
-        let ref dot = matmul(&a_reshaped, &b_reshaped);
-        let final_shape = concat(&[&a_free_dims, &b_free_dims], 0);
-        reshape(dot, &final_shape)
-    }
+    let ((a_reshaped, a_free_dims), (b_reshaped, b_free_dims)) =
+        (preprocess(a, a_axes, false), preprocess(b, b_axes, true));
+    let ref dot = matmul(&a_reshaped, &b_reshaped);
+    let final_shape = concat(&[&a_free_dims, &b_free_dims], 0);
+    reshape(dot, &final_shape)
 }
 
 
@@ -1301,8 +1233,6 @@ pub fn setdiff1d(a: &Tensor, b: &Tensor) -> Tensor
 
 
 /// Permutes dimensions.
-///
-/// If length of `perm` == 0, simply reverses axes of `x`.
 ///
 /// # Examples
 ///
