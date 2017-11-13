@@ -29,8 +29,7 @@ mod split;
 mod slice;
 mod xent_ops;
 mod gather;
-mod matmul;
-mod batch_matmul;
+mod dot_ops;
 mod reduction_ops;
 mod squeeze;
 mod expand_dims;
@@ -659,12 +658,12 @@ pub fn argmax(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 /// extern crate autograd as ag;
 ///
 /// let mut graph = ag::Graph::new();
-/// let ref a = graph.constant(ag::ndarray_ext::standard_normal(&[3]));
+/// let ref a = ag::zeros([3]);
 /// let ref b = ag::expand_dims(a, [0, 2]);
 ///
 /// assert_eq!(b.eval(&mut graph).shape(), &[1, 3, 1]);
 /// ```
-pub fn expand_dims<T: ::tensor::ArrayType>(x: &Tensor, axes: T) -> Tensor
+pub fn expand_dims<T: ::tensor::ArrayLike>(x: &Tensor, axes: T) -> Tensor
 {
     apply_op(expand_dims::ExpandDims, &[x, &axes.as_tensor()])
 }
@@ -680,12 +679,12 @@ pub fn expand_dims<T: ::tensor::ArrayType>(x: &Tensor, axes: T) -> Tensor
 /// extern crate autograd as ag;
 ///
 /// let mut graph = ag::Graph::new();
-/// let ref a = graph.constant(ag::ndarray_ext::standard_normal(&[1, 3, 1]));
+/// let ref a = ag::zeros([1, 3, 1]);
 /// let ref b = ag::squeeze(a, [0, 2]);
 ///
 /// assert_eq!(b.eval(&mut graph).shape(), &[3]);
 /// ```
-pub fn squeeze<T: ::tensor::ArrayType>(x: &Tensor, axes: T) -> Tensor
+pub fn squeeze<T: ::tensor::ArrayLike>(x: &Tensor, axes: T) -> Tensor
 {
     apply_op(squeeze::Squeeze, &[x, &axes.as_tensor()])
 }
@@ -870,7 +869,7 @@ pub fn reduce_prod(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 ///
 /// assert_eq!(y.eval(&mut graph), ag::ndarray_ext::zeros(&[3, 4]));
 /// ```
-pub fn reshape<T: ::tensor::ArrayType>(x: &Tensor, shape: T) -> Tensor
+pub fn reshape<T: ::tensor::ArrayLike>(x: &Tensor, shape: T) -> Tensor
 {
     apply_op(shape_ops::Reshape, &[x, &shape.as_tensor()])
 }
@@ -1050,7 +1049,7 @@ pub fn sparse_softmax_cross_entropy(y: &Tensor, t: &Tensor) -> Tensor
 /// ```
 pub fn matmul(a: &Tensor, b: &Tensor) -> Tensor
 {
-    let op = matmul::MatMul {
+    let op = dot_ops::MatMul {
         transpose_a: false,
         transpose_b: false,
     };
@@ -1079,7 +1078,7 @@ pub fn matmul(a: &Tensor, b: &Tensor) -> Tensor
 /// ```
 pub fn matmul_t(a: &Tensor, b: &Tensor, transpose_a: bool, transpose_b: bool) -> Tensor
 {
-    let op = matmul::MatMul {
+    let op = dot_ops::MatMul {
         transpose_a,
         transpose_b,
     };
@@ -1111,12 +1110,6 @@ pub fn matmul_t(a: &Tensor, b: &Tensor, transpose_a: bool, transpose_b: bool) ->
 /// let ref b = ag::zeros([4, 3, 2]);
 /// let ref c = ag::tensordot(a, b, &[1, 0], &[0, 1]);
 /// assert_eq!(c.eval(&mut graph).shape(), &[5, 2]);
-///
-/// // Another example (simple matmul broadcast)
-/// let ref a = ag::zeros([2, 3, 4]);
-/// let ref b = ag::zeros([4, 2]);
-/// let ref c = ag::tensordot(a, b, &[2], &[0]);
-/// assert_eq!(c.eval(&mut graph).shape(), &[2, 3, 2]);
 /// ```
 ///
 /// For detailed description,
@@ -1181,8 +1174,7 @@ pub fn tensordot(a: &Tensor, b: &Tensor, a_axes: &[isize], b_axes: &[isize]) -> 
 
 /// Batched matrix multiplication.
 ///
-/// Performs matrix multiplication between corresponding dimensions of `a` and `b`.
-/// So the rank of `a` and `b` must be equals.
+/// The rank of `a` and `b` must be equals.
 ///
 /// # Examples
 ///
@@ -1200,7 +1192,7 @@ pub fn tensordot(a: &Tensor, b: &Tensor, a_axes: &[isize], b_axes: &[isize]) -> 
 /// For detailed description, see https://www.tensorflow.org/api_docs/python/tf/matmul
 pub fn batch_matmul(a: &Tensor, b: &Tensor) -> Tensor
 {
-    let op = batch_matmul::BatchMatMul {
+    let op = dot_ops::BatchMatMul {
         transpose_a: false,
         transpose_b: false,
     };
@@ -1245,7 +1237,7 @@ pub fn setdiff1d(a: &Tensor, b: &Tensor) -> Tensor
 ///
 /// assert_eq!(b.eval(&mut graph).shape(), &[5, 3, 4, 1, 2]);
 /// ```
-pub fn transpose<T: ::tensor::ArrayType>(x: &Tensor, perm: T) -> Tensor
+pub fn transpose<T: ::tensor::ArrayLike>(x: &Tensor, perm: T) -> Tensor
 {
     let op = transpose::Transpose { zip: true };
     apply_op(op, &[x, &perm.as_tensor()])
@@ -1255,6 +1247,7 @@ pub fn transpose<T: ::tensor::ArrayType>(x: &Tensor, perm: T) -> Tensor
 /// Splits input tensors into parts.
 ///
 /// Splits `x` into `sizes.len()` parts along `axis`.
+///
 /// The size of dimension of each part is `sizes[i]` on `axis`, but
 /// `x.shape[i]` on other axis.
 ///
@@ -1322,7 +1315,7 @@ pub fn slice(x: &Tensor, starts: &[isize], ends: &[isize]) -> Tensor
 }
 
 
-/// Concatenates (stacks) input tensors along specified axis.
+/// Concatenates input tensors along specified axis.
 ///
 /// `axis` can be negative.
 ///
@@ -1347,7 +1340,7 @@ pub fn concat(tensors: &[&Tensor], axis: isize) -> Tensor
 
 /// Gathers subviews from the input tensor.
 ///
-/// Along `axis`, slices subviews from `param` with `indices` and then gathers those.
+/// Along `axis`, slices subviews from `param` with `indices` and then stacks those.
 /// `axis` can be negative.
 /// For detailed description, see https://www.tensorflow.org/api_docs/python/tf/gather.
 ///
@@ -1382,7 +1375,7 @@ pub fn gather(param: &Tensor, indices: &Tensor, axis: isize) -> Tensor
 }
 
 
-/// Normalizes input tensor along specified axis with the mean and variance.
+/// Normalizes input tensor with its mean and variance along specified axis.
 ///
 /// # Examples
 ///
@@ -1410,7 +1403,7 @@ pub fn normalize(x: &Tensor, axis: isize) -> Tensor
 
 /// Applies batch normalization.
 ///
-/// `gamma` and `beta` should be shared variables.
+/// `scale` and `shift` should be shared variables.
 /// Since normalization is performed along 1st axis of `x`,
 /// both of them should have shape `(1, x.shape[1])`
 ///
@@ -1422,15 +1415,15 @@ pub fn normalize(x: &Tensor, axis: isize) -> Tensor
 ///
 /// let mut graph = ag::Graph::new();
 /// let ref x = ag::standard_normal([3, 4]);
-/// let ref gamma = graph.variable(ag::ndarray_ext::ones(&[1, 4]));
-/// let ref beta = graph.variable(ag::ndarray_ext::zeros(&[1, 4]));
-/// let ref norm = ag::batch_norm(x, gamma, beta);
+/// let ref scale = graph.variable(ag::ndarray_ext::ones(&[1, 4]));
+/// let ref shift = graph.variable(ag::ndarray_ext::zeros(&[1, 4]));
+/// let ref norm = ag::batch_norm(x, scale, shift);
 ///
 /// assert_eq!(norm.eval(&mut graph).shape(), &[3, 4]);
 /// ```
-pub fn batch_norm(x: &Tensor, beta: &Tensor, gamma: &Tensor) -> Tensor
+pub fn batch_norm(x: &Tensor, scale: &Tensor, shift: &Tensor) -> Tensor
 {
-    gamma * normalize(x, 0) + beta
+    scale * normalize(x, 0) + shift
 }
 
 
@@ -1466,7 +1459,7 @@ pub fn scalar(val: f32) -> Tensor
 
 
 /// Outputs values sampled from the normal distribution.
-pub fn random_normal<T: ::tensor::ArrayType>(shape: T, mean: f64, stddev: f64) -> Tensor
+pub fn random_normal<T: ::tensor::ArrayLike>(shape: T, mean: f64, stddev: f64) -> Tensor
 {
     let op = random_ops::RandomNormal { mean, stddev };
     apply_op(op, &[&shape.as_tensor()])
@@ -1474,7 +1467,7 @@ pub fn random_normal<T: ::tensor::ArrayType>(shape: T, mean: f64, stddev: f64) -
 
 
 /// Outputs values sampled from the uniform distribution.
-pub fn random_uniform<T: ::tensor::ArrayType>(shape: T, min: f64, max: f64) -> Tensor
+pub fn random_uniform<T: ::tensor::ArrayLike>(shape: T, min: f64, max: f64) -> Tensor
 {
     let op = random_ops::RandomUniform { min, max };
     apply_op(op, &[&shape.as_tensor()])
@@ -1482,21 +1475,21 @@ pub fn random_uniform<T: ::tensor::ArrayType>(shape: T, min: f64, max: f64) -> T
 
 
 /// Outputs values sampled from the standard normal distribution.
-pub fn standard_normal<T: ::tensor::ArrayType>(shape: T) -> Tensor
+pub fn standard_normal<T: ::tensor::ArrayLike>(shape: T) -> Tensor
 {
     apply_op(random_ops::StandardNormal, &[&shape.as_tensor()])
 }
 
 
 /// Outputs values sampled from the standard uniform distribution.
-pub fn standard_uniform<T: ::tensor::ArrayType>(shape: T) -> Tensor
+pub fn standard_uniform<T: ::tensor::ArrayLike>(shape: T) -> Tensor
 {
     apply_op(random_ops::StandardUniform, &[&shape.as_tensor()])
 }
 
 
 /// Outputs values sampled from the bernoulli distribution.
-pub fn bernoulli<T: ::tensor::ArrayType>(shape: T, p: f64) -> Tensor
+pub fn bernoulli<T: ::tensor::ArrayLike>(shape: T, p: f64) -> Tensor
 {
     let op = random_ops::Bernoulli { p };
     apply_op(op, &[&shape.as_tensor()])
@@ -1504,7 +1497,7 @@ pub fn bernoulli<T: ::tensor::ArrayType>(shape: T, p: f64) -> Tensor
 
 
 /// Outputs values sampled from the exponential distribution.
-pub fn random_exp<T: ::tensor::ArrayType>(shape: T, lambda: f64) -> Tensor
+pub fn random_exp<T: ::tensor::ArrayLike>(shape: T, lambda: f64) -> Tensor
 {
     let op = random_ops::Exponential { lambda };
     apply_op(op, &[&shape.as_tensor()])
@@ -1512,7 +1505,7 @@ pub fn random_exp<T: ::tensor::ArrayType>(shape: T, lambda: f64) -> Tensor
 
 
 /// Outputs values sampled from the gamma distribution.
-pub fn gamma<T: ::tensor::ArrayType>(shape: T, shape_param: f64, scale: f64) -> Tensor
+pub fn gamma<T: ::tensor::ArrayLike>(shape: T, shape_param: f64, scale: f64) -> Tensor
 {
     let op = random_ops::Gamma { shape_param, scale };
     apply_op(op, &[&shape.as_tensor()])
@@ -1520,7 +1513,7 @@ pub fn gamma<T: ::tensor::ArrayType>(shape: T, shape_param: f64, scale: f64) -> 
 
 
 /// Outputs values sampled from the log-normal distribution.
-pub fn log_normal<T: ::tensor::ArrayType>(shape: T, mean: f64, stddev: f64) -> Tensor
+pub fn log_normal<T: ::tensor::ArrayLike>(shape: T, mean: f64, stddev: f64) -> Tensor
 {
     let op = random_ops::LogNormal { mean, stddev };
     apply_op(op, &[&shape.as_tensor()])
@@ -1553,14 +1546,14 @@ where
 
 
 /// Returns zeros with given shape
-pub fn zeros<T: ::tensor::ArrayType>(shape: T) -> Tensor
+pub fn zeros<T: ::tensor::ArrayLike>(shape: T) -> Tensor
 {
     apply_op(generator_ops::Zeros, &[&shape.as_tensor()])
 }
 
 
 /// Returns ones with given shape
-pub fn ones<T: ::tensor::ArrayType>(shape: T) -> Tensor
+pub fn ones<T: ::tensor::ArrayLike>(shape: T) -> Tensor
 {
     apply_op(generator_ops::Ones, &[&shape.as_tensor()])
 }
@@ -1585,7 +1578,7 @@ pub fn ones<T: ::tensor::ArrayType>(shape: T) -> Tensor
 ///
 /// assert_eq!(z.eval(&mut graph), ndarray::Array1::range(0., 5., 1.).into_dyn());
 /// ```
-pub fn range<T: ::tensor::ArrayType>(start: T, end: T, step: T) -> Tensor
+pub fn range<T: ::tensor::ArrayLike>(start: T, end: T, step: T) -> Tensor
 {
     apply_op(
         generator_ops::Range,

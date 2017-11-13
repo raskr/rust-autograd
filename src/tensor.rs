@@ -13,18 +13,17 @@ use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
 
-/// Symbolic multi-dimensional array which supports
-/// efficient gradient computation.
+/// Symbolic multi-dimensional array.
 pub struct Tensor(pub Rc<RawTensor>);
 
 pub struct RawTensor {
-    /// Operation created this node
+    /// Operation created this node.
     pub op: Box<ops::Op>,
 
     /// References to immediate predecessors.
     pub inputs: Vec<Tensor>,
 
-    /// Rank number for topological ordering
+    /// Rank number for topological ordering.
     pub top_rank: usize,
 }
 
@@ -38,15 +37,9 @@ impl Tensor {
     /// extern crate ndarray;
     /// extern crate autograd as ag;
     ///
-    ///
     /// let mut g = ag::Graph::new();
-    ///
-    /// let ref x = g.constant(ag::ndarray_ext::standard_normal(&[4, 2]));
-    /// let ref w = g.variable(ag::ndarray_ext::standard_normal(&[2, 3]));
-    /// let ref b = g.variable(ag::ndarray_ext::zeros(&[1, 3]));
-    /// let ref z = ag::matmul(x, w) + b;
-    ///
-    /// assert_eq!(z.eval(&mut g).shape(), &[4, 3])
+    /// let ref x = ag::zeros([2, 2]);
+    /// assert_eq!(x.eval(&mut g), ndarray::arr2(&[[0., 0.], [0., 0.]]).into_dyn())
     /// ```
     pub fn eval(&self, graph: &mut graph::Graph) -> NdArray
     {
@@ -211,20 +204,20 @@ pub fn eval_tensors(
 }
 
 
-// == ArrayType and its impl ==
+// == ArrayLike and its impl ==
 
-pub trait ArrayType {
+pub trait ArrayLike {
     fn as_tensor(&self) -> Tensor;
 }
 
-impl ArrayType for Tensor {
+impl ArrayLike for Tensor {
     fn as_tensor(&self) -> Tensor
     {
         self.clone()
     }
 }
 
-impl<'a> ArrayType for &'a Tensor {
+impl<'a> ArrayLike for &'a Tensor {
     fn as_tensor(&self) -> Tensor
     {
         (*self).clone()
@@ -233,7 +226,7 @@ impl<'a> ArrayType for &'a Tensor {
 
 macro_rules! impl_unsigned_slice_to_shape {
     ($scalar_type:ty) => {
-        impl<'a> ArrayType for &'a [$scalar_type] {
+        impl<'a> ArrayLike for &'a [$scalar_type] {
             fn as_tensor(&self) -> Tensor
             {
                 // unwrap is safe
@@ -250,7 +243,7 @@ macro_rules! impl_unsigned_slice_to_shape {
 
 macro_rules! impl_signed_slice_to_shape {
     ($scalar_type:ty, $placeholder:expr) => {
-        impl<'a> ArrayType for &'a [$scalar_type] {
+        impl<'a> ArrayLike for &'a [$scalar_type] {
             fn as_tensor(&self) -> Tensor
             {
                 // validation
@@ -280,7 +273,7 @@ macro_rules! impl_signed_slice_to_shape {
 
 macro_rules! impl_signed_array_to_shape {
     ($scalar_type:ty, $placeholder:expr, $num_elems:expr) => {
-        impl ArrayType for [$scalar_type; $num_elems] {
+        impl ArrayLike for [$scalar_type; $num_elems] {
             fn as_tensor(&self) -> Tensor
             {
                 // validation
@@ -310,7 +303,7 @@ macro_rules! impl_signed_array_to_shape {
 
 macro_rules! impl_unsigned_array_to_shape {
     ($scalar_type:ty, $num_elems:expr) => {
-        impl ArrayType for [$scalar_type; $num_elems] {
+        impl ArrayLike for [$scalar_type; $num_elems] {
             fn as_tensor(&self) -> Tensor
             {
                 // unwrap is safe

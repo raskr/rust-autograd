@@ -21,13 +21,13 @@ use tensor::{RawTensor, Tensor};
 /// // new graph
 /// let mut graph = ag::Graph::new();
 ///
-/// let ref a = graph.placeholder();
-/// let ref b = ag::ones([2]);
+/// let ref x = graph.placeholder();
 /// let ref v = graph.variable(ndarray::arr1(&[2., 2.]));
-/// let ref z = a + b + v;
+/// let ref b = ag::ones([2]);
+/// let ref z = x + v + b;
 ///
 /// // fills placeholder
-/// graph.feed(a, ndarray::arr1(&[1., 1.]));
+/// graph.feed(x, ndarray::arr1(&[1., 1.]));
 ///
 /// // eval
 /// assert_eq!(z.eval(&mut graph).as_slice().unwrap(), &[4., 4.]);
@@ -66,15 +66,9 @@ impl Graph {
     /// extern crate ndarray;
     /// extern crate autograd as ag;
     ///
-    ///
     /// let mut graph = ag::Graph::new();
-    ///
-    /// let ref x = graph.constant(ag::ndarray_ext::standard_normal(&[4, 2]));
-    /// let ref w = graph.variable(ag::ndarray_ext::standard_normal(&[2, 3]));
-    /// let ref b = graph.variable(ag::ndarray_ext::zeros(&[1, 3]));
-    /// let ref z = ag::matmul(x, w) + b;
-    ///
-    /// assert_eq!(graph.eval(&[z])[0].shape(), &[4, 3])
+    /// let ref x = ag::zeros([2, 2]);
+    /// assert_eq!(graph.eval(&[x])[0], ndarray::arr2(&[[0., 0.], [0., 0.]]).into_dyn())
     /// ```
     pub fn eval(&mut self, xs: &[&Tensor]) -> Vec<ndarray::Array<f32, ndarray::IxDyn>>
     {
