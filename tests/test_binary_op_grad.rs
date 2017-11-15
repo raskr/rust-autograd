@@ -6,7 +6,7 @@ extern crate ndarray;
 #[test]
 fn scalar_add()
 {
-    let mut graph = ag::Graph::new();
+    let mut graph = ag::Context::new();
     let ref x = graph.variable(ndarray::arr1(&[]));
     let ref y = x + 2;
     let grads = ag::gradients(&[y], &[x], &[None]);
@@ -17,7 +17,7 @@ fn scalar_add()
 #[test]
 fn scalar_sub()
 {
-    let mut graph = ag::Graph::new();
+    let mut graph = ag::Context::new();
     let ref x = graph.variable(ndarray::arr1(&[]));
     let ref y = x - 2;
     let grads = ag::gradients(&[y], &[x], &[None]);
@@ -28,7 +28,7 @@ fn scalar_sub()
 #[test]
 fn scalar_mul()
 {
-    let mut graph = ag::Graph::new();
+    let mut graph = ag::Context::new();
     let ref x = graph.variable(ndarray::arr1(&[]));
     let ref y = 3 * x;
     let grads = ag::gradients(&[y], &[x], &[None]);
@@ -39,7 +39,7 @@ fn scalar_mul()
 #[test]
 fn scalar_div()
 {
-    let mut graph = ag::Graph::new();
+    let mut graph = ag::Context::new();
     let ref x = graph.variable(ndarray::arr1(&[]));
     let ref y = x / 3;
     let grads = ag::gradients(&[y], &[x], &[None]);
@@ -50,7 +50,7 @@ fn scalar_div()
 #[test]
 fn expr1()
 {
-    let mut graph = ag::Graph::new();
+    let mut graph = ag::Context::new();
     let ref x = graph.variable(ndarray::arr1(&[]));
     let ref y = 3 * x + 2;
     let grads = ag::gradients(&[y], &[x], &[None]);
@@ -61,7 +61,7 @@ fn expr1()
 #[test]
 fn expr2()
 {
-    let mut graph = ag::Graph::new();
+    let mut graph = ag::Context::new();
     let ref x = graph.placeholder();
     let ref y = 3 * x * x;
     let grads = ag::gradients(&[y], &[x], &[None]);
@@ -73,7 +73,7 @@ fn expr2()
 #[test]
 fn expr3()
 {
-    let mut graph = ag::Graph::new();
+    let mut graph = ag::Context::new();
     let ref x = graph.placeholder();
     let ref y = 3 * x * x + 2;
     let grads = ag::gradients(&[y], &[x], &[None]);
@@ -85,7 +85,7 @@ fn expr3()
 #[test]
 fn expr4()
 {
-    let mut graph = ag::Graph::new();
+    let mut graph = ag::Context::new();
     let ref x = graph.placeholder();
     let ref y = 3 * x * x + 2 * x + 1;
     let grads = ag::gradients(&[y], &[x], &[None]);
@@ -97,7 +97,7 @@ fn expr4()
 #[test]
 fn expr5()
 {
-    let mut graph = ag::Graph::new();
+    let mut graph = ag::Context::new();
     let ref x1 = graph.placeholder();
     let ref x2 = graph.placeholder();
     let ref y = 3 * x1 * x1 + 2 * x1 + x2 + 1;
@@ -112,7 +112,7 @@ fn expr5()
 // even if the value of `x1` is not given
 fn expr6()
 {
-    let mut graph = ag::Graph::new();
+    let mut graph = ag::Context::new();
     let ref x1 = graph.placeholder();
     let ref x2 = graph.variable(ndarray::arr1(&[]));
     let ref y = 3 * x1 * x1 + 5 * x2 + 1;
@@ -124,7 +124,7 @@ fn expr6()
 #[test]
 fn differentiate_twice()
 {
-    let mut graph = ag::Graph::new();
+    let mut graph = ag::Context::new();
     let ref x = graph.placeholder();
     let ref y = x * x;
     let ref g1 = ag::gradients(&[y], &[x], &[None])[0];
@@ -137,7 +137,7 @@ fn differentiate_twice()
 #[test]
 fn expr7()
 {
-    let mut graph = ag::Graph::new();
+    let mut graph = ag::Context::new();
     let ref x1 = graph.placeholder();
     let ref x2 = graph.variable(ag::ndarray_ext::zeros(&[1]));
     let ref y = 2 * x1 * x1 + 3 * x2 + 1;
@@ -154,7 +154,7 @@ fn expr7()
 #[test]
 fn expr8()
 {
-    let mut graph = ag::Graph::new();
+    let mut graph = ag::Context::new();
     let ref x = graph.placeholder();
     let ref y = graph.variable(ag::ndarray_ext::zeros(&[1]));
     let ref z = 2 * x * x + 3 * y + 1;

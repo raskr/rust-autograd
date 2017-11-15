@@ -5,7 +5,7 @@ extern crate ndarray;
 #[test]
 fn scalar_add()
 {
-    let mut graph = ag::Graph::new();
+    let mut graph = ag::Context::new();
     let ref ones = graph.constant(ndarray::arr1(&[1., 1., 1.]));
     let ref z: ag::Tensor = 3. + ones + 2;
     assert_eq!(graph.eval(&[z])[0], ndarray::arr1(&[6., 6., 6.]).into_dyn());
@@ -14,7 +14,7 @@ fn scalar_add()
 #[test]
 fn scalar_sub()
 {
-    let mut graph = ag::Graph::new();
+    let mut graph = ag::Context::new();
     let ref ones = graph.constant(ndarray::arr1(&[1., 1., 1.]));
     let ref z: ag::Tensor = 3. - ones - 2;
     assert_eq!(graph.eval(&[z])[0], ndarray::arr1(&[0., 0., 0.]).into_dyn());
@@ -23,7 +23,7 @@ fn scalar_sub()
 #[test]
 fn scalar_mul()
 {
-    let mut graph = ag::Graph::new();
+    let mut graph = ag::Context::new();
     let ref ones = graph.constant(ndarray::arr1(&[1., 1., 1.]));
     let ref z: ag::Tensor = 3. * ones * 2;
     assert_eq!(graph.eval(&[z])[0], ndarray::arr1(&[6., 6., 6.]).into_dyn());
@@ -32,7 +32,7 @@ fn scalar_mul()
 #[test]
 fn scalar_div()
 {
-    let mut graph = ag::Graph::new();
+    let mut graph = ag::Context::new();
     let ref ones = graph.constant(ndarray::arr1(&[1., 1., 1.]));
     let ref z: ag::Tensor = 3. / ones / 2;
     assert_eq!(
@@ -44,7 +44,7 @@ fn scalar_div()
 #[test]
 fn add()
 {
-    let mut graph = ag::Graph::new();
+    let mut graph = ag::Context::new();
     let ref zeros = graph.constant(ndarray::arr1(&[0., 0., 0.]));
     let ref ones = graph.constant(ndarray::arr1(&[1., 1., 1.]));
     let ref z: ag::Tensor = zeros + ones;
@@ -54,7 +54,7 @@ fn add()
 #[test]
 fn sub()
 {
-    let mut graph = ag::Graph::new();
+    let mut graph = ag::Context::new();
     let ref zeros = graph.constant(ndarray::arr1(&[0., 0., 0.]));
     let ref ones = graph.constant(ndarray::arr1(&[1., 1., 1.]));
     let ref z: ag::Tensor = ones - zeros;
@@ -64,7 +64,7 @@ fn sub()
 #[test]
 fn mul()
 {
-    let mut graph = ag::Graph::new();
+    let mut graph = ag::Context::new();
     let ref zeros = graph.constant(ndarray::arr1(&[0., 0., 0.]));
     let ref ones = graph.constant(ndarray::arr1(&[1., 1., 1.]));
     let ref z: ag::Tensor = zeros * ones;
@@ -74,7 +74,7 @@ fn mul()
 #[test]
 fn div()
 {
-    let mut graph = ag::Graph::new();
+    let mut graph = ag::Context::new();
     let ref zeros = graph.constant(ndarray::arr1(&[0., 0., 0.]));
     let ref ones = graph.constant(ndarray::arr1(&[1., 1., 1.]));
     let ref z: ag::Tensor = zeros / ones;

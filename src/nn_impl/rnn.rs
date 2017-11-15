@@ -1,13 +1,13 @@
 extern crate ndarray;
 
-use graph::Graph;
+use context::Context;
 use ops;
 use tensor::Tensor;
 
 
 pub trait RNN {
     fn step(&mut self, x: &Tensor) -> Tensor;
-    fn reset_state(&mut self, g: &mut Graph);
+    fn reset_state(&mut self, g: &mut Context);
 }
 
 
@@ -39,7 +39,7 @@ pub struct LSTM {
 
 impl LSTM {
     #[inline]
-    pub fn new(state_size: usize, input_dim: usize, batch_size: usize, g: &mut Graph) -> LSTM
+    pub fn new(state_size: usize, input_dim: usize, batch_size: usize, g: &mut Context) -> LSTM
     {
         LSTM {
             state_size,
@@ -93,7 +93,7 @@ impl RNN for LSTM {
     }
 
     #[inline]
-    fn reset_state(&mut self, g: &mut Graph)
+    fn reset_state(&mut self, g: &mut Context)
     {
         self.last_output = g.constant(::ndarray_ext::zeros(&[self.batch_size, self.state_size]));
         self.cell = g.constant(::ndarray_ext::zeros(&[self.batch_size, self.state_size]));

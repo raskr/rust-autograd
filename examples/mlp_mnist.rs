@@ -29,16 +29,16 @@ fn main()
     let ((x_train, y_train), (x_test, y_test)) = dataset::load();
 
     // -- graph def --
-    let mut graph = ag::Graph::new();
-    let ref x = graph.placeholder();
-    let ref y = graph.placeholder();
-    let ref w = graph.variable(ag::ndarray_ext::glorot_uniform(&[28 * 28, 10]));
-    let ref b = graph.variable(ag::ndarray_ext::zeros(&[1, 10]));
+    let mut ctx = ag::Context::new();
+    let ref x = ctx.placeholder();
+    let ref y = ctx.placeholder();
+    let ref w = ctx.variable(ag::ndarray_ext::glorot_uniform(&[28 * 28, 10]));
+    let ref b = ctx.variable(ag::ndarray_ext::zeros(&[1, 10]));
     let ref z = ag::matmul(x, w) + b;
     let ref loss = ag::sparse_softmax_cross_entropy(z, y);
     let ref grads = ag::gradients(&[loss], &[w, b], &[None]);
     let ref predictions = ag::argmax(z, -1, true);
-    let ref accuracy = ag::reduce_mean(&ag::equals(predictions, y), 0, false);
+    let ref accuracy = ag::reduce_mean(&ag::equal(predictions, y), 0, false);
 
     // -- actual training --
     let mut optimizer = ag::sgd::optimizers::Adam { ..Default::default() };
@@ -54,18 +54,18 @@ fn main()
                 let i = i as isize;
                 let x_batch = x_train.slice(s![i..i + batch_size, ..]).to_owned();
                 let y_batch = y_train.slice(s![i..i + batch_size, ..]).to_owned();
-                graph.feed(x, x_batch);
-                graph.feed(y, y_batch);
-                ag::sgd::apply_gradients(&[w, b], grads, &mut optimizer, &mut graph);
+                ctx.feed(x, x_batch);
+                ctx.feed(y, y_batch);
+                ag::sgd::apply_gradients(&[w, b], grads, &mut optimizer, &mut ctx);
             }
         });
         println!("finish epoch {}", epoch);
     }
 
     // -- test --
-    graph.feed(x, x_test);
-    graph.feed(y, y_test);
-    println!("test accuracy: {}", accuracy.eval(&mut graph));
+    ctx.feed(x, x_test);
+    ctx.feed(y, y_test);
+    println!("test accuracy: {}", accuracy.eval(&mut ctx));
 }
 
 pub mod dataset {

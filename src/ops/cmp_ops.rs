@@ -6,7 +6,7 @@ use ops;
 use tensor::Tensor;
 
 
-pub struct Equals;
+pub struct Equal;
 pub struct Greater {
     pub a: f32,
 }
@@ -21,7 +21,7 @@ pub struct LesserEqual {
 }
 
 
-impl ops::Op for Equals {
+impl ops::Op for Equal {
     fn name(&self) -> &str
     {
         "Equals"

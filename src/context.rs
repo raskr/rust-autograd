@@ -10,7 +10,16 @@ use tensor::{RawTensor, Tensor};
 
 
 #[derive(Clone)]
-/// Graph object.
+/// What is necessary to run computation graphs.
+///
+/// `Context` object is used:
+/// - to create shared variable tensors
+/// - to create placeholder tensors
+/// - to run computation graphs actually
+///
+/// When you use a context object to evaluate a computation graph,
+/// all the variables/placeholders in the graph must be what derives from
+/// that context; otherwise it will panic.
 ///
 /// # Examples
 ///
@@ -18,29 +27,29 @@ use tensor::{RawTensor, Tensor};
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// // new graph
-/// let mut graph = ag::Graph::new();
+/// // new Context
+/// let mut ctx = ag::Context::new();
 ///
-/// let ref x = graph.placeholder();
-/// let ref v = graph.variable(ndarray::arr1(&[2., 2.]));
-/// let ref b = ag::ones([2]);
+/// let ref x = ctx.placeholder();
+/// let ref v = ctx.variable(ndarray::arr1(&[2., 2.]));
+/// let ref b = ag::ones(&[2]);
 /// let ref z = x + v + b;
 ///
 /// // fills placeholder
-/// graph.feed(x, ndarray::arr1(&[1., 1.]));
+/// ctx.feed(x, ndarray::arr1(&[1., 1.]));
 ///
 /// // eval
-/// assert_eq!(z.eval(&mut graph).as_slice().unwrap(), &[4., 4.]);
+/// assert_eq!(z.eval(&mut ctx).as_slice().unwrap(), &[4., 4.]);
 /// ```
-pub struct Graph {
+pub struct Context {
     pub variables: FnvHashMap<Tensor, NdArray>,
     pub outputs: FnvHashMap<Tensor, NdArray>,
 }
 
-impl Graph {
-    pub fn new() -> Graph
+impl Context {
+    pub fn new() -> Context
     {
-        Graph {
+        Context {
             variables: FnvHashMap::default(),
             outputs: FnvHashMap::default(),
         }
@@ -51,7 +60,7 @@ impl Graph {
     {
         if "Placeholder" != placeholder.op.name() {
             panic!(
-                "Don't call `Graph::feed` with non placeholder, got: {}",
+                "Don't call `Context::feed` with non placeholder, got: {}",
                 placeholder.op.name()
             )
         }
@@ -66,9 +75,9 @@ impl Graph {
     /// extern crate ndarray;
     /// extern crate autograd as ag;
     ///
-    /// let mut graph = ag::Graph::new();
-    /// let ref x = ag::zeros([2, 2]);
-    /// assert_eq!(graph.eval(&[x])[0], ndarray::arr2(&[[0., 0.], [0., 0.]]).into_dyn())
+    /// let mut ctx = ag::Context::new();
+    /// let ref x = ag::zeros(&[2, 2]);
+    /// assert_eq!(ctx.eval(&[x])[0], ndarray::arr2(&[[0., 0.], [0., 0.]]).into_dyn())
     /// ```
     pub fn eval(&mut self, xs: &[&Tensor]) -> Vec<ndarray::Array<f32, ndarray::IxDyn>>
     {
@@ -92,13 +101,13 @@ impl Graph {
     /// extern crate ndarray;
     /// extern crate autograd as ag;
     ///
-    /// let mut graph = ag::Graph::new();
-    /// let ref x: ag::Tensor = graph.variable(ndarray::arr1(&[2.]));
+    /// let mut ctx = ag::Context::new();
+    /// let ref x: ag::Tensor = ctx.variable(ndarray::arr1(&[2.]));
     /// let ref y: ag::Tensor = 3 * x;
     ///
-    /// assert_eq!(6., graph.eval(&[y])[0][0]);
-    /// assert!(graph.variables.contains_key(x));
-    /// assert_eq!(graph.variables.get(x).unwrap(), &ndarray::arr1(&[2.]).into_dyn());
+    /// assert_eq!(6., ctx.eval(&[y])[0][0]);
+    /// assert!(ctx.variables.contains_key(x));
+    /// assert_eq!(ctx.variables.get(x).unwrap(), &ndarray::arr1(&[2.]).into_dyn());
     /// ```
     #[inline]
     pub fn variable<T>(&mut self, arr: ndarray::Array<f32, T>) -> Tensor
@@ -116,9 +125,9 @@ impl Graph {
 
     /// Creates a placeholder tensor.
     ///
-    /// The placeholder tensor is a dynamic input node to the computation graph,
+    /// The placeholder tensor is a dynamic input node to the computation Context,
     /// which can be filled on evaluation time.
-    /// To fill the placeholders, use `graph::feed()`.
+    /// To fill the placeholders, use `Context::feed()`.
     ///
     /// # Examples
     ///
@@ -126,13 +135,13 @@ impl Graph {
     /// extern crate ndarray;
     /// extern crate autograd as ag;
     ///
-    /// let mut graph = ag::Graph::new();
-    /// let ref x: ag::Tensor = graph.placeholder();
+    /// let mut ctx = ag::Context::new();
+    /// let ref x: ag::Tensor = ctx.placeholder();
     /// let ref y: ag::Tensor = 3 * x;
     ///
     /// // Fills placeholder `x`.
-    /// graph.feed(x, ndarray::arr1(&[2.]));
-    /// assert_eq!(6., graph.eval(&[y])[0][0]);
+    /// ctx.feed(x, ndarray::arr1(&[2.]));
+    /// assert_eq!(6., y.eval(&mut ctx)[0]);
     /// ```
     #[inline]
     pub fn placeholder(&self) -> Tensor
@@ -153,10 +162,10 @@ impl Graph {
     /// extern crate ndarray;
     /// extern crate autograd as ag;
     ///
-    /// let mut graph = ag::Graph::new();
+    /// let mut ctx = ag::Context::new();
     /// let arr = ndarray::arr1(&[0., 0., 0.]);
-    /// let ref con = graph.constant(arr.clone());
-    /// assert_eq!(arr.into_dyn(), graph.eval(&[con])[0])
+    /// let ref con = ctx.constant(arr.clone());
+    /// assert_eq!(arr.into_dyn(), ctx.eval(&[con])[0])
     /// ```
     #[inline]
     pub fn constant<T>(&mut self, arr: ndarray::Array<f32, T>) -> Tensor

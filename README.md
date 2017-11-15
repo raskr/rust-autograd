@@ -6,14 +6,11 @@
 A library to run the computation graphs, whose current backend is 
 [rust-ndarray](https://github.com/bluss/rust-ndarray).
 
-Documentation: https://docs.rs/autograd/
-
 
 ## Overview
-* Automatic differentiation
+* Tensors with automatic differentiation
 * Pure Rust
 * Neural net first APIs
-* Dynamic/static graph construction with shared variables
 
 ## Examples
 Here we are computing partial derivatives of `z = 2x^2 + 3y + 1`.
@@ -23,9 +20,9 @@ Here we are computing partial derivatives of `z = 2x^2 + 3y + 1`.
 extern crate ndarray;
 extern crate autograd as ag;
 
-let mut graph = ag::Graph::new();
-let ref x = graph.placeholder();
-let ref y = graph.variable(ndarray::arr1(&[0]));
+let mut ctx = ag::Context::new();
+let ref x = ctx.placeholder();
+let ref y = ctx.variable(ndarray::arr1(&[0]));
 let ref z = 2*x*x + 3*y + 1;
 
 // dz/dy
@@ -38,24 +35,24 @@ let ref g2 = ag::gradients(&[z], &[x], None)[0];
 let ref gg = ag::gradients(&[g2], &[x], None)[0];
 
 // evaluation of symbolic gradients
-assert_eq!(3., g1.eval(&mut graph)[0]);
-assert_eq!(4., gg.eval(&mut graph)[0]);
+assert_eq!(3., g1.eval(&mut ctx)[0]);
+assert_eq!(4., gg.eval(&mut ctx)[0]);
 
 // dz/dx requires to fill the placeholder `x`
 graph.feed(x, ndarray::arr1(&[2.]));
-assert_eq!(8., g2.eval(&mut graph)[0]);
+assert_eq!(8., g2.eval(&mut ctx)[0]);
 ```
 
 Another example: multi layer perceptron for MNIST.
 
 ```rust
 // -- graph def --
-let mut g = ag::Graph::new();
+let mut ctx = ag::Context::new();
 
-let ref x = g.placeholder();
-let ref y = g.placeholder();
-let ref w = g.variable(ag::ndarray_ext::glorot_uniform(&[28 * 28, 10]));
-let ref b = g.variable(ag::ndarray_ext::zeros(&[1, 10]));
+let ref x = ctx.placeholder();
+let ref y = ctx.placeholder();
+let ref w = ctx.variable(ag::ndarray_ext::glorot_uniform(&[28 * 28, 10]));
+let ref b = ctx.variable(ag::ndarray_ext::zeros(&[1, 10]));
 let ref z = ag::matmul(x, w) + b;
 let ref loss = ag::sparse_softmax_cross_entropy(z, y);
 let ref grads = ag::gradients(loss, &[w, b], None);

@@ -9,7 +9,7 @@ pub mod tensor;
 #[doc(hidden)]
 pub mod topology;
 
-pub mod graph;
+pub mod context;
 
 pub mod ops;
 
@@ -25,7 +25,7 @@ pub use tensor::Tensor;
 
 pub use ops::*;
 
-pub use graph::Graph;
+pub use context::Context;
 
 #[doc(hidden)]
 pub use ndarray_ext::NdArray;

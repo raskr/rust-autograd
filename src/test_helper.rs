@@ -3,7 +3,7 @@ extern crate rand;
 extern crate fnv;
 
 use self::fnv::FnvHashMap;
-use graph;
+use context;
 use ndarray_ext::NdArray;
 use sgd;
 use std::mem;
@@ -19,7 +19,7 @@ pub fn gradient_check(
     objective: &Tensor,
     gradients: &[Tensor],
     variables: &[&Tensor],
-    graph: graph::Graph,
+    graph: context::Context,
     eps: f32,
     tol: f32,
 )
@@ -82,8 +82,10 @@ pub fn gradient_check(
 
 #[allow(mutable_transmutes)]
 /// Almost same as `graph.eval`, but feeds remains after calling this.
-fn eval_keep_feeds(graph: &graph::Graph, xs: &[&Tensor])
-    -> Vec<ndarray::Array<f32, ndarray::IxDyn>>
+fn eval_keep_feeds(
+    graph: &context::Context,
+    xs: &[&Tensor],
+) -> Vec<ndarray::Array<f32, ndarray::IxDyn>>
 {
     let xs = xs.into_iter().map(|a| (*a).clone()).collect::<Vec<_>>();
 

@@ -68,8 +68,6 @@ impl ops::Op for LogSoftmax {
         let sm = ops::exp(output);
         let sum = ops::reduce_sum(gy, 1, true);
         let ref mul = sm * sum;
-        vec![
-            Some(ops::apply_op(ops::binary_ops::InplaceSubOp, &[gy, mul])),
-        ]
+        vec![Some(gy - mul)]
     }
 }

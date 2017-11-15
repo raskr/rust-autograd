@@ -2,70 +2,12 @@ extern crate ndarray;
 extern crate fnv;
 
 use self::fnv::FnvHashMap;
-use ndarray_ext::NdArray;
 use ops;
 use std::collections::binary_heap::BinaryHeap;
 use std::collections::hash_set::HashSet;
 use std::mem;
 use tensor::Tensor;
 
-
-#[allow(unused_mut)]
-#[doc(hidden)]
-#[inline]
-/// Performs actual graph traversal and its evaluation
-// TODO: loop-based rather than recursion (this would be difficult)
-pub fn perform_eval(
-    target: &Tensor,
-    vars: &mut FnvHashMap<Tensor, NdArray>,
-    memo: &mut FnvHashMap<Tensor, NdArray>,
-    train: bool,
-    mut count: usize, // for debug
-)
-{
-    if vars.contains_key(target) || memo.contains_key(target) {
-        return;
-    }
-
-    let ref inputs = target.inputs;
-
-    // integrating loops below is impossible because of
-    // "memo is already mutably borrowed"
-    for x in inputs.iter() {
-        perform_eval(x, vars, memo, train, count);
-    }
-
-    let y = {
-        let mut xs = Vec::with_capacity(inputs.len());
-        for x in inputs.iter() {
-            if let Some(a) = vars.get(x) {
-                // from variable set
-                xs.push(a);
-            } else {
-                // from memo set
-                xs.push(memo.get(x).unwrap());
-            }
-        }
-        if target.op.inplace() {
-            let mut xs: Vec<&mut NdArray> = unsafe { mem::transmute(xs) };
-            target.op.compute_inplace(xs.as_mut_slice(), train);
-            None
-        } else {
-            Some(target.op.compute(xs.as_slice(), train))
-        }
-    };
-
-    // cache output
-    if let Some(a) = y {
-        memo.insert(target.clone(), a);
-    } else {
-        // desired array is always in `memo`
-        // because inplace ops don't accept variable/constant.
-        let y = memo.remove(&target.inputs[0]);
-        // safe unwrap
-        memo.insert(target.clone(), y.unwrap());
-    }
-}
 
 
 #[inline]
@@ -106,7 +48,7 @@ fn contributed_to_grads(objectives: &[&Tensor], variables: &[&Tensor]) -> FnvHas
 fn contributed_to_grads_test()
 {
     // dummy graph
-    let mut graph = ::Graph::new();
+    let mut graph = ::Context::new();
     let ref t = graph.constant(::ndarray_ext::standard_normal(&[2, 3]));
     let ref v = graph.variable(::ndarray_ext::standard_normal(&[2, 3]));
     let ref z = ::sigmoid_cross_entropy(&v, &t);

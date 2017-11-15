@@ -1,7 +1,7 @@
 extern crate ndarray;
 extern crate fnv;
 
-use graph::Graph;
+use context::Context;
 use ndarray_ext;
 use ndarray_ext::NdArray;
 use tensor;
@@ -17,17 +17,17 @@ pub fn apply_gradients<T: optimizers::Optimizer>(
     variables: &[&Tensor],
     gradients: &[Tensor],
     optimizer: &mut T,
-    graph: &mut Graph,
+    ctx: &mut Context,
 )
 {
     assert_eq!(variables.len(), gradients.len());
     // run graph and get gradient arrays
-    let mut grad_arrays = tensor::eval_tensors(gradients, &mut graph.variables, &mut graph.outputs);
-    graph.outputs.clear();
+    let mut grad_arrays = tensor::eval_tensors(gradients, &mut ctx.variables, &mut ctx.outputs);
+    ctx.outputs.clear();
     for v in variables {
         // safe unwrap
         assert_eq!(v.op.name(), "Variable", "Can't optimize non-variable");
-        let mut v_arr = graph.variables.get_mut(v).unwrap();
+        let mut v_arr = ctx.variables.get_mut(v).unwrap();
         let g = maybe_reduce_grad(grad_arrays.remove(0), v_arr.shape());
         optimizer.update(v, v_arr, g);
     }
@@ -120,7 +120,7 @@ pub mod optimizers {
 
     impl Optimizer for Adam {
         #[inline]
-        fn update(&mut self, node: &Tensor, param: &mut NdArray, mut grad: NdArray)
+        fn update(&mut self, node: &Tensor, param: &mut NdArray, grad: NdArray)
         {
             // get current state
             let AdamState { mut m, mut v, t } = self.states.remove(&node).unwrap_or_else(|| {
@@ -132,20 +132,20 @@ pub mod optimizers {
             });
 
             // make new m
-            m *= self.b1;
-            m += &((1. - self.b1) * &grad);
+            let b1 = self.b1;
+            let tmp = 1. - self.b1;
+            m.zip_mut_with(&grad, move |a, &g| *a = (*a) * b1 + tmp * g);
             let m_new = m;
 
             // make new v
+            let b2 = self.b2;
             let tmp = 1. - self.b2;
-            grad.mapv_inplace(move |a| tmp * a * a);
-            v *= self.b2;
-            v += &grad;
+            v.zip_mut_with(&grad, move |a, &g| *a = (*a) * b2 + tmp * g * g);
             let v_new = v;
 
             // make hat
-            let mut m_hat = &m_new / (1. - self.b1.powf(t));
-            let mut v_hat = &v_new / (1. - self.b2.powf(t));
+            let mut m_hat = &m_new * (1. / (1. - b1.powf(t)));
+            let v_hat = &v_new * (1. / (1. - b2.powf(t)));
 
             // update states
             self.states.insert(
@@ -158,8 +158,7 @@ pub mod optimizers {
             );
 
             let eps = self.eps;
-            v_hat.mapv_inplace(move |a| a.sqrt() + eps);
-            m_hat /= &v_hat;
+            m_hat.zip_mut_with(&v_hat, move |a, &b| (*a) /= b.sqrt() + eps);
             param.scaled_add(-self.alpha, &m_hat);
         }
     } // Adam end

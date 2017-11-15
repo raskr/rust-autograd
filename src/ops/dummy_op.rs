@@ -13,14 +13,21 @@ impl ops::Op for DummyOp {
 
     fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
-        panic!("must not be called ({}#grad)", self.name)
+        panic!(
+            "must not be called ({}#grad). This is probably bug.",
+            self.name
+        )
     }
 
     fn compute(&self, _: &[&::NdArray], _: bool) -> ::NdArray
     {
-        panic!(
-            "There exists placeholder(s) couldn't get initial value, {}",
-            self.name
-        )
+        let msg = if self.name == "Placeholder" {
+            "There exists placeholder(s) couldn't get initial value"
+        } else if self.name == "Variable" {
+            "Current graph evaluation context doesn't match with what generated this variable."
+        } else {
+            unreachable!()
+        };
+        panic!(msg);
     }
 }
