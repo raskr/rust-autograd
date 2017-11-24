@@ -23,6 +23,8 @@ pub struct Sqrt;
 pub struct Floor;
 pub struct Ceil;
 pub struct Sign;
+pub struct Reciprocal;
+pub struct Square;
 pub struct Log {
     pub a: f32,
 }
@@ -93,6 +95,40 @@ impl_cmp_op!(Maximum, move |r, a, b| *r = if a > b { *a } else { *b });
 impl_cmp_op!(Minimum, move |r, a, b| *r = if a < b { *a } else { *b });
 
 
+impl ops::Op for Square {
+    fn name(&self) -> &str
+    {
+        "Square"
+    }
+
+    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    {
+        Ok(xs[0].map(|x| x*x))
+    }
+
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
+        vec![Some(2 * inputs[0] * gy)]
+    }
+}
+
+impl ops::Op for Reciprocal {
+    fn name(&self) -> &str
+    {
+        "Reciprocal"
+    }
+
+    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    {
+        Ok(xs[0].map(|x| x.recip()))
+    }
+
+    fn grad(&self, gy: &Tensor, _: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
+    {
+        vec![Some(-1. * ops::square(output) * gy)]
+    }
+}
+
 impl ops::Op for Sign {
     fn name(&self) -> &str
     {
@@ -104,7 +140,7 @@ impl ops::Op for Sign {
         Ok(xs[0].mapv(|x| if x == 0. { 0. } else { x.signum() }))
     }
 
-    fn grad(&self, _: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         vec![None]
     }

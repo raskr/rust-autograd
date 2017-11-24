@@ -342,12 +342,32 @@ fn reduce_prod()
 }
 
 #[test]
+fn square()
+{
+    let mut ctx = ag::Context::new();
+    let ref v = ag::variable(ag::ndarray_ext::standard_uniform(&[2, 3]), &mut ctx);
+    let ref z = ag::square(v);
+    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    ag::test_helper::gradient_check(z, g.as_slice(), &[v], ctx, 1e-3, 1e-3);
+}
+
+#[test]
+fn reciprocal()
+{
+    let mut ctx = ag::Context::new();
+    let ref v = ag::variable(ag::ndarray_ext::random_uniform(&[2, 3], 1., 1.01), &mut ctx);
+    let ref z = ag::reciprocal(v);
+    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    ag::test_helper::gradient_check(z, g.as_slice(), &[v], ctx, 1e-3, 1e-3);
+}
+
+#[test]
 fn transpose()
 {
     let mut ctx = ag::Context::new();
-    let ref v = ag::constant(ag::ndarray_ext::zeros(&[1, 2, 3, 4, 5]), &mut ctx);
-    let ref z = ag::transpose(v, &[4, 2, 3, 0, 1]);
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&[5, 3, 4, 1, 2])]);
+    let ref v = ag::variable(ag::ndarray_ext::zeros(&[1, 2, 3, 4]), &mut ctx);
+    let ref z = ag::transpose(v, &[2, 3, 0, 1]);
+    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&[3, 4, 1, 2])]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], ctx, 1e-3, 1e-3);
 }
 
@@ -355,7 +375,7 @@ fn transpose()
 fn reshape_after_transpose()
 {
     let mut ctx = ag::Context::new();
-    let ref v = ag::constant(ag::ndarray_ext::zeros(&[1, 2, 3, 4, 5]), &mut ctx);
+    let ref v = ag::variable(ag::ndarray_ext::zeros(&[1, 2, 3, 4, 5]), &mut ctx);
     let ref z = ag::transpose(v, &[4, 2, 3, 0, 1]);
     let ref z = ag::reshape(z, &[15, 8]);
     let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);

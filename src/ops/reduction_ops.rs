@@ -31,6 +31,11 @@ pub struct ReduceSum {
     pub sparse_axes: bool,
 }
 
+pub struct ReduceMean {
+    pub keep_dims: bool,
+    pub sparse_axes: bool,
+}
+
 pub struct ArgMax {
     pub axis: isize,
     pub keep_dim: bool,
@@ -40,18 +45,23 @@ pub struct ArgMax {
 macro_rules! impl_reduce_forward {
     ($forward_name:ident, $reduce_fn_name:ident, $reduce_default:expr) => {
         fn $forward_name(
-            xs: &[&NdArray],
+            x: &NdArray,
+            axes: &NdArray,
+            should_preprocess_axes: bool,
             keep_dims: bool,
             sparse_axes: bool,
         ) -> Result<NdArray, ::OpComputeErrorStatus>
         {
-            let x = xs[0];
-            let axes = xs[1];
-            if x.shape() == &[] {
+            let x_shape = x.shape();
+            if x_shape == &[] {
                 // case of 0 rank
                 Ok((*x).clone())
             } else {
-                let axes: Vec<usize> = ndarray_ext::axes_as_vec(axes, x.ndim(), sparse_axes);
+                let axes: Vec<usize> = if should_preprocess_axes {
+                    ndarray_ext::axes_as_vec(axes, x_shape.len(), sparse_axes)
+                } else {
+                    axes.iter().map(|&a| a as usize).collect()
+                };
                 if axes.is_empty() {
                     return Err(::OpComputeErrorStatus::Delegate { to: 0 });
                 }
@@ -87,7 +97,7 @@ impl ops::Op for ReduceSum {
 
     fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
     {
-        reduce_sum_forward(xs, self.keep_dims, self.sparse_axes)
+        reduce_sum_forward(xs[0], xs[1], true, self.keep_dims, self.sparse_axes)
     }
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
@@ -107,6 +117,42 @@ impl ops::Op for ReduceSum {
     }
 }
 
+impl ops::Op for ReduceMean {
+    fn name(&self) -> &str
+    {
+        "ReduceMean"
+    }
+
+    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    {
+        let sum = reduce_sum_forward(xs[0], xs[1], false, self.keep_dims, self.sparse_axes);
+        sum.map(|mut ok| {
+            let x_shape = xs[0].shape();
+            let reduction_axes: Vec<usize> = xs[1].iter().map(|&a| a as usize).collect();
+            let reduction_len: f32 = reduction_axes
+                .into_iter()
+                .map(|i| x_shape[i] as f32)
+                .product();
+            ok *= 1. / reduction_len;
+            ok
+        })
+    }
+
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
+        let grad_op = ops::array_ops::Broadcast {
+            keep_dims: self.keep_dims,
+            sparse_axes: self.sparse_axes,
+        };
+        let x = inputs[0];
+        let axes = inputs[1]; // this is preprocessed
+        let ref reduction_len = ops::reduce_prod(&ops::gather(&x.shape(), axes, 0), &[0], false);
+        let gx = ops::apply_op(grad_op, &[gy, &inputs[0].shape(), inputs[1]], None) *
+            ops::reciprocal(reduction_len);
+        vec![Some(gx), None]
+    }
+}
+
 impl ops::Op for ReduceProd {
     fn name(&self) -> &str
     {
@@ -115,7 +161,7 @@ impl ops::Op for ReduceProd {
 
     fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
     {
-        reduce_prod_forward(xs, self.keep_dims, self.sparse_axes)
+        reduce_prod_forward(xs[0], xs[1], true, self.keep_dims, self.sparse_axes)
     }
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
@@ -142,7 +188,7 @@ impl ops::Op for ReduceMin {
 
     fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
     {
-        reduce_min_forward(xs, self.keep_dims, self.sparse_axes)
+        reduce_min_forward(xs[0], xs[1], true, self.keep_dims, self.sparse_axes)
     }
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
@@ -159,7 +205,7 @@ impl ops::Op for ReduceMax {
 
     fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
     {
-        reduce_max_forward(xs, self.keep_dims, self.sparse_axes)
+        reduce_max_forward(xs[0], xs[1], true, self.keep_dims, self.sparse_axes)
     }
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>

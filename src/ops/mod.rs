@@ -956,9 +956,9 @@ pub fn clip(x: &Tensor, min: f32, max: f32) -> Tensor
 }
 
 
-/// Takes max along specified axis.
+/// Takes max along specified axes.
 ///
-/// `axis` can be negative.
+/// Elements of `axes` can be negative.
 ///
 /// ```
 /// extern crate ndarray;
@@ -977,9 +977,9 @@ pub fn reduce_max<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tensor
 }
 
 
-/// Takes min along specified axis.
+/// Takes min along specified axes.
 ///
-/// `axis` can be negative.
+/// Elements of `axes` can be negative.
 ///
 /// ```
 /// extern crate ndarray;
@@ -998,33 +998,9 @@ pub fn reduce_min<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tensor
 }
 
 
-/// Takes mean along specified axis.
+/// Takes sum along specified axes.
 ///
-/// `axis` can be negative.
-///
-/// ```
-/// extern crate ndarray;
-/// extern crate autograd as ag;
-///
-/// let mut ctx = ag::Context::new();
-/// let ref x = ag::constant(ndarray::arr2(&[[2., 4.], [3., 1.]]), &mut ctx);
-/// let ref y = ag::reduce_mean(x, &[1], false);
-///
-/// assert_eq!(y.eval(&mut ctx), ndarray::arr1(&[3., 2.]).into_dyn());
-/// ```
-pub fn reduce_mean<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tensor
-{
-    let ref axes = axes.as_tensor();
-    let sum_op = reduction_ops::ReduceSum { keep_dims, sparse_axes: false };
-    let ref sum = apply_op(sum_op, &[x, axes], None);
-    let ref den = reduce_prod(&gather(&x.shape(), axes, 0), &[0], keep_dims);
-    apply_op(binary_ops::DivOp, &[sum, den], Some(sum.shape()))
-}
-
-
-/// Takes sum along specified axis.
-///
-/// `axis` can be negative.
+/// Elements of `axes` can be negative.
 ///
 /// ```
 /// extern crate ndarray;
@@ -1038,8 +1014,41 @@ pub fn reduce_mean<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tenso
 /// ```
 pub fn reduce_sum<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tensor
 {
-    let op = reduction_ops::ReduceSum { keep_dims, sparse_axes: false };
-    apply_op(op, &[x, &axes.as_tensor()], None)
+    let ref axes = axes.as_tensor();
+    let sum = reduction_ops::ReduceSum { keep_dims, sparse_axes: false };
+    apply_op(sum, &[x, axes], None)
+}
+
+
+/// Takes mean along specified axis.
+///
+/// Elements of `axes` can be negative.
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let mut ctx = ag::Context::new();
+/// let ref x = ag::constant(ndarray::arr2(&[[2., 4.], [3., 1.]]), &mut ctx);
+/// let ref y = ag::reduce_mean(x, &[1], false);
+///
+/// assert_eq!(y.eval(&mut ctx), ndarray::arr1(&[3., 2.]).into_dyn());
+/// ```
+pub fn reduce_mean<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tensor
+{
+    let axes = rectify_negative_axes(&axes.as_tensor(), &x.rank());
+    let op = reduction_ops::ReduceMean { keep_dims, sparse_axes: false };
+    apply_op(op, &[x, &axes], None)
+}
+
+
+#[inline]
+fn rectify_negative_axes(axes: &Tensor, x_rank: &Tensor) -> Tensor
+{
+    let ref zero = zeros(&axes.shape());
+    let pos = greater_equal(axes, zero) * axes; // []
+    let neg = lesser(axes, zero) * (axes + x_rank); // [1]
+    pos + neg
 }
 
 
@@ -1080,11 +1089,7 @@ pub fn reduce_prod<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tenso
 /// ```
 pub fn reshape<T: ArrayLike>(x: &Tensor, shape: &T) -> Tensor
 {
-    apply_op(
-        array_ops::Reshape,
-        &[x, &shape.as_tensor()],
-        None,
-    )
+    apply_op(array_ops::Reshape, &[x, &shape.as_tensor()], None)
 }
 
 
@@ -1141,6 +1146,46 @@ pub fn sign(a: &Tensor) -> Tensor
 pub fn floor(a: &Tensor) -> Tensor
 {
     apply_op(math_ops::Floor, &[a], Some(a.shape()))
+}
+
+
+/// Returns the 1/x, element-wise.
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let mut ctx = ag::Context::new();
+/// let ref a = ag::constant(ndarray::arr1(&[2., 3.]), &mut ctx);
+/// let ref b = ag::square(a);
+/// assert_eq!(
+///     b.eval(&mut ctx).as_slice().unwrap(),
+///     &[4., 9.]
+/// );
+/// ```
+pub fn square(a: &Tensor) -> Tensor
+{
+    apply_op(math_ops::Square, &[a], Some(a.shape()))
+}
+
+
+/// Returns the 1/x, element-wise.
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let mut ctx = ag::Context::new();
+/// let ref a = ag::constant(ndarray::arr1(&[2.]), &mut ctx);
+/// let ref b = ag::reciprocal(a);
+/// assert_eq!(
+///     b.eval(&mut ctx).as_slice().unwrap(),
+///     &[0.5]
+/// );
+/// ```
+pub fn reciprocal(a: &Tensor) -> Tensor
+{
+    apply_op(math_ops::Reciprocal, &[a], Some(a.shape()))
 }
 
 
@@ -1374,9 +1419,9 @@ pub fn matmul_t(a: &Tensor, b: &Tensor, transpose_a: bool, transpose_b: bool) ->
 /// * `a_axes` - Contraction axes
 /// * `b_axes` - Contraction axes
 ///
-/// Note1: each axis number can be negative.
+/// Note1: length of a_axes and b_axes must match.
 ///
-/// Note2: The number of contraction axes must be equals.
+/// Note2: Each axis number can be negative.
 ///
 /// ```
 /// extern crate autograd as ag;
@@ -1391,15 +1436,13 @@ pub fn matmul_t(a: &Tensor, b: &Tensor, transpose_a: bool, transpose_b: bool) ->
 ///
 /// For detailed description,
 /// see https://docs.scipy.org/doc/numpy/reference/generated/numpy.tensordot.html.
-pub fn tensordot(a: &Tensor, b: &Tensor, a_axes: &ArrayLike, b_axes: &ArrayLike) -> Tensor
+pub fn tensordot<T: ArrayLike>(a: &Tensor, b: &Tensor, a_axes: &T, b_axes: &T) -> Tensor
 {
-    fn preprocess(x: &Tensor, axes: &ArrayLike, flip: bool) -> (Tensor, Tensor)
+    fn preprocess<T: ArrayLike>(x: &Tensor, axes: &T, flip: bool) -> (Tensor, Tensor)
     {
-        let ref x_shape = shape(x);
-        let ref x_rank = rank(x);
-        let ref axes = axes.as_tensor();
-        let ref zero = zeros(&axes.shape());
-        let ref axes = greater_equal(axes, zero) * axes + lesser(axes, zero) * (axes + x_rank);
+        let ref x_shape = x.shape();
+        let ref x_rank = x.rank();
+        let ref axes = rectify_negative_axes(&axes.as_tensor(), x_rank);
         let ref free = setdiff1d(&range(&scalar(0.), x_rank, &scalar(1.)), axes);
 
         let free_dims = gather(x_shape, free, 0);
@@ -1530,7 +1573,8 @@ pub fn split(x: &Tensor, sizes: &[usize], axis: isize) -> Vec<Tensor>
 /// # Arguments
 /// * `x` - Tensor with arbitrary shape.
 /// * `starts` - Start indices for each dimensions
-/// * `ends` - End indices for each dimensions. `-1` representing the last index is acceptable.
+/// * `ends` - End indices for each dimensions.
+/// `-1` representing the last index is acceptable for each dimension.
 ///
 /// ```
 /// extern crate autograd as ag;
@@ -1542,6 +1586,7 @@ pub fn split(x: &Tensor, sizes: &[usize], axis: isize) -> Vec<Tensor>
 /// ```
 pub fn slice(x: &Tensor, starts: &[isize], ends: &[isize]) -> Tensor
 {
+    // TODO: Make starts and ends ArrayLike
     assert_eq!(starts.len(), ends.len());
     let starts_ends = starts.iter().zip(ends.iter());
 
@@ -1580,17 +1625,8 @@ pub fn concat(tensors: &[&Tensor], axis: isize) -> Tensor
 
 /// Gathers subviews from the input tensor.
 ///
-/// Along `axis`, slices subviews from `param` with `indices` and then stacks those.
-/// `axis` can be negative.
-/// For detailed description, see https://www.tensorflow.org/api_docs/python/tf/gather.
-///
-/// For example, this can be used for embedding vector lookup etc.
-///
-///
-/// # Arguments
-/// * `param` - Target of slicing.
-/// * `indices` - Index tensor with which slices `param`. This can be arbitrary shape.
-/// * `axis` - Slices sub tensors along this axis.
+/// Same spec as https://www.tensorflow.org/api_docs/python/tf/gather.
+/// For example, this can be used for embedding vectors lookup etc.
 ///
 /// # Returns
 /// Tensor with shape `param.shape[..axis] + indices.shape + param.shape[axis+1..]`
@@ -1817,11 +1853,7 @@ pub fn range<T: ArrayLike>(start: &T, end: &T, step: &T) -> Tensor
 {
     apply_op(
         const_gen_ops::Range,
-        &[
-            &start.as_tensor(),
-            &end.as_tensor(),
-            &step.as_tensor(),
-        ],
+        &[&start.as_tensor(), &end.as_tensor(), &step.as_tensor()],
         None,
     )
 }
