@@ -1,6 +1,3 @@
-extern crate ndarray;
-extern crate fnv;
-
 use context::Context;
 use tensor::Tensor;
 
@@ -32,9 +29,8 @@ pub fn apply_gradients<T: optimizers::Optimizer>(
 
 
 pub mod optimizers {
-    extern crate fnv;
-    use self::fnv::FnvHashMap;
     use ndarray_ext::NdArray;
+    use std::collections::hash_map::HashMap;
     use tensor::Tensor;
 
     /// Trait for any stochastic gradient descent optimizer
@@ -71,7 +67,7 @@ pub mod optimizers {
         pub b1: f32,
         pub b2: f32,
         // dynamic params
-        pub states: FnvHashMap<Tensor, AdamState>,
+        pub states: HashMap<Tensor, AdamState>,
     }
 
     pub struct AdamState {
@@ -88,7 +84,7 @@ pub mod optimizers {
                 eps: 1e-08,
                 b1: 0.9,
                 b2: 0.999,
-                states: FnvHashMap::default(),
+                states: HashMap::new(),
             }
         }
     }

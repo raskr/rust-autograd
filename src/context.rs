@@ -1,7 +1,7 @@
-extern crate fnv;
 extern crate ndarray;
 
 use ndarray_ext::NdArray;
+use std::collections::hash_map::HashMap;
 use tensor::Tensor;
 
 
@@ -36,18 +36,15 @@ use tensor::Tensor;
 /// assert_eq!(z.eval(&mut ctx).as_slice().unwrap(), &[4., 4.]);
 /// ```
 pub struct Context {
-    pub variables: fnv::FnvHashMap<Tensor, NdArray>,
-    pub outputs: fnv::FnvHashMap<Tensor, Result<NdArray, ::OpComputeErrorStatus>>,
+    pub variables: HashMap<Tensor, NdArray>,
+    pub outputs: HashMap<Tensor, Result<NdArray, ::OpComputeErrorStatus>>,
 }
 
 impl Context {
     /// Creates new context object.
     pub fn new() -> Context
     {
-        Context {
-            variables: fnv::FnvHashMap::default(),
-            outputs: fnv::FnvHashMap::default(),
-        }
+        Context { variables: HashMap::new(), outputs: HashMap::new() }
     }
 
     /// Returns all variables in this context.

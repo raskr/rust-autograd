@@ -1,5 +1,4 @@
 extern crate ndarray;
-extern crate fnv;
 
 use context;
 use ndarray_ext::NdArray;

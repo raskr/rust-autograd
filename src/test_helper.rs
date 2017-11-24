@@ -1,10 +1,8 @@
 extern crate ndarray;
-extern crate rand;
-extern crate fnv;
 
-use self::fnv::FnvHashMap;
 use context;
 use ndarray_ext::NdArray;
+use std::collections::hash_map::HashMap;
 use std::mem;
 use tensor::Tensor;
 
@@ -75,7 +73,7 @@ pub fn gradient_check(
     }
 }
 
-type Memo = FnvHashMap<Tensor, NdArray>;
+type Memo = HashMap<Tensor, NdArray>;
 
 #[allow(mutable_transmutes)]
 /// Almost same as `eval`, but feeds remains after calling this.
@@ -87,7 +85,7 @@ fn eval_keep_feeds(
     let xs = xs.into_iter().map(|a| (*a).clone()).collect::<Vec<_>>();
 
     // Pull out `outputs` and `variables` from context
-    let mut memo = unsafe { mem::replace(mem::transmute(&ctx.outputs), FnvHashMap::default()) };
+    let mut memo = unsafe { mem::replace(mem::transmute(&ctx.outputs), HashMap::new()) };
     let mut vars = unsafe { mem::transmute::<&Memo, &mut Memo>(&ctx.variables) };
 
     // Run eval with those
@@ -96,7 +94,7 @@ fn eval_keep_feeds(
     // Drain outputs except for placeholder nodes
     let mut memo = memo.into_iter()
         .filter(|&(ref k, _)| k.op.name() == "PH")
-        .collect::<FnvHashMap<_, _>>();
+        .collect::<HashMap<_, _>>();
 
     // Return back memo to `ctx.outputs`
     mem::swap(&mut memo, unsafe { mem::transmute(&ctx.outputs) });

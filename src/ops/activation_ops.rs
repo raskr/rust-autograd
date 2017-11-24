@@ -84,7 +84,7 @@ impl ops::Op for Sigmoid {
 
     fn grad(&self, gy: &Tensor, _: &[&Tensor], y: &Tensor) -> Vec<Option<Tensor>>
     {
-        vec![Some(gy*(y - ops::square(y)))]
+        vec![Some(gy * (y - ops::square(y)))]
     }
 }
 

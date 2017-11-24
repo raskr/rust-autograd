@@ -4,8 +4,8 @@ use self::ndarray::Zip;
 use ndarray_ext::NdArray;
 use ops;
 use std::f32;
-use tensor::Tensor;
 use std::ops::Neg;
+use tensor::Tensor;
 
 pub struct Sin;
 pub struct Cos;
@@ -140,7 +140,7 @@ impl ops::Op for Square {
 
     fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
     {
-        Ok(xs[0].map(|x| x*x))
+        Ok(xs[0].map(|x| x * x))
     }
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
@@ -516,7 +516,7 @@ impl ops::Op for Tanh {
 
     fn grad(&self, gy: &Tensor, _: &[&Tensor], y: &Tensor) -> Vec<Option<Tensor>>
     {
-        vec![Some(gy*(1 - ops::square(y)))]
+        vec![Some(gy * (1 - ops::square(y)))]
     }
 }
 

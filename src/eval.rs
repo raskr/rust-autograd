@@ -1,18 +1,18 @@
 /// Implements graph evaluation algorithms.
 extern crate ndarray;
-extern crate fnv;
 
 use context;
 use ndarray_ext::NdArray;
 use std::collections::hash_map::Entry;
+use std::collections::hash_map::HashMap;
 use std::mem;
 use tensor::Tensor;
 
 
 // private type aliases
 type OpComputeResult = Result<NdArray, ::OpComputeErrorStatus>;
-type OutputMap = fnv::FnvHashMap<Tensor, OpComputeResult>;
-type VariableMap = fnv::FnvHashMap<Tensor, NdArray>;
+type OutputMap = HashMap<Tensor, OpComputeResult>;
+type VariableMap = HashMap<Tensor, NdArray>;
 
 
 
@@ -157,7 +157,7 @@ pub fn eval_tensors(
     }
 
     // `usize` is number of owners of the array
-    let mut owner2arr = fnv::FnvHashMap::<&Tensor, (NdArray, usize)>::default();
+    let mut owner2arr = HashMap::<&Tensor, (NdArray, usize)>::default();
     let mut owners = Vec::with_capacity(tensors.len());
 
     // build owner2arr and owners
