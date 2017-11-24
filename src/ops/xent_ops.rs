@@ -6,10 +6,34 @@ use std::f32;
 use tensor::Tensor;
 
 
-pub struct SoftmaxCrossEntropy;
-pub struct SparseSoftmaxCrossEntropy;
+pub struct SoftmaxCrossEntropyLatter;
+pub struct SparseSoftmaxCrossEntropyLatter;
 pub struct SparseSoftmaxCrossEntropyGrad;
 pub struct SigmoidCrossEntropy;
+pub struct LogSoftmax {
+    pub axis: isize,
+}
+
+
+impl ops::Op for LogSoftmax {
+    fn name(&self) -> &str
+    {
+        "LogSoftmax"
+    }
+
+    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    {
+        Ok(xs[0] - &ops::math_ops::logsumexp_forward(xs[0], self.axis))
+    }
+
+    fn grad(&self, gy: &Tensor, _: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
+    {
+        let sm = ops::exp(output);
+        let sum = ops::reduce_sum(gy, &[1], true);
+        let ref mul = sm * sum;
+        vec![Some(gy - mul)]
+    }
+}
 
 impl ops::Op for SigmoidCrossEntropy {
     fn name(&self) -> &str
@@ -17,18 +41,22 @@ impl ops::Op for SigmoidCrossEntropy {
         "SigmoidCrossEntropy"
     }
 
-    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let x = xs[0];
         let t = xs[1];
 
-        assert_eq!(x.shape(), t.shape());
+        if x.shape() != t.shape() {
+            return Err(::OpComputeErrorStatus::BadInput(
+                "x.shape must match t.shape".to_string(),
+            ));
+        }
 
         let e = f32::consts::E;
         let max_fn = f32::max;
         let mut tmp = x.map(move |a| ((-a.abs()).exp() + 1.).log(e) + max_fn(0., *a));
         tmp -= &(t * x);
-        tmp
+        Ok(tmp)
     }
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
@@ -47,22 +75,29 @@ impl ops::Op for SigmoidCrossEntropy {
     }
 }
 
-impl ops::Op for SparseSoftmaxCrossEntropy {
+impl ops::Op for SparseSoftmaxCrossEntropyLatter {
     fn name(&self) -> &str
     {
-        "SparseSoftmaxCrossEntropy"
+        "SparseSoftmaxCrossEntropyLatter"
     }
 
-    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
     {
-        let (x, t) = (xs[0], xs[1]);
-        {
-            assert_eq!(x.ndim(), 2);
-            let t_ndim = t.ndim();
-            assert!(1 == t_ndim || 2 == t_ndim);
-        }
+        let (log_x, t) = (xs[0], xs[1]);
 
-        let log_x = ops::log_softmax::log_softmax_forward(xs[0], 1);
+        // validation
+        {
+            if log_x.ndim() != 2 {
+                return Err(::OpComputeErrorStatus::BadInput(
+                    "x must be 2-ranked tensor".to_string(),
+                ));
+            }
+            if t.ndim() != 1 {
+                return Err(::OpComputeErrorStatus::BadInput(
+                    "t must be 1-ranked tensor".to_string(),
+                ));
+            }
+        }
 
         let mut t_iter = t.iter();
 
@@ -74,21 +109,24 @@ impl ops::Op for SparseSoftmaxCrossEntropy {
             .into_shape(ndarray::IxDyn(&[log_x.shape()[0], 1]))
             .unwrap();
 
-        ret
+        Ok(ret)
     }
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
-        let x = inputs[0];
+        let log_x = inputs[0];
         let t = inputs[1];
 
-        let gx1 = ops::apply_op(SparseSoftmaxCrossEntropyGrad, &[x, t, gy]);
+        let gx1 = ops::apply_op(
+            SparseSoftmaxCrossEntropyGrad,
+            &[log_x, t, gy],
+            Some(log_x.shape()),
+        );
 
         // gx2 won't be used
         let gx2 = {
-            let ref log_x = ops::log_softmax(inputs[0], -1);
             let ref x = ops::exp(log_x);
-            let sum = ops::reduce_sum(&(x * log_x), 1, true);
+            let sum = ops::reduce_sum(&(x * log_x), &[1], true);
             x * gy * (sum - log_x)
         };
 
@@ -102,20 +140,20 @@ impl ops::Op for SparseSoftmaxCrossEntropyGrad {
         "SparseSoftmaxCrossEntropyGrad"
     }
 
-    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
     {
-        let x = xs[0];
+        let log_x = xs[0]; // x is softmax
         let t = xs[1];
         let gy = xs[2];
 
-        let mut x = ops::activation_ops::softmax_forward(x, 1);
+        let mut x = log_x.map(|a| a.exp());
 
         for (mut row, &t_) in x.axis_iter_mut(ndarray::Axis(0)).zip(t) {
             row[t_ as usize] -= 1.;
         }
 
         x *= gy;
-        x
+        Ok(x)
 
     }
 
@@ -124,43 +162,55 @@ impl ops::Op for SparseSoftmaxCrossEntropyGrad {
         vec![None, None]
     }
 }
-impl ops::Op for SoftmaxCrossEntropy {
+
+
+impl ops::Op for SoftmaxCrossEntropyLatter {
     fn name(&self) -> &str
     {
-        "SoftmaxCrossEntropy"
+        "SoftmaxCrossEntropyLatter"
     }
 
-    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
     {
+        let log_x = xs[0];
         // `t` must be one-hot unlike KL-divergence
-        let x = xs[0];
         let t = xs[1];
-        assert_eq!(x.ndim(), 2);
-        assert_eq!(t.ndim(), 2);
+
+        if log_x.ndim() != 2 {
+            return Err(::OpComputeErrorStatus::BadInput(
+                "x must be 2-ranked tensor".to_string(),
+            ));
+        }
+        if t.ndim() != 2 {
+            return Err(::OpComputeErrorStatus::BadInput(
+                "t must be 2-ranked tensor".to_string(),
+            ));
+        }
 
         // - t log x ( =(batch, num_classes))
-        let log_x = ops::log_softmax::log_softmax_forward(x, 1);
         // TODO: replace "sum" with "select"
         // unwrap is safe
-        (t * &log_x).sum_axis(ndarray::Axis(1)) * -1. // summing class dim.
+        Ok((t * log_x).sum_axis(ndarray::Axis(1)) * -1.) // summing class dim.
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, output_grad: &Tensor, inputs: &[&Tensor], output: &Tensor)
+        -> Vec<Option<Tensor>>
     {
-        let ref x = ops::softmax(inputs[0], -1);
+        let ref x = ops::exp(inputs[0]);
         let t = inputs[1];
 
+        // x = output of softmax, gy = dy/dx
         // = {gy - Σ(x * gy)} * x
         // = {-t/x - Σ(x * -t/x)} * x
         // = {-t/x + Σt} * x
         // = -t + x
-        let gx1 = ops::apply_op(ops::binary_ops::InplaceSubOp, &[x, t]) * gy;
+        let gx1 = (x - t) * output_grad;
 
         // gx2 won't be used
         let gx2 = {
             let ref log_x = ops::log_softmax(inputs[0], -1);
-            let sum = ops::reduce_sum(&(x * log_x), -1, true);
-            gy * (sum - log_x) * output
+            let sum = ops::reduce_sum(&(x * log_x), &[-1], true);
+            output_grad * (sum - log_x) * output
         };
 
         vec![Some(gx1), Some(gx2)]

@@ -26,3 +26,6 @@ path = "src/lib.rs"
 name = "mlp_mnist"
 path = "examples/mlp_mnist.rs"
 
+[[example]]
+name = "lstm_lm"
+path = "examples/lstm_lm.rs"

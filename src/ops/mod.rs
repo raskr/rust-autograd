@@ -4,35 +4,18 @@ use context::Context;
 use ndarray_ext::NdArray;
 use std::rc::Rc;
 use tensor::{RawTensor, Tensor};
+use tensor::ArrayLike;
 
-#[doc(hidden)]
-pub mod dummy_op;
-mod generator_ops;
-mod transpose;
-mod scalar;
-mod setdiff1d;
-mod shape_ops;
-mod stop_gradients;
-mod index;
+mod array_ops;
+mod gradient_ops;
 mod random_ops;
-mod clip;
-mod add_n;
-mod logsumexp;
-mod log_softmax;
 mod activation_ops;
-mod cmp_ops;
 mod math_ops;
-mod concat;
-mod tile;
 mod binary_ops;
-mod split;
-mod slice;
 mod xent_ops;
-mod gather;
 mod dot_ops;
 mod reduction_ops;
-mod squeeze;
-mod expand_dims;
+mod const_gen_ops;
 
 
 #[doc(hidden)]
@@ -52,7 +35,7 @@ pub trait Op {
     ///
     /// N inputs, 1 output.
     #[allow(unused_variables)]
-    fn compute(&self, xs: &[&NdArray], train: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, OpComputeErrorStatus>
     {
         unimplemented!()
     }
@@ -61,7 +44,7 @@ pub trait Op {
     ///
     /// Inplace operators such as InplaceAddOp override this.
     #[allow(unused_variables)]
-    fn compute_inplace(&self, xs: &mut [&mut NdArray], train: bool)
+    fn compute_inplace(&self, xs: &mut [&mut NdArray]) -> Result<(), OpComputeErrorStatus>
     {
         unimplemented!()
     }
@@ -70,41 +53,53 @@ pub trait Op {
     ///
     /// # Arguments
     /// * `gy` - Symbolic representation of the gradient of `compute`'s return value
-    /// * `inputs` - Symbolic representation of `compute::xs`
+    /// * `xs` - Symbolic representation of `compute::xs`
     /// * `y` - Symbolic representation of `compute`'s return value
     ///
     /// NOTE:
-    /// The number of return values must be same as `inputs.len()`.
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], y: &Tensor) -> Vec<Option<Tensor>>;
+    /// The number of return values must match `inputs.len()`.
+    fn grad(&self, gy: &Tensor, xs: &[&Tensor], y: &Tensor) -> Vec<Option<Tensor>>;
 }
 
+/// Error statuses in Op#compute.
+#[derive(Clone, Debug)]
+pub enum OpComputeErrorStatus {
+    /// This denotes that the op didn't any computation with no errors; i.e., this op
+    /// delegates the result to its input node at the index `to`.
+    Delegate { to: usize },
+    /// Could'nt compute output array because of bad inputs.
+    BadInput(String),
+}
 
 impl Tensor {
-    /// Gets a symbolic element from a tensor with shape `[1]`.
+    /// Gets a symbolic element from this tensor with shape `[]`.
     ///
-    /// `idx` can be negative.
-    ///
-    /// # Examples
+    /// Index `i` can be negative.
     ///
     /// ```
     /// extern crate ndarray;
     /// extern crate autograd as ag;
     ///
     /// let mut ctx = ag::Context::new();
-    /// let ref a = ctx.variable(ndarray::arr2(&[[2., 3.], [4., 5.]]));
+    /// let ref a = ag::variable(ndarray::arr2(&[[2., 3.], [4., 5.]]), &mut ctx);
     /// let ref b = a.get(2);
     ///
-    /// assert_eq!(b.eval(&mut ctx)[0], 4.);
+    /// assert_eq!(b.eval(&mut ctx)[ndarray::IxDyn(&[])], 4.);
     /// ```
-    pub fn get(&self, idx: isize) -> Tensor
+    pub fn get(&self, i: isize) -> Tensor
     {
-        apply_op(index::IndexOp { index: idx }, &[self])
+        apply_op(
+            array_ops::IndexOp { index: i },
+            &[self],
+            Some(convert_to_tensor(::ndarray_ext::scalar_shape())),
+        )
     }
 }
 
 
 #[doc(hidden)]
-/// Helper function to generate a symbolic tensor
+#[inline(always)]
+/// Helper. Generates a symbolic tensor.
 ///
 /// ```
 /// extern crate ndarray;
@@ -120,7 +115,7 @@ impl Tensor {
 /// vars.sort_by_key(|a| a.top_rank);
 /// assert!(vars == [a, v, b, z])
 /// ```
-pub fn apply_op<T: Op + 'static>(op: T, inputs: &[&Tensor]) -> Tensor
+pub fn apply_op<T: Op + 'static>(op: T, inputs: &[&Tensor], shape: Option<Tensor>) -> Tensor
 {
     Tensor(Rc::new(RawTensor {
         op: Box::new(op),
@@ -131,77 +126,123 @@ pub fn apply_op<T: Op + 'static>(op: T, inputs: &[&Tensor]) -> Tensor
             .max()
             .map(|a| a + 1)
             .unwrap_or(0),
+        shape,
     }))
 }
 
+pub struct DummyOp {
+    pub name: String,
+}
+
+impl Op for DummyOp {
+    fn name(&self) -> &str
+    {
+        &self.name
+    }
+
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
+        unreachable!(
+            "must not be called ({}#grad). This is probably bug.",
+            self.name
+        )
+    }
+
+    fn compute(&self, _: &[&::NdArray]) -> Result<NdArray, OpComputeErrorStatus>
+    {
+        let msg = if self.name == "PH" {
+            "Wrong `Context` object usage,\
+            or there exists placeholder(s) couldn't get initial value"
+        } else if self.name == "Variable" {
+            "Current graph evaluation context doesn't match with what generated this variable."
+        } else if self.name == "Constant" {
+            "Current graph evaluation context doesn't match with what generated this constant."
+        } else {
+            unreachable!()
+        };
+        panic!(msg);
+    }
+}
 
 // ---------------------------------------
 // -- Ops to manipulate `Tensor` object --
 // ---------------------------------------
 
 
-/// Returns gradient tensors wrt variables.
+/// Returns gradient tensors wrt input tensors.
 ///
 /// # Arguments
-/// * `objectives` - Targets of differentiation.
-/// * `variables` - Variable tensors with which differentiate `objectives`.
-/// * `output_grads` - Optionals. These are already known gradients of `objectives`.
-/// So the length must be same as `objectives`'s.
-/// If **each objective is not a scalar**, you must pass the "Some" value. In most cases,
-/// it is initialized with 1s.
+/// * `ys` - Targets of differentiation.
+/// * `xs` - tensors with which differentiate `ys`.
+/// So the length must be same as `ys`'s.
+///
+/// NOTE: Each objective must be a scalar (0-ranked tensor).
+/// For multi dimensional objectives, use [grad_with_default](ops.fn.grad_with_default.html).
 ///
 /// # Returns
-/// Symbolic gradient tensors corresponding to `variables` in the same order as `variables`
+/// Symbolic gradient tensors corresponding to `xs` in the same order as `xs`
 ///
-/// # Example1
+///
+/// # Example
 /// Partial derivatives of `z = 2x^2 + 3y + 1`.
 ///
 /// ```
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let mut ctx = ag::Context::new();
-/// let ref x = ctx.placeholder();
-/// let ref y = ctx.variable(ndarray::arr1(&[0.]));
+/// let ref x = ag::placeholder(&[]);
+/// let ref y = ag::placeholder(&[]);
 /// let ref z = 2*x*x + 3*y + 1;
 ///
 /// // dz/dy
-/// let ref g1 = ag::gradients(&[z], &[y], &[None])[0];
+/// let ref g1 = ag::grad(&[z], &[y])[0];
 /// // dz/dx
-/// let ref g2 = ag::gradients(&[z], &[x], &[None])[0];
+/// let ref g2 = ag::grad(&[z], &[x])[0];
 ///
 /// // ddz/dx (differentiates `z` again)
-/// let ref gg = ag::gradients(&[g2], &[x], &[None])[0];
+/// let ref gg = ag::grad(&[g2], &[x])[0];
 ///
 /// // evaluation of symbolic gradients
-/// assert_eq!(3., g1.eval(&mut ctx)[0]);
-/// assert_eq!(4., gg.eval(&mut ctx)[0]);
+/// let mut ctx = ag::Context::new();
+/// assert_eq!(3., g1.eval(&mut ctx)[ndarray::IxDyn(&[])]);
+/// assert_eq!(4., gg.eval(&mut ctx)[ndarray::IxDyn(&[])]);
 ///
 /// // dz/dx requires to fill the placeholder `x`
-/// ctx.feed(x, ndarray::arr1(&[2.]));
-/// assert_eq!(8., g2.eval(&mut ctx)[0]);
+/// ctx.feed_input(x, ndarray::arr0(2.));
+/// assert_eq!(8., g2.eval(&mut ctx)[ndarray::IxDyn(&[])]);
 ///
 /// ```
-///
-/// # Example2
-/// The case where objective is not a scalar
-///
-/// ```
-/// extern crate autograd as ag;
-///
-/// let mut ctx = ag::Context::new();
-/// let ref a = ctx.variable(ag::ndarray_ext::zeros(&[4, 2]));
-/// let ref b = ag::zeros(&[2, 3]);
-/// let ref c = ag::matmul(a, b);
-/// let ref g = ag::gradients(&[c], &[a], &[Some(&ag::ones(&[4, 2]))])[0];
-/// ```
-pub fn gradients(
-    objectives: &[&Tensor],
-    variables: &[&Tensor],
-    output_grads: &[Option<&Tensor>],
-) -> Vec<Tensor>
+pub fn grad(ys: &[&Tensor], xs: &[&Tensor]) -> Vec<Tensor>
 {
-    ::topology::symbolic_gradients(objectives, variables, output_grads)
+    ::gradient::symbolic_gradients(ys, xs, &ys.iter().map(|_| None).collect::<Vec<_>>())
+}
+
+
+/// Returns gradient tensors wrt input tensors.
+///
+/// # Arguments
+/// * `ys` - Targets of differentiation.
+/// * `xs` - tensors with which differentiate `ys`.
+/// * `output_grads` - Already known gradients of `ys`.
+///
+/// The length must be same as `ys`'s. If **each objective is not a scalar**,
+/// you must pass the "Some" value. In most cases, it is initialized with 1s.
+///
+/// # Returns
+/// Symbolic gradient tensors corresponding to `xs` in the same order as `xs`
+///
+/// For defailed, see [grad](ops.fn.grad.html).
+pub fn grad_with_default(ys: &[&Tensor], xs: &[&Tensor], output_grads: &[&Tensor]) -> Vec<Tensor>
+{
+    ::gradient::symbolic_gradients(
+        ys,
+        xs,
+        output_grads
+            .into_iter()
+            .map(|&a| Some(a))
+            .collect::<Vec<_>>()
+            .as_slice(),
+    )
 }
 
 
@@ -215,14 +256,12 @@ pub fn gradients(
 /// # Returns
 /// Jacobians for each variable. Each one is matrix of shape `(objective_len, variable size)`.
 ///
-/// # Examples
-///
 /// ```
 /// extern crate autograd as ag;
 ///
 /// let mut ctx = ag::Context::new();
-/// let ref a = ctx.variable(ag::ndarray_ext::standard_normal(&[4, 2]));
-/// let ref b = ctx.variable(ag::ndarray_ext::standard_normal(&[2, 3]));
+/// let ref a = ag::variable(ag::ndarray_ext::standard_normal(&[4, 2]), &mut ctx);
+/// let ref b = ag::variable(ag::ndarray_ext::standard_normal(&[2, 3]), &mut ctx);
 /// let ref c = ag::matmul(a, b);
 /// let ref j = ag::jacobians(c, &[a, b], 4*3);
 ///
@@ -235,7 +274,7 @@ pub fn jacobians(objective: &Tensor, variables: &[&Tensor], objective_len: usize
     let vec_vec = (0..objective_len as isize)
         .map(|i| {
             // For each scalar objective, computes gradients for all variables
-            ::topology::symbolic_gradients(&[&objective.get(i)], variables, &[None])
+            ::gradient::symbolic_gradients(&[&objective.get(i)], variables, &[None])
         })
         .collect::<Vec<Vec<_>>>();
 
@@ -255,14 +294,11 @@ pub fn jacobians(objective: &Tensor, variables: &[&Tensor], objective_len: usize
 
 /// (Experimental) Computes hessian vector product
 ///
-/// `objectives` must be scalars.
-pub fn _hessian_vector_product(
-    objectives: &[&Tensor],
-    variables: &[&Tensor],
-    vectors: &[&Tensor],
-) -> Vec<Tensor>
+/// `ys` must be scalars.
+pub fn _hessian_vector_product(ys: &[&Tensor], xs: &[&Tensor], vectors: &[&Tensor]) -> Vec<Tensor>
 {
-    let grads = ::topology::symbolic_gradients(objectives, variables, &[None]);
+    let grads =
+        ::gradient::symbolic_gradients(ys, xs, &xs.iter().map(|_| None).collect::<Vec<_>>());
 
     let products = grads
         .iter()
@@ -272,7 +308,7 @@ pub fn _hessian_vector_product(
 
     let products = products.iter().map(|a| a).collect::<Vec<_>>();
 
-    ::topology::symbolic_gradients(products.as_slice(), variables, &[None])
+    ::gradient::symbolic_gradients(products.as_slice(), xs, &[None])
 }
 
 
@@ -281,206 +317,336 @@ pub fn _hessian_vector_product(
 /// Make sure that the gradient is not propagated to the tensors behind this.
 pub fn stop_gradients(x: &Tensor) -> Tensor
 {
-    apply_op(stop_gradients::StopGradients, &[x])
+    apply_op(gradient_ops::StopGradients, &[x], Some(x.shape()))
+}
+
+
+/// Creates a shared variable tensor from rust-ndarray's array object.
+///
+/// The shared variable behaves like any other tensors, except that
+/// it can be optimized with gradient descent methods
+/// implemented in `autograd::sgd`.
+/// For the usages, see https://github.com/perrier1034/rust-autograd/tree/master/examples
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let mut ctx = ag::Context::new();
+/// let ref x: ag::Tensor = ag::variable(ndarray::arr1(&[2.]), &mut ctx);
+/// let ref y: ag::Tensor = 3 * x;
+///
+/// assert_eq!(6., y.eval(&mut ctx)[0]);
+/// assert!(ctx.variables.contains_key(x));
+/// assert_eq!(ctx.variables.get(x).unwrap(), &ndarray::arr1(&[2.]).into_dyn());
+/// ```
+#[inline]
+pub fn variable<T>(arr: ndarray::Array<f32, T>, ctx: &mut Context) -> Tensor
+where
+    T: ndarray::Dimension,
+{
+    let arr = arr.into_dyn();
+    let tensor = Tensor(Rc::new(RawTensor {
+        op: Box::new(DummyOp { name: "Variable".to_string() }),
+        inputs: vec![],
+        top_rank: 0,
+        shape: Some(convert_to_tensor(::ndarray_ext::shape_of(&arr))),
+    }));
+    ctx.variables.insert(tensor.clone(), arr);
+    tensor
+}
+
+
+/// Creates a placeholder tensor.
+///
+/// See [Context](struct.Context.html).
+#[inline]
+pub fn placeholder(shape_: &[isize]) -> Tensor
+{
+    let rank = shape_.len();
+    let shape = if rank != 0 && -1 == shape_[0] {
+        // dynamic placeholder
+        None
+    } else {
+        let arr = NdArray::from_shape_vec(
+            ndarray::IxDyn(&[rank]),
+            shape_.iter().map(|&x| x as f32).collect::<Vec<_>>(),
+        ).unwrap();
+        Some(convert_to_tensor(arr))
+    };
+
+    Tensor(Rc::new(RawTensor {
+        op: Box::new(DummyOp { name: "PH".to_string() }),
+        inputs: vec![],
+        top_rank: 0,
+        shape,
+    }))
+}
+
+
+/// Creates a constant tensor.
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let mut ctx = ag::Context::new();
+/// let arr = ndarray::arr1(&[0., 0., 0.]);
+/// let ref con = ag::constant(arr.clone(), &mut ctx);
+/// assert_eq!(con.eval(&mut ctx), arr.into_dyn())
+/// ```
+#[inline]
+pub fn constant<T>(arr: ndarray::Array<f32, T>, ctx: &mut Context) -> Tensor
+where
+    T: ndarray::Dimension,
+{
+    let arr = arr.into_dyn();
+    let t = Tensor(Rc::new(RawTensor {
+        op: Box::new(DummyOp { name: "Const".to_string() }),
+        inputs: vec![],
+        top_rank: 0,
+        shape: Some(convert_to_tensor(::ndarray_ext::shape_of(&arr))),
+    }));
+    ctx.variables.insert(t.clone(), arr);
+    t
 }
 
 
 /// Returns the (symbolic) shape of input tensor
 ///
-/// This is useful when the shape of `x` is dynamic.
-///
-/// # Examples
-///
 /// ```
 /// extern crate autograd as ag;
 ///
-/// let mut ctx = ag::Context::new();
-/// let ref x = ctx.placeholder();
+/// let ref x = ag::zeros(&[2, 3]);
 /// let ref s = ag::shape(x);
 ///
-/// ctx.feed(x, ag::ndarray_ext::zeros(&[2, 3]));
-///
+/// let mut ctx = ag::Context::new();
 /// assert_eq!(&[2., 3.], s.eval(&mut ctx).as_slice().unwrap());
 /// ```
 pub fn shape(x: &Tensor) -> Tensor
 {
-    apply_op(shape_ops::Shape, &[x])
+    if let Some(ref inner) = x.shape {
+        inner.clone()
+    } else {
+        apply_op(array_ops::Shape, &[x], None)
+    }
 }
 
 
-/// Returns the (symbolic) length of input tensor
-///
-/// This is useful when the size of `x` is dynamic.
-///
-/// # Examples
+/// Returns the (symbolic) size of input tensor
 ///
 /// ```
+/// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let mut ctx = ag::Context::new();
-/// let ref a = ctx.placeholder();
-/// let ref b = ag::zeros(&[4, 3]);
-/// let ref c = ag::size(a);
-/// let ref d = ag::size(b);
+/// let ref a = ag::zeros(&[4, 3]);
+/// let ref b = ag::size(a);
 ///
-/// ctx.feed(a, ag::ndarray_ext::zeros(&[2, 3]));
-/// let evaluated = ctx.eval(&[c, d]);
-/// assert_eq!(6., evaluated[0][0]);
-/// assert_eq!(12., evaluated[1][0]);
+/// let mut ctx = ag::Context::new();
+/// assert_eq!(12., b.eval(&mut ctx)[ndarray::IxDyn(&[])]);
 /// ```
 pub fn size(x: &Tensor) -> Tensor
 {
-    apply_op(shape_ops::Size, &[x])
+    apply_op(array_ops::Size, &[x], None)
 }
 
 
 /// Returns the (symbolic) rank of input tensor
 ///
-/// This is useful when the rank of `x` is dynamic.
-///
-/// # Examples
-///
 /// ```
+/// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let mut ctx = ag::Context::new();
-/// let ref x = ctx.placeholder();
+/// let ref x = ag::zeros(&[2, 3, 4]);
 /// let ref r = ag::rank(x);
 ///
-/// ctx.feed(x, ag::ndarray_ext::zeros(&[2, 3]));
-///
-/// assert_eq!(2., r.eval(&mut ctx)[0]);
+/// let mut ctx = ag::Context::new();
+/// assert_eq!(3., r.eval(&mut ctx)[ndarray::IxDyn(&[])]);
 /// ```
 pub fn rank(x: &Tensor) -> Tensor
 {
-    apply_op(shape_ops::Rank, &[x])
+    apply_op(array_ops::Rank, &[x], None)
 }
 
 
 /// Elementwise sine
 pub fn sin(x: &Tensor) -> Tensor
 {
-    apply_op(math_ops::Sin, &[x])
+    apply_op(math_ops::Sin, &[x], Some(x.shape()))
 }
 
 
 /// Elementwise cosine
 pub fn cos(x: &Tensor) -> Tensor
 {
-    apply_op(math_ops::Cos, &[x])
+    apply_op(math_ops::Cos, &[x], Some(x.shape()))
 }
 
 
 /// Elementwise tangent
 pub fn tan(x: &Tensor) -> Tensor
 {
-    apply_op(math_ops::Tan, &[x])
+    apply_op(math_ops::Tan, &[x], Some(x.shape()))
 }
 
 
 /// Elementwise arcsin
 pub fn asin(x: &Tensor) -> Tensor
 {
-    apply_op(math_ops::Asin, &[x])
+    apply_op(math_ops::Asin, &[x], Some(x.shape()))
 }
 
 
 /// Elementwise arccos
 pub fn acos(x: &Tensor) -> Tensor
 {
-    apply_op(math_ops::Acos, &[x])
+    apply_op(math_ops::Acos, &[x], Some(x.shape()))
 }
 
 
 /// Elementwise arctan
 pub fn atan(x: &Tensor) -> Tensor
 {
-    apply_op(math_ops::Atan, &[x])
+    apply_op(math_ops::Atan, &[x], Some(x.shape()))
 }
 
 
 /// Elementwise hyperbolic sine
 pub fn sinh(x: &Tensor) -> Tensor
 {
-    apply_op(math_ops::Sinh, &[x])
+    apply_op(math_ops::Sinh, &[x], Some(x.shape()))
 }
 
 
 /// Elementwise hyperbolic cosine
 pub fn cosh(x: &Tensor) -> Tensor
 {
-    apply_op(math_ops::Cosh, &[x])
+    apply_op(math_ops::Cosh, &[x], Some(x.shape()))
 }
 
 
 /// Elementwise hyperbolic tangent
 pub fn tanh(x: &Tensor) -> Tensor
 {
-    apply_op(math_ops::Tanh, &[x])
+    apply_op(math_ops::Tanh, &[x], Some(x.shape()))
 }
 
 
 /// Elementwise hyperbolic arcsin
 pub fn asinh(x: &Tensor) -> Tensor
 {
-    apply_op(math_ops::Asinh, &[x])
+    apply_op(math_ops::Asinh, &[x], Some(x.shape()))
 }
 
 
 /// Elementwise hyperbolic arccos
 pub fn acosh(x: &Tensor) -> Tensor
 {
-    apply_op(math_ops::Acosh, &[x])
+    apply_op(math_ops::Acosh, &[x], Some(x.shape()))
 }
 
 
 /// Elementwise hyperbolic arctan
 pub fn atanh(x: &Tensor) -> Tensor
 {
-    apply_op(math_ops::Atanh, &[x])
+    apply_op(math_ops::Atanh, &[x], Some(x.shape()))
 }
 
 
 /// Identity function
-pub fn identity(a: &Tensor) -> Tensor
+pub fn identity(x: &Tensor) -> Tensor
 {
-    apply_op(activation_ops::Identity, &[a])
+    apply_op(activation_ops::Identity, &[x], Some(x.shape()))
 }
 
 
 /// Elementwise addition
 ///
-/// You can use `+` operator instead.
+/// `+` operator can be used instead.
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let mut ctx = ag::Context::new();
+/// let ref a = ag::ones(&[3]);
+/// let ref b = ag::ones(&[3]);
+/// let ref z: ag::Tensor = a + b;
+/// assert_eq!(z.eval(&mut ctx), ndarray::arr1(&[2., 2., 2.]).into_dyn());
+/// ```
 pub fn add(a: &Tensor, b: &Tensor) -> Tensor
 {
-    apply_op(binary_ops::AddOp, &[a, b])
+    let ref a_shape = a.shape();
+    let ref b_shape = b.shape();
+    apply_op(binary_ops::AddOp, &[a, b], Some(maximum(a_shape, b_shape)))
 }
 
 
 /// Elementwise subtraction
 ///
-/// You can use `-` operator instead.
+/// `-` operator can be used instead.
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let ref a = ag::ones(&[3]);
+/// let ref b = ag::ones(&[3]);
+///
+/// let mut ctx = ag::Context::new();
+/// let ref z: ag::Tensor = a - b;
+/// assert_eq!(z.eval(&mut ctx), ndarray::arr1(&[0., 0., 0.]).into_dyn());
+/// ```
 pub fn sub(a: &Tensor, b: &Tensor) -> Tensor
 {
-    apply_op(binary_ops::SubOp, &[a, b])
+    let ref a_shape = a.shape();
+    let ref b_shape = b.shape();
+    apply_op(binary_ops::SubOp, &[a, b], Some(maximum(a_shape, b_shape)))
 }
 
 
 /// Elementwise multiplication
 ///
-/// You can use `*` operator instead.
+/// `*` operator can be used instead.
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let mut ctx = ag::Context::new();
+///
+/// let ref a = ag::ones(&[3]);
+/// let ref b = ag::ones(&[3]);
+/// let ref z: ag::Tensor = a * b;
+/// assert_eq!(z.eval(&mut ctx), ndarray::arr1(&[1., 1., 1.]).into_dyn());
+/// ```
 pub fn mul(a: &Tensor, b: &Tensor) -> Tensor
 {
-    apply_op(binary_ops::MulOp, &[a, b])
+    let ref a_shape = a.shape();
+    let ref b_shape = b.shape();
+    apply_op(binary_ops::MulOp, &[a, b], Some(maximum(a_shape, b_shape)))
 }
 
 
 /// Elementwise division
 ///
-/// You can use `/` operator instead.
+/// `/` operator can be used instead.
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let ref a = ag::ones(&[3]);
+/// let ref b = ag::ones(&[3]);
+/// let mut ctx = ag::Context::new();
+/// let ref z: ag::Tensor = a / b;
+/// assert_eq!(z.eval(&mut ctx), ndarray::arr1(&[1., 1., 1.]).into_dyn());
+/// ```
 pub fn div(a: &Tensor, b: &Tensor) -> Tensor
 {
-    apply_op(binary_ops::DivOp, &[a, b])
+    let ref a_shape = a.shape();
+    let ref b_shape = b.shape();
+    apply_op(binary_ops::DivOp, &[a, b], Some(maximum(a_shape, b_shape)))
 }
 
 
@@ -491,9 +657,7 @@ pub fn div(a: &Tensor, b: &Tensor) -> Tensor
 ///
 /// # Panics
 ///
-/// When `a` is from `Context#constant` or `Context#variable`.
-///
-/// # Examples
+/// When `a` is `constant`.
 ///
 /// ```
 /// extern crate ndarray;
@@ -501,7 +665,7 @@ pub fn div(a: &Tensor, b: &Tensor) -> Tensor
 ///
 /// let mut ctx = ag::Context::new();
 ///
-/// let a = ag::zeros(&[2, 2]) + ag::ones(&[2, 2]);
+/// let a = ag::ones(&[2, 2]);
 /// let ref b = ag::ones(&[2, 2]);
 /// let ref c = ag::add_inplace(a, b);
 ///
@@ -509,9 +673,9 @@ pub fn div(a: &Tensor, b: &Tensor) -> Tensor
 /// ```
 pub fn add_inplace(a: Tensor, b: &Tensor) -> Tensor
 {
-    let a_name = a.op.name();
-    assert!(a_name != "Constant" && a_name != "Variable");
-    apply_op(binary_ops::InplaceAddOp, &[&a, b])
+    assert_ne!(a.op.name(), "Const");
+    let shape = a.shape();
+    apply_op(binary_ops::InplaceAddOp, &[&a, b], Some(shape))
 }
 
 
@@ -522,9 +686,7 @@ pub fn add_inplace(a: Tensor, b: &Tensor) -> Tensor
 ///
 /// # Panics
 ///
-/// When `a` is from `Context#constant` or `Context#variable`.
-///
-/// # Examples
+/// When `a` is `constant`.
 ///
 /// ```
 /// extern crate ndarray;
@@ -532,7 +694,7 @@ pub fn add_inplace(a: Tensor, b: &Tensor) -> Tensor
 ///
 /// let mut ctx = ag::Context::new();
 ///
-/// let a = ag::zeros(&[2, 2]) + ag::ones(&[2, 2]);
+/// let a = ag::ones(&[2, 2]);
 /// let ref b = ag::ones(&[2, 2]);
 /// let ref c = ag::sub_inplace(a, b);
 ///
@@ -540,45 +702,81 @@ pub fn add_inplace(a: Tensor, b: &Tensor) -> Tensor
 /// ```
 pub fn sub_inplace(a: Tensor, b: &Tensor) -> Tensor
 {
-    let a_name = a.op.name();
-    assert!(a_name != "Constant" && a_name != "Variable");
-    apply_op(binary_ops::InplaceSubOp, &[&a, b])
+    assert_ne!(a.op.name(), "Const");
+    let shape = a.shape();
+    apply_op(binary_ops::InplaceSubOp, &[&a, b], Some(shape))
 }
 
 
 /// Elementwise sqrt
 pub fn sqrt(x: &Tensor) -> Tensor
 {
-    apply_op(math_ops::Sqrt, &[x])
+    apply_op(math_ops::Sqrt, &[x], Some(x.shape()))
 }
 
 
 /// Elementwise pow
 pub fn pow(x: &Tensor, a: f32) -> Tensor
 {
-    apply_op(math_ops::Pow { a }, &[x])
+    apply_op(math_ops::Pow { a }, &[x], Some(x.shape()))
 }
 
 
 /// Elementwise log
 pub fn log(x: &Tensor, a: f32) -> Tensor
 {
-    apply_op(math_ops::Log { a }, &[x])
+    apply_op(math_ops::Log { a }, &[x], Some(x.shape()))
 }
 
 
 /// Elementwise exponential
 pub fn exp(x: &Tensor) -> Tensor
 {
-    apply_op(math_ops::Exp, &[x])
+    apply_op(math_ops::Exp, &[x], Some(x.shape()))
+}
+
+
+/// Returns the max of x and y (i.e. x > y ? x : y) element-wise.
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let mut ctx = ag::Context::new();
+///
+/// let ref a = ag::constant(ndarray::arr1(&[1., 2., 3.]), &mut ctx);
+/// let ref b = ag::constant(ndarray::arr1(&[3., 2., 1.]), &mut ctx);
+/// let ref c = ag::maximum(a, b);
+/// assert_eq!(c.eval(&mut ctx), ndarray::arr1(&[3., 2., 3.]).into_dyn());
+/// ```
+pub fn maximum(a: &Tensor, b: &Tensor) -> Tensor
+{
+    apply_op(math_ops::Maximum, &[a, b], None)
+}
+
+
+/// Returns the min of x and y (i.e. x > y ? y : x) element-wise.
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let mut ctx = ag::Context::new();
+///
+/// let ref a = ag::constant(ndarray::arr1(&[1., 2., 3.]), &mut ctx);
+/// let ref b = ag::constant(ndarray::arr1(&[3., 2., 1.]), &mut ctx);
+/// let ref c = ag::minimum(a, b);
+/// assert_eq!(c.eval(&mut ctx), ndarray::arr1(&[1., 2., 1.]).into_dyn());
+/// ```
+pub fn minimum(a: &Tensor, b: &Tensor) -> Tensor
+{
+    apply_op(math_ops::Minimum, &[a, b], None)
 }
 
 
 /// Adds all input tensors.
 ///
 /// All the input tensors must have same shapes.
-///
-/// # Examples
 ///
 /// ```
 /// extern crate ndarray;
@@ -595,7 +793,13 @@ pub fn exp(x: &Tensor) -> Tensor
 /// ```
 pub fn add_n(xs: &[&Tensor]) -> Tensor
 {
-    apply_op(add_n::AddN, xs)
+    let len = xs.len();
+    assert_ne!(len, 0);
+    if len == 1 {
+        xs[0].clone()
+    } else {
+        apply_op(array_ops::AddN, xs, Some(xs[0].shape()))
+    }
 }
 
 
@@ -604,32 +808,52 @@ pub fn add_n(xs: &[&Tensor]) -> Tensor
 /// if `a[i] == b[i]` then `return_value[i]` will be 1 else 0
 ///
 /// # Panics
-/// When `a's shape` != `b's shape`.
-///
-/// # Examples
+/// When broadcast is impossible
 ///
 /// ```
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
 /// let mut ctx = ag::Context::new();
-/// let ref a = ctx.constant(ndarray::arr1(&[1., 2., 3.]));
-/// let ref b = ctx.constant(ndarray::arr1(&[3., 2., 1.]));
+/// let ref a = ag::constant(ndarray::arr1(&[1., 2., 3.]), &mut ctx);
+/// let ref b = ag::constant(ndarray::arr1(&[3., 2., 1.]), &mut ctx);
 /// let ref c = ag::equal(a, b);
 ///
 /// assert_eq!(c.eval(&mut ctx), ndarray::arr1(&[0., 1., 0.]).into_dyn());
 /// ```
 pub fn equal(a: &Tensor, b: &Tensor) -> Tensor
 {
-    apply_op(cmp_ops::Equal, &[a, b])
+    apply_op(math_ops::Equal, &[a, b], None)
+}
+
+
+/// Compares two tensors and returns a binary tensor.
+///
+/// if `a[i] != b[i]` then `return_value[i]` will be 1 else 0
+///
+/// # Panics
+/// When broadcast is impossible
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let mut ctx = ag::Context::new();
+/// let ref a = ag::constant(ndarray::arr1(&[1., 2., 3.]), &mut ctx);
+/// let ref b = ag::constant(ndarray::arr1(&[3., 2., 1.]), &mut ctx);
+/// let ref c = ag::not_equal(a, b);
+///
+/// assert_eq!(c.eval(&mut ctx), ndarray::arr1(&[1., 0., 1.]).into_dyn());
+/// ```
+pub fn not_equal(a: &Tensor, b: &Tensor) -> Tensor
+{
+    apply_op(math_ops::NotEqual, &[a, b], None)
 }
 
 
 /// Takes argmax along specified axis.
 ///
 /// `axis` can be negative.
-///
-/// # Examples
 ///
 /// ```
 /// extern crate ndarray;
@@ -638,7 +862,7 @@ pub fn equal(a: &Tensor, b: &Tensor) -> Tensor
 /// let mut ctx = ag::Context::new();
 /// let input_arr = ndarray::arr2(&[[1., 2.], [3., 4.], [6., 5.]]);
 /// let answer = ndarray::arr1(&[1., 1., 0.]).into_dyn();
-/// let ref input = ctx.constant(input_arr);
+/// let ref input = ag::constant(input_arr, &mut ctx);
 /// let ref result = ag::argmax(&input, 1, false);
 ///
 /// assert_eq!(result.eval(&mut ctx), answer);
@@ -646,15 +870,13 @@ pub fn equal(a: &Tensor, b: &Tensor) -> Tensor
 pub fn argmax(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 {
     let op = reduction_ops::ArgMax { axis, keep_dim };
-    apply_op(op, &[x])
+    apply_op(op, &[x], None)
 }
 
 
 /// Expands specified dims.
 ///
 /// Each axis can be negative.
-///
-/// # Examples
 ///
 /// ```
 /// extern crate autograd as ag;
@@ -665,17 +887,15 @@ pub fn argmax(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 ///
 /// assert_eq!(b.eval(&mut ctx).shape(), &[1, 3, 1]);
 /// ```
-pub fn expand_dims<T: ::tensor::ArrayLike>(x: &Tensor, axes: &T) -> Tensor
+pub fn expand_dims<T: ArrayLike>(x: &Tensor, axes: &T) -> Tensor
 {
-    apply_op(expand_dims::ExpandDims, &[x, &axes.as_tensor()])
+    apply_op(array_ops::ExpandDims, &[x, &axes.as_tensor()], None)
 }
 
 
 /// Squeezes specified dims.
 ///
 /// Each axis can be negative.
-///
-/// # Examples
 ///
 /// ```
 /// extern crate autograd as ag;
@@ -686,9 +906,9 @@ pub fn expand_dims<T: ::tensor::ArrayLike>(x: &Tensor, axes: &T) -> Tensor
 ///
 /// assert_eq!(b.eval(&mut ctx).shape(), &[3]);
 /// ```
-pub fn squeeze<T: ::tensor::ArrayLike>(x: &Tensor, axes: &T) -> Tensor
+pub fn squeeze<T: ArrayLike>(x: &Tensor, axes: &T) -> Tensor
 {
-    apply_op(squeeze::Squeeze, &[x, &axes.as_tensor()])
+    apply_op(array_ops::Squeeze, &[x, &axes.as_tensor()], None)
 }
 
 
@@ -697,14 +917,12 @@ pub fn squeeze<T: ::tensor::ArrayLike>(x: &Tensor, axes: &T) -> Tensor
 /// Tiles input tensor `num` times along `axis`.
 /// `axis` can be negative.
 ///
-/// # Examples
-///
 /// ```
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
 /// let mut ctx = ag::Context::new();
-/// let ref x = ctx.constant(ndarray::arr2(&[[2., 2.], [3., 3.]]));
+/// let ref x = ag::constant(ndarray::arr2(&[[2., 2.], [3., 3.]]), &mut ctx);
 /// let ref y = ag::tile(x, 0, 2);
 ///
 /// assert_eq!(
@@ -714,29 +932,27 @@ pub fn squeeze<T: ::tensor::ArrayLike>(x: &Tensor, axes: &T) -> Tensor
 /// ```
 pub fn tile(x: &Tensor, axis: isize, num: usize) -> Tensor
 {
-    let op = tile::Tile { axis, num };
-    apply_op(op, &[x])
+    let op = array_ops::Tile { axis, num };
+    apply_op(op, &[x], None)
 }
 
 
 /// Limits all elements so as to be within `[min, max]`
-///
-/// # Examples
 ///
 /// ```
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
 /// let mut ctx = ag::Context::new();
-/// let ref x = ctx.constant(ndarray::arr1(&[2., 4., 6.]));
+/// let ref x = ag::constant(ndarray::arr1(&[2., 4., 6.]), &mut ctx);
 /// let ref y = ag::clip(x, 3., 5.);
 ///
 /// assert_eq!(y.eval(&mut ctx), ndarray::arr1(&[3., 4., 5.]).into_dyn());
 /// ```
 pub fn clip(x: &Tensor, min: f32, max: f32) -> Tensor
 {
-    let op = clip::Clip { min, max };
-    apply_op(op, &[x])
+    let op = array_ops::Clip { min, max };
+    apply_op(op, &[x], Some(x.shape()))
 }
 
 
@@ -744,22 +960,20 @@ pub fn clip(x: &Tensor, min: f32, max: f32) -> Tensor
 ///
 /// `axis` can be negative.
 ///
-/// # Examples
-///
 /// ```
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
 /// let mut ctx = ag::Context::new();
-/// let ref x = ctx.constant(ndarray::arr2(&[[2., 4.], [3., 1.]]));
-/// let ref y = ag::reduce_max(&x, 0, false);
+/// let ref x = ag::constant(ndarray::arr2(&[[2., 4.], [3., 1.]]), &mut ctx);
+/// let ref y = ag::reduce_max(&x, &[0], false);
 ///
 /// assert_eq!(y.eval(&mut ctx), ndarray::arr1(&[3., 4.]).into_dyn());
 /// ```
-pub fn reduce_max(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
+pub fn reduce_max<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tensor
 {
-    let op = reduction_ops::ReduceMax { axis, keep_dim };
-    apply_op(op, &[x])
+    let op = reduction_ops::ReduceMax { keep_dims, sparse_axes: false };
+    apply_op(op, &[x, &axes.as_tensor()], None)
 }
 
 
@@ -767,22 +981,20 @@ pub fn reduce_max(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 ///
 /// `axis` can be negative.
 ///
-/// # Examples
-///
 /// ```
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
 /// let mut ctx = ag::Context::new();
-/// let ref x = ctx.constant(ndarray::arr2(&[[2., 4.], [3., 1.]]));
-/// let ref y = ag::reduce_min(&x, 0, false);
+/// let ref x = ag::constant(ndarray::arr2(&[[2., 4.], [3., 1.]]), &mut ctx);
+/// let ref y = ag::reduce_min(&x, &[0], false);
 ///
 /// assert_eq!(y.eval(&mut ctx), ndarray::arr1(&[2., 1.]).into_dyn());
 /// ```
-pub fn reduce_min(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
+pub fn reduce_min<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tensor
 {
-    let op = reduction_ops::ReduceMin { axis, keep_dim };
-    apply_op(op, &[x])
+    let op = reduction_ops::ReduceMin { keep_dims, sparse_axes: false };
+    apply_op(op, &[x, &axes.as_tensor()], None)
 }
 
 
@@ -790,22 +1002,23 @@ pub fn reduce_min(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 ///
 /// `axis` can be negative.
 ///
-/// # Examples
-///
 /// ```
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
 /// let mut ctx = ag::Context::new();
-/// let ref x = ctx.constant(ndarray::arr2(&[[2., 4.], [3., 1.]]));
-/// let ref y = ag::reduce_mean(x, 1, false);
+/// let ref x = ag::constant(ndarray::arr2(&[[2., 4.], [3., 1.]]), &mut ctx);
+/// let ref y = ag::reduce_mean(x, &[1], false);
 ///
 /// assert_eq!(y.eval(&mut ctx), ndarray::arr1(&[3., 2.]).into_dyn());
 /// ```
-pub fn reduce_mean(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
+pub fn reduce_mean<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tensor
 {
-    let op = reduction_ops::ReduceMean { axis, keep_dim };
-    apply_op(op, &[x])
+    let ref axes = axes.as_tensor();
+    let sum_op = reduction_ops::ReduceSum { keep_dims, sparse_axes: false };
+    let ref sum = apply_op(sum_op, &[x, axes], None);
+    let ref den = reduce_prod(&gather(&x.shape(), axes, 0), &[0], keep_dims);
+    apply_op(binary_ops::DivOp, &[sum, den], Some(sum.shape()))
 }
 
 
@@ -813,22 +1026,20 @@ pub fn reduce_mean(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 ///
 /// `axis` can be negative.
 ///
-/// # Examples
-///
 /// ```
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
 /// let mut ctx = ag::Context::new();
-/// let ref x = ctx.constant(ndarray::arr2(&[[2., 4.], [3., 1.]]));
-/// let ref y = ag::reduce_sum(&x, 1, false);
+/// let ref x = ag::constant(ndarray::arr2(&[[2., 4.], [3., 1.]]), &mut ctx);
+/// let ref y = ag::reduce_sum(&x, &[1], false);
 ///
 /// assert_eq!(y.eval(&mut ctx), ndarray::arr1(&[6., 4.]).into_dyn());
 /// ```
-pub fn reduce_sum(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
+pub fn reduce_sum<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tensor
 {
-    let op = reduction_ops::ReduceSum { axis, keep_dim };
-    apply_op(op, &[x])
+    let op = reduction_ops::ReduceSum { keep_dims, sparse_axes: false };
+    apply_op(op, &[x, &axes.as_tensor()], None)
 }
 
 
@@ -836,30 +1047,26 @@ pub fn reduce_sum(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 ///
 /// `axis` can be negative.
 ///
-/// # Examples
-///
 /// ```
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
 /// let mut ctx = ag::Context::new();
-/// let ref x = ctx.constant(ndarray::arr2(&[[2., 4.], [3., 1.]]));
-/// let ref y = ag::reduce_prod(&x, 1, false);
+/// let ref x = ag::constant(ndarray::arr2(&[[2., 4.], [3., 1.]]), &mut ctx);
+/// let ref y = ag::reduce_prod(&x, &[1], false);
 ///
 /// assert_eq!(y.eval(&mut ctx), ndarray::arr1(&[8., 3.]).into_dyn());
 /// ```
-pub fn reduce_prod(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
+pub fn reduce_prod<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tensor
 {
-    let op = reduction_ops::ReduceProd { axis, keep_dim };
-    apply_op(op, &[x])
+    let op = reduction_ops::ReduceProd { keep_dims, sparse_axes: false };
+    apply_op(op, &[x, &axes.as_tensor()], None)
 }
 
 
 /// Reshapes input tensor.
 ///
 /// Only one dim in `shape` can be `-1`.
-///
-/// # Examples
 ///
 /// ```
 /// extern crate ndarray;
@@ -871,15 +1078,17 @@ pub fn reduce_prod(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 ///
 /// assert_eq!(y.eval(&mut ctx), ag::ndarray_ext::zeros(&[3, 4]));
 /// ```
-pub fn reshape<T: ::tensor::ArrayLike>(x: &Tensor, shape: &T) -> Tensor
+pub fn reshape<T: ArrayLike>(x: &Tensor, shape: &T) -> Tensor
 {
-    apply_op(shape_ops::Reshape, &[x, &shape.as_reshape_arg_tensor()])
+    apply_op(
+        array_ops::Reshape,
+        &[x, &shape.as_tensor()],
+        None,
+    )
 }
 
 
 /// Flattens input tensor into 1-ranked (vector)
-///
-/// # Examples
 ///
 /// ```
 /// extern crate autograd as ag;
@@ -887,47 +1096,118 @@ pub fn reshape<T: ::tensor::ArrayLike>(x: &Tensor, shape: &T) -> Tensor
 /// let mut ctx = ag::Context::new();
 /// let ref x = ag::zeros(&[3, 2, 2]);
 /// let ref z = ag::flatten(x);
-///
 /// assert_eq!(z.eval(&mut ctx).shape(), &[12]);
 /// ```
 pub fn flatten(x: &Tensor) -> Tensor
 {
-    apply_op(shape_ops::Reshape, &[x, &scalar(-1.)])
+    apply_op(array_ops::Reshape, &[x, &scalar(-1.)], Some(x.size()))
+}
+
+
+/// Returns -1 if x < 0, 0 if x==0, 1 if x > 0, element-wise.
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let mut ctx = ag::Context::new();
+/// let ref a = ag::constant(ndarray::arr1(&[-5., 4.5, 0.]), &mut ctx);
+/// let ref b = ag::sign(a);
+/// assert_eq!(
+///     b.eval(&mut ctx).as_slice().unwrap(),
+///     &[-1., 1., 0.]
+/// );
+/// ```
+pub fn sign(a: &Tensor) -> Tensor
+{
+    apply_op(math_ops::Sign, &[a], Some(a.shape()))
+}
+
+
+/// Returns the largest integer less than or equal to a number, element-wise.
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let mut ctx = ag::Context::new();
+/// let ref a = ag::constant(ndarray::arr1(&[-1.7, -1.5, -0.2, 0.2, 1.5, 1.7, 2.0]), &mut ctx);
+/// let ref b = ag::floor(a);
+/// assert_eq!(
+///     b.eval(&mut ctx).as_slice().unwrap(),
+///     &[-2., -2., -1.,  0.,  1.,  1.,  2.]
+/// );
+/// ```
+pub fn floor(a: &Tensor) -> Tensor
+{
+    apply_op(math_ops::Floor, &[a], Some(a.shape()))
+}
+
+
+/// Returns the smallest integer greater than or equal to a number, element-wise.
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let mut ctx = ag::Context::new();
+/// let ref a = ag::constant(ndarray::arr1(&[-1.7, -1.5, -0.2, 0.2, 1.5, 1.7, 2.0]), &mut ctx);
+/// let ref b = ag::ceil(a);
+/// assert_eq!(
+///     b.eval(&mut ctx).as_slice().unwrap(),
+///     &[-1., -1., -0.,  1.,  2.,  2.,  2.]
+/// );
+/// ```
+pub fn ceil(a: &Tensor) -> Tensor
+{
+    apply_op(math_ops::Ceil, &[a], Some(a.shape()))
 }
 
 
 /// Returns a binary tensor.
-pub fn greater(x: &Tensor, a: f32) -> Tensor
+///
+/// # Panics
+/// When broadcast is impossible
+pub fn greater(a: &Tensor, b: &Tensor) -> Tensor
 {
-    apply_op(cmp_ops::Greater { a }, &[x])
+    apply_op(math_ops::Greater, &[a, b], None)
 }
 
 
 /// Returns a binary tensor.
-pub fn greater_equal(x: &Tensor, a: f32) -> Tensor
+///
+/// # Panics
+/// When broadcast is impossible
+pub fn greater_equal(a: &Tensor, b: &Tensor) -> Tensor
 {
-    apply_op(cmp_ops::GreaterEqual { a }, &[x])
+    apply_op(math_ops::GreaterEqual, &[a, b], None)
 }
 
 
 /// Returns a binary tensor.
-pub fn lesser(x: &Tensor, a: f32) -> Tensor
+///
+/// # Panics
+/// When broadcast is impossible
+pub fn lesser(a: &Tensor, b: &Tensor) -> Tensor
 {
-    apply_op(cmp_ops::Lesser { a }, &[x])
+    apply_op(math_ops::Lesser, &[a, b], None)
 }
 
 
 /// Returns a binary tensor.
-pub fn lesser_equal(x: &Tensor, a: f32) -> Tensor
+///
+/// # Panics
+/// When broadcast is impossible
+pub fn lesser_equal(a: &Tensor, b: &Tensor) -> Tensor
 {
-    apply_op(cmp_ops::LesserEqual { a }, &[x])
+    apply_op(math_ops::LesserEqual, &[a, b], None)
 }
 
 
 /// Elementwise logistic sigmoid function.
 pub fn sigmoid(x: &Tensor) -> Tensor
 {
-    apply_op(activation_ops::Sigmoid, &[x])
+    apply_op(activation_ops::Sigmoid, &[x], Some(x.shape()))
 }
 
 
@@ -936,22 +1216,22 @@ pub fn sigmoid(x: &Tensor) -> Tensor
 /// See https://arxiv.org/abs/1511.07289
 pub fn elu(x: &Tensor, alpha: f32) -> Tensor
 {
-    apply_op(activation_ops::ELU { alpha }, &[x])
+    apply_op(activation_ops::ELU { alpha }, &[x], Some(x.shape()))
 }
 
 
 /// Elementwise rectified linear unit.
 pub fn relu(x: &Tensor) -> Tensor
 {
-    apply_op(activation_ops::ReLU, &[x])
+    apply_op(activation_ops::ReLU, &[x], Some(x.shape()))
 }
 
 
 /// Computes `log(sum(exp(x)))` along specified axis.
 pub fn logsumexp(x: &Tensor, axis: isize) -> Tensor
 {
-    let op = logsumexp::LogSumExp { axis };
-    apply_op(op, &[x])
+    let op = math_ops::LogSumExp { axis };
+    apply_op(op, &[x], None)
 }
 
 
@@ -963,8 +1243,8 @@ pub fn logsumexp(x: &Tensor, axis: isize) -> Tensor
 pub fn log_softmax(x: &Tensor, axis: isize) -> Tensor
 {
     // TODO: Composing from "node level" LogSumExp.
-    let op = log_softmax::LogSoftmax { axis };
-    apply_op(op, &[x])
+    let op = xent_ops::LogSoftmax { axis };
+    apply_op(op, &[x], None)
 }
 
 
@@ -974,7 +1254,7 @@ pub fn log_softmax(x: &Tensor, axis: isize) -> Tensor
 pub fn softmax(x: &Tensor, axis: isize) -> Tensor
 {
     let op = activation_ops::Softmax { axis };
-    apply_op(op, &[x])
+    apply_op(op, &[x], None)
 }
 
 
@@ -994,7 +1274,7 @@ pub fn softmax(x: &Tensor, axis: isize) -> Tensor
 /// Loss tensor with same shape as inputs's shapes
 pub fn sigmoid_cross_entropy(y: &Tensor, t: &Tensor) -> Tensor
 {
-    apply_op(xent_ops::SigmoidCrossEntropy, &[y, t])
+    apply_op(xent_ops::SigmoidCrossEntropy, &[y, t], Some(y.shape()))
 }
 
 
@@ -1011,7 +1291,11 @@ pub fn sigmoid_cross_entropy(y: &Tensor, t: &Tensor) -> Tensor
 /// Loss tensor with shape (batch_size, 1)
 pub fn softmax_cross_entropy(y: &Tensor, t: &Tensor) -> Tensor
 {
-    apply_op(xent_ops::SoftmaxCrossEntropy, &[y, t])
+    apply_op(
+        xent_ops::SoftmaxCrossEntropyLatter,
+        &[&log_softmax(y, 1), t],
+        None,
+    )
 }
 
 
@@ -1028,15 +1312,17 @@ pub fn softmax_cross_entropy(y: &Tensor, t: &Tensor) -> Tensor
 /// Loss tensor with shape (batch_size, 1)
 pub fn sparse_softmax_cross_entropy(y: &Tensor, t: &Tensor) -> Tensor
 {
-    apply_op(xent_ops::SparseSoftmaxCrossEntropy, &[y, t])
+    apply_op(
+        xent_ops::SparseSoftmaxCrossEntropyLatter,
+        &[&log_softmax(y, 1), t],
+        None,
+    )
 }
 
 
 /// Matrix multiplication.
 ///
 /// Both `a` and `b` must be 2-ranked tensors.
-///
-/// # Examples
 ///
 /// ```
 /// extern crate autograd as ag;
@@ -1051,11 +1337,8 @@ pub fn sparse_softmax_cross_entropy(y: &Tensor, t: &Tensor) -> Tensor
 /// ```
 pub fn matmul(a: &Tensor, b: &Tensor) -> Tensor
 {
-    let op = dot_ops::MatMul {
-        transpose_a: false,
-        transpose_b: false,
-    };
-    apply_op(op, &[a, b])
+    let op = dot_ops::MatMul { transpose_a: false, transpose_b: false };
+    apply_op(op, &[a, b], None)
 }
 
 
@@ -1065,8 +1348,6 @@ pub fn matmul(a: &Tensor, b: &Tensor) -> Tensor
 /// before actual matrix multiplication. It is the same for `transpose_b`.
 ///
 /// The performance is better than explicitly computing like `ag::matmul(ag::transpose)`.
-///
-/// # Examples
 ///
 /// ```
 /// extern crate autograd as ag;
@@ -1080,11 +1361,8 @@ pub fn matmul(a: &Tensor, b: &Tensor) -> Tensor
 /// ```
 pub fn matmul_t(a: &Tensor, b: &Tensor, transpose_a: bool, transpose_b: bool) -> Tensor
 {
-    let op = dot_ops::MatMul {
-        transpose_a,
-        transpose_b,
-    };
-    apply_op(op, &[a, b])
+    let op = dot_ops::MatMul { transpose_a, transpose_b };
+    apply_op(op, &[a, b], None)
 }
 
 
@@ -1096,12 +1374,9 @@ pub fn matmul_t(a: &Tensor, b: &Tensor, transpose_a: bool, transpose_b: bool) ->
 /// * `a_axes` - Contraction axes
 /// * `b_axes` - Contraction axes
 ///
-/// Contraction is computed along corresponding `a`'s and `b`'s axes.
-/// The number of the axes must be equals.
+/// Note1: each axis number can be negative.
 ///
-/// Note: each axis number can be negative.
-///
-/// # Examples
+/// Note2: The number of contraction axes must be equals.
 ///
 /// ```
 /// extern crate autograd as ag;
@@ -1116,33 +1391,21 @@ pub fn matmul_t(a: &Tensor, b: &Tensor, transpose_a: bool, transpose_b: bool) ->
 ///
 /// For detailed description,
 /// see https://docs.scipy.org/doc/numpy/reference/generated/numpy.tensordot.html.
-pub fn tensordot(
-    a: &Tensor,
-    b: &Tensor,
-    a_axes: &::tensor::ArrayLike,
-    b_axes: &::tensor::ArrayLike,
-) -> Tensor
+pub fn tensordot(a: &Tensor, b: &Tensor, a_axes: &ArrayLike, b_axes: &ArrayLike) -> Tensor
 {
-    fn preprocess(x: &Tensor, axes: &::tensor::ArrayLike, flip: bool) -> (Tensor, Tensor)
+    fn preprocess(x: &Tensor, axes: &ArrayLike, flip: bool) -> (Tensor, Tensor)
     {
         let ref x_shape = shape(x);
         let ref x_rank = rank(x);
         let ref axes = axes.as_tensor();
-        let ref axes = greater_equal(axes, 0.) * axes + lesser(axes, 0.) * (axes + x_rank);
-
-        let ref free = setdiff1d(
-            &range(
-                &convert_to_tensor(NdArray::from_elem(ndarray::IxDyn(&[1]), 0.)),
-                x_rank,
-                &convert_to_tensor(NdArray::from_elem(ndarray::IxDyn(&[1]), 1.)),
-            ),
-            axes,
-        );
+        let ref zero = zeros(&axes.shape());
+        let ref axes = greater_equal(axes, zero) * axes + lesser(axes, zero) * (axes + x_rank);
+        let ref free = setdiff1d(&range(&scalar(0.), x_rank, &scalar(1.)), axes);
 
         let free_dims = gather(x_shape, free, 0);
         let ref axes_dims = gather(x_shape, axes, 0);
-        let ref prod_free_dims = reduce_prod(&free_dims, 0, true);
-        let ref prod_axes_dims = reduce_prod(axes_dims, 0, true);
+        let ref prod_free_dims = reduce_prod(&free_dims, &[0], true);
+        let ref prod_axes_dims = reduce_prod(axes_dims, &[0], true);
 
         let (perm, new_shape) = if flip {
             (
@@ -1156,8 +1419,7 @@ pub fn tensordot(
             )
         };
 
-        let reshaped = reshape(&transpose(x, &perm), &new_shape);
-        (reshaped, free_dims)
+        (reshape(&transpose(x, &perm), &new_shape), free_dims)
     }
 
     // main procedure
@@ -1173,9 +1435,9 @@ pub fn tensordot(
 ///
 /// The rank of `a` and `b` must be equals.
 ///
-/// # Examples
-///
 /// ```
+/// extern crate autograd as ag;
+///
 /// let mut ctx = ag::Context::new();
 /// let ref a = ag::zeros(&[2, 3, 4, 2]);
 /// let ref b = ag::zeros(&[2, 3, 2, 3]);
@@ -1187,11 +1449,8 @@ pub fn tensordot(
 /// For detailed description, see https://www.tensorflow.org/api_docs/python/tf/matmul
 pub fn batch_matmul(a: &Tensor, b: &Tensor) -> Tensor
 {
-    let op = dot_ops::BatchMatMul {
-        transpose_a: false,
-        transpose_b: false,
-    };
-    apply_op(op, &[a, b])
+    let op = dot_ops::BatchMatMul { transpose_a: false, transpose_b: false };
+    apply_op(op, &[a, b], None)
 }
 
 
@@ -1199,14 +1458,13 @@ pub fn batch_matmul(a: &Tensor, b: &Tensor) -> Tensor
 ///
 /// Returns the sorted, unique values in a that are not in b.
 ///
-/// # Examples
 /// ```
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
 /// let mut ctx = ag::Context::new();
-/// let ref a = ctx.constant(ndarray::arr1(&[4., 1., 5., 2., 3., 6.]));
-/// let ref b = ctx.constant(ndarray::arr2(&[[2., 3.], [1., 4.]]));
+/// let ref a = ag::constant(ndarray::arr1(&[4., 1., 5., 2., 3., 6.]), &mut ctx);
+/// let ref b = ag::constant(ndarray::arr2(&[[2., 3.], [1., 4.]]), &mut ctx);
 /// let ref c = ag::setdiff1d(a, b);
 ///
 /// assert_eq!(c.eval(&mut ctx).as_slice().unwrap(), &[5., 6.])
@@ -1214,14 +1472,12 @@ pub fn batch_matmul(a: &Tensor, b: &Tensor) -> Tensor
 ///
 pub fn setdiff1d(a: &Tensor, b: &Tensor) -> Tensor
 {
-    let op = setdiff1d::SetDiff1D;
-    apply_op(op, &[a, b])
+    let op = array_ops::SetDiff1D;
+    apply_op(op, &[a, b], None)
 }
 
 
 /// Permutes dimensions.
-///
-/// # Examples
 ///
 /// ```
 /// extern crate autograd as ag;
@@ -1232,10 +1488,10 @@ pub fn setdiff1d(a: &Tensor, b: &Tensor) -> Tensor
 ///
 /// assert_eq!(b.eval(&mut ctx).shape(), &[5, 3, 4, 1, 2]);
 /// ```
-pub fn transpose<T: ::tensor::ArrayLike>(x: &Tensor, perm: &T) -> Tensor
+pub fn transpose<T: ArrayLike>(x: &Tensor, perm: &T) -> Tensor
 {
-    let op = transpose::Transpose { zip: true };
-    apply_op(op, &[x, &perm.as_axes_tensor()])
+    let op = math_ops::Transpose { zip: true };
+    apply_op(op, &[x, &perm.as_tensor()], None)
 }
 
 
@@ -1246,16 +1502,13 @@ pub fn transpose<T: ::tensor::ArrayLike>(x: &Tensor, perm: &T) -> Tensor
 /// The size of dimension of each part is `sizes[i]` on `axis`, but
 /// `x.shape[i]` on other axis.
 ///
-/// # Examples
-///
 /// ```
 /// extern crate autograd as ag;
 ///
 /// let ref a = ag::zeros(&[3, 7, 5]);
 /// let ref b = ag::split(a, &[2, 3, 2], 1);
 ///
-/// let mut ctx = ag::Context::new();
-/// let evaluated = ctx.eval(&[&b[0], &b[1], &b[2]]);
+/// let evaluated = ag::eval(&[&b[0], &b[1], &b[2]], &mut ag::Context::new());
 ///
 /// assert_eq!(evaluated[0].shape(), &[3, 2, 5]);
 /// assert_eq!(evaluated[1].shape(), &[3, 3, 5]);
@@ -1265,12 +1518,8 @@ pub fn split(x: &Tensor, sizes: &[usize], axis: isize) -> Vec<Tensor>
 {
     (0..sizes.len())
         .map(|i| {
-            let op = split::Split {
-                sizes: sizes.to_vec(),
-                index: i,
-                axis,
-            };
-            apply_op(op, &[x])
+            let op = array_ops::Split { sizes: sizes.to_vec(), index: i, axis };
+            apply_op(op, &[x], None)
         })
         .collect::<Vec<_>>()
 }
@@ -1282,8 +1531,6 @@ pub fn split(x: &Tensor, sizes: &[usize], axis: isize) -> Vec<Tensor>
 /// * `x` - Tensor with arbitrary shape.
 /// * `starts` - Start indices for each dimensions
 /// * `ends` - End indices for each dimensions. `-1` representing the last index is acceptable.
-///
-/// # Examples
 ///
 /// ```
 /// extern crate autograd as ag;
@@ -1304,17 +1551,15 @@ pub fn slice(x: &Tensor, starts: &[isize], ends: &[isize]) -> Tensor
         })
         .collect::<Vec<ndarray::Si>>();
 
-    let op = slice::Slice { indices: indices.into_boxed_slice() };
+    let op = array_ops::Slice { indices: indices.into_boxed_slice() };
 
-    apply_op(op, &[x])
+    apply_op(op, &[x], None)
 }
 
 
 /// Concatenates input tensors along specified axis.
 ///
 /// `axis` can be negative.
-///
-/// # Examples
 ///
 /// ```
 /// extern crate autograd as ag;
@@ -1329,7 +1574,7 @@ pub fn slice(x: &Tensor, starts: &[isize], ends: &[isize]) -> Tensor
 /// ```
 pub fn concat(tensors: &[&Tensor], axis: isize) -> Tensor
 {
-    apply_op(concat::Concat { axis }, tensors)
+    apply_op(array_ops::Concat { axis }, tensors, None)
 }
 
 
@@ -1350,48 +1595,44 @@ pub fn concat(tensors: &[&Tensor], axis: isize) -> Tensor
 /// # Returns
 /// Tensor with shape `param.shape[..axis] + indices.shape + param.shape[axis+1..]`
 ///
-/// # Examples
-///
 /// ```
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
 /// let mut ctx = ag::Context::new();
-/// let ref param = ctx.constant(ag::ndarray_ext::zeros(&[5, 4, 8, 2]));
-/// let ref indices = ctx.constant(ndarray::arr2(&[[5., 4., 3.], [2., 1., 0.]]));
+/// let ref param = ag::constant(ag::ndarray_ext::zeros(&[5, 4, 8, 2]), &mut ctx);
+/// let ref indices = ag::constant(ndarray::arr2(&[[5., 4., 3.], [2., 1., 0.]]), &mut ctx);
 /// let ref y = ag::gather(param, indices, 2);
 ///
 /// assert_eq!(y.eval(&mut ctx).shape(), &[5, 4, 2, 3, 2])
 /// ```
-pub fn gather(param: &Tensor, indices: &Tensor, axis: isize) -> Tensor
+pub fn gather<T: ArrayLike>(param: &Tensor, indices: &T, axis: isize) -> Tensor
 {
-    let op = gather::Gather { axis };
-    apply_op(op, &[indices, param])
+    let op = array_ops::Gather { axis };
+    apply_op(op, &[&indices.as_tensor(), param], None)
 }
 
 
 /// Normalizes input tensor with its mean and variance along specified axis.
 ///
-/// # Examples
-///
 /// ```
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let mut ctx = ag::Context::new();
 /// let ref x = ag::standard_normal(&[3, 4]);
-/// let ref y1 = ag::normalize(x, 0);
-/// let ref y2 = ag::normalize(x, 1);
+/// let ref y1 = ag::normalize(x, &[0]);
+/// let ref y2 = ag::normalize(x, &[0]);
 ///
-/// let evaluated = ctx.eval(&[y1, y2]);
+/// let evaluated = ag::eval(&[y1, y2], &mut ag::Context::new());
 /// assert_eq!(&[3, 4], evaluated[0].shape());
 /// assert_eq!(&[3, 4], evaluated[1].shape());
 /// ```
-pub fn normalize(x: &Tensor, axis: isize) -> Tensor
+pub fn normalize<T: ArrayLike>(x: &Tensor, axes: &T) -> Tensor
 {
-    let ref mean = reduce_mean(x, axis, true);
+    let axes = axes.as_tensor();
+    let ref mean = reduce_mean(x, &axes, true);
     let ref centered = x - mean;
-    let ref variance = reduce_mean(&(centered * centered), axis, true);
+    let ref variance = reduce_mean(&(centered * centered), &axes, true);
     (x - mean) / sqrt(&(variance + 1e-5))
 }
 
@@ -1402,179 +1643,158 @@ pub fn normalize(x: &Tensor, axis: isize) -> Tensor
 /// Since normalization is performed along 1st axis of `x`,
 /// both of them should have shape `(1, x.shape[1])`
 ///
-/// # Examples
-///
 /// ```
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
 /// let mut ctx = ag::Context::new();
 /// let ref x = ag::standard_normal(&[3, 4]);
-/// let ref scale = ctx.variable(ag::ndarray_ext::ones(&[1, 4]));
-/// let ref shift = ctx.variable(ag::ndarray_ext::zeros(&[1, 4]));
+/// let ref scale = ag::variable(ag::ndarray_ext::ones(&[1, 4]), &mut ctx);
+/// let ref shift = ag::variable(ag::ndarray_ext::zeros(&[1, 4]), &mut ctx);
 /// let ref norm = ag::batch_norm(x, scale, shift);
 ///
 /// assert_eq!(norm.eval(&mut ctx).shape(), &[3, 4]);
 /// ```
 pub fn batch_norm(x: &Tensor, scale: &Tensor, shift: &Tensor) -> Tensor
 {
-    scale * normalize(x, 0) + shift
+    normalize(x, &[0]) * scale + shift
 }
 
 
-/// Applies recurrent net unit to the input.
-///
-/// This func processes a time step in the batch of sequences in parallel.
-///
-/// # Arguments
-/// * `x` - Input tensor for this step
-/// * `rnn` - RNN struct
-/// * `with_new_state` - If true, calls `rnn.reset_state()` before running a step
-///
-/// # Returns
-/// Output of `rnn.step()`
-///
-/// For the usage, see `lstm_lm()` in `tests/test_tensor_ops_grad.rs` and `nn_impl::rnn`
-pub fn rnn_step<T>(x: &Tensor, rnn: &mut T, with_new_state: bool, g: &mut Context) -> Tensor
-where
-    T: ::nn_impl::rnn::RNN,
-{
-    if with_new_state {
-        rnn.reset_state(g);
-    }
-    rnn.step(x)
-}
-
-
-/// Generates a tensor with shape `[1]` from a scalar value.
+/// Generates a zero-ranked tensor from a scalar value.
 pub fn scalar(val: f32) -> Tensor
 {
-    apply_op(scalar::Scalar { val }, &[])
+    apply_op(
+        const_gen_ops::Scalar { val },
+        &[],
+        Some(convert_to_tensor(::ndarray_ext::scalar_shape())),
+    )
 }
 
 
 /// Outputs values sampled from the normal distribution.
-pub fn random_normal<T: ::tensor::ArrayLike>(shape: &T, mean: f64, stddev: f64) -> Tensor
+pub fn random_normal<T: ArrayLike>(shape: &T, mean: f64, stddev: f64) -> Tensor
 {
     let op = random_ops::RandomNormal { mean, stddev };
-    apply_op(op, &[&shape.as_tensor_positive()])
+    let shape = shape.as_tensor();
+    apply_op(op, &[&shape.clone()], Some(shape))
 }
 
 
 /// Outputs values sampled from the uniform distribution.
-pub fn random_uniform<T: ::tensor::ArrayLike>(shape: &T, min: f64, max: f64) -> Tensor
+pub fn random_uniform<T: ArrayLike>(shape: &T, min: f64, max: f64) -> Tensor
 {
     let op = random_ops::RandomUniform { min, max };
-    apply_op(op, &[&shape.as_tensor_positive()])
+    let shape = shape.as_tensor();
+    apply_op(op, &[&shape.clone()], Some(shape))
 }
 
 
 /// Outputs values sampled from the standard normal distribution.
-pub fn standard_normal<T: ::tensor::ArrayLike>(shape: &T) -> Tensor
+pub fn standard_normal<T: ArrayLike>(shape: &T) -> Tensor
 {
-    apply_op(random_ops::StandardNormal, &[&shape.as_tensor_positive()])
+    let op = random_ops::StandardNormal;
+    let shape = shape.as_tensor();
+    apply_op(op, &[&shape.clone()], Some(shape))
 }
 
 
 /// Outputs values sampled from the standard uniform distribution.
-pub fn standard_uniform<T: ::tensor::ArrayLike>(shape: &T) -> Tensor
+pub fn standard_uniform<T: ArrayLike>(shape: &T) -> Tensor
 {
-    apply_op(random_ops::StandardUniform, &[&shape.as_tensor_positive()])
+    let op = random_ops::StandardUniform;
+    let shape = shape.as_tensor();
+    apply_op(op, &[&shape.clone()], Some(shape))
 }
 
 
 /// Outputs values sampled from the bernoulli distribution.
-pub fn bernoulli<T: ::tensor::ArrayLike>(shape: &T, p: f64) -> Tensor
+pub fn bernoulli<T: ArrayLike>(shape: &T, p: f64) -> Tensor
 {
     let op = random_ops::Bernoulli { p };
-    apply_op(op, &[&shape.as_tensor_positive()])
+    let shape = shape.as_tensor();
+    apply_op(op, &[&shape.clone()], Some(shape))
 }
 
 
 /// Outputs values sampled from the exponential distribution.
-pub fn random_exp<T: ::tensor::ArrayLike>(shape: &T, lambda: f64) -> Tensor
+pub fn random_exp<T: ArrayLike>(shape: &T, lambda: f64) -> Tensor
 {
     let op = random_ops::Exponential { lambda };
-    apply_op(op, &[&shape.as_tensor_positive()])
+    let shape = shape.as_tensor();
+    apply_op(op, &[&shape.clone()], Some(shape))
 }
 
 
 /// Outputs values sampled from the gamma distribution.
-pub fn gamma<T: ::tensor::ArrayLike>(shape: &T, shape_param: f64, scale: f64) -> Tensor
+pub fn random_gamma<T: ArrayLike>(shape: &T, shape_param: f64, scale: f64) -> Tensor
 {
     let op = random_ops::Gamma { shape_param, scale };
-    apply_op(op, &[&shape.as_tensor_positive()])
+    let shape = shape.as_tensor();
+    apply_op(op, &[&shape.clone()], Some(shape))
 }
 
 
 /// Outputs values sampled from the log-normal distribution.
-pub fn log_normal<T: ::tensor::ArrayLike>(shape: &T, mean: f64, stddev: f64) -> Tensor
+pub fn log_normal<T: ArrayLike>(shape: &T, mean: f64, stddev: f64) -> Tensor
 {
     let op = random_ops::LogNormal { mean, stddev };
-    apply_op(op, &[&shape.as_tensor_positive()])
+    let shape = shape.as_tensor();
+    apply_op(op, &[&shape.clone()], Some(shape))
 }
 
 
-/// Converts rust-ndarray's array object to a `ag::Tensor` object.
-///
-/// If you won't apply inplace ops to this, `Context#constant` is better
-/// for performance.
-///
-/// # Examples
+/// Converts `ndarray::Array` to `ag::Tensor`.
 ///
 /// ```
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let mut ctx = ag::Context::new();
 /// let arr = ndarray::arr1(&[2., 3.]);
 /// let tensor = ag::convert_to_tensor(arr.clone());
-/// assert_eq!(tensor.eval(&mut ctx), arr.into_dyn());
+/// assert_eq!(tensor.eval(&mut ag::Context::new()), arr.into_dyn());
 /// ```
 pub fn convert_to_tensor<T>(arr: ndarray::Array<f32, T>) -> Tensor
 where
     T: ndarray::Dimension,
 {
-    let op = generator_ops::ConvertToTensor { arr: arr.into_dyn() };
-    apply_op(op, &[])
+    let arr = arr.into_dyn();
+    let shape = {
+        let op = const_gen_ops::ConvertToTensor { arr: ::ndarray_ext::shape_of(&arr) };
+        apply_op(op, &[], None)
+    };
+    apply_op(const_gen_ops::ConvertToTensor { arr }, &[], Some(shape))
 }
 
 
 /// Returns zeros with given shape
 ///
-/// # Examples
-///
 /// ```
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let mut ctx = ag::Context::new();
-///
 /// let a = ag::zeros(&[4, 2]);
-/// assert_eq!(a.eval(&mut ctx), ndarray::Array2::<f32>::zeros((4, 2)).into_dyn());
+/// assert_eq!(a.eval(&mut ag::Context::new()), ndarray::Array2::<f32>::zeros((4, 2)).into_dyn());
 /// ```
-pub fn zeros<T: ::tensor::ArrayLike>(shape: &T) -> Tensor
+pub fn zeros<T: ArrayLike>(shape: &T) -> Tensor
 {
-    apply_op(generator_ops::Zeros, &[&shape.as_tensor_positive()])
+    apply_op(const_gen_ops::Zeros, &[&shape.as_tensor()], None)
 }
 
 
 /// Returns ones with given shape
 ///
-/// # Examples
-///
 /// ```
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let mut ctx = ag::Context::new();
-///
 /// let a = ag::ones(&[4, 2]);
-/// assert_eq!(a.eval(&mut ctx), ndarray::Array2::<f32>::from_elem((4, 2), 1.).into_dyn());
+/// assert_eq!(a.eval(&mut ag::Context::new()),
+///                   ndarray::Array2::<f32>::from_elem((4, 2), 1.).into_dyn());
 /// ```
-pub fn ones<T: ::tensor::ArrayLike>(shape: &T) -> Tensor
+pub fn ones<T: ArrayLike>(shape: &T) -> Tensor
 {
-    apply_op(generator_ops::Ones, &[&shape.as_tensor_positive()])
+    apply_op(const_gen_ops::Ones, &[&shape.as_tensor()], None)
 }
 
 
@@ -1582,27 +1802,26 @@ pub fn ones<T: ::tensor::ArrayLike>(shape: &T) -> Tensor
 ///
 /// Unlike `range`, inputs are symbolic tensors.
 ///
-/// # Examples
-///
 /// ```
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref start = ag::convert_to_tensor(ndarray::arr1(&[0.]));
-/// let ref end = ag::convert_to_tensor(ndarray::arr1(&[5.]));
-/// let ref step = ag::convert_to_tensor(ndarray::arr1(&[1.]));
+/// let ref start = ag::scalar(0.);
+/// let ref end = ag::scalar(5.);
+/// let ref step = ag::scalar(1.);
 /// let ref z = ag::range(start, end, step);
 ///
 /// assert_eq!(z.eval(&mut ag::Context::new()), ndarray::Array1::range(0., 5., 1.).into_dyn());
 /// ```
-pub fn range<T: ::tensor::ArrayLike>(start: &T, end: &T, step: &T) -> Tensor
+pub fn range<T: ArrayLike>(start: &T, end: &T, step: &T) -> Tensor
 {
     apply_op(
-        generator_ops::Range,
+        const_gen_ops::Range,
         &[
-            &start.as_tensor_positive(),
-            &end.as_tensor_positive(),
-            &step.as_tensor_positive(),
+            &start.as_tensor(),
+            &end.as_tensor(),
+            &step.as_tensor(),
         ],
+        None,
     )
 }

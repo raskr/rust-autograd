@@ -5,64 +5,185 @@ use ndarray_ext;
 use ndarray_ext::NdArray;
 use ops;
 use std::f32;
+use std::mem;
+use std::ops::Add;
+use std::ops::Mul;
 use tensor::Tensor;
 
+
+pub struct ReduceMin {
+    pub keep_dims: bool,
+    pub sparse_axes: bool,
+}
+
+pub struct ReduceMax {
+    pub keep_dims: bool,
+    pub sparse_axes: bool,
+}
+
+pub struct ReduceProd {
+    pub keep_dims: bool,
+    pub sparse_axes: bool,
+}
+
+pub struct ReduceSum {
+    pub keep_dims: bool,
+    pub sparse_axes: bool,
+}
 
 pub struct ArgMax {
     pub axis: isize,
     pub keep_dim: bool,
 }
 
-pub struct ReduceMin {
-    pub axis: isize,
-    pub keep_dim: bool,
+
+macro_rules! impl_reduce_forward {
+    ($forward_name:ident, $reduce_fn_name:ident, $reduce_default:expr) => {
+        fn $forward_name(
+            xs: &[&NdArray],
+            keep_dims: bool,
+            sparse_axes: bool,
+        ) -> Result<NdArray, ::OpComputeErrorStatus>
+        {
+            let x = xs[0];
+            let axes = xs[1];
+            if x.shape() == &[] {
+                // case of 0 rank
+                Ok((*x).clone())
+            } else {
+                let axes: Vec<usize> = ndarray_ext::axes_as_vec(axes, x.ndim(), sparse_axes);
+                if axes.is_empty() {
+                    return Err(::OpComputeErrorStatus::Delegate { to: 0 });
+                }
+
+                let mut folded: Option<NdArray> = None;
+
+                for axis in axes.into_iter() {
+                    let func = f32::$reduce_fn_name;
+                    let ret = folded.as_ref().unwrap_or(x).fold_axis(
+                        ndarray::Axis(axis),
+                        $reduce_default,
+                        move |&a, &b| func(a, b),
+                    );
+
+                    if keep_dims {
+                        mem::swap(&mut folded, &mut Some(ndarray_ext::expand_dims(ret, axis)));
+                    } else {
+                        mem::swap(&mut folded, &mut Some(ret));
+                    }
+                }
+
+                Ok(folded.unwrap_or_else(|| x.clone()))
+            }
+        }
+    };
 }
 
-pub struct ReduceMax {
-    pub axis: isize,
-    pub keep_dim: bool,
+impl ops::Op for ReduceSum {
+    fn name(&self) -> &str
+    {
+        "ReduceSum"
+    }
+
+    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    {
+        reduce_sum_forward(xs, self.keep_dims, self.sparse_axes)
+    }
+
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
+        let grad_op = ops::array_ops::Broadcast {
+            keep_dims: self.keep_dims,
+            sparse_axes: self.sparse_axes,
+        };
+        vec![
+            Some(ops::apply_op(
+                grad_op,
+                &[gy, &inputs[0].shape(), inputs[1]],
+                None,
+            )),
+            None,
+        ]
+    }
 }
 
-pub struct ReduceSum {
-    pub axis: isize,
-    pub keep_dim: bool,
+impl ops::Op for ReduceProd {
+    fn name(&self) -> &str
+    {
+        "ReduceProd"
+    }
+
+    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    {
+        reduce_prod_forward(xs, self.keep_dims, self.sparse_axes)
+    }
+
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
+    {
+        let grad_op = ops::array_ops::Broadcast {
+            keep_dims: self.keep_dims,
+            sparse_axes: self.sparse_axes,
+        };
+        let gx = ops::apply_op(
+            grad_op,
+            &[&(gy * output), &inputs[0].shape(), inputs[1]],
+            None,
+        ) / inputs[0];
+        vec![Some(gx), None]
+    }
 }
 
-pub struct ReduceProd {
-    pub axis: isize,
-    pub keep_dim: bool,
+
+impl ops::Op for ReduceMin {
+    fn name(&self) -> &str
+    {
+        "ReduceMin"
+    }
+
+    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    {
+        reduce_min_forward(xs, self.keep_dims, self.sparse_axes)
+    }
+
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
+    {
+        min_max_grad(gy, inputs, output, self.keep_dims, self.sparse_axes)
+    }
 }
 
-pub struct ReduceMean {
-    pub axis: isize,
-    pub keep_dim: bool,
+impl ops::Op for ReduceMax {
+    fn name(&self) -> &str
+    {
+        "ReduceMax"
+    }
+
+    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    {
+        reduce_max_forward(xs, self.keep_dims, self.sparse_axes)
+    }
+
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
+    {
+        min_max_grad(gy, inputs, output, self.keep_dims, self.sparse_axes)
+    }
 }
 
-pub struct ReduceMinGrad {
-    pub axis: isize,
-    pub keep_dim: bool,
+fn min_max_grad(
+    gy: &Tensor,
+    inputs: &[&Tensor],
+    output: &Tensor,
+    keep_dims: bool,
+    sparse_axes: bool,
+) -> Vec<Option<Tensor>>
+{
+    let grad_op1 = ops::array_ops::Broadcast { keep_dims, sparse_axes };
+    let grad_op2 = ops::array_ops::Broadcast { keep_dims, sparse_axes };
+    let x = inputs[0];
+    let x_shape = inputs[0].shape();
+    let y = ops::apply_op(grad_op1, &[output, &x_shape, inputs[1]], None);
+    let gy = ops::apply_op(grad_op2, &[gy, &x_shape, inputs[1]], None);
+    vec![Some(gy * ops::equal(&x, &y)), None]
 }
-
-pub struct ReduceMaxGrad {
-    pub axis: isize,
-    pub keep_dim: bool,
-}
-
-pub struct ReduceSumGrad {
-    pub axis: isize,
-    pub keep_dim: bool,
-}
-
-pub struct ReduceProdGrad {
-    pub axis: isize,
-    pub keep_dim: bool,
-}
-
-pub struct ReduceMeanGrad {
-    pub axis: isize,
-    pub keep_dim: bool,
-}
-
 
 
 impl ops::Op for ArgMax {
@@ -72,7 +193,7 @@ impl ops::Op for ArgMax {
     }
 
     // cf. https://github.com/tensorflow/compiler/tf2xla/kernels/index_ops.cc
-    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let x = xs[0];
         let axis = if self.axis < 0 {
@@ -134,7 +255,7 @@ impl ops::Op for ArgMax {
                 .unwrap()
         };
 
-        result
+        Ok(result)
     }
 
     fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
@@ -143,396 +264,7 @@ impl ops::Op for ArgMax {
     }
 }
 
-
-impl ops::Op for ReduceMin {
-    fn name(&self) -> &str
-    {
-        "ReduceMin"
-    }
-
-    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
-    {
-        let x = xs[0];
-
-        let axis = if self.axis < 0 {
-            (x.ndim() as isize + self.axis) as usize
-        } else {
-            self.axis as usize
-        };
-
-        let min_fn = f32::min;
-        let min = x.fold_axis(ndarray::Axis(axis), f32::MAX, move |&a, &b| min_fn(a, b));
-
-        if self.keep_dim {
-            ndarray_ext::expand_dims(min, axis)
-        } else {
-            min
-        }
-    }
-
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
-    {
-        let grad_op = ReduceMinGrad {
-            axis: self.axis,
-            keep_dim: self.keep_dim,
-        };
-        vec![Some(ops::apply_op(grad_op, &[inputs[0], output, gy]))]
-    }
-}
-
-impl ops::Op for ReduceMinGrad {
-    fn name(&self) -> &str
-    {
-        "ReduceMinGrad"
-    }
-
-    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
-    {
-        let x = xs[0].view();
-        let y = xs[1].view();
-        let gy = xs[2].view();
-
-        let axis = if self.axis < 0 {
-            (x.ndim() as isize + self.axis) as usize
-        } else {
-            self.axis as usize
-        };
-
-        let (y, gy) = if self.keep_dim {
-            (y, gy)
-        } else {
-            (
-                ndarray_ext::expand_dims_view(y, axis),
-                ndarray_ext::expand_dims_view(gy, axis),
-            )
-        };
-
-        // compare x and y
-        let mut mask = NdArray::zeros(x.shape());
-        Zip::from(&mut mask).and(x).and_broadcast(&y).apply(
-            |r, a, b| {
-                *r = ((a == b) as i32) as f32
-            },
-        );
-
-        mask *= &gy;
-        mask
-    }
-
-
-    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
-        vec![None, None, None]
-    }
-}
-
-impl ops::Op for ReduceMax {
-    fn name(&self) -> &str
-    {
-        "ReduceMax"
-    }
-
-    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
-    {
-        let x = xs[0];
-
-        let axis = if self.axis < 0 {
-            (x.ndim() as isize + self.axis) as usize
-        } else {
-            self.axis as usize
-        };
-
-        let max_fn = f32::max;
-        let maxed = x.fold_axis(ndarray::Axis(axis), f32::MIN, move |&a, &b| max_fn(a, b));
-
-        if self.keep_dim {
-            ndarray_ext::expand_dims(maxed, axis)
-        } else {
-            maxed
-        }
-    }
-
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
-    {
-        let grad_op = ReduceMaxGrad {
-            axis: self.axis,
-            keep_dim: self.keep_dim,
-        };
-        vec![Some(ops::apply_op(grad_op, &[inputs[0], output, gy]))]
-    }
-}
-
-impl ops::Op for ReduceMaxGrad {
-    fn name(&self) -> &str
-    {
-        "ReduceMaxGrad"
-    }
-
-    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
-    {
-        let x = xs[0].view();
-        let y = xs[1].view();
-        let gy = xs[2].view();
-
-        let axis = if self.axis < 0 {
-            (x.ndim() as isize + self.axis) as usize
-        } else {
-            self.axis as usize
-        };
-
-        let (y, gy) = if self.keep_dim {
-            (y, gy)
-        } else {
-            (
-                ndarray_ext::expand_dims_view(y, axis),
-                ndarray_ext::expand_dims_view(gy, axis),
-            )
-        };
-
-        // compare x and y
-        let mut mask = NdArray::zeros(x.shape());
-        Zip::from(&mut mask).and(x).and_broadcast(&y).apply(
-            |r, a, b| {
-                *r = ((a == b) as i32) as f32
-            },
-        );
-
-        mask *= &gy;
-        mask
-    }
-
-    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
-        vec![None, None, None]
-    }
-}
-
-impl ops::Op for ReduceMean {
-    fn name(&self) -> &str
-    {
-        "ReduceMean"
-    }
-
-    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
-    {
-        let x: &NdArray = xs[0];
-
-        // TODO
-        if 1 == x.ndim() {
-            panic!(
-                "ReduceMean: input of row vector is not supported.\
-                Consider converting it to vertical vector."
-            )
-        }
-
-        let axis = if self.axis < 0 {
-            (x.ndim() as isize + self.axis) as usize
-        } else {
-            self.axis as usize
-        };
-
-        if self.keep_dim {
-            let ret = x.mean_axis(ndarray::Axis(axis));
-            ndarray_ext::expand_dims(ret, axis)
-        } else {
-            x.mean_axis(ndarray::Axis(axis))
-        }
-    }
-
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
-        let grad_op = ReduceMeanGrad {
-            axis: self.axis,
-            keep_dim: self.keep_dim,
-        };
-        vec![Some(ops::apply_op(grad_op, &[inputs[0], gy]))]
-    }
-}
-
-
-impl ops::Op for ReduceMeanGrad {
-    fn name(&self) -> &str
-    {
-        "ReduceMeanGrad"
-    }
-
-    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
-    {
-        let x = xs[0];
-
-        let axis = if self.axis < 0 {
-            (x.ndim() as isize + self.axis) as usize
-        } else {
-            self.axis as usize
-        };
-
-        // add dim for broadcast (the result is "view")
-        let gy = if self.keep_dim {
-            xs[1].view()
-        } else {
-            ndarray_ext::expand_dims_view(xs[1].view(), axis)
-        };
-
-        // do broadcast and division
-        if let Some(gx) = gy.broadcast(x.shape()) {
-            let mut gx = gx.to_owned();
-            let reduction_len = x.shape()[axis] as f32;
-            gx /= reduction_len;
-            gx
-        } else {
-            panic!("grad implementation of immediate successor of ReduceMean is wrong")
-        }
-    }
-
-    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
-        vec![None, None]
-    }
-}
-
-impl ops::Op for ReduceProd {
-    fn name(&self) -> &str
-    {
-        "ReduceProd"
-    }
-
-    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
-    {
-        let x: &NdArray = &xs[0];
-
-        let axis = if self.axis < 0 {
-            (x.ndim() as isize + self.axis) as usize
-        } else {
-            self.axis as usize
-        };
-
-        if self.keep_dim {
-            let ret = x.fold_axis(ndarray::Axis(axis), 1., |acc, x| acc * x);
-            ndarray_ext::expand_dims(ret, axis)
-        } else {
-            x.fold_axis(ndarray::Axis(axis), 1., |acc, x| acc * x)
-        }
-    }
-
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
-    {
-        let grad_op = ReduceProdGrad {
-            axis: self.axis,
-            keep_dim: self.keep_dim,
-        };
-        vec![Some(ops::apply_op(grad_op, &[inputs[0], output, gy]))]
-    }
-}
-
-impl ops::Op for ReduceProdGrad {
-    fn name(&self) -> &str
-    {
-        "ReduceProdGrad"
-    }
-
-    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
-    {
-        let x: &NdArray = xs[0];
-        let y: &NdArray = xs[1];
-        let gy: &NdArray = xs[2];
-
-        let axis = if self.axis < 0 {
-            (x.ndim() as isize + self.axis) as usize
-        } else {
-            self.axis as usize
-        };
-
-        // add dim for broadcast (the result is "view")
-        let y_gy = if self.keep_dim {
-            gy * y
-        } else {
-            ndarray_ext::expand_dims(gy * y, axis)
-        };
-
-
-        // do broadcast
-        if let Some(y_gy_broadcast) = y_gy.broadcast(x.shape()) {
-            let mut owned: NdArray = y_gy_broadcast.to_owned();
-            owned.zip_mut_with(x, |a, &b| *a /= b);
-            owned
-        } else {
-            panic!("grad implementation of immediate successor of ReduceSum is wrong")
-        }
-    }
-
-    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
-        vec![None, None]
-    }
-}
-
-impl ops::Op for ReduceSum {
-    fn name(&self) -> &str
-    {
-        "ReduceSum"
-    }
-
-    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
-    {
-        let x = &xs[0];
-
-        let axis = if self.axis < 0 {
-            (x.ndim() as isize + self.axis) as usize
-        } else {
-            self.axis as usize
-        };
-
-        if self.keep_dim {
-            let ret = x.sum_axis(ndarray::Axis(axis));
-            ndarray_ext::expand_dims(ret, axis)
-        } else {
-            x.sum_axis(ndarray::Axis(axis))
-        }
-    }
-
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
-        let grad_op = ReduceSumGrad {
-            axis: self.axis,
-            keep_dim: self.keep_dim,
-        };
-        vec![Some(ops::apply_op(grad_op, &[inputs[0], gy]))]
-    }
-}
-
-impl ops::Op for ReduceSumGrad {
-    fn name(&self) -> &str
-    {
-        "ReduceSumGrad"
-    }
-
-    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
-    {
-        let x = xs[0];
-
-        let axis = if self.axis < 0 {
-            (x.ndim() as isize + self.axis) as usize
-        } else {
-            self.axis as usize
-        };
-
-        // add dim for broadcast (the result is "view")
-        let gy = if self.keep_dim {
-            xs[1].view()
-        } else {
-            ndarray_ext::expand_dims_view(xs[1].view(), axis)
-        };
-
-        // do broadcast
-        if let Some(gx) = gy.broadcast(x.shape()) {
-            gx.to_owned()
-        } else {
-            panic!("grad implementation of immediate successor of ReduceSum is wrong")
-        }
-    }
-
-    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
-        vec![None, None]
-    }
-}
+impl_reduce_forward!(reduce_sum_forward, add, 0.);
+impl_reduce_forward!(reduce_min_forward, min, f32::MAX);
+impl_reduce_forward!(reduce_max_forward, max, f32::MIN);
+impl_reduce_forward!(reduce_prod_forward, mul, 1.);

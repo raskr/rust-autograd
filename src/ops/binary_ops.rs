@@ -1,54 +1,38 @@
 /// Implement +, -, *, / operators for Tensor
-/// +=, -= are not supported but do as ops::inplace_add, ops::inplace_sub
+/// +=, -= are provided as methods of ops::inplace_add, ops::inplace_sub
 extern crate ndarray;
 
 use ndarray_ext::NdArray;
 use ops;
 use std::mem;
 use std::ops::{Add, Div, Mul, Sub};
-use std::rc::Rc;
-use tensor::{RawTensor, Tensor};
-
-
-#[inline(always)]
-fn scalar_tensor_add(a: &NdArray, b: &NdArray) -> NdArray
-{
-    // comparing the rank of tensors doesn't solve the problem here.
-    if a.len() > b.len() { a + b } else { b + a }
-}
-
-#[inline(always)]
-fn scalar_tensor_mul(a: &NdArray, b: &NdArray) -> NdArray
-{
-    // comparing the rank of tensors doesn't solve the problem here.
-    if a.len() > b.len() { a * b } else { b * a }
-}
+use std::result::Result;
+use tensor::Tensor;
 
 
 pub struct AddOp;
 pub struct SubOp;
 pub struct MulOp;
 pub struct DivOp;
-
 pub struct InplaceAddOp;
 pub struct InplaceSubOp;
+
 
 impl ops::Op for AddOp {
     fn name(&self) -> &str
     {
-        "AddOp"
+        "Add"
     }
 
-    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
     {
-        let a = xs[0];
-        let b = xs[1];
-        scalar_tensor_add(a, b)
+        add_forward(xs[0], xs[1])
     }
 
-    fn grad(&self, gy: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
-        vec![Some(gy.clone()), Some(gy.clone())]
+        let (gy1, gy2) = maybe_reduce_gy(inputs[0], inputs[1], gy);
+        vec![Some(gy1), Some(gy2)]
     }
 }
 
@@ -56,66 +40,67 @@ impl ops::Op for AddOp {
 impl ops::Op for SubOp {
     fn name(&self) -> &str
     {
-        "SubOp"
+        "Sub"
     }
 
-    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
     {
-        let a = xs[0];
-        let b = xs[1];
-        if a.shape() == &[1] {
+        let x0 = xs[0];
+        let x1 = xs[1];
+        let shape0: &[usize] = x0.shape();
+        if shape0 == &[] {
             // a is scalar
-            // unwrap is safe
-            let a = NdArray::from_elem(b.shape(), *a.get(0).unwrap());
-            a - b
+            let x0_elem = x0[ndarray::IxDyn(&[])];
+            Ok(x1.map(move |a| x0_elem - a))
         } else {
-            a - b
+            Ok(x0 - x1)
         }
     }
 
-    fn grad(&self, gy: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
-        vec![Some(gy.clone()), Some(-1 * gy)]
+        let (gy1, gy2) = maybe_reduce_gy(inputs[0], inputs[1], gy);
+        vec![Some(gy1), Some(gy2 * -1.)]
     }
 }
 
 impl ops::Op for MulOp {
     fn name(&self) -> &str
     {
-        "MulOp"
+        "Mul"
     }
 
-    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
     {
-        let a = xs[0];
-        let b = xs[1];
-        scalar_tensor_mul(a, b)
+        mul_forward(xs[0], xs[1])
     }
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         let x0 = inputs[0];
         let x1 = inputs[1];
-        vec![Some(gy * x1), Some(gy * x0)]
+        let (gy1, gy2) = maybe_reduce_gy(x0, x1, gy);
+        vec![Some(gy1 * x1), Some(gy2 * x0)]
     }
 }
 
 impl ops::Op for DivOp {
     fn name(&self) -> &str
     {
-        "DivOp"
+        "Div"
     }
 
-    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let x0 = xs[0];
         let x1 = xs[1];
-        if x0.shape() == &[1] {
+        let shape0: &[usize] = x0.shape();
+        if shape0 == &[] {
             // a is scalar
-            // unwrap is safe
-            NdArray::from_elem(x1.shape(), *x0.get(0).unwrap()) / x1
+            let x0_elem = x0[ndarray::IxDyn(&[])];
+            Ok(x1.map(move |a| x0_elem / a))
         } else {
-            x0 / x1
+            Ok(x0 / x1)
         }
     }
 
@@ -123,9 +108,8 @@ impl ops::Op for DivOp {
     {
         let x0 = inputs[0];
         let x1 = inputs[1];
-        let a: Tensor = gy / x1;
-        let b: Tensor = -1 * x0 * ops::pow(x1, -2.) * gy;
-        vec![Some(a), Some(b)]
+        let (gy1, gy2) = maybe_reduce_gy(x0, x1, gy);
+        vec![Some(gy1 / x1), Some(-1 * x0 * ops::pow(x1, -2.) * gy2)]
     }
 }
 
@@ -140,17 +124,19 @@ impl ops::Op for InplaceAddOp {
         "InplaceAddOp"
     }
 
-    fn compute_inplace(&self, xs: &mut [&mut NdArray], _: bool)
+    fn compute_inplace(&self, xs: &mut [&mut NdArray]) -> Result<(), ::OpComputeErrorStatus>
     {
-        // safe transmute
-        let b: &&NdArray = unsafe { mem::transmute(&mut xs[1]) };
-        let a = &mut xs[0];
-        a.zip_mut_with(b, |x, &y| *x += y);
+        // safe transmute probably
+        let x1: &&NdArray = unsafe { mem::transmute(&mut xs[1]) };
+        let x0 = &mut xs[0];
+        x0.zip_mut_with(x1, |a, &b| *a += b);
+        Ok(())
     }
 
-    fn grad(&self, gy: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
-        vec![Some(gy.clone()), Some(gy.clone())]
+        let (gy1, gy2) = maybe_reduce_gy(inputs[0], inputs[1], gy);
+        vec![Some(gy1), Some(gy2)]
     }
 }
 
@@ -166,29 +152,51 @@ impl ops::Op for InplaceSubOp {
         "InplaceSubOp"
     }
 
-    fn compute_inplace(&self, xs: &mut [&mut NdArray], _: bool)
+    fn compute_inplace(&self, xs: &mut [&mut NdArray]) -> Result<(), ::OpComputeErrorStatus>
     {
-        // safe transmute
-        let b: &&NdArray = unsafe { mem::transmute(&mut xs[1]) };
-        let a = &mut xs[0];
-        a.zip_mut_with(b, |x, &y| *x -= y);
+        // safe transmute probably
+        let x1: &&NdArray = unsafe { mem::transmute(&mut xs[1]) };
+        let x0 = &mut xs[0];
+        x0.zip_mut_with(x1, |a, &b| *a -= b);
+        Ok(())
     }
 
-    fn grad(&self, gy: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
-        vec![Some(gy.clone()), Some(-1 * gy)]
+        let (gy1, gy2) = maybe_reduce_gy(inputs[0], inputs[1], gy);
+        vec![Some(gy1), Some(-1. * gy2)]
     }
 }
+
+#[inline]
+// Reduce gy if broadcast occurred in the forward pass
+fn maybe_reduce_gy(x0: &Tensor, x1: &Tensor, gy: &Tensor) -> (Tensor, Tensor)
+{
+    let shape0 = x0.shape();
+    let shape1 = x1.shape();
+    let gy_shape = gy.shape();
+    let sum0 = ops::reduction_ops::ReduceSum { keep_dims: true, sparse_axes: true };
+    let sum1 = ops::reduction_ops::ReduceSum { keep_dims: true, sparse_axes: true };
+    return (
+        ops::apply_op(
+            sum0,
+            &[gy, &ops::not_equal(&gy_shape, &shape0)],
+            Some(shape0),
+        ), // gy1
+        ops::apply_op(
+            sum1,
+            &[gy, &ops::not_equal(&gy_shape, &shape1)],
+            Some(shape1),
+        ), /* gy2 */
+    );
+}
+
 
 macro_rules! impl_scalar_to_tensor {
     ($func_name:ident, $scalar_type:ty) => {
         fn $func_name(val: $scalar_type) -> Tensor
         {
-            Tensor(Rc::new(RawTensor {
-                op: Box::new(ops::scalar::Scalar { val: val as f32 }),
-                inputs: vec![],
-                top_rank: 0,
-            }))
+            ops::scalar(val as f32)
         }
     };
 }
@@ -197,7 +205,7 @@ macro_rules! impl_scalar_to_tensor {
 // -- std::ops::{Add, Sub, Mul, Div} implementations --
 
 
-macro_rules! impl_elementwise_between_tensor_and_scalar {
+macro_rules! impl_bin_op_between_tensor_and_scalar {
     (
         $trt:ident,
         $func:ident,
@@ -211,7 +219,7 @@ macro_rules! impl_elementwise_between_tensor_and_scalar {
             type Output = Tensor;
             fn $func(self, rhs: Tensor) -> Self::Output
             {
-                ops::apply_op($op, &[&$conversion_fn(self), &rhs])
+                ops::apply_op($op, &[&$conversion_fn(self), &rhs], Some(rhs.shape()))
             }
         }
 
@@ -220,7 +228,7 @@ macro_rules! impl_elementwise_between_tensor_and_scalar {
             type Output = Tensor;
             fn $func(self, rhs: &'a Tensor) -> Self::Output
             {
-                ops::apply_op($op, &[&$conversion_fn(self), rhs])
+                ops::apply_op($op, &[&$conversion_fn(self), rhs], Some(rhs.shape()))
             }
         }
 
@@ -229,7 +237,7 @@ macro_rules! impl_elementwise_between_tensor_and_scalar {
             type Output = Tensor;
             fn $func(self, rhs: $scalar_type) -> Self::Output
             {
-                ops::apply_op($op, &[&self, &$conversion_fn(rhs)])
+                ops::apply_op($op, &[&self, &$conversion_fn(rhs)], Some(self.shape()))
             }
         }
 
@@ -238,13 +246,13 @@ macro_rules! impl_elementwise_between_tensor_and_scalar {
             type Output = Tensor;
             fn $func(self, rhs: $scalar_type) -> Self::Output
             {
-                ops::apply_op($op, &[self, &$conversion_fn(rhs)])
+                ops::apply_op($op, &[self, &$conversion_fn(rhs)], Some(self.shape()))
             }
         }
     }
 }
 
-macro_rules! impl_elementwise_between_two_tensors {
+macro_rules! impl_bin_op_between_tensors {
     (
         $trt:ident,
         $func:ident,
@@ -255,7 +263,7 @@ macro_rules! impl_elementwise_between_two_tensors {
             type Output = Tensor;
             fn $func(self, rhs: Tensor) -> Self::Output
             {
-                ops::apply_op($op, &[&self, &rhs])
+                ops::$func(&self, &rhs)
             }
         }
 
@@ -264,7 +272,7 @@ macro_rules! impl_elementwise_between_two_tensors {
             type Output = Tensor;
             fn $func(self, rhs: &Tensor) -> Self::Output
             {
-                ops::apply_op($op, &[&self, rhs])
+                ops::$func(&self, rhs)
             }
         }
 
@@ -273,7 +281,7 @@ macro_rules! impl_elementwise_between_two_tensors {
             type Output = Tensor;
             fn $func(self, rhs: Tensor) -> Self::Output
             {
-                ops::apply_op($op, &[self, &rhs])
+                ops::$func(&self, &rhs)
             }
         }
 
@@ -283,12 +291,35 @@ macro_rules! impl_elementwise_between_two_tensors {
             type Output = Tensor;
             fn $func(self, rhs: &Tensor) -> Self::Output
             {
-                ops::apply_op($op, &[self, rhs])
+                ops::$func(self, rhs)
             }
         }
     };
 }
 
+macro_rules! impl_bin_op_forward {
+    ($forward_name:ident, $bin_op:tt) => {
+        fn $forward_name(x0: &NdArray, x1: &NdArray) -> Result<NdArray, ::OpComputeErrorStatus>
+        {
+            let shape0: &[usize]  = x0.shape();
+            let shape1: &[usize]  = x1.shape();
+            let len0: usize = shape0.iter().product();
+            let len1: usize = shape1.iter().product();
+            let (larger, smaller) = if len0 > len1 { (x0, x1) } else { (x1, x0) };
+            let smaller_sh = if len0 > len1 { shape1 } else { shape0 };
+
+            if smaller_sh == &[] {
+                let smaller_elem = smaller[ndarray::IxDyn(&[])];
+                Ok(larger.map(move |a| smaller_elem $bin_op a))
+            } else {
+                Ok(larger $bin_op smaller)
+            }
+        }
+    };
+}
+
+impl_bin_op_forward!(add_forward, +);
+impl_bin_op_forward!(mul_forward, *);
 
 impl_scalar_to_tensor!(isize_to_tensor, isize);
 impl_scalar_to_tensor!(usize_to_tensor, usize);
@@ -299,48 +330,47 @@ impl_scalar_to_tensor!(u64_to_tensor, u64);
 impl_scalar_to_tensor!(f32_to_tensor, f32);
 impl_scalar_to_tensor!(f64_to_tensor, f64);
 
+impl_bin_op_between_tensors!(Add, add, AddOp);
+impl_bin_op_between_tensors!(Sub, sub, SubOp);
+impl_bin_op_between_tensors!(Mul, mul, MulOp);
+impl_bin_op_between_tensors!(Div, div, DivOp);
 
-impl_elementwise_between_two_tensors!(Add, add, AddOp);
-impl_elementwise_between_two_tensors!(Sub, sub, SubOp);
-impl_elementwise_between_two_tensors!(Mul, mul, MulOp);
-impl_elementwise_between_two_tensors!(Div, div, DivOp);
+impl_bin_op_between_tensor_and_scalar!(Add, add, AddOp, i32, i32_to_tensor);
+impl_bin_op_between_tensor_and_scalar!(Sub, sub, SubOp, i32, i32_to_tensor);
+impl_bin_op_between_tensor_and_scalar!(Mul, mul, MulOp, i32, i32_to_tensor);
+impl_bin_op_between_tensor_and_scalar!(Div, div, DivOp, i32, i32_to_tensor);
 
-impl_elementwise_between_tensor_and_scalar!(Add, add, AddOp, i32, i32_to_tensor);
-impl_elementwise_between_tensor_and_scalar!(Sub, sub, SubOp, i32, i32_to_tensor);
-impl_elementwise_between_tensor_and_scalar!(Mul, mul, MulOp, i32, i32_to_tensor);
-impl_elementwise_between_tensor_and_scalar!(Div, div, DivOp, i32, i32_to_tensor);
+impl_bin_op_between_tensor_and_scalar!(Add, add, AddOp, i64, i64_to_tensor);
+impl_bin_op_between_tensor_and_scalar!(Sub, sub, SubOp, i64, i64_to_tensor);
+impl_bin_op_between_tensor_and_scalar!(Mul, mul, MulOp, i64, i64_to_tensor);
+impl_bin_op_between_tensor_and_scalar!(Div, div, DivOp, i64, i64_to_tensor);
 
-impl_elementwise_between_tensor_and_scalar!(Add, add, AddOp, i64, i64_to_tensor);
-impl_elementwise_between_tensor_and_scalar!(Sub, sub, SubOp, i64, i64_to_tensor);
-impl_elementwise_between_tensor_and_scalar!(Mul, mul, MulOp, i64, i64_to_tensor);
-impl_elementwise_between_tensor_and_scalar!(Div, div, DivOp, i64, i64_to_tensor);
+impl_bin_op_between_tensor_and_scalar!(Add, add, AddOp, f32, f32_to_tensor);
+impl_bin_op_between_tensor_and_scalar!(Sub, sub, SubOp, f32, f32_to_tensor);
+impl_bin_op_between_tensor_and_scalar!(Mul, mul, MulOp, f32, f32_to_tensor);
+impl_bin_op_between_tensor_and_scalar!(Div, div, DivOp, f32, f32_to_tensor);
 
-impl_elementwise_between_tensor_and_scalar!(Add, add, AddOp, f32, f32_to_tensor);
-impl_elementwise_between_tensor_and_scalar!(Sub, sub, SubOp, f32, f32_to_tensor);
-impl_elementwise_between_tensor_and_scalar!(Mul, mul, MulOp, f32, f32_to_tensor);
-impl_elementwise_between_tensor_and_scalar!(Div, div, DivOp, f32, f32_to_tensor);
+impl_bin_op_between_tensor_and_scalar!(Add, add, AddOp, f64, f64_to_tensor);
+impl_bin_op_between_tensor_and_scalar!(Sub, sub, SubOp, f64, f64_to_tensor);
+impl_bin_op_between_tensor_and_scalar!(Mul, mul, MulOp, f64, f64_to_tensor);
+impl_bin_op_between_tensor_and_scalar!(Div, div, DivOp, f64, f64_to_tensor);
 
-impl_elementwise_between_tensor_and_scalar!(Add, add, AddOp, f64, f64_to_tensor);
-impl_elementwise_between_tensor_and_scalar!(Sub, sub, SubOp, f64, f64_to_tensor);
-impl_elementwise_between_tensor_and_scalar!(Mul, mul, MulOp, f64, f64_to_tensor);
-impl_elementwise_between_tensor_and_scalar!(Div, div, DivOp, f64, f64_to_tensor);
+impl_bin_op_between_tensor_and_scalar!(Add, add, AddOp, u32, u32_to_tensor);
+impl_bin_op_between_tensor_and_scalar!(Sub, sub, SubOp, u32, u32_to_tensor);
+impl_bin_op_between_tensor_and_scalar!(Mul, mul, MulOp, u32, u32_to_tensor);
+impl_bin_op_between_tensor_and_scalar!(Div, div, DivOp, u32, u32_to_tensor);
 
-impl_elementwise_between_tensor_and_scalar!(Add, add, AddOp, u32, u32_to_tensor);
-impl_elementwise_between_tensor_and_scalar!(Sub, sub, SubOp, u32, u32_to_tensor);
-impl_elementwise_between_tensor_and_scalar!(Mul, mul, MulOp, u32, u32_to_tensor);
-impl_elementwise_between_tensor_and_scalar!(Div, div, DivOp, u32, u32_to_tensor);
+impl_bin_op_between_tensor_and_scalar!(Add, add, AddOp, u64, u64_to_tensor);
+impl_bin_op_between_tensor_and_scalar!(Sub, sub, SubOp, u64, u64_to_tensor);
+impl_bin_op_between_tensor_and_scalar!(Mul, mul, MulOp, u64, u64_to_tensor);
+impl_bin_op_between_tensor_and_scalar!(Div, div, DivOp, u64, u64_to_tensor);
 
-impl_elementwise_between_tensor_and_scalar!(Add, add, AddOp, u64, u64_to_tensor);
-impl_elementwise_between_tensor_and_scalar!(Sub, sub, SubOp, u64, u64_to_tensor);
-impl_elementwise_between_tensor_and_scalar!(Mul, mul, MulOp, u64, u64_to_tensor);
-impl_elementwise_between_tensor_and_scalar!(Div, div, DivOp, u64, u64_to_tensor);
+impl_bin_op_between_tensor_and_scalar!(Add, add, AddOp, usize, usize_to_tensor);
+impl_bin_op_between_tensor_and_scalar!(Sub, sub, SubOp, usize, usize_to_tensor);
+impl_bin_op_between_tensor_and_scalar!(Mul, mul, MulOp, usize, usize_to_tensor);
+impl_bin_op_between_tensor_and_scalar!(Div, div, DivOp, usize, usize_to_tensor);
 
-impl_elementwise_between_tensor_and_scalar!(Add, add, AddOp, usize, usize_to_tensor);
-impl_elementwise_between_tensor_and_scalar!(Sub, sub, SubOp, usize, usize_to_tensor);
-impl_elementwise_between_tensor_and_scalar!(Mul, mul, MulOp, usize, usize_to_tensor);
-impl_elementwise_between_tensor_and_scalar!(Div, div, DivOp, usize, usize_to_tensor);
-
-impl_elementwise_between_tensor_and_scalar!(Add, add, AddOp, isize, isize_to_tensor);
-impl_elementwise_between_tensor_and_scalar!(Sub, sub, SubOp, isize, isize_to_tensor);
-impl_elementwise_between_tensor_and_scalar!(Mul, mul, MulOp, isize, isize_to_tensor);
-impl_elementwise_between_tensor_and_scalar!(Div, div, DivOp, isize, isize_to_tensor);
+impl_bin_op_between_tensor_and_scalar!(Add, add, AddOp, isize, isize_to_tensor);
+impl_bin_op_between_tensor_and_scalar!(Sub, sub, SubOp, isize, isize_to_tensor);
+impl_bin_op_between_tensor_and_scalar!(Mul, mul, MulOp, isize, isize_to_tensor);
+impl_bin_op_between_tensor_and_scalar!(Div, div, DivOp, isize, isize_to_tensor);

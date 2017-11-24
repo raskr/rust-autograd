@@ -1,3 +1,4 @@
+/// `Tensordot` is implemented in `ops/mod.rs`.
 extern crate ndarray;
 extern crate rayon;
 
@@ -25,14 +26,22 @@ impl ops::Op for MatMul {
         "MatMul"
     }
 
-    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let x0 = xs[0];
         let x1 = xs[1];
         let x0_shape = x0.shape();
         let x1_shape = x1.shape();
-        assert_eq!(x0_shape.len(), 2);
-        assert_eq!(x1_shape.len(), 2);
+        if x0_shape.len() != 2 {
+            return Err(::OpComputeErrorStatus::BadInput(
+                "First input to the matmul should be Matrix".to_string(),
+            ));
+        }
+        if x1_shape.len() != 2 {
+            return Err(::OpComputeErrorStatus::BadInput(
+                "Second input to the matmul should be Matrix".to_string(),
+            ));
+        }
         let x0_view = x0.view();
         let x1_view = x1.view();
         // unwrap is always safe
@@ -46,22 +55,16 @@ impl ops::Op for MatMul {
             // almost zero cost
             b.swap_axes(0, 1);
         }
-        a.dot(&b).into_dyn()
+        Ok(a.dot(&b).into_dyn())
     }
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
-        let opa = MatMul {
-            transpose_a: false,
-            transpose_b: true,
-        };
-        let opb = MatMul {
-            transpose_a: true,
-            transpose_b: false,
-        };
+        let opa = MatMul { transpose_a: false, transpose_b: true };
+        let opb = MatMul { transpose_a: true, transpose_b: false };
         vec![
-            Some(ops::apply_op(opa, &[gy, inputs[1]])),
-            Some(ops::apply_op(opb, &[inputs[0], gy])),
+            Some(ops::apply_op(opa, &[gy, inputs[1]], None)),
+            Some(ops::apply_op(opb, &[inputs[0], gy], None)),
         ]
     }
 }
@@ -73,22 +76,28 @@ impl ops::Op for BatchMatMul {
         "BatchMatMul"
     }
 
-    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let x0: &NdArray = xs[0];
         let x1: &NdArray = xs[1];
-        let x0_shape = x0.shape();
-        let x1_shape = x1.shape();
-        let ndim = x0.ndim();
+        let shape0 = x0.shape();
+        let shape1 = x1.shape();
+        let rank0 = x0.ndim();
+        let rank1 = x1.ndim();
 
-        assert_eq!(ndim, x1.ndim());
-        assert_eq!(x0_shape[..ndim - 2], x1_shape[..ndim - 2]);
+        if rank0 != rank1 || shape0[..rank0 - 2] != shape1[..rank0 - 2] {
+            return Err(::OpComputeErrorStatus::BadInput(format!(
+                "Input shape mismatch: {:?} vs {:?}",
+                shape0,
+                shape1
+            )));
+        }
 
-        let row0 = x0_shape[ndim - 2];
-        let row1 = x1_shape[ndim - 2];
+        let row0 = shape0[rank0 - 2];
+        let row1 = shape1[rank0 - 2];
 
-        let col0 = x0_shape[ndim - 1];
-        let col1 = x1_shape[ndim - 1];
+        let col0 = shape0[rank0 - 1];
+        let col1 = shape1[rank0 - 1];
 
         // squashes dims (remains last two dims)
         // unwrap is always safe
@@ -139,7 +148,7 @@ impl ops::Op for BatchMatMul {
 
         let dst_shape = {
             let stacked_shape = stacked.shape();
-            x0_shape[..ndim - 2]
+            shape0[..rank0 - 2]
                 .into_iter()
                 .chain(&[stacked_shape[1], stacked_shape[2]])
                 .cloned()
@@ -147,9 +156,11 @@ impl ops::Op for BatchMatMul {
         };
 
         // reshape to dst shape
-        stacked
-            .into_shape(ndarray::IxDyn(dst_shape.as_slice()))
-            .unwrap()
+        Ok(
+            stacked
+                .into_shape(ndarray::IxDyn(dst_shape.as_slice()))
+                .unwrap(),
+        ) // safe unwrap
 
     }
 
@@ -157,17 +168,11 @@ impl ops::Op for BatchMatMul {
     {
         // Using `ops::swap_axes()` here causes "invalid memory layout error"
         // so transpose_* flags is used in BatchMatMul.
-        let opa = BatchMatMul {
-            transpose_a: false,
-            transpose_b: true,
-        };
-        let opb = BatchMatMul {
-            transpose_a: true,
-            transpose_b: false,
-        };
+        let opa = BatchMatMul { transpose_a: false, transpose_b: true };
+        let opb = BatchMatMul { transpose_a: true, transpose_b: false };
         vec![
-            Some(ops::apply_op(opa, &[gy, inputs[1]])),
-            Some(ops::apply_op(opb, &[inputs[0], gy])),
+            Some(ops::apply_op(opa, &[gy, inputs[1]], None)),
+            Some(ops::apply_op(opb, &[inputs[0], gy], None)),
         ]
     }
 }

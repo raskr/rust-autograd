@@ -8,12 +8,12 @@ pub struct StopGradients;
 impl ops::Op for StopGradients {
     fn name(&self) -> &str
     {
-        "StopGradient"
+        "StopGradients"
     }
 
-    fn compute(&self, xs: &[&NdArray], _: bool) -> NdArray
+    fn compute(&self, _: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
     {
-        xs[0].clone()
+        return Err(::OpComputeErrorStatus::Delegate { to: 0 });
     }
 
     fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>

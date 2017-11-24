@@ -1,7 +1,6 @@
 /// small extension of rust-ndarray for convenience
 extern crate ndarray;
 
-
 /// type alias for convenience
 pub type NdArray = ndarray::Array<f32, ndarray::IxDyn>;
 
@@ -58,6 +57,92 @@ pub fn roll_axis(arg: &mut NdArray, to: ndarray::Axis, from: ndarray::Axis)
         }
     }
 }
+
+
+#[inline]
+#[doc(hidden)]
+pub fn axes_as_vec(axes_: &NdArray, ndim: usize, sparse_axes: bool) -> Vec<usize>
+{
+    if sparse_axes {
+        let mut axes: Vec<usize> = vec![];
+        for (i, &a) in axes_.iter().enumerate() {
+            if a == 1. {
+                axes.push(i as usize);
+            }
+        }
+        axes
+    } else {
+        let mut axes: Vec<usize> = Vec::with_capacity(axes_.len());
+        for &axis in axes_.iter() {
+            let axis = if axis < 0. {
+                (ndim as f32 + axis) as usize
+            } else {
+                axis as usize
+            };
+            axes.push(axis);
+        }
+        axes
+    }
+}
+
+
+#[doc(hidden)]
+pub fn broadcast_to(
+    broadcast_objective: &NdArray,
+    target: &[usize],
+    reduction_axes: &NdArray,
+    keep_dims: bool,
+    sparse_axes: bool,
+) -> NdArray
+{
+    let mut gy = broadcast_objective.view();
+
+    // convert axes_ to usize vec
+    let mut axes = axes_as_vec(reduction_axes, target.len(), sparse_axes);
+
+    // make broadcast dims
+    if !keep_dims {
+        axes.sort();
+        for &axis in axes.iter() {
+            gy = expand_dims_view(gy, axis);
+        }
+    }
+
+    // do broadcast
+    if let Some(gx) = gy.broadcast(target) {
+        gx.to_owned()
+    } else {
+        panic!("Broadcast failed. This is probably a bug.")
+    }
+}
+
+#[inline]
+/// This works well only for small array
+pub fn vec_as_shape(x: &NdArray) -> Vec<usize>
+{
+    let mut target = Vec::with_capacity(x.len());
+    for &a in x.iter() {
+        target.push(a as usize);
+    }
+    target
+}
+
+#[inline]
+pub fn scalar_shape() -> NdArray
+{
+    // safe unwrap
+    NdArray::from_shape_vec(ndarray::IxDyn(&[0]), vec![]).unwrap()
+}
+
+#[inline]
+pub fn shape_of(x: &NdArray) -> NdArray
+{
+    let shape = x.shape().iter().map(|&a| a as f32).collect::<Vec<f32>>();
+    let rank = shape.len();
+    // safe unwrap
+    NdArray::from_shape_vec(ndarray::IxDyn(&[rank]), shape).unwrap()
+}
+
 
 #[doc(hidden)]
 #[inline]
@@ -121,7 +206,7 @@ pub mod array_gen {
     /// Create ndarray object from a scalar.
     pub fn from_scalar(val: f32) -> ndarray::Array<f32, ndarray::IxDyn>
     {
-        NdArray::from_elem(ndarray::IxDyn(&[1]), val)
+        NdArray::from_elem(ndarray::IxDyn(&[]), val)
     }
 
     #[inline]

@@ -2,9 +2,6 @@ extern crate ndarray;
 extern crate fnv;
 
 use context::Context;
-use ndarray_ext;
-use ndarray_ext::NdArray;
-use tensor;
 use tensor::Tensor;
 
 
@@ -22,37 +19,15 @@ pub fn apply_gradients<T: optimizers::Optimizer>(
 {
     assert_eq!(variables.len(), gradients.len());
     // run graph and get gradient arrays
-    let mut grad_arrays = tensor::eval_tensors(gradients, &mut ctx.variables, &mut ctx.outputs);
+    let mut grad_arrays = ::eval::eval_tensors(gradients, &mut ctx.variables, &mut ctx.outputs);
     ctx.outputs.clear();
     for v in variables {
         // safe unwrap
         assert_eq!(v.op.name(), "Variable", "Can't optimize non-variable");
         let mut v_arr = ctx.variables.get_mut(v).unwrap();
-        let g = maybe_reduce_grad(grad_arrays.remove(0), v_arr.shape());
+        let g = grad_arrays.remove(0);
         optimizer.update(v, v_arr, g);
     }
-}
-
-
-#[doc(hidden)]
-#[inline(always)]
-/// Reduces gradient's each dim by summation.
-/// This is used when parameter shape and
-/// gradient shape don't match due to broadcast.
-pub fn maybe_reduce_grad(mut grad: NdArray, var_shape: &[usize]) -> NdArray
-{
-    let grad_shape = grad.shape().to_vec();
-    // for each grad axis
-    for (i, (g, v)) in grad_shape.iter().zip(var_shape).enumerate() {
-        if g == v {
-            continue; // do nothing
-        } else if g < v {
-            panic!("bad gradient")
-        } else {
-            grad = ndarray_ext::expand_dims(grad.sum_axis(ndarray::Axis(i)), i);
-        }
-    }
-    grad
 }
 
 
@@ -150,11 +125,7 @@ pub mod optimizers {
             // update states
             self.states.insert(
                 node.clone(),
-                AdamState {
-                    m: m_new,
-                    v: v_new,
-                    t: t + 1.,
-                },
+                AdamState { m: m_new, v: v_new, t: t + 1. },
             );
 
             let eps = self.eps;

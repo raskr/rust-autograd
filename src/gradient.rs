@@ -48,9 +48,9 @@ fn contributed_to_grads(objectives: &[&Tensor], variables: &[&Tensor]) -> FnvHas
 fn contributed_to_grads_test()
 {
     // dummy graph
-    let mut graph = ::Context::new();
-    let ref t = graph.constant(::ndarray_ext::standard_normal(&[2, 3]));
-    let ref v = graph.variable(::ndarray_ext::standard_normal(&[2, 3]));
+    let mut ctx = ::Context::new();
+    let ref t = ::constant(::ndarray_ext::standard_normal(&[2, 3]), &mut ctx);
+    let ref v = ::variable(::ndarray_ext::standard_normal(&[2, 3]), &mut ctx);
     let ref z = ::sigmoid_cross_entropy(&v, &t);
     let booleans = contributed_to_grads(&[z], &[v]);
     assert_eq!(booleans.len(), 3);
@@ -75,37 +75,23 @@ pub fn symbolic_gradients(
     output_grads: &[Option<&Tensor>],
 ) -> Vec<Tensor>
 {
-    assert_eq!(objectives.len(), output_grads.len());
+    assert_eq!(
+        objectives.len(),
+        output_grads.len(),
+        "`objectives.len()` must match `output_grads.len()`"
+    );
     #[inline]
     fn maybe_reduce_grad(gys: &mut Vec<Tensor>)
     {
-        if gys.len() < 2 {
-            return;
-        }
-        let acc = {
-            // values to refs
-            let refs = gys.iter().map(|a| a).collect::<Vec<_>>();
-            if refs.len() == 2 {
-                // normal addition
-                refs[0] + refs[1]
-            } else {
-                // For 3 or more gradients, AddN, i.e. inplace accumulation
-                // is preferred for performance
+        if gys.len() >= 2 {
+            let acc = {
+                // values to refs
+                let refs = gys.iter().map(|a| a).collect::<Vec<_>>();
                 ops::add_n(refs.as_slice())
-            }
-        };
-        mem::swap(&mut vec![acc], gys);
+            };
+            mem::swap(&mut vec![acc], gys);
+        }
     }
-
-    // Treats `None` in `initial_gys`
-    let output_grads = output_grads
-        .into_iter()
-        .map(|init_grad: &Option<&Tensor>| {
-            init_grad.map(|ig| ig.clone()).unwrap_or_else(
-                || ops::scalar(1.),
-            )
-        })
-        .collect::<Vec<Tensor>>();
 
     // Mapping of {y => [gy]}
     let mut grads: FnvHashMap<Tensor, Vec<Tensor>> = FnvHashMap::default();
@@ -113,12 +99,15 @@ pub fn symbolic_gradients(
     // Mapping of {node => must visit or not (boolean)}
     let contrib = contributed_to_grads(objectives, variables);
 
-    // Prepare a heap with tensor's rank numbers for reversed
+    // Prepare a heap with tensor's rank numbers for reverse
     // topological sort.
     let mut heap = BinaryHeap::new();
-    for (o, g) in objectives.into_iter().zip(output_grads) {
-        heap.push((*o).clone());
-        grads.insert((*o).clone(), vec![g]);
+    for (&o, out_grad) in objectives.into_iter().zip(output_grads) {
+        let g = out_grad.map(|gy| gy.clone()).unwrap_or_else(
+            || ops::scalar(1.),
+        );
+        heap.push(o.clone());
+        grads.insert(o.clone(), vec![g]);
     }
 
     // This prevents calling `grad()` twice or more
@@ -135,7 +124,7 @@ pub fn symbolic_gradients(
                 maybe_reduce_grad(gys);
                 target.op.grad(&gys[0], xs.as_slice(), &target)
             } else {
-                unreachable!("Safe unwrapping is guaranteed by topological ordering")
+                unreachable!("Safe unwrapping should be guaranteed by topological ordering")
             }
         };
 

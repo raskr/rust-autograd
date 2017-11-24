@@ -7,7 +7,7 @@ use std::time::Instant;
 
 // This is softmax regression with Adam optimizer for mnist.
 // 0.918 test accuracy after 3 epochs,
-// 0.25 sec/epoch on 2.7GHz Intel Core i5 (blas feature is disabled)
+// 0.26 sec/epoch on 2.7GHz Intel Core i5 (blas feature is disabled)
 //
 // First, run "./download_mnist.sh" beforehand if you don't have dataset and then run
 // "cargo run --example mlp_mnist --release" in `examples` dicectory.
@@ -30,15 +30,15 @@ fn main()
 
     // -- graph def --
     let mut ctx = ag::Context::new();
-    let ref x = ctx.placeholder();
-    let ref y = ctx.placeholder();
-    let ref w = ctx.variable(ag::ndarray_ext::glorot_uniform(&[28 * 28, 10]));
-    let ref b = ctx.variable(ag::ndarray_ext::zeros(&[1, 10]));
+    let ref x = ag::placeholder(&[-1, 28 * 28]);
+    let ref y = ag::placeholder(&[-1]);
+    let ref w = ag::variable(ag::ndarray_ext::glorot_uniform(&[28 * 28, 10]), &mut ctx);
+    let ref b = ag::variable(ag::ndarray_ext::zeros(&[1, 10]), &mut ctx);
     let ref z = ag::matmul(x, w) + b;
     let ref loss = ag::sparse_softmax_cross_entropy(z, y);
-    let ref grads = ag::gradients(&[loss], &[w, b], &[None]);
+    let ref grads = ag::grad(&[loss], &[w, b]);
     let ref predictions = ag::argmax(z, -1, true);
-    let ref accuracy = ag::reduce_mean(&ag::equal(predictions, y), 0, false);
+    let ref accuracy = ag::reduce_mean(&ag::equal(predictions, y), &[0], false);
 
     // -- actual training --
     let mut optimizer = ag::sgd::optimizers::Adam { ..Default::default() };
@@ -54,8 +54,8 @@ fn main()
                 let i = i as isize;
                 let x_batch = x_train.slice(s![i..i + batch_size, ..]).to_owned();
                 let y_batch = y_train.slice(s![i..i + batch_size, ..]).to_owned();
-                ctx.feed(x, x_batch);
-                ctx.feed(y, y_batch);
+                ctx.feed_input(x, x_batch);
+                ctx.feed_input(y, y_batch);
                 ag::sgd::apply_gradients(&[w, b], grads, &mut optimizer, &mut ctx);
             }
         });
@@ -63,8 +63,8 @@ fn main()
     }
 
     // -- test --
-    ctx.feed(x, x_test);
-    ctx.feed(y, y_test);
+    ctx.feed_input(x, x_test);
+    ctx.feed_input(y, y_test);
     println!("test accuracy: {}", accuracy.eval(&mut ctx));
 }
 

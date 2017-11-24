@@ -5,9 +5,7 @@ extern crate fnv;
 use self::fnv::FnvHashMap;
 use context;
 use ndarray_ext::NdArray;
-use sgd;
 use std::mem;
-use tensor;
 use tensor::Tensor;
 
 
@@ -19,22 +17,19 @@ pub fn gradient_check(
     objective: &Tensor,
     gradients: &[Tensor],
     variables: &[&Tensor],
-    graph: context::Context,
+    ctx: context::Context, // cannot be mut ...
     eps: f32,
     tol: f32,
 )
 {
     // back prop
     let gradients = gradients.iter().map(|a| a).collect::<Vec<_>>();
-    let theoretical_grads = eval_keep_feeds(&graph, gradients.as_slice());
+    let theoretical_grads = eval_keep_feeds(&ctx, gradients.as_slice());
 
     // for each variable nodes
     for (v, th_grad) in variables.iter().zip(theoretical_grads) {
-        let v_arr = graph.variables.get(v).expect("You passed non-variable");
+        let v_arr = ctx.variables.get(v).expect("You passed non-variable");
         let mut v_arr = unsafe { mem::transmute::<&NdArray, &mut NdArray>(v_arr) };
-
-        // reduce gradient if necessary
-        let th_grad = sgd::maybe_reduce_grad(th_grad, v_arr.shape());
 
         let head_ptr: *mut f32 = v_arr.as_mut_ptr();
 
@@ -49,7 +44,7 @@ pub fn gradient_check(
             }
 
             // eval
-            let ref obj_pos = eval_keep_feeds(&graph, &[objective])[0];
+            let ref obj_pos = eval_keep_feeds(&ctx, &[objective])[0];
 
             // perturbation (-)
             unsafe {
@@ -57,7 +52,7 @@ pub fn gradient_check(
             }
 
             // eval
-            let ref obj_neg = eval_keep_feeds(&graph, &[objective])[0];
+            let ref obj_neg = eval_keep_feeds(&ctx, &[objective])[0];
 
             // restore
             unsafe {
@@ -80,31 +75,32 @@ pub fn gradient_check(
     }
 }
 
+type Memo = FnvHashMap<Tensor, NdArray>;
+
 #[allow(mutable_transmutes)]
-/// Almost same as `graph.eval`, but feeds remains after calling this.
+/// Almost same as `eval`, but feeds remains after calling this.
 fn eval_keep_feeds(
-    graph: &context::Context,
+    ctx: &context::Context,
     xs: &[&Tensor],
 ) -> Vec<ndarray::Array<f32, ndarray::IxDyn>>
 {
     let xs = xs.into_iter().map(|a| (*a).clone()).collect::<Vec<_>>();
 
-    let mut memo = unsafe { mem::replace(mem::transmute(&graph.outputs), FnvHashMap::default()) };
+    // Pull out `outputs` and `variables` from context
+    let mut memo = unsafe { mem::replace(mem::transmute(&ctx.outputs), FnvHashMap::default()) };
+    let mut vars = unsafe { mem::transmute::<&Memo, &mut Memo>(&ctx.variables) };
 
-    type M = FnvHashMap<Tensor, NdArray>;
-    let ret = tensor::eval_tensors(
-        xs.as_slice(),
-        unsafe { &mut mem::transmute::<&M, &mut M>(&graph.variables) },
-        &mut memo,
-    );
+    // Run eval with those
+    let arrays = ::eval::eval_tensors(xs.as_slice(), vars, &mut memo);
 
-    // Drain except for placeholder nodes and its feeds
+    // Drain outputs except for placeholder nodes
     let mut memo = memo.into_iter()
-        .filter(|&(ref k, _)| k.op.name() == "Placeholder")
-        .collect::<FnvHashMap<Tensor, NdArray>>();
+        .filter(|&(ref k, _)| k.op.name() == "PH")
+        .collect::<FnvHashMap<_, _>>();
 
-    mem::swap(&mut memo, unsafe { mem::transmute(&graph.outputs) });
-    ret
+    // Return back memo to `ctx.outputs`
+    mem::swap(&mut memo, unsafe { mem::transmute(&ctx.outputs) });
+    arrays
 }
 
 

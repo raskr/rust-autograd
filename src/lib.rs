@@ -6,14 +6,14 @@ pub mod test_helper;
 
 pub mod tensor;
 
+pub mod eval;
+
 #[doc(hidden)]
-pub mod topology;
+pub mod gradient;
 
 pub mod context;
 
 pub mod ops;
-
-pub mod nn_impl;
 
 pub mod sgd;
 
@@ -29,3 +29,5 @@ pub use context::Context;
 
 #[doc(hidden)]
 pub use ndarray_ext::NdArray;
+
+pub use eval::eval;
