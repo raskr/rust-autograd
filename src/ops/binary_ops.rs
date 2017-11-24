@@ -192,15 +192,6 @@ fn maybe_reduce_gy(x0: &Tensor, x1: &Tensor, gy: &Tensor) -> (Tensor, Tensor)
 }
 
 
-macro_rules! impl_scalar_to_tensor {
-    ($func_name:ident, $scalar_type:ty) => {
-        fn $func_name(val: $scalar_type) -> Tensor
-        {
-            ops::scalar(val as f32)
-        }
-    };
-}
-
 
 // -- std::ops::{Add, Sub, Mul, Div} implementations --
 
@@ -219,7 +210,7 @@ macro_rules! impl_bin_op_between_tensor_and_scalar {
             type Output = Tensor;
             fn $func(self, rhs: Tensor) -> Self::Output
             {
-                ops::apply_op($op, &[&$conversion_fn(self), &rhs], Some(rhs.shape()))
+                ops::apply_op($op, &[&ops::scalar(self as f32), &rhs], Some(rhs.shape()))
             }
         }
 
@@ -228,7 +219,7 @@ macro_rules! impl_bin_op_between_tensor_and_scalar {
             type Output = Tensor;
             fn $func(self, rhs: &'a Tensor) -> Self::Output
             {
-                ops::apply_op($op, &[&$conversion_fn(self), rhs], Some(rhs.shape()))
+                ops::apply_op($op, &[&ops::scalar(self as f32), rhs], Some(rhs.shape()))
             }
         }
 
@@ -237,7 +228,7 @@ macro_rules! impl_bin_op_between_tensor_and_scalar {
             type Output = Tensor;
             fn $func(self, rhs: $scalar_type) -> Self::Output
             {
-                ops::apply_op($op, &[&self, &$conversion_fn(rhs)], Some(self.shape()))
+                ops::apply_op($op, &[&self, &ops::scalar(rhs as f32)], Some(self.shape()))
             }
         }
 
@@ -246,7 +237,7 @@ macro_rules! impl_bin_op_between_tensor_and_scalar {
             type Output = Tensor;
             fn $func(self, rhs: $scalar_type) -> Self::Output
             {
-                ops::apply_op($op, &[self, &$conversion_fn(rhs)], Some(self.shape()))
+                ops::apply_op($op, &[self, &ops::scalar(rhs as f32)], Some(self.shape()))
             }
         }
     }
@@ -320,15 +311,6 @@ macro_rules! impl_bin_op_forward {
 
 impl_bin_op_forward!(add_forward, +);
 impl_bin_op_forward!(mul_forward, *);
-
-impl_scalar_to_tensor!(isize_to_tensor, isize);
-impl_scalar_to_tensor!(usize_to_tensor, usize);
-impl_scalar_to_tensor!(i32_to_tensor, i32);
-impl_scalar_to_tensor!(i64_to_tensor, i64);
-impl_scalar_to_tensor!(u32_to_tensor, u32);
-impl_scalar_to_tensor!(u64_to_tensor, u64);
-impl_scalar_to_tensor!(f32_to_tensor, f32);
-impl_scalar_to_tensor!(f64_to_tensor, f64);
 
 impl_bin_op_between_tensors!(Add, add, AddOp);
 impl_bin_op_between_tensors!(Sub, sub, SubOp);
