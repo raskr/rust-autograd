@@ -1,6 +1,6 @@
 # autograd
 
-[![Build Status](https://travis-ci.org/raskr/rust-autograd.svg?branch=master)](https://travis-ci.org/rasker/rust-autograd)
+[![Build Status](https://travis-ci.org/raskr/rust-autograd.svg?branch=master)](https://travis-ci.org/raskr/rust-autograd)
 [![](http://meritbadge.herokuapp.com/autograd)](https://crates.io/crates/autograd)
 
 This library provides differentiable operations and tensors.
@@ -68,5 +68,5 @@ For more, see
 [examples](https://github.com/raskr/rust-autograd/tree/master/examples) or
 [tests](https://github.com/raskr/rust-autograd/tree/master/tests). 
 
-Available operations in rust-autograd are listed [here](https://docs.rs/autograd/0.5.0/autograd/ops/index.html).
+Available ops are listed [here](https://docs.rs/autograd/0.5.0/autograd/ops/index.html).
 
