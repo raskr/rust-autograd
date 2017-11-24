@@ -342,6 +342,26 @@ fn reduce_prod()
 }
 
 #[test]
+fn abs()
+{
+    let mut ctx = ag::Context::new();
+    let ref v = ag::variable(ag::ndarray_ext::standard_uniform(&[2, 3]), &mut ctx);
+    let ref z = ag::abs(v);
+    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    ag::test_helper::gradient_check(z, g.as_slice(), &[v], ctx, 1e-3, 1e-3);
+}
+
+#[test]
+fn neg()
+{
+    let mut ctx = ag::Context::new();
+    let ref v = ag::variable(ag::ndarray_ext::standard_uniform(&[2, 3]), &mut ctx);
+    let ref z = ag::neg(v);
+    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    ag::test_helper::gradient_check(z, g.as_slice(), &[v], ctx, 1e-3, 1e-3);
+}
+
+#[test]
 fn square()
 {
     let mut ctx = ag::Context::new();

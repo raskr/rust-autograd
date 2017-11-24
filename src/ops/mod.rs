@@ -650,6 +650,49 @@ pub fn div(a: &Tensor, b: &Tensor) -> Tensor
 }
 
 
+#[doc(hidden)]
+/// Should be limited to internal use.
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let mut ctx = ag::Context::new();
+///
+/// let a = ag::ones(&[2, 2]);
+/// let ref b = ag::zeros(&[2, 2]);
+/// let ref c = ag::mul_inplace(a, b);
+///
+/// assert_eq!(c.eval(&mut ctx), ndarray::arr2(&[[0., 0.], [0., 0.]]).into_dyn());
+/// ```
+pub fn mul_inplace(a: Tensor, b: &Tensor) -> Tensor
+{
+    assert_ne!(a.op.name(), "Const");
+    apply_op(binary_ops::InplaceMulOp, &[&a, b], Some(a.shape()))
+}
+
+
+#[doc(hidden)]
+/// Should be limited to internal use.
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let mut ctx = ag::Context::new();
+///
+/// let a = ag::ones(&[2, 2]);
+/// let ref c = ag::div_inplace(a, &ag::scalar(2.));
+///
+/// assert_eq!(c.eval(&mut ctx), ndarray::arr2(&[[0.5, 0.5], [0.5, 0.5]]).into_dyn());
+/// ```
+pub fn div_inplace(a: Tensor, b: &Tensor) -> Tensor
+{
+    assert_ne!(a.op.name(), "Const");
+    apply_op(binary_ops::InplaceDivOp, &[&a, b], Some(a.shape()))
+}
+
+
 /// Inplace addition
 ///
 /// Returns `a` after performing `a += b`.
@@ -674,8 +717,7 @@ pub fn div(a: &Tensor, b: &Tensor) -> Tensor
 pub fn add_inplace(a: Tensor, b: &Tensor) -> Tensor
 {
     assert_ne!(a.op.name(), "Const");
-    let shape = a.shape();
-    apply_op(binary_ops::InplaceAddOp, &[&a, b], Some(shape))
+    apply_op(binary_ops::InplaceAddOp, &[&a, b], Some(a.shape()))
 }
 
 
@@ -703,8 +745,7 @@ pub fn add_inplace(a: Tensor, b: &Tensor) -> Tensor
 pub fn sub_inplace(a: Tensor, b: &Tensor) -> Tensor
 {
     assert_ne!(a.op.name(), "Const");
-    let shape = a.shape();
-    apply_op(binary_ops::InplaceSubOp, &[&a, b], Some(shape))
+    apply_op(binary_ops::InplaceSubOp, &[&a, b], Some(a.shape()))
 }
 
 
@@ -1046,9 +1087,9 @@ pub fn reduce_mean<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tenso
 fn rectify_negative_axes(axes: &Tensor, x_rank: &Tensor) -> Tensor
 {
     let ref zero = zeros(&axes.shape());
-    let pos = greater_equal(axes, zero) * axes; // []
-    let neg = lesser(axes, zero) * (axes + x_rank); // [1]
-    pos + neg
+    let ge = greater_equal(axes, zero);
+    let lt = lesser(axes, zero);
+    add_inplace(mul_inplace(ge, axes), &mul_inplace(lt, &(axes + x_rank)))
 }
 
 
@@ -1136,6 +1177,26 @@ pub fn sign(a: &Tensor) -> Tensor
 /// extern crate autograd as ag;
 ///
 /// let mut ctx = ag::Context::new();
+/// let ref a = ag::constant(ndarray::arr1(&[-0.2, 0., 0.2]), &mut ctx);
+/// let ref b = ag::abs(a);
+/// assert_eq!(
+///     b.eval(&mut ctx).as_slice().unwrap(),
+///     &[0.2, 0., 0.2]
+/// );
+/// ```
+pub fn abs(a: &Tensor) -> Tensor
+{
+    apply_op(math_ops::Abs, &[a], Some(a.shape()))
+}
+
+
+/// Returns the largest integer less than or equal to a number, element-wise.
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let mut ctx = ag::Context::new();
 /// let ref a = ag::constant(ndarray::arr1(&[-1.7, -1.5, -0.2, 0.2, 1.5, 1.7, 2.0]), &mut ctx);
 /// let ref b = ag::floor(a);
 /// assert_eq!(
@@ -1149,7 +1210,27 @@ pub fn floor(a: &Tensor) -> Tensor
 }
 
 
-/// Returns the 1/x, element-wise.
+/// Performs the - operation.
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let mut ctx = ag::Context::new();
+/// let ref a = ag::constant(ndarray::arr1(&[2., 3.]), &mut ctx);
+/// let ref b = ag::neg(a);
+/// assert_eq!(
+///     b.eval(&mut ctx).as_slice().unwrap(),
+///     &[-2., -3.]
+/// );
+/// ```
+pub fn neg(a: &Tensor) -> Tensor
+{
+    apply_op(math_ops::NegOp, &[a], Some(a.shape()))
+}
+
+
+/// Returns square of the input.
 ///
 /// ```
 /// extern crate ndarray;

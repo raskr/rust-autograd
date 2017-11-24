@@ -5,6 +5,7 @@ use ndarray_ext::NdArray;
 use ops;
 use std::f32;
 use tensor::Tensor;
+use std::ops::Neg;
 
 pub struct Sin;
 pub struct Cos;
@@ -20,11 +21,13 @@ pub struct Acosh;
 pub struct Atanh;
 pub struct Exp;
 pub struct Sqrt;
+pub struct NegOp;
 pub struct Floor;
 pub struct Ceil;
 pub struct Sign;
 pub struct Reciprocal;
 pub struct Square;
+pub struct Abs;
 pub struct Log {
     pub a: f32,
 }
@@ -95,6 +98,40 @@ impl_cmp_op!(Maximum, move |r, a, b| *r = if a > b { *a } else { *b });
 impl_cmp_op!(Minimum, move |r, a, b| *r = if a < b { *a } else { *b });
 
 
+impl ops::Op for Abs {
+    fn name(&self) -> &str
+    {
+        "Abs"
+    }
+
+    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    {
+        Ok(xs[0].map(|x| x.abs()))
+    }
+
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
+        vec![Some(gy * ops::sign(inputs[0]))]
+    }
+}
+
+impl ops::Op for NegOp {
+    fn name(&self) -> &str
+    {
+        "Neg"
+    }
+
+    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    {
+        Ok(xs[0].map(|x| x.neg()))
+    }
+
+    fn grad(&self, gy: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
+        vec![Some(ops::neg(gy))]
+    }
+}
+
 impl ops::Op for Square {
     fn name(&self) -> &str
     {
@@ -125,7 +162,7 @@ impl ops::Op for Reciprocal {
 
     fn grad(&self, gy: &Tensor, _: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
     {
-        vec![Some(-1. * ops::square(output) * gy)]
+        vec![Some(ops::neg(&ops::square(output)) * gy)]
     }
 }
 
@@ -418,7 +455,7 @@ impl ops::Op for Atanh {
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         let x = inputs[0];
-        let y = 1 / (1 - x * x);
+        let y = ops::reciprocal(&(1 - ops::square(x)));
         vec![Some(y * gy)]
     }
 
@@ -437,7 +474,7 @@ impl ops::Op for Acosh {
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         let x = inputs[0];
-        let y = -1 / ops::sqrt(&(x * x - 1));
+        let y = -1 / ops::sqrt(&(ops::square(x) - 1));
         vec![Some(y * gy)]
     }
 
@@ -479,7 +516,7 @@ impl ops::Op for Tanh {
 
     fn grad(&self, gy: &Tensor, _: &[&Tensor], y: &Tensor) -> Vec<Option<Tensor>>
     {
-        vec![Some(gy - &(y * y * gy))]
+        vec![Some(gy*(1 - ops::square(y)))]
     }
 }
 
@@ -526,7 +563,7 @@ impl ops::Op for Atan {
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         let x = inputs[0];
-        let y = 1 / (1 + x * x);
+        let y = ops::reciprocal(&(1 + ops::square(x)));
         vec![Some(y * gy)]
     }
 
@@ -545,7 +582,7 @@ impl ops::Op for Acos {
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         let x = inputs[0];
-        let y = -1 / ops::sqrt(&(1 - x * x));
+        let y = -1 / ops::sqrt(&(1 - ops::square(x)));
         vec![Some(y * gy)]
     }
 
@@ -599,7 +636,7 @@ impl ops::Op for Cos {
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
-        vec![Some(-1 * ops::sin(inputs[0]) * gy)]
+        vec![Some(ops::neg(&(ops::sin(inputs[0]) * gy)))]
     }
 
     fn compute(&self, xs: &[&::NdArray]) -> Result<::NdArray, ::OpComputeErrorStatus>
@@ -617,7 +654,7 @@ impl ops::Op for Tan {
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         let ref cos = ops::cos(inputs[0]);
-        vec![Some(gy / (cos * cos))]
+        vec![Some(gy / (ops::square(cos)))]
     }
 
     fn compute(&self, xs: &[&::NdArray]) -> Result<::NdArray, ::OpComputeErrorStatus>

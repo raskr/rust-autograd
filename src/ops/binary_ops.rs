@@ -1,5 +1,6 @@
 /// Implement +, -, *, / operators for Tensor
-/// +=, -= are provided as methods of ops::inplace_add, ops::inplace_sub
+/// +=, -=, *=, /= are provided as methods of ops::inplace_*.
+/// *=, /= don't propagate gradients.
 extern crate ndarray;
 
 use ndarray_ext::NdArray;
@@ -16,6 +17,8 @@ pub struct MulOp;
 pub struct DivOp;
 pub struct InplaceAddOp;
 pub struct InplaceSubOp;
+pub struct InplaceMulOp;
+pub struct InplaceDivOp;
 
 
 impl ops::Op for AddOp {
@@ -60,7 +63,7 @@ impl ops::Op for SubOp {
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         let (gy1, gy2) = maybe_reduce_gy(inputs[0], inputs[1], gy);
-        vec![Some(gy1), Some(gy2 * -1.)]
+        vec![Some(gy1), Some(ops::neg(&gy2))]
     }
 }
 
@@ -109,7 +112,7 @@ impl ops::Op for DivOp {
         let x0 = inputs[0];
         let x1 = inputs[1];
         let (gy1, gy2) = maybe_reduce_gy(x0, x1, gy);
-        vec![Some(gy1 / x1), Some(-1 * x0 * ops::pow(x1, -2.) * gy2)]
+        vec![Some(gy1 / x1), Some(ops::neg(x0) * ops::pow(x1, -2.) * gy2)]
     }
 }
 
@@ -121,7 +124,7 @@ impl ops::Op for InplaceAddOp {
 
     fn name(&self) -> &str
     {
-        "InplaceAddOp"
+        "InplaceAdd"
     }
 
     fn compute_inplace(&self, xs: &mut [&mut NdArray]) -> Result<(), ::OpComputeErrorStatus>
@@ -149,7 +152,7 @@ impl ops::Op for InplaceSubOp {
 
     fn name(&self) -> &str
     {
-        "InplaceSubOp"
+        "InplaceSub"
     }
 
     fn compute_inplace(&self, xs: &mut [&mut NdArray]) -> Result<(), ::OpComputeErrorStatus>
@@ -164,7 +167,59 @@ impl ops::Op for InplaceSubOp {
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         let (gy1, gy2) = maybe_reduce_gy(inputs[0], inputs[1], gy);
-        vec![Some(gy1), Some(-1. * gy2)]
+        vec![Some(gy1), Some(ops::neg(&gy2))]
+    }
+}
+
+impl ops::Op for InplaceMulOp {
+    fn inplace(&self) -> bool
+    {
+        true
+    }
+
+    fn name(&self) -> &str
+    {
+        "InplaceMul"
+    }
+
+    fn compute_inplace(&self, xs: &mut [&mut NdArray]) -> Result<(), ::OpComputeErrorStatus>
+    {
+        // safe transmute probably
+        let x1: &&NdArray = unsafe { mem::transmute(&mut xs[1]) };
+        let x0 = &mut xs[0];
+        x0.zip_mut_with(x1, |a, &b| *a *= b);
+        Ok(())
+    }
+
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
+        vec![None, None]
+    }
+}
+
+impl ops::Op for InplaceDivOp {
+    fn inplace(&self) -> bool
+    {
+        true
+    }
+
+    fn name(&self) -> &str
+    {
+        "InplaceDiv"
+    }
+
+    fn compute_inplace(&self, xs: &mut [&mut NdArray]) -> Result<(), ::OpComputeErrorStatus>
+    {
+        // safe transmute probably
+        let x1: &&NdArray = unsafe { mem::transmute(&mut xs[1]) };
+        let x0 = &mut xs[0];
+        x0.zip_mut_with(x1, |a, &b| *a /= b);
+        Ok(())
+    }
+
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
+        vec![None, None]
     }
 }
 

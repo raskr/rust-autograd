@@ -69,7 +69,7 @@ impl ops::Op for SigmoidCrossEntropy {
             ((exp / (exp + 1)) - t) * gy
         };
 
-        let gx2 = -1 * gy * t;
+        let gx2 = ops::neg(&(gy * t));
 
         vec![Some(gx1), Some(gx2)]
     }

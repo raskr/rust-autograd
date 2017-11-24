@@ -228,7 +228,8 @@ fn min_max_grad(
     let x_shape = inputs[0].shape();
     let y = ops::apply_op(grad_op1, &[output, &x_shape, inputs[1]], None);
     let gy = ops::apply_op(grad_op2, &[gy, &x_shape, inputs[1]], None);
-    vec![Some(gy * ops::equal(&x, &y)), None]
+    let eq = ops::equal(&x, &y);
+    vec![Some(ops::mul_inplace(eq, &gy)), None]
 }
 
 

@@ -18,8 +18,6 @@ pub struct Identity;
 
 pub struct ReLU;
 
-pub struct ReLUGrad;
-
 pub struct Sigmoid;
 
 pub struct Softmax {
@@ -84,9 +82,9 @@ impl ops::Op for Sigmoid {
         Ok(xs[0].mapv(|a| ((a * 0.5).tanh() * 0.5) + 0.5))
     }
 
-    fn grad(&self, gy: &Tensor, _: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, _: &[&Tensor], y: &Tensor) -> Vec<Option<Tensor>>
     {
-        vec![Some((output * (1 - output)) * gy)]
+        vec![Some(gy*(y - ops::square(y)))]
     }
 }
 
@@ -103,28 +101,8 @@ impl ops::Op for ReLU {
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
-        vec![
-            Some(ops::apply_op(ReLUGrad, &[inputs[0], gy], Some(gy.shape()))),
-        ]
-    }
-}
-
-impl ops::Op for ReLUGrad {
-    fn name(&self) -> &str
-    {
-        "ReLUGrad"
-    }
-
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
-    {
-        let mut bin = xs[0].mapv(move |a| ((a > 0.) as i32) as f32);
-        bin *= xs[1];
-        Ok(bin)
-    }
-
-    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
-        vec![None]
+        let bin = ops::greater(inputs[0], &ops::scalar(0.));
+        vec![Some(ops::mul_inplace(bin, gy))]
     }
 }
 
