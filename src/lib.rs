@@ -6,6 +6,7 @@ pub mod test_helper;
 
 pub mod tensor;
 
+#[doc(hidden)]
 pub mod eval;
 
 #[doc(hidden)]

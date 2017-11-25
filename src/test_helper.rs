@@ -8,9 +8,8 @@ use tensor::Tensor;
 
 
 #[allow(mutable_transmutes)]
-/// This computes partial derivatives of `objective` with `var_node` using
-/// back propagation, and then checks those are close to numerically
-/// computed gradients (uses finite difference trick).
+/// Checks the validity of `gradients` with finite difference trick.
+/// For this test only, `variables` must be "shared" variables.
 pub fn gradient_check(
     objective: &Tensor,
     gradients: &[Tensor],
