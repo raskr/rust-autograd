@@ -224,7 +224,7 @@ impl ops::Op for InplaceDivOp {
 }
 
 #[inline]
-// Reduce gy if broadcast occurred in the forward pass
+// Reduce gy if broadcast occurred in the forward path
 fn maybe_reduce_gy(x0: &Tensor, x1: &Tensor, gy: &Tensor) -> (Tensor, Tensor)
 {
     let shape0 = x0.shape();
