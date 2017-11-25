@@ -256,7 +256,7 @@ macro_rules! impl_bin_op_between_tensor_and_scalar {
         $trt:ident,
         $func:ident,
         $op:ident,
-        $scalar_type:ty,
+        $scalar_type:ty
     ) => {
 
         // scalar op Tensor
