@@ -9,9 +9,10 @@ use tensor::Tensor;
 
 /// Returns symbolic gradient tensors.
 ///
-/// This computes partial derivatives of `objective` with `variables` and returns the
-/// gradients. This is achieved by building the subgraph between `objective` and
-/// `variables` in reverse order from user's graph definition.
+/// This computes partial derivatives of `ys` with `xs` and returns the
+/// gradients. This is achieved by building the subgraph between `ys` and
+/// `xs` in reverse order from user's graph definition.
+/// `gys` are already known gradients of `ys`'s outputs.
 ///
 /// NOTE: Nodes that do not contribute to the gradient won't be included to avoid
 /// unnecessary computation.
@@ -19,7 +20,7 @@ pub fn symbolic_gradients(ys: &[&Tensor], xs: &[&Tensor], gys: &[Option<&Tensor>
 {
     assert_eq!(ys.len(), gys.len(), "`ys.len()` must match `gys.len()`");
     #[inline]
-    fn maybe_reduce_grad(gys_: &mut Vec<Tensor>)
+    fn maybe_accumulate_grads(gys_: &mut Vec<Tensor>)
     {
         if gys_.len() >= 2 {
             let acc = {
@@ -59,7 +60,7 @@ pub fn symbolic_gradients(ys: &[&Tensor], xs: &[&Tensor], gys: &[Option<&Tensor>
         // time to call `grad`
         let gxs = {
             if let Some(gys) = grads.get_mut(&target) {
-                maybe_reduce_grad(gys);
+                maybe_accumulate_grads(gys);
                 target.op.grad(&gys[0], xs.as_slice(), &target)
             } else {
                 unreachable!("Safe unwrapping should be guaranteed by topological ordering")
@@ -74,6 +75,7 @@ pub fn symbolic_gradients(ys: &[&Tensor], xs: &[&Tensor], gys: &[Option<&Tensor>
             xs.len()
         );
 
+        // register computed gxs
         for (x, maybe_gx) in xs.into_iter().zip(gxs) {
             if !contrib.contains_key(x) {
                 continue;
@@ -102,7 +104,7 @@ pub fn symbolic_gradients(ys: &[&Tensor], xs: &[&Tensor], gys: &[Option<&Tensor>
             let mut gys = grads.remove(v).expect(
                 "Input tensor(s) didn't contributed to gradient computation",
             );
-            maybe_reduce_grad(&mut gys);
+            maybe_accumulate_grads(&mut gys);
             gys.remove(0)
         })
         .collect::<Vec<Tensor>>()

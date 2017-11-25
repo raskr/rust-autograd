@@ -13,7 +13,7 @@ use tensor::Tensor;
 /// - to create constant tensors
 /// - to run computation graphs actually
 ///
-/// When a computation graph is evaluated, all the variables/constant in the graph
+/// When a computation graph is evaluated, all the variables/constants in the graph
 /// must be what derives from the same context; otherwise will panic.
 ///
 /// ```
