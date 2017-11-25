@@ -82,14 +82,12 @@ fn eval_keep_feeds(
     xs: &[&Tensor],
 ) -> Vec<ndarray::Array<f32, ndarray::IxDyn>>
 {
-    let xs = xs.into_iter().map(|a| (*a).clone()).collect::<Vec<_>>();
-
     // Pull out `outputs` and `variables` from context
     let mut memo = unsafe { mem::replace(mem::transmute(&ctx.outputs), HashMap::new()) };
     let mut vars = unsafe { mem::transmute::<&Memo, &mut Memo>(&ctx.variables) };
 
     // Run eval with those
-    let arrays = ::eval::eval_tensors(xs.as_slice(), vars, &mut memo);
+    let arrays = ::eval::eval_tensors(xs, vars, &mut memo);
 
     // Drain outputs except for placeholder nodes
     let mut memo = memo.into_iter()

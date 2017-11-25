@@ -22,21 +22,43 @@ type VariableMap = HashMap<Tensor, NdArray>;
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::zeros(&[2, 2]);
-/// let ref b = ag::ones(&[2, 2]);
+/// let ref a = ag::zeros(&[2]);
+/// let ref b = ag::ones(&[2]);
 ///
 /// // eval two tensors at once.
 /// let evaluated = ag::eval(&[a, b], &mut ag::Context::new());
-/// assert_eq!(evaluated[0], ndarray::arr2(&[[0., 0.], [0., 0.]]).into_dyn());
-/// assert_eq!(evaluated[1], ndarray::arr2(&[[1., 1.], [1., 1.]]).into_dyn());
+/// assert_eq!(evaluated[0], ndarray::arr1(&[0., 0.]).into_dyn());
+/// assert_eq!(evaluated[1], ndarray::arr1(&[1., 1.]).into_dyn());
 /// ```
 pub fn eval(xs: &[&Tensor], ctx: &mut context::Context)
     -> Vec<ndarray::Array<f32, ndarray::IxDyn>>
 {
-    let xs = xs.into_iter().map(|&a| a.clone()).collect::<Vec<_>>();
-    let ret = eval_tensors(xs.as_slice(), &mut ctx.variables, &mut ctx.outputs);
+    let ret = eval_tensors(xs, &mut ctx.variables, &mut ctx.outputs);
     ctx.outputs.clear();
     ret
+}
+
+/// Evaluates endpoints `tensors`.
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let mut ctx = ag::Context::new();
+/// let a = ag::variable(ndarray::arr1(&[1., 1.]), &mut ctx);
+/// let b = ag::ones(&[2]);
+/// let c = ag::sub_inplace(a, &b);
+///
+/// // runs inplace op.
+/// ag::run(&[&c], &mut ctx);
+/// // pull out shared variable
+/// let should_be_zeros = ctx.variables.remove(&c).unwrap();
+/// assert_eq!(should_be_zeros, ndarray::arr1(&[0., 0.]).into_dyn());
+///
+/// ```
+pub fn run(xs: &[&Tensor], ctx: &mut context::Context)
+{
+    eval_tensors_ref(xs, &mut ctx.variables, &mut ctx.outputs);
 }
 
 
@@ -107,7 +129,7 @@ pub fn perform_eval(target: &Tensor, vars: &mut VariableMap, memo: &mut OutputMa
         // normal op
         memo.insert(target.clone(), y_);
     } else {
-        let x = &target.inputs[0]; // inplace => get x as a output
+        let x = &inputs[0]; // inplace => get x as a output
         if let Some(y) = memo.remove(x) {
             // move array from memo
             memo.insert(target.clone(), y);
@@ -136,32 +158,33 @@ fn seek_array_owner<'a, 'b>(memo: &'a OutputMap, x: &'b Tensor) -> &'b Tensor
                 panic!(format!("autograd failed: {}, msg: {}", x, msg))
         }
     } else {
-        // `x` is owner but array is already took out by past self.
+        // `x` is owner but array is already took out by past self; so returns
+        // self again.
         x
     }
 }
 
 
-// TODO: clean code
 #[doc(hidden)]
+// TODO: clean code
 // limited to internal use.
 pub fn eval_tensors(
-    tensors: &[Tensor],
+    tensors: &[&Tensor],
     variables: &mut VariableMap,
     memo: &mut OutputMap,
 ) -> Vec<NdArray>
 {
     // run graph
-    for t in tensors.iter() {
+    for &t in tensors.iter() {
         perform_eval(t, variables, memo);
     }
 
     // `usize` is number of owners of the array
-    let mut owner2arr = HashMap::<&Tensor, (NdArray, usize)>::default();
+    let mut owner2arr = HashMap::<&Tensor, (NdArray, usize)>::new();
     let mut owners = Vec::with_capacity(tensors.len());
 
     // build owner2arr and owners
-    for t in tensors.iter() {
+    for &t in tensors.iter() {
         if let Some(var) = variables.get(t) {
             // case of "from variable set"
             match owner2arr.entry(t) {
@@ -195,9 +218,9 @@ pub fn eval_tensors(
         .into_iter()
         .map(move |owner| {
             if let Some(arr) = owner2arr.get_mut(owner).and_then(
-                |&mut (ref arr, ref mut count)| {
-                    if *count >= 2 {
-                        *count -= 1;
+                |&mut (ref arr, ref mut shared_count)| {
+                    if *shared_count >= 2 {
+                        *shared_count -= 1;
                         Some(arr)
                     } else {
                         None
@@ -205,11 +228,39 @@ pub fn eval_tensors(
                 },
             )
             {
-                // clone the array and exit this closure
+                // Shared count is over 2, so
+                // clone the array and exit this closure.
                 return arr.clone();
             }
-            // otherwise, shared count is 1, then remove the array from map and return it
+            // Otherwise, shared count is 1, then remove the array from map and return it.
             owner2arr.remove(owner).unwrap().0
         })
         .collect::<Vec<NdArray>>()
+}
+
+
+#[allow(dead_code)]
+/// Evaluates endpoints `tensors` and returns the "references" of their arrays.
+pub fn eval_tensors_ref<'a>(
+    tensors: &[&Tensor],
+    variables: &'a mut VariableMap,
+    memo: &'a mut OutputMap,
+) -> Vec<&'a NdArray>
+{
+    // run graph
+    for t in tensors.iter() {
+        perform_eval(t, variables, memo);
+    }
+
+    let mut results = Vec::with_capacity(tensors.len());
+    for t in tensors.iter() {
+        if let Some(var) = variables.get(t) {
+            results.push(var);
+        } else {
+            // case of "from output memo"
+            let owner = seek_array_owner(memo, t);
+            results.push(memo.get(owner).unwrap().as_ref().unwrap());
+        };
+    }
+    results
 }

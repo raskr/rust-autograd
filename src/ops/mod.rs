@@ -249,12 +249,12 @@ pub fn grad_with_default(ys: &[&Tensor], xs: &[&Tensor], output_grads: &[&Tensor
 /// Computes jacobians for variables.
 ///
 /// # Arguments
-/// * `objective` - Target of differentiation.
-/// * `variables` - Variable tensors with which differentiate `objective`.
-/// * `objective_len` - (flattened) Length of `objective`
+/// * `y` - Target of differentiation.
+/// * `xs` - Tensors with which differentiate `ys`.
+/// * `y_size` - (flattened) size of `y`
 ///
 /// # Returns
-/// Jacobians for each variable. Each one is matrix of shape `(objective_len, variable size)`.
+/// Jacobians for each variable. Each one is matrix of shape `(y_size, x size)`.
 ///
 /// ```
 /// extern crate autograd as ag;
@@ -268,24 +268,24 @@ pub fn grad_with_default(ys: &[&Tensor], xs: &[&Tensor], output_grads: &[&Tensor
 /// assert_eq!(j[0].eval(&mut ctx).shape(), &[4*3, 4*2]);
 /// assert_eq!(j[1].eval(&mut ctx).shape(), &[4*3, 2*3]);
 /// ```
-pub fn jacobians(objective: &Tensor, variables: &[&Tensor], objective_len: usize) -> Vec<Tensor>
+pub fn jacobians(y: &Tensor, xs: &[&Tensor], objective_len: usize) -> Vec<Tensor>
 {
     // TODO: remove map
     let vec_vec = (0..objective_len as isize)
         .map(|i| {
             // For each scalar objective, computes gradients for all variables
-            ::gradient::symbolic_gradients(&[&objective.get(i)], variables, &[None])
+            ::gradient::symbolic_gradients(&[&y.get(i)], xs, &[None])
         })
         .collect::<Vec<Vec<_>>>();
 
     // post process gradients
-    (0..variables.len())
+    (0..xs.len())
         .map(|i| {
             // jac is matrix
             let jac = (0..objective_len)
                 .map(|j| expand_dims(&flatten(&vec_vec[j][i]), &[0]))
                 .collect::<Vec<_>>();
-            // (objective_len, variable size)
+            // (y size, x size)
             concat(jac.iter().map(|a| a).collect::<Vec<_>>().as_slice(), 0)
         })
         .collect::<Vec<_>>()
@@ -314,7 +314,7 @@ pub fn _hessian_vector_product(ys: &[&Tensor], xs: &[&Tensor], vectors: &[&Tenso
 
 /// Stops gradients
 ///
-/// Make sure that the gradient is not propagated to the tensors behind this.
+/// Makes sure that the gradient is not propagated to the tensors behind this.
 pub fn stop_gradients(x: &Tensor) -> Tensor
 {
     apply_op(gradient_ops::StopGradients, &[x], Some(x.shape()))
@@ -325,7 +325,7 @@ pub fn stop_gradients(x: &Tensor) -> Tensor
 ///
 /// The shared variable behaves like any other tensors, except that
 /// it can be optimized with gradient descent methods
-/// implemented in `autograd::sgd`.
+/// implemented in `autograd::gradient_descent`.
 /// For the usages, see https://github.com/perrier1034/rust-autograd/tree/master/examples
 ///
 /// ```
@@ -560,7 +560,7 @@ pub fn identity(x: &Tensor) -> Tensor
 }
 
 
-/// Elementwise addition
+/// Addition.
 ///
 /// `+` operator can be used instead.
 ///
@@ -569,10 +569,10 @@ pub fn identity(x: &Tensor) -> Tensor
 /// extern crate autograd as ag;
 ///
 /// let mut ctx = ag::Context::new();
-/// let ref a = ag::ones(&[3]);
-/// let ref b = ag::ones(&[3]);
+/// let ref a = ag::ones(&[2]);
+/// let ref b = ag::ones(&[2]);
 /// let ref z: ag::Tensor = a + b;
-/// assert_eq!(z.eval(&mut ctx), ndarray::arr1(&[2., 2., 2.]).into_dyn());
+/// assert_eq!(z.eval(&mut ctx), ndarray::arr1(&[2., 2.]).into_dyn());
 /// ```
 pub fn add(a: &Tensor, b: &Tensor) -> Tensor
 {
@@ -582,7 +582,7 @@ pub fn add(a: &Tensor, b: &Tensor) -> Tensor
 }
 
 
-/// Elementwise subtraction
+/// Subtraction.
 ///
 /// `-` operator can be used instead.
 ///
@@ -590,12 +590,12 @@ pub fn add(a: &Tensor, b: &Tensor) -> Tensor
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::ones(&[3]);
-/// let ref b = ag::ones(&[3]);
+/// let ref a = ag::ones(&[2]);
+/// let ref b = ag::ones(&[2]);
 ///
 /// let mut ctx = ag::Context::new();
 /// let ref z: ag::Tensor = a - b;
-/// assert_eq!(z.eval(&mut ctx), ndarray::arr1(&[0., 0., 0.]).into_dyn());
+/// assert_eq!(z.eval(&mut ctx), ndarray::arr1(&[0., 0.]).into_dyn());
 /// ```
 pub fn sub(a: &Tensor, b: &Tensor) -> Tensor
 {
@@ -605,7 +605,7 @@ pub fn sub(a: &Tensor, b: &Tensor) -> Tensor
 }
 
 
-/// Elementwise multiplication
+/// Multiplication.
 ///
 /// `*` operator can be used instead.
 ///
@@ -615,10 +615,10 @@ pub fn sub(a: &Tensor, b: &Tensor) -> Tensor
 ///
 /// let mut ctx = ag::Context::new();
 ///
-/// let ref a = ag::ones(&[3]);
-/// let ref b = ag::ones(&[3]);
+/// let ref a = ag::ones(&[2]);
+/// let ref b = ag::ones(&[2]);
 /// let ref z: ag::Tensor = a * b;
-/// assert_eq!(z.eval(&mut ctx), ndarray::arr1(&[1., 1., 1.]).into_dyn());
+/// assert_eq!(z.eval(&mut ctx), ndarray::arr1(&[1., 1.]).into_dyn());
 /// ```
 pub fn mul(a: &Tensor, b: &Tensor) -> Tensor
 {
@@ -628,7 +628,7 @@ pub fn mul(a: &Tensor, b: &Tensor) -> Tensor
 }
 
 
-/// Elementwise division
+/// Division.
 ///
 /// `/` operator can be used instead.
 ///
@@ -636,11 +636,11 @@ pub fn mul(a: &Tensor, b: &Tensor) -> Tensor
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::ones(&[3]);
-/// let ref b = ag::ones(&[3]);
+/// let ref a = ag::ones(&[2]);
+/// let ref b = ag::ones(&[2]);
 /// let mut ctx = ag::Context::new();
 /// let ref z: ag::Tensor = a / b;
-/// assert_eq!(z.eval(&mut ctx), ndarray::arr1(&[1., 1., 1.]).into_dyn());
+/// assert_eq!(z.eval(&mut ctx), ndarray::arr1(&[1., 1.]).into_dyn());
 /// ```
 pub fn div(a: &Tensor, b: &Tensor) -> Tensor
 {
@@ -696,11 +696,11 @@ pub fn div_inplace(a: Tensor, b: &Tensor) -> Tensor
 /// Inplace addition
 ///
 /// Returns `a` after performing `a += b`.
-/// This function requires the move of `a`.
+/// This function moves `a`.
 ///
 /// # Panics
 ///
-/// When `a` is `constant`.
+/// When `a` is a `constant`.
 ///
 /// ```
 /// extern crate ndarray;
@@ -724,11 +724,11 @@ pub fn add_inplace(a: Tensor, b: &Tensor) -> Tensor
 /// Inplace subtraction
 ///
 /// Returns `a` after performing `a -= b`.
-/// This function requires the move of `a`.
+/// This function moves `a`.
 ///
 /// # Panics
 ///
-/// When `a` is `constant`.
+/// When `a` is a `constant`.
 ///
 /// ```
 /// extern crate ndarray;
@@ -901,12 +901,10 @@ pub fn not_equal(a: &Tensor, b: &Tensor) -> Tensor
 /// extern crate autograd as ag;
 ///
 /// let mut ctx = ag::Context::new();
-/// let input_arr = ndarray::arr2(&[[1., 2.], [3., 4.], [6., 5.]]);
-/// let answer = ndarray::arr1(&[1., 1., 0.]).into_dyn();
-/// let ref input = ag::constant(input_arr, &mut ctx);
-/// let ref result = ag::argmax(&input, 1, false);
+/// let ref x = ag::constant(ndarray::arr2(&[[3., 4.], [6., 5.]]), &mut ctx);
+/// let ref y = ag::argmax(x, 1, false);
 ///
-/// assert_eq!(result.eval(&mut ctx), answer);
+/// assert_eq!(y.eval(&mut ctx), ndarray::arr1(&[1., 0.]).into_dyn());
 /// ```
 pub fn argmax(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 {
@@ -1095,7 +1093,7 @@ fn rectify_negative_axes(axes: &Tensor, x_rank: &Tensor) -> Tensor
 
 /// Takes product along specified axis.
 ///
-/// `axis` can be negative.
+/// Elements of `axes` can be negative.
 ///
 /// ```
 /// extern crate ndarray;
@@ -1116,7 +1114,7 @@ pub fn reduce_prod<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tenso
 
 /// Reshapes input tensor.
 ///
-/// Only one dim in `shape` can be `-1`.
+/// Only one element in `shape` can be `-1`.
 ///
 /// ```
 /// extern crate ndarray;

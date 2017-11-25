@@ -15,7 +15,7 @@ pub mod context;
 
 pub mod ops;
 
-pub mod sgd;
+pub mod gradient_descent;
 
 pub mod ndarray_ext;
 
@@ -31,3 +31,5 @@ pub use context::Context;
 pub use ndarray_ext::NdArray;
 
 pub use eval::eval;
+
+pub use eval::run;

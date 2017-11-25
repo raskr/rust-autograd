@@ -37,7 +37,7 @@ ag::feed_input(x, ndarray::arr0(2.), &mut ctx);
 println!("{}", g2.eval(&mut ctx));   // => 8.
 ```
 
-Another example: multi layer perceptron for MNIST classification.
+Another example: multi layer perceptron for MNIST digits classification.
 
 ```rust
 // -- graph def --
@@ -56,7 +56,7 @@ let ref accuracy = ag::reduce_mean(&ag::equal(predictions, y), &[0], false);
 let ((x_train, y_train), (x_test, y_test)) = dataset::load();
 
 // -- training method --
-let mut optimizer = ag::sgd::optimizers::Adam { ..Default::default() };
+let mut optimizer = ag::gradient_descent::SGD { lr: 0.01 };
 
 // -- training loop --
 for epoch in 0..max_epoch {

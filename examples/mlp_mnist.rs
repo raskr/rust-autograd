@@ -41,7 +41,7 @@ fn main()
     let ref accuracy = ag::reduce_mean(&ag::equal(predictions, y), &[0], false);
 
     // -- actual training --
-    let mut optimizer = ag::sgd::optimizers::Adam { ..Default::default() };
+    let mut optimizer = ag::gradient_descent::Adam { ..Default::default() };
     let max_epoch = 3;
     let batch_size = 200isize;
     let num_samples = x_train.shape()[0];
@@ -56,7 +56,7 @@ fn main()
                 let y_batch = y_train.slice(s![i..i + batch_size, ..]).to_owned();
                 ctx.feed_input(x, x_batch);
                 ctx.feed_input(y, y_batch);
-                ag::sgd::apply_gradients(&[w, b], grads, &mut optimizer, &mut ctx);
+                ag::gradient_descent::update(&[w, b], grads, &mut optimizer, &mut ctx);
             }
         });
         println!("finish epoch {}", epoch);
