@@ -1430,7 +1430,7 @@ pub fn softmax_cross_entropy(y: &Tensor, t: &Tensor) -> Tensor
 ///
 /// # Arguments
 /// * `y` - Tensor with shape (batch_size, num_classes)
-/// * `t` - Tensor with shape (batch_size, 1)
+/// * `t` - Tensor with shape (batch_size,) or (batch_size, 1)
 ///
 /// # Returns
 /// Loss tensor with shape (batch_size, 1)

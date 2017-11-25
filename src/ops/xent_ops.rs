@@ -89,12 +89,21 @@ impl ops::Op for SparseSoftmaxCrossEntropyLatter {
         {
             if log_x.ndim() != 2 {
                 return Err(::OpComputeErrorStatus::BadInput(
-                    "x must be 2-ranked tensor".to_string(),
+                    format!("Bad first argument's shape {:?}", log_x.shape())
                 ));
             }
-            if t.ndim() != 1 {
+
+            let t_shape = t.shape();
+            let t_rank = t_shape.len();
+            if t_rank == 2 {
+                if t_shape[1] != 1 {
+                    return Err(::OpComputeErrorStatus::BadInput(
+                        format!("Bad second argument's shape {:?}", t_shape)
+                    ));
+                }
+            } else if t_rank != 1 {
                 return Err(::OpComputeErrorStatus::BadInput(
-                    "t must be 1-ranked tensor".to_string(),
+                    format!("Bad second argument's shape {:?}", t_shape)
                 ));
             }
         }

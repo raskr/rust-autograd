@@ -31,7 +31,7 @@ fn main()
     // -- graph def --
     let mut ctx = ag::Context::new();
     let ref x = ag::placeholder(&[-1, 28 * 28]);
-    let ref y = ag::placeholder(&[-1]);
+    let ref y = ag::placeholder(&[-1, 1]);
     let ref w = ag::variable(ag::ndarray_ext::glorot_uniform(&[28 * 28, 10]), &mut ctx);
     let ref b = ag::variable(ag::ndarray_ext::zeros(&[1, 10]), &mut ctx);
     let ref z = ag::matmul(x, w) + b;
