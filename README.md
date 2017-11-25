@@ -68,5 +68,5 @@ For more, see
 [examples](https://github.com/raskr/rust-autograd/tree/master/examples) or
 [tests](https://github.com/raskr/rust-autograd/tree/master/tests). 
 
-Available ops are listed [here](https://docs.rs/autograd/0.6.0/autograd/ops/index.html).
+Available ops are listed [here](https://docs.rs/autograd/0.6.1/autograd/ops/index.html).
 
