@@ -257,7 +257,6 @@ macro_rules! impl_bin_op_between_tensor_and_scalar {
         $func:ident,
         $op:ident,
         $scalar_type:ty,
-        $conversion_fn:ident
     ) => {
 
         // scalar op Tensor
@@ -383,42 +382,42 @@ impl_bin_op_between_tensors!(Sub, sub, SubOp);
 impl_bin_op_between_tensors!(Mul, mul, MulOp);
 impl_bin_op_between_tensors!(Div, div, DivOp);
 
-impl_bin_op_between_tensor_and_scalar!(Add, add, AddOp, i32, i32_to_tensor);
-impl_bin_op_between_tensor_and_scalar!(Sub, sub, SubOp, i32, i32_to_tensor);
-impl_bin_op_between_tensor_and_scalar!(Mul, mul, MulOp, i32, i32_to_tensor);
-impl_bin_op_between_tensor_and_scalar!(Div, div, DivOp, i32, i32_to_tensor);
+impl_bin_op_between_tensor_and_scalar!(Add, add, AddOp, i32);
+impl_bin_op_between_tensor_and_scalar!(Sub, sub, SubOp, i32);
+impl_bin_op_between_tensor_and_scalar!(Mul, mul, MulOp, i32);
+impl_bin_op_between_tensor_and_scalar!(Div, div, DivOp, i32);
 
-impl_bin_op_between_tensor_and_scalar!(Add, add, AddOp, i64, i64_to_tensor);
-impl_bin_op_between_tensor_and_scalar!(Sub, sub, SubOp, i64, i64_to_tensor);
-impl_bin_op_between_tensor_and_scalar!(Mul, mul, MulOp, i64, i64_to_tensor);
-impl_bin_op_between_tensor_and_scalar!(Div, div, DivOp, i64, i64_to_tensor);
+impl_bin_op_between_tensor_and_scalar!(Add, add, AddOp, i64);
+impl_bin_op_between_tensor_and_scalar!(Sub, sub, SubOp, i64);
+impl_bin_op_between_tensor_and_scalar!(Mul, mul, MulOp, i64);
+impl_bin_op_between_tensor_and_scalar!(Div, div, DivOp, i64);
 
-impl_bin_op_between_tensor_and_scalar!(Add, add, AddOp, f32, f32_to_tensor);
-impl_bin_op_between_tensor_and_scalar!(Sub, sub, SubOp, f32, f32_to_tensor);
-impl_bin_op_between_tensor_and_scalar!(Mul, mul, MulOp, f32, f32_to_tensor);
-impl_bin_op_between_tensor_and_scalar!(Div, div, DivOp, f32, f32_to_tensor);
+impl_bin_op_between_tensor_and_scalar!(Add, add, AddOp, f32);
+impl_bin_op_between_tensor_and_scalar!(Sub, sub, SubOp, f32);
+impl_bin_op_between_tensor_and_scalar!(Mul, mul, MulOp, f32);
+impl_bin_op_between_tensor_and_scalar!(Div, div, DivOp, f32);
 
-impl_bin_op_between_tensor_and_scalar!(Add, add, AddOp, f64, f64_to_tensor);
-impl_bin_op_between_tensor_and_scalar!(Sub, sub, SubOp, f64, f64_to_tensor);
-impl_bin_op_between_tensor_and_scalar!(Mul, mul, MulOp, f64, f64_to_tensor);
-impl_bin_op_between_tensor_and_scalar!(Div, div, DivOp, f64, f64_to_tensor);
+impl_bin_op_between_tensor_and_scalar!(Add, add, AddOp, f64);
+impl_bin_op_between_tensor_and_scalar!(Sub, sub, SubOp, f64);
+impl_bin_op_between_tensor_and_scalar!(Mul, mul, MulOp, f64);
+impl_bin_op_between_tensor_and_scalar!(Div, div, DivOp, f64);
 
-impl_bin_op_between_tensor_and_scalar!(Add, add, AddOp, u32, u32_to_tensor);
-impl_bin_op_between_tensor_and_scalar!(Sub, sub, SubOp, u32, u32_to_tensor);
-impl_bin_op_between_tensor_and_scalar!(Mul, mul, MulOp, u32, u32_to_tensor);
-impl_bin_op_between_tensor_and_scalar!(Div, div, DivOp, u32, u32_to_tensor);
+impl_bin_op_between_tensor_and_scalar!(Add, add, AddOp, u32);
+impl_bin_op_between_tensor_and_scalar!(Sub, sub, SubOp, u32);
+impl_bin_op_between_tensor_and_scalar!(Mul, mul, MulOp, u32);
+impl_bin_op_between_tensor_and_scalar!(Div, div, DivOp, u32);
 
-impl_bin_op_between_tensor_and_scalar!(Add, add, AddOp, u64, u64_to_tensor);
-impl_bin_op_between_tensor_and_scalar!(Sub, sub, SubOp, u64, u64_to_tensor);
-impl_bin_op_between_tensor_and_scalar!(Mul, mul, MulOp, u64, u64_to_tensor);
-impl_bin_op_between_tensor_and_scalar!(Div, div, DivOp, u64, u64_to_tensor);
+impl_bin_op_between_tensor_and_scalar!(Add, add, AddOp, u64);
+impl_bin_op_between_tensor_and_scalar!(Sub, sub, SubOp, u64);
+impl_bin_op_between_tensor_and_scalar!(Mul, mul, MulOp, u64);
+impl_bin_op_between_tensor_and_scalar!(Div, div, DivOp, u64);
 
-impl_bin_op_between_tensor_and_scalar!(Add, add, AddOp, usize, usize_to_tensor);
-impl_bin_op_between_tensor_and_scalar!(Sub, sub, SubOp, usize, usize_to_tensor);
-impl_bin_op_between_tensor_and_scalar!(Mul, mul, MulOp, usize, usize_to_tensor);
-impl_bin_op_between_tensor_and_scalar!(Div, div, DivOp, usize, usize_to_tensor);
+impl_bin_op_between_tensor_and_scalar!(Add, add, AddOp, usize);
+impl_bin_op_between_tensor_and_scalar!(Sub, sub, SubOp, usize);
+impl_bin_op_between_tensor_and_scalar!(Mul, mul, MulOp, usize);
+impl_bin_op_between_tensor_and_scalar!(Div, div, DivOp, usize);
 
-impl_bin_op_between_tensor_and_scalar!(Add, add, AddOp, isize, isize_to_tensor);
-impl_bin_op_between_tensor_and_scalar!(Sub, sub, SubOp, isize, isize_to_tensor);
-impl_bin_op_between_tensor_and_scalar!(Mul, mul, MulOp, isize, isize_to_tensor);
-impl_bin_op_between_tensor_and_scalar!(Div, div, DivOp, isize, isize_to_tensor);
+impl_bin_op_between_tensor_and_scalar!(Add, add, AddOp, isize);
+impl_bin_op_between_tensor_and_scalar!(Sub, sub, SubOp, isize);
+impl_bin_op_between_tensor_and_scalar!(Mul, mul, MulOp, isize);
+impl_bin_op_between_tensor_and_scalar!(Div, div, DivOp, isize);
