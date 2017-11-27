@@ -116,6 +116,7 @@ pub fn broadcast_to(
     }
 }
 
+#[doc(hidden)]
 #[inline]
 /// This works well only for small array
 pub fn vec_as_shape(x: &NdArray) -> Vec<usize>
@@ -127,6 +128,7 @@ pub fn vec_as_shape(x: &NdArray) -> Vec<usize>
     target
 }
 
+#[doc(hidden)]
 #[inline]
 pub fn scalar_shape() -> NdArray
 {
@@ -134,6 +136,7 @@ pub fn scalar_shape() -> NdArray
     NdArray::from_shape_vec(ndarray::IxDyn(&[0]), vec![]).unwrap()
 }
 
+#[doc(hidden)]
 #[inline]
 pub fn shape_of(x: &NdArray) -> NdArray
 {

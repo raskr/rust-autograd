@@ -9,12 +9,12 @@ use tensor::Tensor;
 /// What is necessary to run computation graphs.
 ///
 /// `Context` object is used:
-/// - to create shared variable tensors
-/// - to create constant tensors
-/// - to run computation graphs actually
+/// * to create shared variable tensors
+/// * to create constant tensors
+/// * to run computation graphs actually
 ///
 /// When a computation graph is evaluated, all the variables/constants in the graph
-/// must be what derives from the same context; otherwise will panic.
+/// must be generated in the same context; otherwise will panic.
 ///
 /// ```
 /// extern crate ndarray;
@@ -34,9 +34,17 @@ use tensor::Tensor;
 ///
 /// // eval
 /// assert_eq!(z.eval(&mut ctx).as_slice().unwrap(), &[4., 4.]);
+/// assert!(ctx.variables.contains_key(v));
+/// assert_eq!(ctx.variables.get(v).unwrap(), &ndarray::arr1(&[2., 2.]).into_dyn());
 /// ```
 pub struct Context {
+    /// Variables generated in this context.
+    /// Each array can be obtained by using corresponding `Tensor` object.
     pub variables: HashMap<Tensor, NdArray>,
+
+    #[doc(hidden)]
+    // Evaluation results of tensors in this context are stored in this map.
+    // Each output are cleared after evaluation.
     pub outputs: HashMap<Tensor, Result<NdArray, ::OpComputeErrorStatus>>,
 }
 

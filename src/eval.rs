@@ -239,8 +239,7 @@ pub fn eval_tensors(
 }
 
 
-#[allow(dead_code)]
-/// Evaluates endpoints `tensors` and returns the "references" of their arrays.
+/// Evaluates endpoints `tensors` and returns the "references" to their arrays.
 pub fn eval_tensors_ref<'a>(
     tensors: &[&Tensor],
     variables: &'a mut VariableMap,

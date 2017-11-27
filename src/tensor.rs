@@ -12,9 +12,10 @@ use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
 
-/// "Shared" symbolic multi-dimensional array.
+/// Symbolic multi-dimensional array.
 pub struct Tensor(pub Rc<RawTensor>);
 
+#[doc(hidden)]
 /// Symbolic multi-dimensional array.
 pub struct RawTensor {
     /// Operation created this node.
@@ -34,7 +35,7 @@ pub struct RawTensor {
 impl Tensor {
     /// Evaluates this tensor as a ndarray's array object.
     ///
-    /// See [eval](fn.eval.html).
+    /// See [eval](../fn.eval.html).
     pub fn eval(&self, ctx: &mut context::Context) -> NdArray
     {
         ::eval::eval(&[self], ctx).remove(0)
@@ -43,7 +44,7 @@ impl Tensor {
 
     /// Returns the (symbolic) shape of this tensor.
     ///
-    /// See [shape](ops.fn.shape.html).
+    /// See [shape](../ops.fn.shape.html).
     pub fn shape(&self) -> Tensor
     {
         ::ops::shape(self)
@@ -52,7 +53,7 @@ impl Tensor {
 
     /// Returns the (symbolic) rank of this tensor.
     ///
-    /// See [rank](ops.fn.rank.html).
+    /// See [rank](../ops.fn.rank.html).
     pub fn rank(&self) -> Tensor
     {
         ::ops::rank(self)
@@ -61,7 +62,7 @@ impl Tensor {
 
     /// Returns the (symbolic) size of this tensor.
     ///
-    /// See [size](ops.fn.size.html).
+    /// See [size](../ops.fn.size.html).
     pub fn size(&self) -> Tensor
     {
         ::ops::size(self)
@@ -74,16 +75,6 @@ impl Tensor {
     pub fn is_source(&self) -> bool
     {
         self.inputs.is_empty()
-    }
-
-
-    // TODO: Make `Tensor` Tensor(Rc<RefCell>)
-    #[allow(mutable_transmutes)]
-    pub fn set_shape(&self, shape: Tensor)
-    {
-        let mut mut_shape: &mut Option<Tensor> =
-            unsafe { &mut mem::transmute::<&Option<Tensor>, &mut Option<Tensor>>(&self.shape) };
-        mem::swap(mut_shape, &mut Some(shape))
     }
 
 

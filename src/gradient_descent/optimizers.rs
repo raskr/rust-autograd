@@ -30,6 +30,7 @@ pub struct Adam {
     pub states: HashMap<Tensor, AdamState>,
 }
 
+#[doc(hidden)]
 pub struct AdamState {
     m: NdArray,
     v: NdArray,

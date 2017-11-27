@@ -6,7 +6,6 @@ use std::mem;
 use tensor::Tensor;
 
 
-
 /// Returns symbolic gradient tensors.
 ///
 /// This computes partial derivatives of `ys` with `xs` and returns the

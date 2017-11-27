@@ -61,7 +61,8 @@ pub trait Op {
     fn grad(&self, gy: &Tensor, xs: &[&Tensor], y: &Tensor) -> Vec<Option<Tensor>>;
 }
 
-/// Error statuses in Op#compute.
+/// Error status in Op#compute.
+#[doc(hidden)]
 #[derive(Clone, Debug)]
 pub enum OpComputeErrorStatus {
     /// This denotes that the op didn't any computation with no errors; i.e., this op
@@ -177,7 +178,7 @@ impl Op for DummyOp {
 /// So the length must be same as `ys`'s.
 ///
 /// NOTE: Each objective must be a scalar (0-ranked tensor).
-/// For multi dimensional objectives, use [grad_with_default](ops.fn.grad_with_default.html).
+/// For multi dimensional objectives, use [grad_with_default](fn.grad_with_default.html).
 ///
 /// # Returns
 /// Symbolic gradient tensors corresponding to `xs` in the same order as `xs`
@@ -195,21 +196,21 @@ impl Op for DummyOp {
 /// let ref z = 2*x*x + 3*y + 1;
 ///
 /// // dz/dy
-/// let ref g1 = ag::grad(&[z], &[y])[0];
+/// let ref gy = ag::grad(&[z], &[y])[0];
 /// // dz/dx
-/// let ref g2 = ag::grad(&[z], &[x])[0];
+/// let ref gx = ag::grad(&[z], &[x])[0];
 ///
 /// // ddz/dx (differentiates `z` again)
-/// let ref gg = ag::grad(&[g2], &[x])[0];
+/// let ref ggx = ag::grad(&[gx], &[x])[0];
 ///
 /// // evaluation of symbolic gradients
 /// let mut ctx = ag::Context::new();
-/// assert_eq!(3., g1.eval(&mut ctx)[ndarray::IxDyn(&[])]);
-/// assert_eq!(4., gg.eval(&mut ctx)[ndarray::IxDyn(&[])]);
+/// assert_eq!(3., gy.eval(&mut ctx)[ndarray::IxDyn(&[])]);
+/// assert_eq!(4., ggx.eval(&mut ctx)[ndarray::IxDyn(&[])]);
 ///
 /// // dz/dx requires to fill the placeholder `x`
 /// ctx.feed_input(x, ndarray::arr0(2.));
-/// assert_eq!(8., g2.eval(&mut ctx)[ndarray::IxDyn(&[])]);
+/// assert_eq!(8., gx.eval(&mut ctx)[ndarray::IxDyn(&[])]);
 ///
 /// ```
 pub fn grad(ys: &[&Tensor], xs: &[&Tensor]) -> Vec<Tensor>
@@ -231,7 +232,7 @@ pub fn grad(ys: &[&Tensor], xs: &[&Tensor]) -> Vec<Tensor>
 /// # Returns
 /// Symbolic gradient tensors corresponding to `xs` in the same order as `xs`
 ///
-/// For defailed, see [grad](ops.fn.grad.html).
+/// For detailed, see [grad](fn.grad.html).
 pub fn grad_with_default(ys: &[&Tensor], xs: &[&Tensor], output_grads: &[&Tensor]) -> Vec<Tensor>
 {
     ::gradient::symbolic_gradients(
@@ -312,9 +313,10 @@ pub fn _hessian_vector_product(ys: &[&Tensor], xs: &[&Tensor], vectors: &[&Tenso
 }
 
 
-/// Stops gradients
+/// Stops gradients.
 ///
-/// Makes sure that the gradient is not propagated to the tensors behind this.
+/// Guarantees that the gradient is not propagated to the tensors behind this
+/// during gradient computation.
 pub fn stop_gradients(x: &Tensor) -> Tensor
 {
     apply_op(gradient_ops::StopGradients, &[x], Some(x.shape()))
@@ -337,8 +339,6 @@ pub fn stop_gradients(x: &Tensor) -> Tensor
 /// let ref y: ag::Tensor = 3 * x;
 ///
 /// assert_eq!(6., y.eval(&mut ctx)[0]);
-/// assert!(ctx.variables.contains_key(x));
-/// assert_eq!(ctx.variables.get(x).unwrap(), &ndarray::arr1(&[2.]).into_dyn());
 /// ```
 #[inline]
 pub fn variable<T>(arr: ndarray::Array<f32, T>, ctx: &mut Context) -> Tensor
@@ -359,7 +359,7 @@ where
 
 /// Creates a placeholder tensor.
 ///
-/// See [Context](struct.Context.html).
+/// See [Context](../context/struct.Context.html).
 #[inline]
 pub fn placeholder(shape_: &[isize]) -> Tensor
 {
@@ -659,11 +659,11 @@ pub fn div(a: &Tensor, b: &Tensor) -> Tensor
 ///
 /// let mut ctx = ag::Context::new();
 ///
-/// let a = ag::ones(&[2, 2]);
-/// let ref b = ag::zeros(&[2, 2]);
+/// let a = ag::ones(&[2]);
+/// let ref b = ag::zeros(&[2]);
 /// let ref c = ag::mul_inplace(a, b);
 ///
-/// assert_eq!(c.eval(&mut ctx), ndarray::arr2(&[[0., 0.], [0., 0.]]).into_dyn());
+/// assert_eq!(c.eval(&mut ctx), ndarray::arr1(&[0., 0.]).into_dyn());
 /// ```
 pub fn mul_inplace(a: Tensor, b: &Tensor) -> Tensor
 {
@@ -681,10 +681,10 @@ pub fn mul_inplace(a: Tensor, b: &Tensor) -> Tensor
 ///
 /// let mut ctx = ag::Context::new();
 ///
-/// let a = ag::ones(&[2, 2]);
+/// let a = ag::ones(&[2]);
 /// let ref c = ag::div_inplace(a, &ag::scalar(2.));
 ///
-/// assert_eq!(c.eval(&mut ctx), ndarray::arr2(&[[0.5, 0.5], [0.5, 0.5]]).into_dyn());
+/// assert_eq!(c.eval(&mut ctx), ndarray::arr1(&[0.5, 0.5]).into_dyn());
 /// ```
 pub fn div_inplace(a: Tensor, b: &Tensor) -> Tensor
 {
@@ -708,11 +708,11 @@ pub fn div_inplace(a: Tensor, b: &Tensor) -> Tensor
 ///
 /// let mut ctx = ag::Context::new();
 ///
-/// let a = ag::ones(&[2, 2]);
-/// let ref b = ag::ones(&[2, 2]);
+/// let a = ag::ones(&[2]);
+/// let ref b = ag::ones(&[2]);
 /// let ref c = ag::add_inplace(a, b);
 ///
-/// assert_eq!(c.eval(&mut ctx), ndarray::arr2(&[[2., 2.], [2., 2.]]).into_dyn());
+/// assert_eq!(c.eval(&mut ctx), ndarray::arr1(&[2., 2.]).into_dyn());
 /// ```
 pub fn add_inplace(a: Tensor, b: &Tensor) -> Tensor
 {
@@ -1059,7 +1059,7 @@ pub fn reduce_sum<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tensor
 }
 
 
-/// Takes mean along specified axis.
+/// Takes mean along specified axes.
 ///
 /// Elements of `axes` can be negative.
 ///
@@ -1091,7 +1091,7 @@ fn rectify_negative_axes(axes: &Tensor, x_rank: &Tensor) -> Tensor
 }
 
 
-/// Takes product along specified axis.
+/// Takes product along specified axes.
 ///
 /// Elements of `axes` can be negative.
 ///

@@ -2,6 +2,7 @@
 extern crate ndarray;
 
 #[macro_use]
+#[doc(hidden)]
 pub mod test_helper;
 
 pub mod tensor;

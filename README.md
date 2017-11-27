@@ -19,22 +19,22 @@ let ref y = ag::placeholder(&[]);
 let ref z = 2*x*x + 3*y + 1;
 
 // dz/dy
-let ref g1 = ag::grad(&[z], &[y])[0];
+let ref gy = ag::grad(&[z], &[y])[0];
 
 // dz/dx
-let ref g2 = ag::grad(&[z], &[x])[0];
+let ref gx = ag::grad(&[z], &[x])[0];
 
 // ddz/dx (differentiates `z` again)
-let ref gg = ag::grad(&[g2], &[x])[0];
+let ref ggx = ag::grad(&[gx], &[x])[0];
 
 // evaluation of symbolic gradients
 let mut ctx = ag::Context::new();
-println!("{}", g1.eval(&mut ctx));   // => 3.
-println!("{}", gg.eval(&mut ctx));   // => 4.
+println!("{}", gy.eval(&mut ctx));   // => 3.
+println!("{}", ggx.eval(&mut ctx));   // => 4.
 
 // dz/dx requires to fill the placeholder `x`
-ag::feed_input(x, ndarray::arr0(2.), &mut ctx);
-println!("{}", g2.eval(&mut ctx));   // => 8.
+ctx.feed_input(x, ndarray::arr0(2.));
+println!("{}", gx.eval(&mut ctx));   // => 8.
 ```
 
 Another example: multi layer perceptron for MNIST digits classification.
