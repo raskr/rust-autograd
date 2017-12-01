@@ -3,10 +3,9 @@ extern crate autograd as ag;
 
 
 struct LSTM {
-    pub state_size: usize,
-    pub batch_size: usize,
-    pub last_output: ag::Tensor,
-    pub cell: ag::Tensor,
+    pub vector_dim: usize,
+    pub hs: Vec<ag::Tensor>,
+    pub cells: Vec<ag::Tensor>,
     pub wx: ag::Tensor,
     pub wh: ag::Tensor,
     pub b: ag::Tensor,
@@ -14,23 +13,22 @@ struct LSTM {
 
 
 impl LSTM {
-    pub fn new(state_size: usize, input_dim: usize, batch_size: usize, c: &mut ag::Context)
+    pub fn new(vector_dim: usize, c: &mut ag::Context)
         -> LSTM
     {
         LSTM {
-            state_size,
-            batch_size,
-            last_output: ag::constant(ag::ndarray_ext::zeros(&[batch_size, state_size]), c),
-            cell: ag::constant(ag::ndarray_ext::zeros(&[batch_size, state_size]), c),
+            vector_dim,
+            hs: vec![],
+            cells: vec![],
             wx: ag::variable(
-                ag::ndarray_ext::glorot_uniform(&[input_dim, 4 * state_size]),
+                ag::ndarray_ext::random_normal(&[vector_dim, 4 * vector_dim], 0., 0.01),
                 c,
             ),
             wh: ag::variable(
-                ag::ndarray_ext::glorot_uniform(&[state_size, 4 * state_size]),
+                ag::ndarray_ext::random_normal(&[vector_dim, 4 * vector_dim], 0., 0.01),
                 c,
             ),
-            b: ag::variable(ag::ndarray_ext::zeros(&[1, 4 * state_size]), c),
+            b: ag::variable(ag::ndarray_ext::zeros(&[1, 4 * vector_dim]), c),
         }
     }
 
@@ -49,77 +47,68 @@ impl LSTM {
     /// output tensor of this unit with shape (batch_size, state_size)
     fn step(&mut self, x: &ag::Tensor) -> ag::Tensor
     {
-        let xh = ag::matmul(x, &self.wx) + ag::matmul(&self.last_output, &self.wh) + &self.b;
+        let (cell, h) = {
+            let ref last_output = self.hs.pop().unwrap_or_else(|| ag::zeros(&x.shape()));
+            let ref last_cell = self.cells.pop().unwrap_or_else(|| ag::zeros(&x.shape()));
 
-        let size = self.state_size as isize;
-        let i = &ag::slice(&xh, &[0, 0 * size], &[-1, 1 * size]);
-        let f = &ag::slice(&xh, &[0, 1 * size], &[-1, 2 * size]);
-        let c = &ag::slice(&xh, &[0, 2 * size], &[-1, 3 * size]);
-        let o = &ag::slice(&xh, &[0, 3 * size], &[-1, 4 * size]);
+            let ref xh = ag::matmul(x, &self.wx) + ag::matmul(last_output, &self.wh) + &self.b;
 
-        let cell = ag::sigmoid(f) * &self.cell + ag::sigmoid(i) * ag::tanh(c);
-        let h = ag::sigmoid(o) * ag::tanh(&cell);
+            let size = self.vector_dim as isize;
+            let ref i = ag::slice(xh, &[0, 0 * size], &[-1, 1 * size]);
+            let ref f = ag::slice(xh, &[0, 1 * size], &[-1, 2 * size]);
+            let ref c = ag::slice(xh, &[0, 2 * size], &[-1, 3 * size]);
+            let ref o = ag::slice(xh, &[0, 3 * size], &[-1, 4 * size]);
 
-        self.cell = cell;
-        self.last_output = h.clone(); // data is not cloned
+            let cell = ag::sigmoid(f) * last_cell + ag::sigmoid(i) * ag::tanh(c);
+            let h = ag::sigmoid(o) * ag::tanh(&cell);
+            (cell, h)
+        };
+        self.cells.push(cell);
+        self.hs.push(h.clone());
         h
-    }
-
-    fn reset_state(&mut self, c: &mut ag::Context)
-    {
-        self.last_output = ag::constant(
-            ag::ndarray_ext::zeros(&[self.batch_size, self.state_size]),
-            c,
-        );
-
-        self.cell = ag::constant(
-            ag::ndarray_ext::zeros(&[self.batch_size, self.state_size]),
-            c,
-        );
     }
 }
 
 pub fn main()
 {
-    let state_size = 3;
     let vec_dim = 4;
     let max_sent = 2;
     let vocab_size = 5;
-    let batch_size = 2;
 
     // === graph def
     let mut ctx = ag::Context::new();
-    let ref tbl = ag::variable(
-        ag::ndarray_ext::standard_uniform(&[vocab_size, vec_dim]),
-        &mut ctx,
-    );
-    let ref w = ag::variable(
-        ag::ndarray_ext::standard_normal(&[state_size, vocab_size]),
-        &mut ctx,
-    );
-    let ref sentences = ag::placeholder(&[-1, max_sent]);
-    let ref mut rnn = LSTM::new(state_size, vec_dim, batch_size, &mut ctx);
 
+    let ref sentences = ag::placeholder(&[-1, max_sent]);
+    let ref mut rnn = LSTM::new(vec_dim, &mut ctx);
+
+    let ref lookup_table = ag::variable(
+        ag::ndarray_ext::random_normal(&[vocab_size, vec_dim], 0., 0.01),
+        &mut ctx,
+    );
+    let ref w_pred = ag::variable(
+        ag::ndarray_ext::random_uniform(&[vec_dim, vocab_size], 0., 0.01),
+        &mut ctx,
+    );
+    // Compute cross entropy losses for each LSTM step
     let losses = (0..max_sent)
         .map(|i| {
             let ref cur_id = ag::slice(sentences, &[0, i], &[-1, i + 1]);
-            let ref nex_id = ag::slice(sentences, &[0, i + 1], &[-1, i + 2]);
-            let ref x = ag::gather(tbl, cur_id, 0);
-            if i == max_sent - 1 {
-                rnn.reset_state(&mut ctx);
-            }
+            let ref next_id = ag::slice(sentences, &[0, i + 1], &[-1, i + 2]);
+            let ref x = ag::gather(lookup_table, cur_id, 0);
             let ref h = rnn.step(x);
-            let ref prediction = ag::matmul(h, w);
-            ag::sparse_softmax_cross_entropy(prediction, nex_id)
+            let ref prediction = ag::matmul(h, w_pred);
+            ag::sparse_softmax_cross_entropy(prediction, next_id)
         })
         .collect::<Vec<_>>();
 
+    // For simplicity, I use loss of the last output only.
     let loss = losses.last().unwrap();
     let mut vars = rnn.list_vars();
-    vars.extend_from_slice(&[tbl, w]);
+    vars.extend_from_slice(&[lookup_table, w_pred]);
     let ref g = ag::grad(&[loss], vars.as_slice());
-    ctx.feed_input(sentences, ndarray::arr2(&[[2., 3., 1.], [3., 0., 1.]]));
+    // === graph def end
 
-    // test
+    // test with toy data
+    ctx.feed_input(sentences, ndarray::arr2(&[[2., 3., 1.], [3., 0., 1.]]));
     ag::test_helper::gradient_check(loss, g.as_slice(), vars.as_slice(), ctx, 1e-3, 1e-3);
 }
