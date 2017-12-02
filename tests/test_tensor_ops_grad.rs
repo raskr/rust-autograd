@@ -342,6 +342,28 @@ fn reduce_prod()
 }
 
 #[test]
+fn maximum()
+{
+    let mut ctx = ag::Context::new();
+    let ref v1 = ag::variable(ag::ndarray_ext::standard_normal(&[3, 2, 2]), &mut ctx);
+    let ref v2 = ag::variable(ag::ndarray_ext::standard_normal(&[3, 2, 2]), &mut ctx);
+    let ref z = ag::maximum(v1, v2);
+    let ref g = ag::grad_with_default(&[z], &[v1, v2], &[&ag::ones(&z.shape())]);
+    ag::test_helper::gradient_check(z, g.as_slice(), &[v1, v2], ctx, 1e-3, 1e-3);
+}
+
+#[test]
+fn minimum()
+{
+    let mut ctx = ag::Context::new();
+    let ref v1 = ag::variable(ag::ndarray_ext::standard_normal(&[3, 2, 2]), &mut ctx);
+    let ref v2 = ag::variable(ag::ndarray_ext::standard_normal(&[3, 2, 2]), &mut ctx);
+    let ref z = ag::minimum(v1, v2);
+    let ref g = ag::grad_with_default(&[z], &[v1, v2], &[&ag::ones(&z.shape())]);
+    ag::test_helper::gradient_check(z, g.as_slice(), &[v1, v2], ctx, 1e-3, 1e-3);
+}
+
+#[test]
 fn abs()
 {
     let mut ctx = ag::Context::new();

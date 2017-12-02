@@ -44,7 +44,7 @@ pub struct Transpose {
 
 
 macro_rules! impl_cmp_op {
-    ($struct_name:ident, $assign:expr) => {
+    ($struct_name:ident, $assign:expr, $grad_fn:expr) => {
 
         pub struct $struct_name;
 
@@ -80,24 +80,34 @@ macro_rules! impl_cmp_op {
                 }
             }
 
-            fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+            fn grad(&self, gy: &Tensor, xs: &[&Tensor], y: &Tensor) -> Vec<Option<Tensor>>
             {
-                vec![None]
+                $grad_fn(gy, xs, y)
             }
         }
 
     };
 }
 
-impl_cmp_op!(Equal, move |r, a, b| *r = ((a == b) as i32) as f32);
-impl_cmp_op!(NotEqual, move |r, a, b| *r = ((a != b) as i32) as f32);
-impl_cmp_op!(Greater, move |r, a, b| *r = ((a > b) as i32) as f32);
-impl_cmp_op!(Lesser, move |r, a, b| *r = ((a < b) as i32) as f32);
-impl_cmp_op!(GreaterEqual, move |r, a, b| *r = ((a >= b) as i32) as f32);
-impl_cmp_op!(LesserEqual, move |r, a, b| *r = ((a <= b) as i32) as f32);
-impl_cmp_op!(Maximum, move |r, a, b| *r = if a > b { *a } else { *b });
-impl_cmp_op!(Minimum, move |r, a, b| *r = if a < b { *a } else { *b });
+impl_cmp_op!(Equal, move |r, a, b| *r = ((a == b) as i32) as f32, |_, _, _| vec![None]);
+impl_cmp_op!(NotEqual, move |r, a, b| *r = ((a != b) as i32) as f32, |_, _, _| vec![None]);
+impl_cmp_op!(Greater, move |r, a, b| *r = ((a > b) as i32) as f32, |_, _, _| vec![None]);
+impl_cmp_op!(Lesser, move |r, a, b| *r = ((a < b) as i32) as f32, |_, _, _| vec![None]);
+impl_cmp_op!(GreaterEqual, move |r, a, b| *r = ((a >= b) as i32) as f32, |_, _, _| vec![None]);
+impl_cmp_op!(LesserEqual, move |r, a, b| *r = ((a <= b) as i32) as f32, |_, _, _| vec![None]);
+impl_cmp_op!(Maximum, move |r, a, b| *r = if a > b { *a } else { *b }, min_max_grad);
+impl_cmp_op!(Minimum, move |r, a, b| *r = if a < b { *a } else { *b }, min_max_grad);
 
+
+fn min_max_grad(gy: &Tensor, xs: &[&Tensor], y: &Tensor) -> Vec<Option<Tensor>>
+{
+    let a = xs[0];
+    let b = xs[1];
+    let selected_a = ops::equal(a, y);
+    let selected_b = ops::equal(b, y);
+    vec![Some(ops::mul_inplace(selected_a, gy)),
+         Some(ops::mul_inplace(selected_b, gy))]
+}
 
 impl ops::Op for Abs {
     fn name(&self) -> &str
