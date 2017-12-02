@@ -1351,6 +1351,13 @@ pub fn relu(x: &Tensor) -> Tensor
 }
 
 
+/// Elementwise softplus.
+pub fn softplus(x: &Tensor) -> Tensor
+{
+    apply_op(activation_ops::Softplus, &[x], Some(x.shape()))
+}
+
+
 /// Computes `log(sum(exp(x)))` along specified axis.
 /// `axis` can be negative.
 pub fn reduce_logsumexp(x: &Tensor, axis: isize, keep_dims: bool) -> Tensor

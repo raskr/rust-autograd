@@ -477,6 +477,16 @@ fn relu()
 }
 
 #[test]
+fn softplus()
+{
+    let mut ctx = ag::Context::new();
+    let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[2, 2]), &mut ctx);
+    let ref z = ag::softplus(v);
+    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    ag::test_helper::gradient_check(z, g.as_slice(), &[v], ctx, 1e-3, 1e-3);
+}
+
+#[test]
 fn logsumexp()
 {
     let mut ctx = ag::Context::new();

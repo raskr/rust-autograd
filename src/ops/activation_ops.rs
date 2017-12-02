@@ -20,6 +20,8 @@ pub struct ReLU;
 
 pub struct Sigmoid;
 
+pub struct Softplus;
+
 pub struct Softmax {
     pub axis: isize,
 }
@@ -71,6 +73,27 @@ impl ops::Op for Softmax {
     }
 }
 
+impl ops::Op for Softplus {
+    fn name(&self) -> &str
+    {
+        "Softplus"
+    }
+
+    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    {
+        let e = f32::consts::E;
+        Ok(xs[0].mapv(move |a| (a.exp() + 1.).log(e)))
+    }
+
+    fn grad(&self, gy: &Tensor, xs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
+        let a = &ops::exp(xs[0]);
+        let b = a + 1;
+        let gx = gy * (a / b);
+        vec![Some(gx)]
+    }
+}
+
 impl ops::Op for Sigmoid {
     fn name(&self) -> &str
     {
@@ -103,6 +126,8 @@ impl ops::Op for ReLU {
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         let bin = ops::greater(inputs[0], &ops::scalar(0.));
+        // inplace is ok because second derivative of relu is 0.
+        // (`mul_inplace` returns `None` as input gradient.)
         vec![Some(ops::mul_inplace(bin, gy))]
     }
 }
@@ -115,11 +140,13 @@ impl ops::Op for Identity {
 
     fn compute(&self, _: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
     {
+        // do nothing
         Err(::OpComputeErrorStatus::Delegate { to: 0 })
     }
 
     fn grad(&self, gy: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
+        // use gy's array with rc increment.
         vec![Some(gy.clone())]
     }
 }
@@ -169,7 +196,6 @@ impl ops::Op for ELUGrad {
         Ok(a * gy)
     }
 
-    // TODO: impl
     fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         vec![None, None]
