@@ -1352,9 +1352,10 @@ pub fn relu(x: &Tensor) -> Tensor
 
 
 /// Computes `log(sum(exp(x)))` along specified axis.
-pub fn logsumexp(x: &Tensor, axis: isize) -> Tensor
+/// `axis` can be negative.
+pub fn reduce_logsumexp(x: &Tensor, axis: isize, keep_dims: bool) -> Tensor
 {
-    let op = math_ops::LogSumExp { axis };
+    let op = math_ops::LogSumExp { axis, keep_dims };
     apply_op(op, &[x], None)
 }
 
@@ -1366,9 +1367,8 @@ pub fn logsumexp(x: &Tensor, axis: isize) -> Tensor
 /// `axis` can be negative.
 pub fn log_softmax(x: &Tensor, axis: isize) -> Tensor
 {
-    // TODO: Composing from "node level" LogSumExp.
     let op = xent_ops::LogSoftmax { axis };
-    apply_op(op, &[x], None)
+    apply_op(op, &[x], Some(x.shape()))
 }
 
 

@@ -23,7 +23,7 @@ impl ops::Op for LogSoftmax {
 
     fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
     {
-        Ok(xs[0] - &ops::math_ops::logsumexp_forward(xs[0], self.axis))
+        Ok(xs[0] - &ops::math_ops::logsumexp_forward(xs[0], self.axis, true))
     }
 
     fn grad(&self, gy: &Tensor, _: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
@@ -182,7 +182,7 @@ impl ops::Op for SoftmaxCrossEntropyLatter {
     fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let log_x = xs[0];
-        // `t` must be one-hot unlike KL-divergence
+        // `t` must be one-hot
         let t = xs[1];
 
         if log_x.ndim() != 2 {
@@ -197,9 +197,7 @@ impl ops::Op for SoftmaxCrossEntropyLatter {
         }
 
         // - t log x ( =(batch, num_classes))
-        // TODO: replace "sum" with "select"
-        // unwrap is safe
-        Ok((t * log_x).sum_axis(ndarray::Axis(1)) * -1.) // summing class dim.
+        Ok((t * log_x).sum_axis(ndarray::Axis(1)) * -1.)
     }
 
     fn grad(&self, output_grad: &Tensor, inputs: &[&Tensor], output: &Tensor)

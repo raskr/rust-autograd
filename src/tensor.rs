@@ -7,7 +7,6 @@ use std::cmp::Ordering;
 use std::collections::hash_set::HashSet;
 use std::fmt;
 use std::hash::{Hash, Hasher};
-use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 

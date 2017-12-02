@@ -36,6 +36,7 @@ pub struct Pow {
 }
 pub struct LogSumExp {
     pub axis: isize,
+    pub keep_dims: bool,
 }
 pub struct Transpose {
     pub zip: bool,
@@ -311,7 +312,7 @@ fn transpose_reversed(perm: &NdArray) -> bool
     true
 }
 
-pub fn logsumexp_forward(x: &NdArray, axis: isize) -> NdArray
+pub fn logsumexp_forward(x: &NdArray, axis: isize, keep_dims: bool) -> NdArray
 {
     let axis = if axis < 0 {
         (x.ndim() as isize + axis) as usize
@@ -320,7 +321,11 @@ pub fn logsumexp_forward(x: &NdArray, axis: isize) -> NdArray
     };
 
     let mut a = x.shape().to_vec();
-    a[axis] = 1;
+    if keep_dims {
+        a[axis] = 1;
+    } else {
+        a.remove(axis);
+    }
     let reduced_shape = a.as_slice();
 
     let max_fn = f32::max;
@@ -357,7 +362,7 @@ impl ops::Op for LogSumExp {
     fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let x = xs[0];
-        Ok(logsumexp_forward(x, self.axis))
+        Ok(logsumexp_forward(x, self.axis, self.keep_dims))
     }
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
