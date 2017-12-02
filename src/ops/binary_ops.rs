@@ -349,9 +349,10 @@ macro_rules! impl_bin_op_forward {
             let shape0: &[usize]  = x0.shape();
             let shape1: &[usize]  = x1.shape();
             let scalar_shape = &[];
+            let scalar_shape1 = &[0];
 
-            let x0_is_scalar = shape0 == scalar_shape;
-            let x1_is_scalar = shape1 == scalar_shape;
+            let x0_is_scalar = shape0 == scalar_shape || shape0 == scalar_shape1;
+            let x1_is_scalar = shape1 == scalar_shape || shape1 == scalar_shape1;
 
             if x0_is_scalar && !x1_is_scalar {
                 let elem = x0[ndarray::IxDyn(&[])];
