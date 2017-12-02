@@ -100,4 +100,20 @@ impl Context {
         }
         self.outputs.insert(placeholder.clone(), Ok(arr.into_dyn()));
     }
+
+    /// Same as [autograd::variable](../ops/fn.variable.html).
+    pub fn variable<T>(&mut self, arr: ndarray::Array<f32, T>) -> Tensor
+        where
+            T: ndarray::Dimension,
+    {
+        ::ops::variable(arr, self)
+    }
+
+    /// Same as [autograd::constant](../ops/fn.constant.html).
+    pub fn constant<T>(&mut self, arr: ndarray::Array<f32, T>) -> Tensor
+        where
+            T: ndarray::Dimension,
+    {
+        ::ops::constant(arr, self)
+    }
 }

@@ -325,6 +325,8 @@ pub fn stop_gradients(x: &Tensor) -> Tensor
 
 /// Creates a shared variable tensor from rust-ndarray's array object.
 ///
+/// Same as [Context::variable](../context/fn.variable.html).
+///
 /// The shared variable behaves like any other tensors, except that
 /// it can be optimized with gradient descent methods
 /// implemented in `autograd::gradient_descent`.
@@ -385,6 +387,8 @@ pub fn placeholder(shape_: &[isize]) -> Tensor
 
 
 /// Creates a constant tensor.
+///
+/// Same as [Context::constant](../context/fn.constant.html).
 ///
 /// ```
 /// extern crate ndarray;
