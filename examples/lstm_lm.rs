@@ -13,8 +13,7 @@ struct LSTM {
 
 
 impl LSTM {
-    pub fn new(vector_dim: usize, c: &mut ag::Context)
-        -> LSTM
+    pub fn new(vector_dim: usize, c: &mut ag::Context) -> LSTM
     {
         LSTM {
             vector_dim,

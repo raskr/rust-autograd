@@ -89,14 +89,46 @@ macro_rules! impl_cmp_op {
     };
 }
 
-impl_cmp_op!(Equal, move |r, a, b| *r = ((a == b) as i32) as f32, |_, _, _| vec![None]);
-impl_cmp_op!(NotEqual, move |r, a, b| *r = ((a != b) as i32) as f32, |_, _, _| vec![None]);
-impl_cmp_op!(Greater, move |r, a, b| *r = ((a > b) as i32) as f32, |_, _, _| vec![None]);
-impl_cmp_op!(Lesser, move |r, a, b| *r = ((a < b) as i32) as f32, |_, _, _| vec![None]);
-impl_cmp_op!(GreaterEqual, move |r, a, b| *r = ((a >= b) as i32) as f32, |_, _, _| vec![None]);
-impl_cmp_op!(LesserEqual, move |r, a, b| *r = ((a <= b) as i32) as f32, |_, _, _| vec![None]);
-impl_cmp_op!(Maximum, move |r, a, b| *r = if a > b { *a } else { *b }, min_max_grad);
-impl_cmp_op!(Minimum, move |r, a, b| *r = if a < b { *a } else { *b }, min_max_grad);
+impl_cmp_op!(Equal, move |r, a, b| *r = ((a == b) as i32) as f32, |_,
+ _,
+ _| {
+    vec![None]
+});
+impl_cmp_op!(NotEqual, move |r, a, b| *r = ((a != b) as i32) as f32, |_,
+ _,
+ _| {
+    vec![None]
+});
+impl_cmp_op!(Greater, move |r, a, b| *r = ((a > b) as i32) as f32, |_,
+ _,
+ _| {
+    vec![None]
+});
+impl_cmp_op!(Lesser, move |r, a, b| *r = ((a < b) as i32) as f32, |_,
+ _,
+ _| {
+    vec![None]
+});
+impl_cmp_op!(
+    GreaterEqual,
+    move |r, a, b| *r = ((a >= b) as i32) as f32,
+    |_, _, _| vec![None]
+);
+impl_cmp_op!(
+    LesserEqual,
+    move |r, a, b| *r = ((a <= b) as i32) as f32,
+    |_, _, _| vec![None]
+);
+impl_cmp_op!(
+    Maximum,
+    move |r, a, b| *r = if a > b { *a } else { *b },
+    min_max_grad
+);
+impl_cmp_op!(
+    Minimum,
+    move |r, a, b| *r = if a < b { *a } else { *b },
+    min_max_grad
+);
 
 
 fn min_max_grad(gy: &Tensor, xs: &[&Tensor], y: &Tensor) -> Vec<Option<Tensor>>
@@ -105,8 +137,10 @@ fn min_max_grad(gy: &Tensor, xs: &[&Tensor], y: &Tensor) -> Vec<Option<Tensor>>
     let b = xs[1];
     let selected_a = ops::equal(a, y);
     let selected_b = ops::equal(b, y);
-    vec![Some(ops::mul_inplace(selected_a, gy)),
-         Some(ops::mul_inplace(selected_b, gy))]
+    vec![
+        Some(ops::mul_inplace(selected_a, gy)),
+        Some(ops::mul_inplace(selected_b, gy)),
+    ]
 }
 
 impl ops::Op for Abs {

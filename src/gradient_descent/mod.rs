@@ -2,8 +2,8 @@ pub mod optimizers;
 
 pub use self::optimizers::*;
 
-use ndarray_ext::NdArray;
 use context::Context;
+use ndarray_ext::NdArray;
 use tensor::Tensor;
 
 
@@ -22,8 +22,11 @@ pub fn update<T: Optimizer>(
     assert_eq!(variables.len(), gradients.len());
     // run graph and get gradient arrays
     let gradient_refs = gradients.iter().map(|a| a).collect::<Vec<_>>();
-    let mut grad_arrays = ::eval::eval_tensors(gradient_refs.as_slice(), &mut ctx.variables,
-                                               &mut ctx.outputs);
+    let mut grad_arrays = ::eval::eval_tensors(
+        gradient_refs.as_slice(),
+        &mut ctx.variables,
+        &mut ctx.outputs,
+    );
     ctx.outputs.clear();
     for v in variables {
         // safe unwrap

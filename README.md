@@ -44,8 +44,8 @@ Another example: multi layer perceptron for MNIST digits classification.
 let mut ctx = ag::Context::new();
 let ref x = ag::placeholder(&[-1, 28*28]);
 let ref y = ag::placeholder(&[-1]);
-let ref w = ag::variable(ag::ndarray_ext::glorot_uniform(&[28*28, 10]), &mut ctx);
-let ref b = ag::variable(ag::ndarray_ext::zeros(&[1, 10]), &mut ctx);
+let ref w = ctx.variable(ag::ndarray_ext::glorot_uniform(&[28*28, 10]));
+let ref b = ctx.variable(ag::ndarray_ext::zeros(&[1, 10]));
 let ref z = ag::matmul(x, w) + b;
 let ref loss = ag::reduce_mean(&ag::sparse_softmax_cross_entropy(z, y), &[0], false);
 let ref grads = ag::grad(loss, &[w, b]);
@@ -64,9 +64,5 @@ for epoch in 0..max_epoch {
 }
 
 ```
-For more, see 
-[examples](https://github.com/raskr/rust-autograd/tree/master/examples) or
-[tests](https://github.com/raskr/rust-autograd/tree/master/tests). 
-
-Available ops are listed [here](https://docs.rs/autograd/0.6.1/autograd/ops/index.html).
-
+For more, see [documentation](https://docs.rs/autograd/) or
+[examples](https://github.com/raskr/rust-autograd/tree/master/examples)

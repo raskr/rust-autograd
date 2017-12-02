@@ -217,16 +217,15 @@ pub fn eval_tensors(
     owners
         .into_iter()
         .map(move |owner| {
-            if let Some(arr) = owner2arr.get_mut(owner).and_then(
-                |&mut (ref arr, ref mut shared_count)| {
-                    if *shared_count >= 2 {
-                        *shared_count -= 1;
-                        Some(arr)
-                    } else {
-                        None
-                    }
-                },
-            )
+            if let Some(arr) = owner2arr.get_mut(owner).and_then(|&mut (ref arr,
+                   ref mut shared_count)| {
+                if *shared_count >= 2 {
+                    *shared_count -= 1;
+                    Some(arr)
+                } else {
+                    None
+                }
+            })
             {
                 // Shared count is over 2, so
                 // clone the array and exit this closure.

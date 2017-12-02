@@ -23,7 +23,9 @@ impl ops::Op for LogSoftmax {
 
     fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
     {
-        Ok(xs[0] - &ops::math_ops::logsumexp_forward(xs[0], self.axis, true))
+        Ok(
+            xs[0] - &ops::math_ops::logsumexp_forward(xs[0], self.axis, true),
+        )
     }
 
     fn grad(&self, gy: &Tensor, _: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
@@ -89,7 +91,7 @@ impl ops::Op for SparseSoftmaxCrossEntropyLatter {
         {
             if log_x.ndim() != 2 {
                 return Err(::OpComputeErrorStatus::BadInput(
-                    format!("Bad first argument's shape {:?}", log_x.shape())
+                    format!("Bad first argument's shape {:?}", log_x.shape()),
                 ));
             }
 
@@ -98,12 +100,12 @@ impl ops::Op for SparseSoftmaxCrossEntropyLatter {
             if t_rank == 2 {
                 if t_shape[1] != 1 {
                     return Err(::OpComputeErrorStatus::BadInput(
-                        format!("Bad second argument's shape {:?}", t_shape)
+                        format!("Bad second argument's shape {:?}", t_shape),
                     ));
                 }
             } else if t_rank != 1 {
                 return Err(::OpComputeErrorStatus::BadInput(
-                    format!("Bad second argument's shape {:?}", t_shape)
+                    format!("Bad second argument's shape {:?}", t_shape),
                 ));
             }
         }
