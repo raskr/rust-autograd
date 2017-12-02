@@ -8,10 +8,11 @@ use tensor::Tensor;
 #[derive(Clone)]
 /// What is necessary to run computation graphs.
 ///
-/// `Context` object is used:
-/// * to create shared variable tensors
-/// * to create constant tensors
-/// * to run computation graphs actually
+/// `Context` object is used to:
+///
+/// * create shared variable tensors
+/// * create constant tensors
+/// * run computation graphs actually
 ///
 /// When a computation graph is evaluated, all the variables/constants in the graph
 /// must be generated in the same context; otherwise will panic.

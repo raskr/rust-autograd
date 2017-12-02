@@ -43,7 +43,7 @@ impl Tensor {
 
     /// Returns the (symbolic) shape of this tensor.
     ///
-    /// See [shape](../ops.fn.shape.html).
+    /// See [shape](../ops/fn.shape.html).
     pub fn shape(&self) -> Tensor
     {
         ::ops::shape(self)
@@ -52,7 +52,7 @@ impl Tensor {
 
     /// Returns the (symbolic) rank of this tensor.
     ///
-    /// See [rank](../ops.fn.rank.html).
+    /// See [rank](../ops/fn.rank.html).
     pub fn rank(&self) -> Tensor
     {
         ::ops::rank(self)
@@ -61,7 +61,7 @@ impl Tensor {
 
     /// Returns the (symbolic) size of this tensor.
     ///
-    /// See [size](../ops.fn.size.html).
+    /// See [size](../ops/fn.size.html).
     pub fn size(&self) -> Tensor
     {
         ::ops::size(self)

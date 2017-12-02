@@ -19,6 +19,8 @@ mod const_gen_ops;
 
 
 #[doc(hidden)]
+// TODO: Ugly `compute` and `compute_inplace`.
+// TODO: Use associated constants for name.
 /// Represents a operation node in a computation graph.
 /// `Tensor` wraps trait-object of this.
 pub trait Op {
@@ -52,6 +54,7 @@ pub trait Op {
     /// Returns symbolic gradients for input nodes by use of output gradient etc.
     ///
     /// # Arguments
+    ///
     /// * `gy` - Symbolic representation of the gradient of `compute`'s return value
     /// * `xs` - Symbolic representation of `compute::xs`
     /// * `y` - Symbolic representation of `compute`'s return value
@@ -61,7 +64,7 @@ pub trait Op {
     fn grad(&self, gy: &Tensor, xs: &[&Tensor], y: &Tensor) -> Vec<Option<Tensor>>;
 }
 
-/// Error status in Op#compute.
+/// Error status in Op#compute and Op#compute_inplace.
 #[doc(hidden)]
 #[derive(Clone, Debug)]
 pub enum OpComputeErrorStatus {
@@ -131,7 +134,7 @@ pub fn apply_op<T: Op + 'static>(op: T, inputs: &[&Tensor], shape: Option<Tensor
     }))
 }
 
-pub struct DummyOp {
+struct DummyOp {
     pub name: String,
 }
 
@@ -1266,9 +1269,9 @@ pub fn square(a: &Tensor) -> Tensor
 ///     &[0.5]
 /// );
 /// ```
-pub fn reciprocal(a: &Tensor) -> Tensor
+pub fn reciprocal(x: &Tensor) -> Tensor
 {
-    apply_op(math_ops::Reciprocal, &[a], Some(a.shape()))
+    apply_op(math_ops::Reciprocal, &[x], Some(x.shape()))
 }
 
 

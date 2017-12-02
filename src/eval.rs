@@ -56,9 +56,9 @@ pub fn eval(xs: &[&Tensor], ctx: &mut context::Context)
 /// assert_eq!(should_be_zeros, ndarray::arr1(&[0., 0.]).into_dyn());
 ///
 /// ```
-pub fn run(xs: &[&Tensor], ctx: &mut context::Context)
+pub fn run(tensors: &[&Tensor], ctx: &mut context::Context)
 {
-    eval_tensors_ref(xs, &mut ctx.variables, &mut ctx.outputs);
+    eval_tensors_ref(tensors, &mut ctx.variables, &mut ctx.outputs);
 }
 
 
