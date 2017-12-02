@@ -1350,6 +1350,16 @@ pub fn relu(x: &Tensor) -> Tensor
     apply_op(activation_ops::ReLU, &[x], Some(x.shape()))
 }
 
+/// Elementwise leaky relu.
+///
+/// In common, `alpha` is around 0.1 ~ 0.2.
+///
+/// See http://web.stanford.edu/~awni/papers/relu_hybrid_icml2013_final.pdf
+pub fn leaky_relu(x: &Tensor, alpha: f32) -> Tensor
+{
+    maximum(x, &(alpha * x))
+}
+
 
 /// Elementwise softplus.
 pub fn softplus(x: &Tensor) -> Tensor
