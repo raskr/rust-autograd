@@ -27,8 +27,14 @@ pub trait Op {
     /// Name of this op
     fn name(&self) -> &str;
 
-    /// Flag: inplace or not.
+    /// Flag: inplace or not. (Don't touch)
     fn inplace(&self) -> bool
+    {
+        false
+    }
+
+    /// Flag: stops gradient propagation or not. (Don't touch)
+    fn stop_gradient(&self) -> bool
     {
         false
     }
@@ -322,7 +328,7 @@ pub fn _hessian_vector_product(ys: &[&Tensor], xs: &[&Tensor], vectors: &[&Tenso
 /// during gradient computation.
 pub fn stop_gradients(x: &Tensor) -> Tensor
 {
-    apply_op(gradient_ops::StopGradients, &[x], Some(x.shape()))
+    apply_op(gradient_ops::StopGradients, &[x], None)
 }
 
 
@@ -435,7 +441,7 @@ pub fn shape(x: &Tensor) -> Tensor
     if let Some(ref inner) = x.shape {
         inner.clone()
     } else {
-        apply_op(array_ops::Shape, &[x], None)
+        stop_gradients(&apply_op(array_ops::Shape, &[x], None))
     }
 }
 
@@ -454,7 +460,7 @@ pub fn shape(x: &Tensor) -> Tensor
 /// ```
 pub fn size(x: &Tensor) -> Tensor
 {
-    apply_op(array_ops::Size, &[x], None)
+    stop_gradients(&apply_op(array_ops::Size, &[x], None))
 }
 
 
@@ -472,7 +478,7 @@ pub fn size(x: &Tensor) -> Tensor
 /// ```
 pub fn rank(x: &Tensor) -> Tensor
 {
-    apply_op(array_ops::Rank, &[x], None)
+    stop_gradients(&apply_op(array_ops::Rank, &[x], None))
 }
 
 

@@ -116,23 +116,6 @@ impl Tensor {
     }
 }
 
-
-impl Ord for Tensor {
-    /// Compares the ranks in topological ordering
-    fn cmp(&self, other: &Self) -> Ordering
-    {
-        self.top_rank.cmp(&other.top_rank)
-    }
-}
-
-impl PartialOrd for Tensor {
-    /// Compares the ranks in topological ordering
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering>
-    {
-        Some(self.cmp(other))
-    }
-}
-
 // empty implementation
 impl Eq for Tensor {}
 

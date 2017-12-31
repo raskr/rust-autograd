@@ -626,11 +626,12 @@ fn reshape()
 }
 
 #[test]
+#[should_panic]
 fn reshape_grad()
 {
     let mut ctx = ag::Context::new();
     let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[4, 4]), &mut ctx);
-    let ref z = ag::reshape(&(v * v), &[4, 2, 2]);
+    let ref z = ag::reshape(&(v), &[4, 2, 2]);
     let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())])[0];
     let ref gg = ag::grad_with_default(&[g], &[v], &[&ag::ones(&g.shape())]);
     ag::test_helper::gradient_check(g, gg.as_slice(), &[v], ctx, 1e-3, 1e-3);

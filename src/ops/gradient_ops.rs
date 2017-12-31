@@ -20,4 +20,9 @@ impl ops::Op for StopGradients {
     {
         vec![None]
     }
+
+    fn stop_gradient(&self) -> bool
+    {
+        true
+    }
 }
