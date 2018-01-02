@@ -3,7 +3,6 @@ extern crate ndarray;
 use context;
 use ndarray_ext::NdArray;
 use ops;
-use std::cmp::Ordering;
 use std::collections::hash_set::HashSet;
 use std::fmt;
 use std::hash::{Hash, Hasher};

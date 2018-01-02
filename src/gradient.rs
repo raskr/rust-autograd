@@ -10,9 +10,13 @@ fn get_sorted_between_nodes<'a>(ys: &[&'a Tensor], xs: &[&'a Tensor]) -> Vec<Ten
     let marked = mark_backward_path(ys, xs);
     let mut between = marked
         .into_iter()
-        .filter_map(|(k, v)| if v && !k.is_source() { Some(k.wrapped()) } else { None })
+        .filter_map(|(k, v)| if v && !k.is_source() {
+            Some(k.wrapped())
+        } else {
+            None
+        })
         .collect::<Vec<TensorWrapper>>();
-    between.sort_unstable();  // topological sort
+    between.sort_unstable(); // topological sort
     between
 }
 
@@ -25,11 +29,11 @@ fn test_sorted_between_nodes()
     let ref x1 = ::placeholder(&[]);
     let ref x2 = ::placeholder(&[]);
     let ref x3 = ::placeholder(&[]);
-    let ref a = 3 * x1;  // rank 1
-    let ref b = a * x1;  // rank 2
-    let ref c = 5 * x2;  // rank 1
-    let ref d = b + c;   // rank 3
-    let ref y = d + x3;  // rank 4
+    let ref a = 3 * x1; // rank 1
+    let ref b = a * x1; // rank 2
+    let ref c = 5 * x2; // rank 1
+    let ref d = b + c; // rank 3
+    let ref y = d + x3; // rank 4
     let sorted_between: Vec<TensorWrapper> = get_sorted_between_nodes(&[y], &[x1, x2]);
     let sorted_between: Vec<&Tensor> = sorted_between.iter().map(|a| a.tensor).collect();
 
@@ -51,7 +55,8 @@ fn test_sorted_between_nodes()
 use std::fmt;
 
 impl fmt::Debug for Tensor {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result
+    {
         write!(f, "{}", self.op.name())
     }
 }
@@ -65,17 +70,26 @@ impl fmt::Debug for Tensor {
 ///
 /// NOTE: Nodes that do not contribute to the gradient won't be included to avoid
 /// unnecessary computation.
-pub fn symbolic_gradients(ys: &[&Tensor], xs: &[&Tensor],
-                          known_gys: &[Option<&Tensor>]) -> Vec<Tensor>
+pub fn symbolic_gradients(
+    ys: &[&Tensor],
+    xs: &[&Tensor],
+    known_gys: &[Option<&Tensor>],
+) -> Vec<Tensor>
 {
-    assert_eq!(ys.len(), known_gys.len(), "`ys.len()` must match `gys.len()`");
+    assert_eq!(
+        ys.len(),
+        known_gys.len(),
+        "`ys.len()` must match `gys.len()`"
+    );
 
     // Prepare gradient store
     let mut computed_gys: HashMap<&Tensor, Vec<Tensor>> = HashMap::new();
 
     // Store default grads
     for (y, known_gy) in ys.iter().zip(known_gys) {
-        let gy = known_gy.map(|k| k.clone()).unwrap_or_else(|| ops::scalar(1.));
+        let gy = known_gy.map(|k| k.clone()).unwrap_or_else(
+            || ops::scalar(1.),
+        );
         computed_gys.insert(y, vec![gy]);
     }
 
@@ -87,14 +101,21 @@ pub fn symbolic_gradients(ys: &[&Tensor], xs: &[&Tensor],
         // Get gxs by calling `Op::grad`
         let gxs = {
             let gys = computed_gys.get_mut(&y.tensor).expect(&format!(
-                "Couldn't get `{}`'s grad (probably a bug)", y.tensor));
+                "Couldn't get `{}`'s grad (probably a bug)",
+                y.tensor
+            ));
             accumulate_grads(gys);
             y.tensor.op.grad(&gys[0], xs_ref.as_slice(), y.tensor)
         };
 
         // Check correctness of y's `grad` implementation
-        debug_assert_eq!(xs_ref.len(), gxs.len(), "`{}.grad` must return {} gxs",
-                         y.tensor, xs_ref.len());
+        debug_assert_eq!(
+            xs_ref.len(),
+            gxs.len(),
+            "`{}.grad` must return {} gxs",
+            y.tensor,
+            xs_ref.len()
+        );
 
         // Register computed gxs
         for (gx, x) in gxs.into_iter().zip(xs_ref) {
@@ -183,9 +204,7 @@ impl Tensor {
     #[inline]
     fn wrapped(&self) -> TensorWrapper
     {
-        let ret = TensorWrapper {
-            tensor: self,
-        };
+        let ret = TensorWrapper { tensor: self };
         ret
     }
 }

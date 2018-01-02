@@ -3,6 +3,7 @@ extern crate ndarray;
 
 use context;
 use ndarray_ext::NdArray;
+use std::collections::LinkedList;
 use std::collections::hash_map::Entry;
 use std::collections::hash_map::HashMap;
 use std::mem;
@@ -66,7 +67,7 @@ pub fn run(tensors: &[&Tensor], ctx: &mut context::Context)
 fn seek_array<'a>(memo: &'a OutputMap, x: &Tensor) -> &'a NdArray
 {
     // safe unwrap
-    match *memo.get(x).unwrap() {
+    match *memo.get(x).expect(&format!("Internal error: couldn't get output array of `{}`", x)) {
         Ok(ref arr) => arr,
         Err(::OpComputeErrorStatus::Delegate { to: i }) =>
             seek_array(memo, &x.inputs[i])  // hoping for x.inputs[i] to have the value
@@ -76,74 +77,116 @@ fn seek_array<'a>(memo: &'a OutputMap, x: &Tensor) -> &'a NdArray
     }
 }
 
+#[test]
+fn test_list_reachable_nodes_desc()
+{
+    let ref v = ::zeros(&[3, 1, 2, 1]);
+    let ref z = ::squeeze(v, &[3, 1]);
+    let ref g = ::grad_with_default(&[z], &[v], &[&::ones(&z.shape())])[0];
+    assert_eq!(
+        list_reachable_nodes_desc(g)
+            .iter()
+            .rev()
+            .map(|a| a.op.name())
+            .collect::<Vec<_>>(),
+        vec![
+            "ConvertToTensor",
+            "Zeros",
+            "ConvertToTensor",
+            "Squeeze",
+            "Shape",
+            "StopGradients",
+            "Ones",
+            "ConvertToTensor",
+            "ExpandDims",
+        ]
+    );
+}
+
+// - Lists all reachable nodes from a "sink" node
+// - Sorted in "descending" order
+// - Variables/Constants are omitted
+fn list_reachable_nodes_desc<'a>(target: &'a Tensor) -> LinkedList<&'a Tensor>
+{
+    let mut stack: Vec<&Tensor> = vec![target];
+    let mut result: LinkedList<&Tensor> = LinkedList::new();
+    // DFS (Avoid recursion)
+    while let Some(pop) = stack.pop() {
+        let name = pop.op.name();
+        if name == "Variable" || name == "Const" {
+            continue;
+        }
+        result.push_back(pop);
+        for x in pop.inputs.iter() {
+            stack.push(x);
+        }
+    }
+    result
+}
 
 #[doc(hidden)]
 // Performs actual graph traversal and its evaluation.
 // Evaluated output arrays are cached in `memo`.
-// TODO: loop-based rather than recursion
-pub fn perform_eval(target: &Tensor, vars: &mut VariableMap, memo: &mut OutputMap)
+fn perform_eval(target: &Tensor, vars: &mut VariableMap, memo: &mut OutputMap)
 {
+    // Iterate all nodes that are reachable from a sink node, in ascending topological order.
+    for cur in list_reachable_nodes_desc(target).into_iter().rev() {
+        if vars.contains_key(cur) || memo.contains_key(cur) {
+            continue;
+        }
+        let y: Option<OpComputeResult> = {
+            // ** make xs **
+            let inputs = &cur.inputs;
+            let xs = inputs
+                .iter()
+                .map(|x| if let Some(a) = vars.get(x) {
+                    a
+                } else {
+                    seek_array(memo, x)
+                })
+                .collect::<Vec<_>>();
 
-    if vars.contains_key(target) || memo.contains_key(target) {
-        return;
-    }
-
-    let inputs = &target.inputs;
-
-    for x in inputs.iter() {
-        perform_eval(x, vars, memo);
-    }
-
-    let y: Option<OpComputeResult> = {
-        // ** make xs **
-        let mut xs = Vec::with_capacity(inputs.len());
-        for x in inputs.iter() {
-            if let Some(a) = vars.get(x) {
-                // from variable set
-                xs.push(a);
+            // ** compute output **
+            if cur.op.inplace() {
+                // make xs mutable temporarily
+                let mut xs: Vec<&mut NdArray> = unsafe { mem::transmute(xs) };
+                if let Err(::OpComputeErrorStatus::BadInput(msg)) =
+                    cur.op.compute_inplace(xs.as_mut_slice())
+                {
+                    // For inplace ops, reports error here
+                    panic!(msg)
+                }
+                None
             } else {
-                // from memo set
-                xs.push(seek_array(memo, x));
+                // non-inplace op
+                println!("{}", vars.len());
+                // ここで、Variable.compute() が呼ばれる
+                Some(cur.op.compute(xs.as_slice()))
             }
-        }
+        };
 
-        // ** compute output **
-        if target.op.inplace() {
-            // make xs mutable temporarily
-            let mut xs: Vec<&mut NdArray> = unsafe { mem::transmute(xs) };
-            if let Err(::OpComputeErrorStatus::BadInput(msg)) =
-                target.op.compute_inplace(xs.as_mut_slice())
-            {
-                // For inplace ops, reports error here
-                panic!(msg)
-            }
-            None
+        // ** cache the output **
+        if let Some(y_) = y {
+            // normal op
+            memo.insert(cur.clone(), y_);
         } else {
-            // non-inplace op
-            Some(target.op.compute(xs.as_slice()))
-        }
-    };
-
-    // ** cache the output **
-    if let Some(y_) = y {
-        // normal op
-        memo.insert(target.clone(), y_);
-    } else {
-        let x = &inputs[0]; // inplace => get x as a output
-        if let Some(y) = memo.remove(x) {
-            // move array from memo
-            memo.insert(target.clone(), y);
-        } else {
-            // move array from variable set
-            if let Some(y) = vars.remove(x) {
-                vars.insert(target.clone(), y);
+            // inplace op
+            let x = &cur.inputs[0]; // get x as a output
+            if let Some(y) = memo.remove(x) {
+                // move array from memo
+                memo.insert(cur.clone(), y);
             } else {
-                unreachable!()
+                // move array from variable set
+                if let Some(y) = vars.remove(x) {
+                    vars.insert(cur.clone(), y);
+                } else {
+                    unreachable!()
+                }
             }
         }
+
     }
 }
-
 
 // Recursive function which seeks the owner node of `x` in `memo`
 fn seek_array_owner<'a, 'b>(memo: &'a OutputMap, x: &'b Tensor) -> &'b Tensor
