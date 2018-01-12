@@ -1,32 +1,29 @@
 extern crate ndarray;
 
-use context;
 use ndarray_ext::NdArray;
-use std::collections::hash_map::HashMap;
-use std::mem;
 use tensor::Tensor;
 
 
 #[allow(mutable_transmutes)]
 /// Checks the validity of `gradients` with finite difference trick.
 /// For this test only, `variables` must be "shared" variables.
-pub fn gradient_check(
+pub fn gradient_check<'a, 'b, T>(
     objective: &Tensor,
-    gradients: &[Tensor],
+    gradients: &[T],
     variables: &[&Tensor],
-    ctx: context::Context, // cannot be mut ...
+    feeds: &[(&Tensor, &NdArray)],
     eps: f32,
     tol: f32,
-)
+) where
+    T: AsRef<Tensor>,
 {
-    // back prop
-    let gradients = gradients.iter().map(|a| a).collect::<Vec<_>>();
-    let theoretical_grads = eval_keep_feeds(&ctx, gradients.as_slice());
+    // backprop
+    let theoretical_grads = ::eval::eval(gradients, feeds);
 
     // for each variable nodes
-    for (v, th_grad) in variables.iter().zip(theoretical_grads) {
-        let v_arr = ctx.variables.get(v).expect("You passed non-variable");
-        let mut v_arr = unsafe { mem::transmute::<&NdArray, &mut NdArray>(v_arr) };
+    for (var_node, th_grad) in variables.iter().zip(theoretical_grads) {
+        // Sorry for unwrap
+        let v_arr = var_node.get_persistent_array().unwrap();
 
         let head_ptr: *mut f32 = v_arr.as_mut_ptr();
 
@@ -41,7 +38,7 @@ pub fn gradient_check(
             }
 
             // eval
-            let ref obj_pos = eval_keep_feeds(&ctx, &[objective])[0];
+            let ref obj_pos = ::eval::eval(&[objective], feeds)[0];
 
             // perturbation (-)
             unsafe {
@@ -49,7 +46,7 @@ pub fn gradient_check(
             }
 
             // eval
-            let ref obj_neg = eval_keep_feeds(&ctx, &[objective])[0];
+            let ref obj_neg = ::eval::eval(&[objective], feeds)[0];
 
             // restore
             unsafe {
@@ -70,32 +67,6 @@ pub fn gradient_check(
             }
         }
     }
-}
-
-type Memo = HashMap<Tensor, NdArray>;
-
-#[allow(mutable_transmutes)]
-/// Almost same as `eval`, but feeds remains after calling this.
-fn eval_keep_feeds(
-    ctx: &context::Context,
-    xs: &[&Tensor],
-) -> Vec<ndarray::Array<f32, ndarray::IxDyn>>
-{
-    // Pull out `outputs` and `variables` from context
-    let mut memo = unsafe { mem::replace(mem::transmute(&ctx.outputs), HashMap::new()) };
-    let mut vars = unsafe { mem::transmute::<&Memo, &mut Memo>(&ctx.variables) };
-
-    // Run eval with those
-    let arrays = ::eval::eval_tensors(xs, vars, &mut memo);
-
-    // Drain outputs except for placeholder nodes
-    let mut memo = memo.into_iter()
-        .filter(|&(ref k, _)| k.op.name() == "PH")
-        .collect::<HashMap<_, _>>();
-
-    // Return back memo to `ctx.outputs`
-    mem::swap(&mut memo, unsafe { mem::transmute(&ctx.outputs) });
-    arrays
 }
 
 

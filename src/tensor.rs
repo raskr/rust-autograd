@@ -1,11 +1,10 @@
 extern crate ndarray;
 
-use context;
 use ndarray_ext::NdArray;
 use ops;
-use std::collections::hash_set::HashSet;
 use std::fmt;
 use std::hash::{Hash, Hasher};
+use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
@@ -27,16 +26,34 @@ pub struct RawTensor {
 
     /// Symbolic shape of this tensor.
     pub shape: Option<Tensor>,
+
+    /// Variable or constant array is placed here.
+    pub persistent_array: Option<NdArray>,
+
+    /// Evaluation context of this tensor.
+    /// This is activated during graph evaluation time, and
+    /// invalidated at any other time.
+    pub eval_context: ::eval::TensorEvaluationContext,
 }
 
 
 impl Tensor {
+    #[allow(mutable_transmutes)]
+    pub fn get_persistent_array(&self) -> Option<&mut NdArray>
+    {
+        let m: &mut Option<NdArray> = unsafe { mem::transmute(&self.persistent_array) };
+        m.as_mut()
+    }
+
+
     /// Evaluates this tensor as a ndarray's array object.
     ///
     /// See [eval](../fn.eval.html).
-    pub fn eval(&self, ctx: &mut context::Context) -> NdArray
+    pub fn eval<'a, 'b: 'a, 'c: 'a, T>(&self, feeds: T) -> NdArray
+    where
+        T: IntoIterator<Item = &'a (&'b Tensor, &'c ndarray::Array<f32, ndarray::IxDyn>)>,
     {
-        ::eval::eval(&[self], ctx).remove(0)
+        ::eval::eval(&[self], feeds).swap_remove(0)
     }
 
 
@@ -74,44 +91,13 @@ impl Tensor {
     {
         self.inputs.is_empty()
     }
+}
 
-
-    #[doc(hidden)]
-    pub fn visit_once<F>(&self, f: &mut F)
-    where
-        F: FnMut(&Tensor) -> (),
+impl AsRef<Tensor> for Tensor {
+    #[inline(always)]
+    fn as_ref(&self) -> &Tensor
     {
-        self.run_visit_once(f, &mut HashSet::new())
-    }
-
-    #[inline]
-    fn run_visit_once<F>(&self, f: &mut F, visited: &mut HashSet<Tensor>)
-    where
-        F: FnMut(&Tensor) -> (),
-    {
-        if visited.contains(self) {
-            return; // early exit
-        } else {
-            visited.insert(self.clone()); // first visit
-        }
-
-        f(self);
-
-        for child in &(*self).inputs {
-            child.run_visit_once(f, visited)
-        }
-    }
-
-    #[doc(hidden)]
-    pub fn visit<F>(&self, f: &mut F)
-    where
-        F: FnMut(&Tensor) -> (),
-    {
-        f(self);
-
-        for child in &(*self).inputs {
-            child.visit(f)
-        }
+        self
     }
 }
 

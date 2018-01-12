@@ -10,9 +10,13 @@ pub struct SGD {
 
 impl ::gradient_descent::Optimizer for SGD {
     #[inline]
-    fn update(&mut self, _: &Tensor, param: &mut NdArray, grad: NdArray)
+    fn update(&mut self, target: &Tensor, grad: &NdArray)
     {
-        param.scaled_add(-self.lr, &grad);
+        if let Some(mut a) = target.get_persistent_array() {
+            a.scaled_add(-self.lr, grad);
+        } else {
+            panic!("Can't optimize non-variable.");
+        }
     }
 }
 
@@ -52,41 +56,44 @@ impl Default for Adam {
 
 impl ::gradient_descent::Optimizer for Adam {
     #[inline]
-    fn update(&mut self, node: &Tensor, param: &mut NdArray, grad: NdArray)
+    fn update(&mut self, target: &Tensor, grad: &NdArray)
     {
+        let new_key = target.clone();
         // get current state
-        let AdamState { mut m, mut v, t } = self.states.remove(&node).unwrap_or_else(|| {
-            AdamState {
-                m: NdArray::zeros(param.shape()),
-                v: NdArray::zeros(param.shape()),
-                t: 1.,
-            }
-        });
+        if let Some(param) = target.get_persistent_array() {
+            let AdamState { mut m, mut v, t } = self.states.remove(&new_key).unwrap_or_else(|| {
+                AdamState {
+                    m: NdArray::zeros(param.shape()),
+                    v: NdArray::zeros(param.shape()),
+                    t: 1.,
+                }
+            });
 
-        // make new m
-        let b1 = self.b1;
-        let tmp = 1. - self.b1;
-        m.zip_mut_with(&grad, move |a, &g| *a = (*a) * b1 + tmp * g);
-        let m_new = m;
+            // make new m
+            let b1 = self.b1;
+            let tmp = 1. - self.b1;
+            m.zip_mut_with(&grad, move |a, &g| *a = (*a) * b1 + tmp * g);
+            let m_new = m;
 
-        // make new v
-        let b2 = self.b2;
-        let tmp = 1. - self.b2;
-        v.zip_mut_with(&grad, move |a, &g| *a = (*a) * b2 + tmp * g * g);
-        let v_new = v;
+            // make new v
+            let b2 = self.b2;
+            let tmp = 1. - self.b2;
+            v.zip_mut_with(&grad, move |a, &g| *a = (*a) * b2 + tmp * g * g);
+            let v_new = v;
 
-        // make hat
-        let mut m_hat = &m_new * (1. / (1. - b1.powf(t)));
-        let v_hat = &v_new * (1. / (1. - b2.powf(t)));
+            // make hat
+            let mut m_hat = &m_new * (1. / (1. - b1.powf(t)));
+            let v_hat = &v_new * (1. / (1. - b2.powf(t)));
 
-        // update states
-        self.states.insert(
-            node.clone(),
-            AdamState { m: m_new, v: v_new, t: t + 1. },
-        );
+            // update states
+            self.states.insert(
+                new_key,
+                AdamState { m: m_new, v: v_new, t: t + 1. },
+            );
 
-        let eps = self.eps;
-        m_hat.zip_mut_with(&v_hat, move |a, &b| (*a) /= b.sqrt() + eps);
-        param.scaled_add(-self.alpha, &m_hat);
+            let eps = self.eps;
+            m_hat.zip_mut_with(&v_hat, move |a, &b| (*a) /= b.sqrt() + eps);
+            param.scaled_add(-self.alpha, &m_hat);
+        }
     }
 } // Adam end

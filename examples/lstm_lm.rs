@@ -13,21 +13,23 @@ struct LSTM {
 
 
 impl LSTM {
-    pub fn new(vector_dim: usize, c: &mut ag::Context) -> LSTM
+    pub fn new(vector_dim: usize) -> LSTM
     {
         LSTM {
             vector_dim,
             hs: vec![],
             cells: vec![],
-            wx: ag::variable(
-                ag::ndarray_ext::random_normal(&[vector_dim, 4 * vector_dim], 0., 0.01),
-                c,
-            ),
-            wh: ag::variable(
-                ag::ndarray_ext::random_normal(&[vector_dim, 4 * vector_dim], 0., 0.01),
-                c,
-            ),
-            b: ag::variable(ag::ndarray_ext::zeros(&[1, 4 * vector_dim]), c),
+            wx: ag::variable(ag::ndarray_ext::random_normal(
+                &[vector_dim, 4 * vector_dim],
+                0.,
+                0.01,
+            )),
+            wh: ag::variable(ag::ndarray_ext::random_normal(
+                &[vector_dim, 4 * vector_dim],
+                0.,
+                0.01,
+            )),
+            b: ag::variable(ag::ndarray_ext::zeros(&[1, 4 * vector_dim])),
         }
     }
 
@@ -75,19 +77,19 @@ pub fn main()
     let vocab_size = 5;
 
     // === graph def
-    let mut ctx = ag::Context::new();
-
     let ref sentences = ag::placeholder(&[-1, max_sent]);
-    let ref mut rnn = LSTM::new(vec_dim, &mut ctx);
+    let ref mut rnn = LSTM::new(vec_dim);
 
-    let ref lookup_table = ag::variable(
-        ag::ndarray_ext::random_normal(&[vocab_size, vec_dim], 0., 0.01),
-        &mut ctx,
-    );
-    let ref w_pred = ag::variable(
-        ag::ndarray_ext::random_uniform(&[vec_dim, vocab_size], 0., 0.01),
-        &mut ctx,
-    );
+    let ref lookup_table = ag::variable(ag::ndarray_ext::random_normal(
+        &[vocab_size, vec_dim],
+        0.,
+        0.01,
+    ));
+    let ref w_pred = ag::variable(ag::ndarray_ext::random_uniform(
+        &[vec_dim, vocab_size],
+        0.,
+        0.01,
+    ));
     // Compute cross entropy losses for each LSTM step
     let losses = (0..max_sent)
         .map(|i| {
@@ -108,6 +110,17 @@ pub fn main()
     // === graph def end
 
     // test with toy data
-    ctx.feed_input(sentences, ndarray::arr2(&[[2., 3., 1.], [3., 0., 1.]]));
-    ag::test_helper::gradient_check(loss, g.as_slice(), vars.as_slice(), ctx, 1e-3, 1e-3);
+    ag::test_helper::gradient_check(
+        loss,
+        g.as_slice(),
+        vars.as_slice(),
+        &[
+            (
+                sentences,
+                &ndarray::arr2(&[[2., 3., 1.], [3., 0., 1.]]).into_dyn(),
+            ),
+        ],
+        1e-3,
+        1e-3,
+    );
 }

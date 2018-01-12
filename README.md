@@ -28,24 +28,21 @@ let ref gx = ag::grad(&[z], &[x])[0];
 let ref ggx = ag::grad(&[gx], &[x])[0];
 
 // evaluation of symbolic gradients
-let mut ctx = ag::Context::new();
-println!("{}", gy.eval(&mut ctx));   // => 3.
-println!("{}", ggx.eval(&mut ctx));   // => 4.
+println!("{}", gy.eval(&[]));   // => 3.
+println!("{}", ggx.eval(&[]));  // => 4.
 
 // dz/dx requires to fill the placeholder `x`
-ctx.feed_input(x, ndarray::arr0(2.));
-println!("{}", gx.eval(&mut ctx));   // => 8.
+println!("{}", gx.eval(&[(x, &ndarray::arr0(2.))]));  // => 8.
 ```
 
 Another example: multi layer perceptron for MNIST digits classification.
 
 ```rust
 // -- graph def --
-let mut ctx = ag::Context::new();
 let ref x = ag::placeholder(&[-1, 28*28]);
 let ref y = ag::placeholder(&[-1]);
-let ref w = ctx.variable(ag::ndarray_ext::glorot_uniform(&[28*28, 10]));
-let ref b = ctx.variable(ag::ndarray_ext::zeros(&[1, 10]));
+let ref w = ag::variable(ag::ndarray_ext::glorot_uniform(&[28*28, 10]));
+let ref b = ag::variable(ag::ndarray_ext::zeros(&[1, 10]));
 let ref z = ag::matmul(x, w) + b;
 let ref loss = ag::reduce_mean(&ag::sparse_softmax_cross_entropy(z, y), &[0], false);
 let ref grads = ag::grad(loss, &[w, b]);
