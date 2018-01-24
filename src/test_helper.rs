@@ -4,7 +4,6 @@ use ndarray_ext::NdArray;
 use tensor::Tensor;
 
 
-#[allow(mutable_transmutes)]
 /// Checks the validity of `gradients` with finite difference trick.
 /// For this test only, `variables` must be "shared" variables.
 pub fn gradient_check<'a, 'b, T>(
