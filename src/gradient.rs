@@ -7,8 +7,9 @@ use std::rc::Rc;
 use tensor::Tensor;
 
 
+// module private
 struct GradInfo<'a> {
-    node: &'a Tensor,
+    node: &'a Tensor, // information of this node
     has_gradient: bool,
     grad_called: bool,
     computed_grads: Vec<Tensor>,
@@ -45,7 +46,7 @@ impl fmt::Debug for Tensor {
 
 macro_rules! access_grad_info_of {
     ($node:expr, $path:expr) => {
-        $path[$node.eval_context.resource_lookup_key.get()]
+        $path[$node.resource_lookup_key.get()]
     };
 }
 
@@ -67,20 +68,20 @@ fn mark_gradient_path<'a>(ys: &[&'a Tensor], xs: &[&'a Tensor]) -> Vec<GradInfo<
                     marker |= access_grad_info_of!(x, path).has_gradient;
                 }
             }
-            node.eval_context.resource_lookup_key.set(path.len());
+            node.resource_lookup_key.set(path.len());
             path.push(GradInfo::new(node, marker, None));
         } else {
             dfs_stack.push((node, true));
-            // Push children if needed
+            // Push children as necessary
             for child in &node.inputs {
                 let visited = {
-                    let k = child.eval_context.resource_lookup_key.get();
+                    let k = child.resource_lookup_key.get();
                     k < path.len() && Rc::ptr_eq(child, path[k].node)
                 };
                 if !visited {
                     if child.is_source() || child.op.stop_gradient() {
                         // Add to result, but don't allow more recursive search
-                        child.eval_context.resource_lookup_key.set(path.len());
+                        child.resource_lookup_key.set(path.len());
                         path.push(GradInfo::new(child, xs.contains(&child), None));
                     } else {
                         // Recurse
@@ -137,7 +138,7 @@ fn test_gradient_path()
 
     // Ensure continuity of keys
     for (i, node) in path_.iter().enumerate() {
-        assert_eq!(i, node.eval_context.resource_lookup_key.get());
+        assert_eq!(i, node.resource_lookup_key.get());
     }
 
     // Connection test
@@ -166,7 +167,7 @@ fn test_gradient_path()
 /// `xs` in reverse order from user's graph definition.
 /// `known_gys` are already known gradients of `ys`'s outputs.
 ///
-/// NOTE: Nodes that do not have gradient won't be included in the subgraph avoid
+/// NOTE: Nodes that do not have gradient won't be included in the subgraph to avoid
 /// unnecessary computation.
 pub fn symbolic_gradients(
     ys: &[&Tensor],
@@ -199,25 +200,26 @@ pub fn symbolic_gradients(
         .collect::<BinaryHeap<TensorWrapper>>();
 
     // Backprop.
+    // cf. https://github.com/chainer/chainer/blob/master/chainer/variable.py
     while let Some(y) = heap.pop() {
-        let xs_ = y.tensor.inputs.iter().map(|a| a).collect::<Vec<&Tensor>>();
+        let xs_ = y.inner.inputs.iter().map(|a| a).collect::<Vec<&Tensor>>();
         let gxs = {
-            let info = &mut access_grad_info_of!(y.tensor, path);
+            let info = &mut access_grad_info_of!(y.inner, path);
             let gy = if let Some(def) = info.default_grad {
                 def
             } else {
                 let gys: &mut Vec<_> = &mut info.computed_grads;
-                accumulate_grads(gys);
+                accumulate_grads_if_needed(gys);
                 &gys[0]
             };
             // Call Op::grad
-            let gxs = y.tensor.op.grad(gy, xs_.as_slice(), y.tensor);
+            let gxs = y.inner.op.grad(gy, xs_.as_slice(), y.inner);
             // Validate y::op::grad implementation
             debug_assert_eq!(
                 xs_.len(),
                 gxs.len(),
                 "{}::grad returned {} gxs",
-                y.tensor,
+                y.inner,
                 gxs.len()
             );
             gxs
@@ -241,7 +243,7 @@ pub fn symbolic_gradients(
     // Aggregate and return xs's gradients
     xs.iter()
         .map(|x| {
-            let xk = x.eval_context.resource_lookup_key.get();
+            let xk = x.resource_lookup_key.get();
             assert!(
                 xk < path.len() && Rc::ptr_eq(x, path[xk].node),
                 "Not differentiable with given tensor(s)."
@@ -252,7 +254,7 @@ pub fn symbolic_gradients(
                 "Can't differentiate with objective itself"
             );
             let gxs = &mut info.computed_grads;
-            accumulate_grads(gxs);
+            accumulate_grads_if_needed(gxs);
             debug_assert_eq!(gxs.len(), 1);
             gxs.remove(0)
         })
@@ -261,31 +263,33 @@ pub fn symbolic_gradients(
 
 // Module private.
 struct TensorWrapper<'a> {
-    tensor: &'a Tensor,
+    inner: &'a Tensor,
 }
 
 impl<'a> Ord for TensorWrapper<'a> {
     // Compares the ranks in topological ordering
     fn cmp(&self, other: &Self) -> Ordering
     {
-        self.tensor.top_rank.cmp(&other.tensor.top_rank)
+        self.inner.top_rank.cmp(&other.inner.top_rank)
     }
 }
 
 impl<'a> PartialOrd for TensorWrapper<'a> {
+    #[inline]
     // Compares the ranks in topological ordering
     fn partial_cmp(&self, other: &Self) -> Option<Ordering>
     {
-        Some(self.tensor.top_rank.cmp(&other.tensor.top_rank))
+        Some(self.inner.top_rank.cmp(&other.inner.top_rank))
     }
 }
 
 impl<'a> Eq for TensorWrapper<'a> {}
 
 impl<'a> PartialEq for TensorWrapper<'a> {
+    #[inline]
     fn eq(&self, other: &TensorWrapper<'a>) -> bool
     {
-        self.tensor.eq(&other.tensor)
+        self.inner.eq(&other.inner)
     }
 }
 
@@ -293,18 +297,19 @@ impl Tensor {
     #[inline]
     fn wrapped(&self) -> TensorWrapper
     {
-        TensorWrapper { tensor: self }
+        TensorWrapper { inner: self }
     }
 }
 
 #[inline]
-fn accumulate_grads(grads: &mut Vec<Tensor>)
+fn accumulate_grads_if_needed(grads: &mut Vec<Tensor>)
 {
     if grads.len() > 1 {
-        let acc = {
+        let mut acc = {
             let refs = grads.iter().map(|a| a).collect::<Vec<_>>();
-            ops::add_n(refs.as_slice())
+            ::ops::add_n(refs.as_slice())
         };
-        mem::swap(&mut vec![acc], grads);
+        mem::swap(&mut acc, &mut grads[0]);
+        grads.truncate(1)
     }
 }

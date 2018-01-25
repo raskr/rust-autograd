@@ -2,6 +2,7 @@ extern crate ndarray;
 
 use ndarray_ext::NdArray;
 use ops;
+use std::cell::Cell;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::mem;
@@ -30,10 +31,11 @@ pub struct RawTensor {
     /// Variable or constant array is placed here.
     pub persistent_array: Option<NdArray>,
 
-    /// Evaluation context of this tensor.
-    /// This is activated during graph evaluation time, and
-    /// invalidated at any other time.
-    pub eval_context: ::eval::TensorEvaluationContext,
+    /// Used to lookup a resource of this tensor.
+    pub resource_lookup_key: Cell<usize>,
+
+    /// Immutable flag of tensor is placeholder or not.
+    pub is_placeholder: bool,
 }
 
 

@@ -2,79 +2,30 @@
 extern crate ndarray;
 
 use ndarray_ext::NdArray;
-use std::cell::Cell;
 use std::collections::BTreeMap;
+use std::collections::btree_map::Entry;
 use std::mem;
+use std::rc::Rc;
 use tensor::Tensor;
 
 
-#[doc(hidden)]
-// Contains properties used for evaluation of a tensor.
-pub struct TensorEvaluationContext {
-    // Key of a tensor to look up corresponding array resource in a storage.
-    pub resource_lookup_key: Cell<usize>,
-    // Immutable flag of tensor is placeholder or not.
-    pub is_placeholder: bool,
-    // How many resources of a tensor does user requires.
-    pub num_required_as_ret_val: Cell<usize>,
+// Module private.
+struct TensorWithResource<'a> {
+    inner: &'a Tensor,
+    // Evaluation result this tensor.
+    val: OpComputeResult,
+    // How many resources of this tensor does user requires.
+    // If this is reduced to zero, `val` can be moved.
+    pending_count: usize,
 }
 
-impl TensorEvaluationContext {
-    pub fn new(is_placeholder: bool) -> TensorEvaluationContext
-    {
-        TensorEvaluationContext {
-            resource_lookup_key: Cell::new(!0),
-            is_placeholder,
-            num_required_as_ret_val: Cell::new(0),
-        }
-    }
-
+impl<'a> Tensor {
     #[inline]
-    // Helper
-    pub fn decrement_shared_count(&self)
+    fn with_resource(&'a self, val: OpComputeResult) -> TensorWithResource<'a>
     {
-        self.num_required_as_ret_val.set(
-            self.num_required_as_ret_val
-                .get() - 1,
-        )
-    }
-
-    #[inline]
-    // Helper
-    pub fn increment_shared_count(&self)
-    {
-        self.num_required_as_ret_val.set(
-            self.num_required_as_ret_val
-                .get() + 1,
-        )
+        TensorWithResource { inner: self, val, pending_count: 0 }
     }
 }
-
-
-#[inline]
-fn remove_or_borrow_resource(
-    node: &Tensor,
-    key: &usize,
-    map: &mut BTreeMap<usize, OutputStorageContent>,
-    remove: bool,
-) -> NdArray
-{
-    // Safe unwrapping is guarantied by topological ordering.
-    if remove {
-        match map.remove(key).unwrap().1 {
-            Ok(arr) => arr,
-            Err(::OpComputeErrorStatus::BadInput(ref msg)) => panic!(bad_input_msg(node, msg)),
-            _ => unreachable!(),
-        }
-    } else {
-        match map.get(key).unwrap().1 {
-            Ok(ref arr) => arr.clone(),
-            Err(::OpComputeErrorStatus::BadInput(ref msg)) => panic!(bad_input_msg(node, msg)),
-            _ => unreachable!(),
-        }
-    }
-}
-
 
 /// Evaluates given symbolic tensors.
 ///
@@ -100,41 +51,53 @@ where
 {
     // Run graph
     let feeds = feeds.into_iter().collect::<Vec<_>>();
-    let output_storage = eval_internal(&tensors.iter().map(|t| t.as_ref()).collect(), &feeds);
+    let mut output_storage = eval_internal(&tensors.iter().map(|t| t.as_ref()).collect(), &feeds);
 
     // Treat in-place or delegation ops
     let creators = tensors
         .iter()
         .map(|x| {
-            let creator = find_resource_creator(&output_storage, x.as_ref());
-            creator.eval_context.increment_shared_count();
+            let x = x.as_ref();
+            let creator = if x.is_placeholder || x.persistent_array.is_some() {
+                x
+            } else {
+                let creator = find_resource_creator(&output_storage, x);
+                output_storage[creator.resource_lookup_key.get()].pending_count += 1;
+                creator
+            };
             creator
         })
         .collect::<Vec<&Tensor>>();
 
-    // Shrink to fit
-    let mut key2res: BTreeMap<usize, OutputStorageContent> =
-        finalize_output_storage(output_storage);
+    // Shrink to fit (output_storage is moved)
+    let mut key2res: BTreeMap<usize, TensorWithResource> = finalize_output_storage(output_storage);
 
     // Aggregate return values
     creators
         .iter()
         .map(|ref creator| {
-            let ctx = &creator.eval_context;
             if let Some(ref per) = creator.persistent_array {
-                // Rarely happens (case that user want a constant value)
+                // Rarely happens (case that a persistent array given by user is required)
                 per.clone()
-            } else if ctx.is_placeholder {
-                // Rarely happens (case that user want a placeholder value)
+            } else if creator.is_placeholder {
+                // Rarely happens (case that a feed by user is required)
                 get_fed_resource(creator, &feeds).clone()
             } else {
-                let res = remove_or_borrow_resource(
-                    creator,
-                    &ctx.resource_lookup_key.get(),
-                    &mut key2res,
-                    ctx.num_required_as_ret_val.get() == 1,
-                );
-                ctx.decrement_shared_count();
+                let res = match key2res.entry(creator.resource_lookup_key.get()) {
+                    Entry::Occupied(mut ent) => {
+                        // pending_count == 1, so move out
+                        if ent.get().pending_count == 1 {
+                            let got = ent.remove();
+                            got.val.expect(got.inner.op.name())
+                        } else {
+                            // pending_count > 1, so copy the resource
+                            let got = ent.get_mut();
+                            got.pending_count -= 1;
+                            got.val.as_ref().expect(got.inner.op.name()).clone()
+                        }
+                    }
+                    _ => unreachable!(),
+                };
                 res
             }
         })
@@ -172,12 +135,6 @@ where
     );
 }
 
-#[inline(always)]
-fn key_of(x: &Tensor) -> usize
-{
-    x.eval_context.resource_lookup_key.get()
-}
-
 #[inline]
 // Recursive function which seeks array resource of `x` in 'output_storage` or `feed_storage`.
 // Actual recursion "rarely" happens.
@@ -191,27 +148,23 @@ fn find_resource<'a, 'b: 'a>(
     if let Some(ref per) = x.persistent_array {
         assert!(!inplace || x.op.name() != "Const");
         per
-    } else if x.eval_context.is_placeholder {
-        feed_storage[key_of(x)]
+    } else if x.is_placeholder {
+        feed_storage[x.resource_lookup_key.get()]
     } else if x.op.inplace() {
         find_resource(output_storage, feed_storage, &x.inputs[0], inplace)
     } else {
-        match output_storage[key_of(x)].1 {
+        match output_storage[x.resource_lookup_key.get()].val {
             Ok(ref arr) => arr,
             // hoping for x.inputs[i] to have the value
             Err(::OpComputeErrorStatus::Delegate { to: i }) => {
                 find_resource(output_storage, feed_storage, &x.inputs[i], inplace)
             }
             // panic
-            Err(::OpComputeErrorStatus::BadInput(ref msg)) => panic!(bad_input_msg(x, msg)),
+            Err(::OpComputeErrorStatus::BadInput(ref msg)) => {
+                panic!("autograd failed: {}, msg: {}", x, msg)
+            }
         }
     }
-}
-
-
-fn bad_input_msg(x: &Tensor, msg: &str) -> String
-{
-    format!("autograd failed: {}, msg: {}", x, msg)
 }
 
 
@@ -220,32 +173,25 @@ fn bad_input_msg(x: &Tensor, msg: &str) -> String
 // Actual recursion "rarely" happens.
 fn find_resource_creator<'a, 'b>(storage: &OutputStorage, x: &'b Tensor) -> &'b Tensor
 {
-    if x.eval_context.is_placeholder || x.persistent_array.is_some() {
-        x
+    if x.op.inplace() {
+        find_resource_creator(storage, &x.inputs[0])
     } else {
-        if x.op.inplace() {
-            find_resource_creator(storage, &x.inputs[0])
-        } else {
-            match storage[key_of(x)].1 {
-                Ok(_) => x,
-                Err(::OpComputeErrorStatus::Delegate { to: i }) =>
-                    find_resource_creator(storage, &x.inputs[i])  // recurse
-                ,
-                Err(::OpComputeErrorStatus::BadInput(ref msg)) =>
-                    panic!(bad_input_msg(x, msg))
-            }
+        match storage[x.resource_lookup_key.get()].val {
+            Ok(_) => x,
+            Err(::OpComputeErrorStatus::Delegate { to: i }) =>
+                find_resource_creator(storage, &x.inputs[i])  // recurse
+            ,
+            Err(::OpComputeErrorStatus::BadInput(ref msg)) =>
+                panic!("autograd failed: {}, msg: {}", x, msg),
         }
     }
 }
 
 
 // private type alias
-type OpComputeResult = Result<NdArray, ::OpComputeErrorStatus>;
-type OutputStorageContent<'a> = (&'a Tensor, OpComputeResult);
-type OutputStorage<'a> = Vec<OutputStorageContent<'a>>;
+type OpComputeResult = Result<NdArray, ::ops::OpComputeErrorStatus>;
+type OutputStorage<'a> = Vec<TensorWithResource<'a>>;
 type FeedStorage<'a> = Vec<&'a NdArray>;
-
-use std::rc::Rc;
 
 // TODO: Use raw pointer comparison after removing "Rc"
 fn get_fed_resource<'a>(node: &Tensor, feeds: &Vec<&(&Tensor, &'a NdArray)>) -> &'a NdArray
@@ -260,30 +206,28 @@ fn get_fed_resource<'a>(node: &Tensor, feeds: &Vec<&(&Tensor, &'a NdArray)>) -> 
 }
 
 
-// Actually evaluates tensors "from".
+// Actually evaluates "endpoints".
 fn eval_internal<'a>(
-    from: &Vec<&'a Tensor>,
+    endpoints: &Vec<&'a Tensor>,
     feeds: &Vec<&(&'a Tensor, &NdArray)>,
 ) -> OutputStorage<'a>
 {
     // Use vector for resource storage to do O(1) lookup.
     // Storage sizes are unknown at this point.
-    let mut output_storage: Vec<OutputStorageContent> = Vec::new();
+    let mut output_storage: OutputStorage<'a> = Vec::new();
     let mut feed_storage: Vec<&NdArray> = Vec::new();
 
-    // Obtain array resources while visiting nodes in execution (topological) order.
+    // Obtain array resources while visiting nodes in topological order.
     // Stack-based DFS is used, to avoid stack overflow in explicit recursion.
-    let mut dfs_stack: Vec<(&Tensor, bool)> = from.iter().map(|&x| (x, false)).collect();
+    let mut dfs_stack: Vec<(&Tensor, bool)> = endpoints.iter().map(|&x| (x, false)).collect();
     while let Some((node, is_parent)) = dfs_stack.pop() {
-        let ctx: &TensorEvaluationContext = &node.eval_context;
         if is_parent {
             // Visit this node
-            if ctx.is_placeholder {
-                let res = get_fed_resource(node, &feeds);
-                ctx.resource_lookup_key.set(feed_storage.len());
-                feed_storage.push(res);
+            if node.is_placeholder {
+                node.resource_lookup_key.set(feed_storage.len());
+                feed_storage.push(get_fed_resource(node, &feeds));
             } else {
-                ctx.resource_lookup_key.set(output_storage.len());
+                node.resource_lookup_key.set(output_storage.len());
                 if node.persistent_array.is_none() {
                     let y = compute_y(node, &output_storage, &feed_storage);
                     preserve_y(node, y, &mut output_storage);
@@ -294,9 +238,10 @@ fn eval_internal<'a>(
             dfs_stack.push((node, true));
             // Push children if needed
             for child in &node.inputs {
-                let k = key_of(child);
+                let k = child.resource_lookup_key.get();
                 // TODO: Use raw pointer comparison after removing "Rc"
-                let visited = k < output_storage.len() && Rc::ptr_eq(child, output_storage[k].0);
+                let visited = k < output_storage.len() &&
+                    Rc::ptr_eq(child, output_storage[k].inner);
                 if !visited {
                     dfs_stack.push((child, false));
                 }
@@ -348,12 +293,11 @@ fn preserve_y<'a>(
 {
     if let Some(y) = node_y {
         // push back
-        output_storage.push((node, y));
+        output_storage.push(node.with_resource(y));
     } else {
         // inplace op: just transfer the lookup key (node.inputs[0] => node)
-        node.eval_context.resource_lookup_key.set(
+        node.resource_lookup_key.set(
             node.inputs[0]
-                .eval_context
                 .resource_lookup_key
                 .get(),
         );
@@ -362,8 +306,8 @@ fn preserve_y<'a>(
 
 
 // Shrink output storage by dropping useless resources
-// and converts it into mapping of {lookup key => resource}
-fn finalize_output_storage(mut vec: OutputStorage) -> BTreeMap<usize, OutputStorageContent>
+// and convert it into mappings of {lookup key => resource}
+fn finalize_output_storage(mut vec: OutputStorage) -> BTreeMap<usize, TensorWithResource>
 {
     let mut retained_keys = Vec::new();
     let len = vec.len();
@@ -375,10 +319,7 @@ fn finalize_output_storage(mut vec: OutputStorage) -> BTreeMap<usize, OutputStor
             let v = &mut **mut_ref;
 
             for i in 0..len {
-                let node: &Tensor = v[i].0;
-                let ctx = &node.eval_context;
-
-                if ctx.num_required_as_ret_val.get() == 0 {
+                if v[i].pending_count == 0 {
                     del += 1;
                     continue;
                 }
@@ -436,7 +377,10 @@ fn test_eval_internal()
     let storage = eval_internal(&vec![&g[0]], &vec![&(v, &::ndarray_ext::ones(&[3, 2, 1]))]);
 
     assert_eq!(
-        storage.iter().map(|x| x.0.op.name()).collect::<Vec<_>>(),
+        storage
+            .iter()
+            .map(|x| x.inner.op.name())
+            .collect::<Vec<_>>(),
         vec![
             "ConvertToTensor",
             "Squeeze", // forward end

@@ -1,7 +1,7 @@
 extern crate ndarray;
 
-use eval::TensorEvaluationContext;
 use ndarray_ext::NdArray;
+use std::cell::Cell;
 use std::rc::Rc;
 use tensor::{ArrayLike, RawTensor, Tensor};
 
@@ -135,7 +135,8 @@ pub fn apply_op<T: Op + 'static>(op: T, inputs: &[&Tensor], shape: Option<Tensor
             .unwrap_or(0),
         shape,
         persistent_array: None,
-        eval_context: TensorEvaluationContext::new(false),
+        is_placeholder: false,
+        resource_lookup_key: Cell::new(!0),
     }))
 }
 
@@ -357,8 +358,9 @@ where
         inputs: vec![],
         top_rank: 0,
         shape: Some(convert_to_tensor(::ndarray_ext::shape_of(&arr))),
-        eval_context: TensorEvaluationContext::new(false),
         persistent_array: Some(arr),
+        is_placeholder: false,
+        resource_lookup_key: Cell::new(!0),
     }))
 }
 
@@ -386,8 +388,9 @@ pub fn placeholder(shape_: &[isize]) -> Tensor
         inputs: vec![],
         top_rank: 0,
         shape,
-        eval_context: TensorEvaluationContext::new(true),
         persistent_array: None,
+        is_placeholder: true,
+        resource_lookup_key: Cell::new(!0),
     }))
 }
 
@@ -415,7 +418,8 @@ where
         inputs: vec![],
         top_rank: 0,
         shape: Some(convert_to_tensor(::ndarray_ext::shape_of(&arr))),
-        eval_context: TensorEvaluationContext::new(false),
+        is_placeholder: false,
+        resource_lookup_key: Cell::new(!0),
         persistent_array: Some(arr),
     }))
 }
