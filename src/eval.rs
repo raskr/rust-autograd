@@ -12,10 +12,10 @@ use tensor::Tensor;
 // Module private.
 struct TensorWithResource<'a> {
     inner: &'a Tensor,
-    // Evaluation result this tensor.
+    // Evaluation result of this tensor.
     val: OpComputeResult,
     // How many resources of this tensor does user requires.
-    // If this is reduced to zero, `val` can be moved.
+    // If this is reduced to one, `val` can be moved.
     pending_count: usize,
 }
 
@@ -85,7 +85,7 @@ where
             } else {
                 let res = match key2res.entry(creator.resource_lookup_key.get()) {
                     Entry::Occupied(mut ent) => {
-                        // pending_count == 1, so move out
+                        // pending_count = 1, so move out
                         if ent.get().pending_count == 1 {
                             let got = ent.remove();
                             got.val.expect(got.inner.op.name())
@@ -238,10 +238,11 @@ fn eval_internal<'a>(
             dfs_stack.push((node, true));
             // Push children if needed
             for child in &node.inputs {
-                let k = child.resource_lookup_key.get();
                 // TODO: Use raw pointer comparison after removing "Rc"
-                let visited = k < output_storage.len() &&
-                    Rc::ptr_eq(child, output_storage[k].inner);
+                let visited = {
+                    let k = child.resource_lookup_key.get();
+                    k < output_storage.len() && Rc::ptr_eq(child, output_storage[k].inner)
+                };
                 if !visited {
                     dfs_stack.push((child, false));
                 }
@@ -263,9 +264,7 @@ fn compute_y(
     // make xs
     let xs = node.inputs
         .iter()
-        .map(|x| {
-            find_resource(output_storage, feed_storage, x, is_inplace)
-        })
+        .map(|x| find_resource(output_storage, feed_storage, x, is_inplace))
         .collect::<Vec<_>>();
 
     // compute output
@@ -345,9 +344,9 @@ fn finalize_output_storage(mut vec: OutputStorage) -> BTreeMap<usize, TensorWith
 #[test]
 fn test_eval()
 {
-    let ref v = ::placeholder(&[3, 2, 1]);
-    let ref z = ::squeeze(v, &[2]);
-    let ref g = ::grad_with_default(&[z], &[v], &[&::ones(&z.shape())]);
+    let ref v = ::ops::placeholder(&[3, 2, 1]);
+    let ref z = ::ops::squeeze(v, &[2]);
+    let ref g = ::ops::grad_with_default(&[z], &[v], &[&::ones(&z.shape())]);
     let eval_result = eval(g, &[(v, &::ndarray_ext::ones(&[3, 2, 1]))]);
     assert_eq!(eval_result[0].shape(), &[3, 2, 1]);
 }
@@ -363,7 +362,7 @@ fn test_constant_eval()
 fn test_placeholder_eval()
 {
     let arr = ::ndarray_ext::ones(&[3, 2, 1]);
-    let ref v = ::placeholder(&[3, 2, 1]);
+    let ref v = ::ops::placeholder(&[3, 2, 1]);
     let eval_result = eval(&[v], &[(v, &arr)]);
     assert_eq!(eval_result[0], arr);
 }
@@ -371,9 +370,9 @@ fn test_placeholder_eval()
 #[test]
 fn test_eval_internal()
 {
-    let ref v = ::placeholder(&[3, 2, 1]);
-    let ref z = ::squeeze(v, &[2]);
-    let ref g = ::grad_with_default(&[z], &[v], &[&::ones(&z.shape())]);
+    let ref v = ::ops::placeholder(&[3, 2, 1]);
+    let ref z = ::ops::squeeze(v, &[2]);
+    let ref g = ::ops::grad_with_default(&[z], &[v], &[&::ones(&z.shape())]);
     let storage = eval_internal(&vec![&g[0]], &vec![&(v, &::ndarray_ext::ones(&[3, 2, 1]))]);
 
     assert_eq!(
@@ -385,7 +384,7 @@ fn test_eval_internal()
             "ConvertToTensor",
             "Squeeze", // forward end
             "Shape",
-            "StopGradients",
+            "StopGradient",
             "Ones",
             "ExpandDims",
         ]

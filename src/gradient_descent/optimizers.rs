@@ -12,7 +12,7 @@ impl ::gradient_descent::Optimizer for SGD {
     #[inline]
     fn update(&mut self, target: &Tensor, grad: &NdArray)
     {
-        if let Some(mut a) = target.get_persistent_array() {
+        if let Some(mut a) = unsafe { target.get_persistent_array_mut() } {
             a.scaled_add(-self.lr, grad);
         } else {
             panic!("Can't optimize non-variable.");
@@ -60,7 +60,7 @@ impl ::gradient_descent::Optimizer for Adam {
     {
         let new_key = target.clone();
         // get current state
-        if let Some(param) = target.get_persistent_array() {
+        if let Some(param) = unsafe { target.get_persistent_array_mut() } {
             let AdamState { mut m, mut v, t } = self.states.remove(&new_key).unwrap_or_else(|| {
                 AdamState {
                     m: NdArray::zeros(param.shape()),

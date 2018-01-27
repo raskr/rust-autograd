@@ -3,12 +3,12 @@ use ops;
 use tensor::Tensor;
 
 
-pub struct StopGradients;
+pub struct StopGradient;
 
-impl ops::Op for StopGradients {
+impl ops::Op for StopGradient {
     fn name(&self) -> &str
     {
-        "StopGradients"
+        "StopGradient"
     }
 
     fn compute(&self, _: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>

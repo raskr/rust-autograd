@@ -40,10 +40,11 @@ pub struct RawTensor {
 
 
 impl Tensor {
+    // TODO: Use UnsafeCell
     #[allow(mutable_transmutes)]
-    pub fn get_persistent_array(&self) -> Option<&mut NdArray>
+    pub unsafe fn get_persistent_array_mut(&self) -> Option<&mut NdArray>
     {
-        let m: &mut Option<NdArray> = unsafe { mem::transmute(&self.persistent_array) };
+        let m: &mut Option<NdArray> =  mem::transmute(&self.persistent_array);
         m.as_mut()
     }
 
