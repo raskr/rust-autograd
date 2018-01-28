@@ -48,9 +48,10 @@ fn main()
 
     for epoch in 0..max_epoch {
         eval_with_time!({
-            let perm = ag::ndarray_ext::permutation(num_batches) * batch_size as usize;
-            for i in perm.to_vec().into_iter() {
-                let i = i as isize;
+            let mut perm = ag::ndarray_ext::permutation(num_batches);
+            perm *= batch_size as usize;
+            for i in perm.into_iter() {
+                let i = *i as isize;
                 let x_batch = x_train.slice(s![i..i + batch_size, ..]).to_owned();
                 let y_batch = y_train.slice(s![i..i + batch_size, ..]).to_owned();
                 ag::gradient_descent::update(
