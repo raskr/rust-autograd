@@ -1,5 +1,6 @@
 use ndarray_ext::NdArray;
-use std::collections::hash_map::HashMap;
+use std::collections::BTreeMap;
+use std::collections::btree_map::Entry;
 use tensor::Tensor;
 
 
@@ -8,12 +9,12 @@ pub struct SGD {
     pub lr: f32,
 }
 
-impl ::gradient_descent::Optimizer for SGD {
+impl<'a> super::Optimizer<'a> for SGD {
     #[inline]
-    fn update(&mut self, target: &Tensor, grad: &NdArray)
+    fn update(&mut self, param: &'a Tensor, grad: NdArray)
     {
-        if let Some(mut a) = unsafe { target.get_persistent_array_mut() } {
-            a.scaled_add(-self.lr, grad);
+        if let Some(mut param_arr) = unsafe { param.get_persistent_array_mut() } {
+            param_arr.scaled_add(-self.lr, &grad);
         } else {
             panic!("Can't optimize non-variable.");
         }
@@ -24,76 +25,77 @@ impl ::gradient_descent::Optimizer for SGD {
 /// Adam optimizer
 ///
 /// This implementation is based on http://arxiv.org/abs/1412.6980v8
-pub struct Adam {
+pub struct Adam<'a> {
     // static params
     pub alpha: f32,
     pub eps: f32,
     pub b1: f32,
     pub b2: f32,
     // dynamic params
-    pub states: HashMap<Tensor, AdamState>,
+    pub states: BTreeMap<super::StateKey<'a>, AdamState>,
 }
 
-#[doc(hidden)]
 pub struct AdamState {
     m: NdArray,
     v: NdArray,
     t: f32,
 }
 
-impl Default for Adam {
-    fn default() -> Adam
+impl<'a> Default for Adam<'a> {
+    fn default() -> Adam<'a>
     {
         Adam {
             alpha: 0.001,
             eps: 1e-08,
             b1: 0.9,
             b2: 0.999,
-            states: HashMap::new(),
+            states: BTreeMap::new(),
         }
     }
 }
 
-impl ::gradient_descent::Optimizer for Adam {
+impl<'a> super::Optimizer<'a> for Adam<'a> {
     #[inline]
-    fn update(&mut self, target: &Tensor, grad: &NdArray)
+    fn update(&mut self, param: &'a Tensor, grad: NdArray)
     {
-        let new_key = target.clone();
         // get current state
-        if let Some(param) = unsafe { target.get_persistent_array_mut() } {
-            let AdamState { mut m, mut v, t } = self.states.remove(&new_key).unwrap_or_else(|| {
-                AdamState {
-                    m: NdArray::zeros(param.shape()),
-                    v: NdArray::zeros(param.shape()),
-                    t: 1.,
+        if let Some(mut param_arr) = unsafe { param.get_persistent_array_mut() } {
+            // If first time access => Insert new param
+            match self.states.entry(param.as_state_key()) {
+                Entry::Vacant(ent) => {
+                    ent.insert(AdamState {
+                        m: NdArray::zeros(param_arr.shape()),
+                        v: NdArray::zeros(param_arr.shape()),
+                        t: 1.,
+                    });
                 }
-            });
+                _ => {}
+            }
 
-            // make new m
+            // Get current state with aafe unwrap.
+            let &mut AdamState { ref mut m, ref mut v, ref mut t } =
+                self.states.get_mut(&param.as_state_key()).unwrap();
+
+            // Make new m
             let b1 = self.b1;
             let tmp = 1. - self.b1;
             m.zip_mut_with(&grad, move |a, &g| *a = (*a) * b1 + tmp * g);
-            let m_new = m;
 
-            // make new v
+            // Make new v
             let b2 = self.b2;
             let tmp = 1. - self.b2;
             v.zip_mut_with(&grad, move |a, &g| *a = (*a) * b2 + tmp * g * g);
-            let v_new = v;
 
-            // make hat
-            let mut m_hat = &m_new * (1. / (1. - b1.powf(t)));
-            let v_hat = &v_new * (1. / (1. - b2.powf(t)));
-
-            // update states
-            self.states.insert(
-                new_key,
-                AdamState { m: m_new, v: v_new, t: t + 1. },
-            );
+            // Make hat
+            let new_m: &NdArray = m;
+            let new_v: &NdArray = v;
+            let mut m_hat = new_m * (1. / (1. - b1.powf(*t)));
+            let v_hat = new_v * (1. / (1. - b2.powf(*t)));
 
             let eps = self.eps;
             m_hat.zip_mut_with(&v_hat, move |a, &b| (*a) /= b.sqrt() + eps);
-            param.scaled_add(-self.alpha, &m_hat);
+            param_arr.scaled_add(-self.alpha, &m_hat);
+            *t += 1.;
         }
     }
 } // Adam end
