@@ -3,6 +3,7 @@ extern crate ndarray;
 extern crate autograd as ag;
 
 use std::time::Instant;
+use self::ag::gradient_descent_ops::Optimizer;
 
 
 // This is softmax regression with Adam optimizer for mnist.
@@ -35,12 +36,14 @@ fn main()
     let ref b = ag::variable(ag::ndarray_ext::zeros(&[1, 10]));
     let ref z = ag::matmul(x, w) + b;
     let ref loss = ag::sparse_softmax_cross_entropy(z, y);
-    let ref grads = ag::grad(&[loss], &[w, b]);
+    let ref params = [w, b];
+    let ref grads = ag::grad(&[loss], params);
     let ref predictions = ag::argmax(z, -1, true);
     let ref accuracy = ag::reduce_mean(&ag::equal(predictions, y), &[0], false);
+    let mut adam = ag::gradient_descent_ops::Adam::default();
+    let ref update_ops = adam.compute_updates(params, grads);
 
     // -- actual training --
-    let mut optimizer = ag::gradient_descent::Adam { ..Default::default() };
     let max_epoch = 3;
     let batch_size = 200isize;
     let num_samples = x_train.shape()[0];
@@ -48,18 +51,12 @@ fn main()
 
     for epoch in 0..max_epoch {
         eval_with_time!({
-            let mut perm = ag::ndarray_ext::permutation(num_batches);
-            perm *= batch_size as usize;
+            let perm = ag::ndarray_ext::permutation(num_batches) * batch_size as usize;
             for i in perm.into_iter() {
                 let i = *i as isize;
                 let x_batch = x_train.slice(s![i..i + batch_size, ..]).to_owned();
                 let y_batch = y_train.slice(s![i..i + batch_size, ..]).to_owned();
-                ag::gradient_descent::update(
-                    &[w, b],
-                    grads,
-                    &mut optimizer,
-                    &[(x, &x_batch), (y, &y_batch)],
-                );
+                ag::run(update_ops, &[(x, &x_batch), (y, &y_batch)]);
             }
         });
         println!("finish epoch {}", epoch);
