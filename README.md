@@ -14,6 +14,8 @@ Here we are computing partial derivatives of `z = 2x^2 + 3y + 1`.
 extern crate ndarray;
 extern crate autograd as ag;
 
+use self::ag::gradient_descent_ops::Optimizer;
+
 let ref x = ag::placeholder(&[]);
 let ref y = ag::placeholder(&[]);
 let ref z = 2*x*x + 3*y + 1;
@@ -45,19 +47,20 @@ let ref w = ag::variable(ag::ndarray_ext::glorot_uniform(&[28*28, 10]));
 let ref b = ag::variable(ag::ndarray_ext::zeros(&[1, 10]));
 let ref z = ag::matmul(x, w) + b;
 let ref loss = ag::reduce_mean(&ag::sparse_softmax_cross_entropy(z, y), &[0], false);
-let ref grads = ag::grad(loss, &[w, b]);
+let ref params = [w, b]
+let ref grads = ag::grad(loss, params);
 let ref predictions = ag::argmax(z, -1, true);
 let ref accuracy = ag::reduce_mean(&ag::equal(predictions, y), &[0], false);
+let mut adam = ag::gradient_descent_ops::Adam::default();
+let ref update_ops = adam.compute_updates(params, grads);
 
 // -- dataset --
 let ((x_train, y_train), (x_test, y_test)) = dataset::load();
 
-// -- training method --
-let mut optimizer = ag::gradient_descent::SGD { lr: 0.01 };
-
 // -- training loop --
 for epoch in 0..max_epoch {
     ...
+    ag::run(update_ops, &[(x, &x_batch), (y, &y_batch)]);
 }
 
 ```
