@@ -50,6 +50,19 @@ macro_rules! access_grad_info_of {
     };
 }
 
+
+#[inline]
+fn has_marked_child(parent: &Tensor, path: &Vec<GradInfo>) -> bool
+{
+    let mut it = parent.inputs.iter();
+    while let Some(child) = it.next() {
+        if access_grad_info_of!(child, path).has_gradient {
+            return true;
+        }
+    }
+    false
+}
+
 // Marks `has_gradient` if each node is on the gradient propagation path.
 // NOTE: Disconnected "parent nodes" are included but their children are not.
 fn mark_gradient_path<'a>(ys: &[&'a Tensor], xs: &[&'a Tensor]) -> Vec<GradInfo<'a>>
@@ -62,12 +75,7 @@ fn mark_gradient_path<'a>(ys: &[&'a Tensor], xs: &[&'a Tensor]) -> Vec<GradInfo<
     let mut dfs_stack: Vec<(&Tensor, bool)> = ys.iter().map(|&y| (y, false)).collect();
     while let Some((node, is_parent)) = dfs_stack.pop() {
         if is_parent {
-            let mut marker = xs.contains(&node);
-            if !marker {
-                for x in node.inputs.iter() {
-                    marker |= access_grad_info_of!(x, path).has_gradient;
-                }
-            }
+            let marker = xs.contains(&node) || has_marked_child(node, &path);
             node.resource_lookup_key.set(path.len());
             path.push(GradInfo::new(node, marker, None));
         } else {
