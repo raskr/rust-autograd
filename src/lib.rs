@@ -15,8 +15,6 @@ pub mod gradient;
 
 pub mod ops;
 
-pub mod gradient_descent;
-
 pub mod ndarray_ext;
 
 pub use ndarray_ext::array_gen;
@@ -24,6 +22,8 @@ pub use ndarray_ext::array_gen;
 pub use tensor::Tensor;
 
 pub use ops::*;
+
+pub use ops::gradient_descent_ops;
 
 #[doc(hidden)]
 pub use ndarray_ext::NdArray;
