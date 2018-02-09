@@ -102,7 +102,7 @@ impl ops::Op for Shape {
         vec![None]
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let xs = ctx.grab_inputs();
         let x = xs[0];
@@ -121,7 +121,8 @@ impl ops::Op for Rank {
         vec![None]
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<::NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext)
+        -> Result<::NdArray, ::OpComputeErrorStatus>
     {
         let xs = ctx.grab_inputs();
         let x: &NdArray = xs[0];
@@ -140,7 +141,8 @@ impl ops::Op for Size {
         vec![None]
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<::NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext)
+        -> Result<::NdArray, ::OpComputeErrorStatus>
     {
         let xs = ctx.grab_inputs();
         let x: &NdArray = xs[0];
@@ -155,7 +157,7 @@ impl ops::Op for Reshape {
         "Reshape"
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let xs = ctx.grab_inputs();
         let ret = xs[0].clone();
@@ -194,7 +196,7 @@ impl ops::Op for SetDiff1D {
         "SetDiff1D"
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let xs = ctx.grab_inputs();
         let x0: &NdArray = xs[0];
@@ -230,7 +232,7 @@ impl ops::Op for IndexOp {
         "IndexOp"
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let xs = ctx.grab_inputs();
         let x: &NdArray = xs[0];
@@ -265,7 +267,7 @@ impl ops::Op for IndexOpGrad {
         "IndexOpGrad"
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let xs = ctx.grab_inputs();
         let x = xs[0];
@@ -305,7 +307,7 @@ impl ops::Op for Gather {
         "Gather"
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let xs = ctx.grab_inputs();
         let indices = xs[0].map(|a| *a as usize);
@@ -356,7 +358,7 @@ impl ::Op for GatherGrad {
         "GatherGrad"
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let xs = ctx.grab_inputs();
         let indices: &NdArray = xs[0];
@@ -421,7 +423,7 @@ impl ops::Op for AddN {
         "AddN"
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let xs = ctx.grab_inputs();
         if 0 == xs.len() {
@@ -453,7 +455,7 @@ impl ops::Op for Clip {
         "Clip"
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let xs = ctx.grab_inputs();
         Ok(xs[0].mapv(move |a| a.min(self.max).max(self.min)))
@@ -475,7 +477,7 @@ impl ops::Op for ClipGrad {
     {
         "ClipGrad"
     }
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let xs = ctx.grab_inputs();
         let mut ret = xs[0].mapv(move |x| {
@@ -498,7 +500,8 @@ impl ops::Op for Concat {
         "Concat"
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<::NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext)
+        -> Result<::NdArray, ::OpComputeErrorStatus>
     {
         let mut views = vec![];
         let xs = ctx.grab_inputs();
@@ -549,7 +552,8 @@ impl ops::Op for ConcatGrad {
         "ConcatGrad"
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<::NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext)
+        -> Result<::NdArray, ::OpComputeErrorStatus>
     {
         let xs = ctx.grab_inputs();
         let gy = xs[0];
@@ -595,7 +599,7 @@ impl ops::Op for Tile {
         "Tile"
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let xs = ctx.grab_inputs();
         let x: &NdArray = xs[0];
@@ -631,7 +635,7 @@ impl ops::Op for Split {
         "Split"
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let xs = ctx.grab_inputs();
         let x = xs[0];
@@ -667,7 +671,7 @@ impl ops::Op for SplitGrad {
         "SplitGrad"
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let xs = ctx.grab_inputs();
         let x = xs[0];
@@ -725,7 +729,7 @@ impl ops::Op for Slice {
         "Slice"
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let xs = ctx.grab_inputs();
         let y: NdArray = xs[0].slice(&*self.indices).to_owned();
@@ -754,7 +758,7 @@ impl ops::Op for SliceGrad {
         "SliceGrad"
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let xs = ctx.grab_inputs();
         let x = xs[0];
@@ -780,7 +784,7 @@ impl ops::Op for Squeeze {
         "Squeeze"
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let xs = ctx.grab_inputs();
         let mut x = xs[0].view();
@@ -814,7 +818,8 @@ impl ops::Op for ExpandDims {
         "ExpandDims"
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<::NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext)
+        -> Result<::NdArray, ::OpComputeErrorStatus>
     {
         let xs = ctx.grab_inputs();
         let ret = xs[0].clone();
@@ -844,7 +849,7 @@ impl ops::Op for Broadcast {
         "Broadcast"
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let xs = ctx.grab_inputs();
         let x = xs[0];

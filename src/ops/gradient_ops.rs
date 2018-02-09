@@ -11,7 +11,7 @@ impl ops::Op for StopGradient {
         "StopGradient"
     }
 
-    fn compute(&self, _: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, _: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         Err(::OpComputeErrorStatus::Delegate { to: 0 })
     }

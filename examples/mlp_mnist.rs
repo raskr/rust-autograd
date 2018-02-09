@@ -2,8 +2,8 @@
 extern crate ndarray;
 extern crate autograd as ag;
 
-use std::time::Instant;
 use self::ag::gradient_descent_ops::Optimizer;
+use std::time::Instant;
 
 
 // This is softmax regression with Adam optimizer for mnist.

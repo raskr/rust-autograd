@@ -11,7 +11,6 @@ Here we are computing partial derivatives of `z = 2x^2 + 3y + 1`.
 
 ```rust
 
-extern crate ndarray;
 extern crate autograd as ag;
 
 use self::ag::gradient_descent_ops::Optimizer;
@@ -34,7 +33,7 @@ println!("{}", gy.eval(&[]));   // => 3.
 println!("{}", ggx.eval(&[]));  // => 4.
 
 // dz/dx requires to fill the placeholder `x`
-println!("{}", gx.eval(&[(x, &ndarray::arr0(2.))]));  // => 8.
+println!("{}", gx.eval(&[(x, &ag::ndarray::arr0(2.))]));  // => 8.
 ```
 
 Another example: multi layer perceptron for MNIST digits classification.

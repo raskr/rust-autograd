@@ -1,5 +1,6 @@
 extern crate ndarray;
 
+use errors::OpComputeErrorStatus;
 use ndarray_ext::NdArray;
 use std::cell::Cell;
 use std::rc::Rc;
@@ -18,8 +19,7 @@ mod const_gen_ops;
 pub mod gradient_descent_ops;
 
 
-/// Represents a operation node in a computation graph.
-/// `Tensor` wraps trait-object of this.
+/// Operation trait. `Tensor` wraps trait-object of this.
 pub trait Op {
     /// Name of this op
     fn name(&self) -> &str;
@@ -33,7 +33,7 @@ pub trait Op {
     /// Actually runs this op.
     ///
     /// N inputs, 1 output.
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, OpComputeErrorStatus>;
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, OpComputeErrorStatus>;
 
     /// Returns symbolic gradients for input nodes by use of output gradient etc.
     ///
@@ -46,18 +46,6 @@ pub trait Op {
     /// NOTE:
     /// The number of return values must match `xs.len()`.
     fn grad(&self, gy: &Tensor, xs: &[&Tensor], y: &Tensor) -> Vec<Option<Tensor>>;
-}
-
-/// Error status in Op#compute.
-// TODO: Move some entries to "non" error enum.
-#[derive(Clone, Debug)]
-pub enum OpComputeErrorStatus {
-    /// Computation finished correctly but delegates the result to its `to` th input.
-    Delegate { to: usize },
-    /// Could'nt compute output array because of bad inputs.
-    BadInput(String),
-    /// Computation finished correctly with no output
-    NoOutput,
 }
 
 impl Tensor {
@@ -138,7 +126,7 @@ impl Op for DummyOp {
         )
     }
 
-    fn compute(&self, _: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, _: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         unreachable!(
             "must not be called ({}#grad). This is probably bug.",

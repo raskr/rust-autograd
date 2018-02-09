@@ -27,7 +27,7 @@ impl ops::Op for AddOp {
         "Add"
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let xs = ctx.grab_inputs();
         add_forward(xs[0], xs[1])
@@ -47,7 +47,7 @@ impl ops::Op for SubOp {
         "Sub"
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let xs = ctx.grab_inputs();
         let x0 = xs[0];
@@ -75,7 +75,7 @@ impl ops::Op for MulOp {
         "Mul"
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let xs = ctx.grab_inputs();
         mul_forward(xs[0], xs[1])
@@ -96,7 +96,7 @@ impl ops::Op for DivOp {
         "Div"
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let xs = ctx.grab_inputs();
         let x0 = xs[0];
@@ -121,13 +121,12 @@ impl ops::Op for DivOp {
 }
 
 impl ops::Op for InplaceAddOp {
-
     fn name(&self) -> &str
     {
         "InplaceAdd"
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let mut xs = unsafe { ctx.grab_assignable_inputs() };
         // safe transmute probably
@@ -146,13 +145,12 @@ impl ops::Op for InplaceAddOp {
 
 
 impl ops::Op for InplaceSubOp {
-
     fn name(&self) -> &str
     {
         "InplaceSub"
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let mut xs = unsafe { ctx.grab_assignable_inputs() };
         // safe transmute probably
@@ -170,13 +168,12 @@ impl ops::Op for InplaceSubOp {
 }
 
 impl ops::Op for InplaceMulOp {
-
     fn name(&self) -> &str
     {
         "InplaceMul"
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let mut xs = unsafe { ctx.grab_assignable_inputs() };
         // safe transmute probably
@@ -193,13 +190,12 @@ impl ops::Op for InplaceMulOp {
 }
 
 impl ops::Op for InplaceDivOp {
-
     fn name(&self) -> &str
     {
         "InplaceDiv"
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let mut xs = unsafe { ctx.grab_assignable_inputs() };
         // safe transmute probably

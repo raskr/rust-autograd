@@ -16,7 +16,7 @@ impl ::ops::Op for AdamOp {
         "Adam"
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let StaticParams { alpha, eps, b1, b2 } = self.static_params;
         let mut xs = unsafe { ctx.grab_assignable_inputs() };

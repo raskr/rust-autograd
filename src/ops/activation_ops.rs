@@ -60,7 +60,7 @@ impl ops::Op for Softmax {
         "Softmax"
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         Ok(softmax_forward(ctx.grab_inputs()[0], self.axis))
     }
@@ -78,7 +78,7 @@ impl ops::Op for Softplus {
         "Softplus"
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let xs = ctx.grab_inputs();
         let e = f32::consts::E;
@@ -100,7 +100,7 @@ impl ops::Op for Sigmoid {
         "Sigmoid"
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let x = ctx.grab_inputs()[0];
         Ok(x.mapv(|a| ((a * 0.5).tanh() * 0.5) + 0.5))
@@ -118,7 +118,7 @@ impl ops::Op for ReLU {
         "ReLU"
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let x = ctx.grab_inputs()[0];
         Ok(x.map(|a| a.max(0.)))
@@ -139,7 +139,7 @@ impl ops::Op for Identity {
         "Identity"
     }
 
-    fn compute(&self, _: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, _: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         // do nothing
         Err(::OpComputeErrorStatus::Delegate { to: 0 })
@@ -158,7 +158,7 @@ impl ops::Op for ELU {
         "ELU"
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let x = ctx.grab_inputs()[0];
         let ret = x.mapv(move |a| if a > 0. {
@@ -186,7 +186,7 @@ impl ops::Op for ELUGrad {
         "ELUGrad"
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let xs = ctx.grab_inputs();
         let x = xs[0];

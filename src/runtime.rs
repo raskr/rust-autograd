@@ -1,4 +1,3 @@
-//! Implements graph evaluation algorithms.
 extern crate ndarray;
 
 use ndarray_ext::NdArray;
@@ -16,7 +15,6 @@ pub struct OpComputeContext<'a, 'b: 'a> {
 }
 
 impl<'a, 'b> OpComputeContext<'a, 'b> {
-
     #[inline]
     fn new(
         node: &'b Tensor,
@@ -225,7 +223,7 @@ fn find_resource_creator<'a, 'b>(storage: &ResourceStore, x: &'b Tensor) -> &'b 
 
 
 // private type alias
-type OpComputeResult = Result<NdArray, ::ops::OpComputeErrorStatus>;
+type OpComputeResult = Result<NdArray, ::errors::OpComputeErrorStatus>;
 type ResourceStore<'a> = Vec<NodeWithValue<'a>>;
 type FeedStore<'a> = Vec<&'a NdArray>;
 

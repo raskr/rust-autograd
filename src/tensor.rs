@@ -44,7 +44,7 @@ impl Tensor {
     #[allow(mutable_transmutes)]
     pub unsafe fn get_persistent_array_mut(&self) -> Option<&mut NdArray>
     {
-        let m: &mut Option<NdArray> =  mem::transmute(&self.persistent_array);
+        let m: &mut Option<NdArray> = mem::transmute(&self.persistent_array);
         m.as_mut()
     }
 
@@ -56,7 +56,7 @@ impl Tensor {
     where
         T: IntoIterator<Item = &'a (&'b Tensor, &'c ndarray::Array<f32, ndarray::IxDyn>)>,
     {
-        ::eval::eval(&[self], feeds).swap_remove(0)
+        ::runtime::eval(&[self], feeds).swap_remove(0)
     }
 
 

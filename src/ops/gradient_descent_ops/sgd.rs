@@ -12,7 +12,7 @@ impl ::ops::Op for SGDOp {
         "SGD"
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let mut xs = unsafe { ctx.grab_assignable_inputs() };
         let updates = {

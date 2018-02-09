@@ -48,7 +48,8 @@ impl ops::Op for RandomNormal {
         vec![None]
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<::NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext)
+        -> Result<::NdArray, ::OpComputeErrorStatus>
     {
         let xs = ctx.grab_inputs();
         let shape = ndarray_ext::arr_to_shape(xs[0]);
@@ -71,7 +72,8 @@ impl ops::Op for RandomUniform {
         vec![None]
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<::NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext)
+        -> Result<::NdArray, ::OpComputeErrorStatus>
     {
         let xs = ctx.grab_inputs();
         let shape = ndarray_ext::arr_to_shape(xs[0]);
@@ -94,7 +96,8 @@ impl ops::Op for StandardNormal {
         vec![None]
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<::NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext)
+        -> Result<::NdArray, ::OpComputeErrorStatus>
     {
         let xs = ctx.grab_inputs();
         let shape = ndarray_ext::arr_to_shape(xs[0]);
@@ -113,7 +116,8 @@ impl ops::Op for StandardUniform {
         vec![None]
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<::NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext)
+        -> Result<::NdArray, ::OpComputeErrorStatus>
     {
         let xs = ctx.grab_inputs();
         let shape = ndarray_ext::arr_to_shape(xs[0]);
@@ -132,7 +136,8 @@ impl ops::Op for Bernoulli {
         vec![None]
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<::NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext)
+        -> Result<::NdArray, ::OpComputeErrorStatus>
     {
         let xs = ctx.grab_inputs();
         let shape = ndarray_ext::arr_to_shape(xs[0]);
@@ -151,7 +156,8 @@ impl ops::Op for Exponential {
         vec![None]
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<::NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext)
+        -> Result<::NdArray, ::OpComputeErrorStatus>
     {
         let xs = ctx.grab_inputs();
         let shape = ndarray_ext::arr_to_shape(xs[0]);
@@ -170,7 +176,8 @@ impl ops::Op for LogNormal {
         vec![None]
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<::NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext)
+        -> Result<::NdArray, ::OpComputeErrorStatus>
     {
         let xs = ctx.grab_inputs();
         let shape = ndarray_ext::arr_to_shape(xs[0]);
@@ -193,7 +200,8 @@ impl ops::Op for Gamma {
         vec![None]
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<::NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext)
+        -> Result<::NdArray, ::OpComputeErrorStatus>
     {
         let xs = ctx.grab_inputs();
         let shape = ndarray_ext::arr_to_shape(xs[0]);

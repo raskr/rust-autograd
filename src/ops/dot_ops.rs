@@ -1,4 +1,3 @@
-/// `Tensordot` is implemented in `ops/mod.rs`.
 extern crate ndarray;
 extern crate rayon;
 
@@ -8,6 +7,7 @@ use ndarray_ext::NdArray;
 use ops;
 use tensor::Tensor;
 
+// `Tensordot` is implemented in `ops/mod.rs`.
 
 pub struct MatMul {
     pub transpose_a: bool,
@@ -26,7 +26,7 @@ impl ops::Op for MatMul {
         "MatMul"
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let xs = ctx.grab_inputs();
         let x0 = xs[0];
@@ -77,7 +77,7 @@ impl ops::Op for BatchMatMul {
         "BatchMatMul"
     }
 
-    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let xs = ctx.grab_inputs();
         let x0: &NdArray = xs[0];

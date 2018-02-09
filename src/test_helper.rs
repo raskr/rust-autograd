@@ -17,7 +17,7 @@ pub fn gradient_check<'a, 'b, T>(
     T: AsRef<Tensor>,
 {
     // backprop
-    let theoretical_grads = ::eval::eval(gradients, feeds);
+    let theoretical_grads = ::runtime::eval(gradients, feeds);
 
     // for each variable nodes
     for (var_node, th_grad) in variables.iter().zip(theoretical_grads) {
@@ -37,7 +37,7 @@ pub fn gradient_check<'a, 'b, T>(
             }
 
             // eval
-            let ref obj_pos = ::eval::eval(&[objective], feeds)[0];
+            let ref obj_pos = ::runtime::eval(&[objective], feeds)[0];
 
             // perturbation (-)
             unsafe {
@@ -45,7 +45,7 @@ pub fn gradient_check<'a, 'b, T>(
             }
 
             // eval
-            let ref obj_neg = ::eval::eval(&[objective], feeds)[0];
+            let ref obj_neg = ::runtime::eval(&[objective], feeds)[0];
 
             // restore
             unsafe {

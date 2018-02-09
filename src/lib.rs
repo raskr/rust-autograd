@@ -8,7 +8,7 @@ pub mod test_helper;
 pub mod tensor;
 
 #[doc(hidden)]
-pub mod eval;
+pub mod runtime;
 
 #[doc(hidden)]
 pub mod gradient;
@@ -16,6 +16,8 @@ pub mod gradient;
 pub mod ops;
 
 pub mod ndarray_ext;
+
+pub mod errors;
 
 pub use ndarray_ext::array_gen;
 
@@ -25,9 +27,11 @@ pub use ops::*;
 
 pub use ops::gradient_descent_ops;
 
+pub use errors::*;
+
 #[doc(hidden)]
 pub use ndarray_ext::NdArray;
 
-pub use eval::eval;
+pub use runtime::eval;
 
-pub use eval::run;
+pub use runtime::run;

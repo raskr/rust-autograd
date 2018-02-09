@@ -73,8 +73,8 @@ fn mark_gradient_path<'a>(ys: &[&'a Tensor], xs: &[&'a Tensor]) -> Vec<GradInfo<
     // Builds GradInfo while performing DFS.
     // `has_gradient` properties are filled at the same time.
     let mut dfs_stack: Vec<(&Tensor, bool)> = ys.iter().map(|&y| (y, false)).collect();
-    while let Some((node, is_parent)) = dfs_stack.pop() {
-        if is_parent {
+    while let Some((node, should_visit)) = dfs_stack.pop() {
+        if should_visit {
             let marker = xs.contains(&node) || has_marked_child(node, &path);
             node.resource_lookup_key.set(path.len());
             path.push(GradInfo::new(node, marker, None));
