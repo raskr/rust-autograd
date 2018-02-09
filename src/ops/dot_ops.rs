@@ -26,8 +26,9 @@ impl ops::Op for MatMul {
         "MatMul"
     }
 
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
+        let xs = ctx.grab_inputs();
         let x0 = xs[0];
         let x1 = xs[1];
         let x0_shape = x0.shape();
@@ -76,8 +77,9 @@ impl ops::Op for BatchMatMul {
         "BatchMatMul"
     }
 
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
+        let xs = ctx.grab_inputs();
         let x0: &NdArray = xs[0];
         let x1: &NdArray = xs[1];
         let shape0 = x0.shape();

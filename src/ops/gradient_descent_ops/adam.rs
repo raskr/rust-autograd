@@ -16,14 +16,10 @@ impl ::ops::Op for AdamOp {
         "Adam"
     }
 
-    fn inplace(&self) -> bool
-    {
-        true
-    }
-
-    fn compute_inplace(&self, xs: &mut [&mut NdArray]) -> Result<(), ::ops::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         let StaticParams { alpha, eps, b1, b2 } = self.static_params;
+        let mut xs = unsafe { ctx.grab_assignable_inputs() };
 
         // Make new m
         let new_m = {
@@ -53,7 +49,7 @@ impl ::ops::Op for AdamOp {
         // Update t and param
         xs[4][ndarray::IxDyn(&[])] += 1.;
         xs[0].scaled_add(-alpha, &m_hat);
-        Ok(())
+        Err(::ops::OpComputeErrorStatus::NoOutput)
     }
 
     fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
@@ -102,8 +98,11 @@ pub struct StatefulParams {
 }
 
 impl<'a> super::Optimizer<'a> for Adam<'a> {
-    fn compute_updates<T: AsRef<Tensor>>(&mut self, params: &[&'a Tensor], grads: &[T])
-                                         -> Vec<Tensor>
+    fn compute_updates<T: AsRef<Tensor>>(
+        &mut self,
+        params: &[&'a Tensor],
+        grads: &[T],
+    ) -> Vec<Tensor>
     {
         params
             .into_iter()

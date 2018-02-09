@@ -27,8 +27,9 @@ impl ops::Op for AddOp {
         "Add"
     }
 
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
+        let xs = ctx.grab_inputs();
         add_forward(xs[0], xs[1])
     }
 
@@ -46,8 +47,9 @@ impl ops::Op for SubOp {
         "Sub"
     }
 
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
+        let xs = ctx.grab_inputs();
         let x0 = xs[0];
         let x1 = xs[1];
         let shape0: &[usize] = x0.shape();
@@ -73,8 +75,9 @@ impl ops::Op for MulOp {
         "Mul"
     }
 
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
+        let xs = ctx.grab_inputs();
         mul_forward(xs[0], xs[1])
     }
 
@@ -93,8 +96,9 @@ impl ops::Op for DivOp {
         "Div"
     }
 
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
+        let xs = ctx.grab_inputs();
         let x0 = xs[0];
         let x1 = xs[1];
         let shape0: &[usize] = x0.shape();
@@ -117,23 +121,20 @@ impl ops::Op for DivOp {
 }
 
 impl ops::Op for InplaceAddOp {
-    fn inplace(&self) -> bool
-    {
-        true
-    }
 
     fn name(&self) -> &str
     {
         "InplaceAdd"
     }
 
-    fn compute_inplace(&self, xs: &mut [&mut NdArray]) -> Result<(), ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
+        let mut xs = unsafe { ctx.grab_assignable_inputs() };
         // safe transmute probably
         let x1: &&NdArray = unsafe { mem::transmute(&mut xs[1]) };
         let x0 = &mut xs[0];
         x0.zip_mut_with(x1, |a, &b| *a += b);
-        Ok(())
+        Err(::ops::OpComputeErrorStatus::Delegate { to: 0 })
     }
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
@@ -145,23 +146,20 @@ impl ops::Op for InplaceAddOp {
 
 
 impl ops::Op for InplaceSubOp {
-    fn inplace(&self) -> bool
-    {
-        true
-    }
 
     fn name(&self) -> &str
     {
         "InplaceSub"
     }
 
-    fn compute_inplace(&self, xs: &mut [&mut NdArray]) -> Result<(), ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
+        let mut xs = unsafe { ctx.grab_assignable_inputs() };
         // safe transmute probably
         let x1: &&NdArray = unsafe { mem::transmute(&mut xs[1]) };
         let x0 = &mut xs[0];
         x0.zip_mut_with(x1, |a, &b| *a -= b);
-        Ok(())
+        Err(::ops::OpComputeErrorStatus::Delegate { to: 0 })
     }
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
@@ -172,23 +170,20 @@ impl ops::Op for InplaceSubOp {
 }
 
 impl ops::Op for InplaceMulOp {
-    fn inplace(&self) -> bool
-    {
-        true
-    }
 
     fn name(&self) -> &str
     {
         "InplaceMul"
     }
 
-    fn compute_inplace(&self, xs: &mut [&mut NdArray]) -> Result<(), ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
+        let mut xs = unsafe { ctx.grab_assignable_inputs() };
         // safe transmute probably
         let x1: &&NdArray = unsafe { mem::transmute(&mut xs[1]) };
         let x0 = &mut xs[0];
         x0.zip_mut_with(x1, |a, &b| *a *= b);
-        Ok(())
+        Err(::ops::OpComputeErrorStatus::Delegate { to: 0 })
     }
 
     fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
@@ -198,23 +193,20 @@ impl ops::Op for InplaceMulOp {
 }
 
 impl ops::Op for InplaceDivOp {
-    fn inplace(&self) -> bool
-    {
-        true
-    }
 
     fn name(&self) -> &str
     {
         "InplaceDiv"
     }
 
-    fn compute_inplace(&self, xs: &mut [&mut NdArray]) -> Result<(), ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
+        let mut xs = unsafe { ctx.grab_assignable_inputs() };
         // safe transmute probably
         let x1: &&NdArray = unsafe { mem::transmute(&mut xs[1]) };
         let x0 = &mut xs[0];
         x0.zip_mut_with(x1, |a, &b| *a /= b);
-        Ok(())
+        Err(::ops::OpComputeErrorStatus::Delegate { to: 0 })
     }
 
     fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>

@@ -60,15 +60,14 @@ impl ops::Op for Softmax {
         "Softmax"
     }
 
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
-        Ok(softmax_forward(xs[0], self.axis))
+        Ok(softmax_forward(ctx.grab_inputs()[0], self.axis))
     }
 
     fn grad(&self, gy: &Tensor, _: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
     {
-        let ref sum = ops::reduce_sum(&(output * gy), &[self.axis], true);
-
+        let sum = ops::reduce_sum(&(output * gy), &[self.axis], true);
         vec![Some((gy - sum) * output)]
     }
 }
@@ -79,8 +78,9 @@ impl ops::Op for Softplus {
         "Softplus"
     }
 
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
+        let xs = ctx.grab_inputs();
         let e = f32::consts::E;
         Ok(xs[0].mapv(move |a| (a.exp() + 1.).log(e)))
     }
@@ -100,9 +100,9 @@ impl ops::Op for Sigmoid {
         "Sigmoid"
     }
 
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
-        let x = xs[0];
+        let x = ctx.grab_inputs()[0];
         Ok(x.mapv(|a| ((a * 0.5).tanh() * 0.5) + 0.5))
     }
 
@@ -118,9 +118,10 @@ impl ops::Op for ReLU {
         "ReLU"
     }
 
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
-        Ok(xs[0].map(|a| a.max(0.)))
+        let x = ctx.grab_inputs()[0];
+        Ok(x.map(|a| a.max(0.)))
     }
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
@@ -138,7 +139,7 @@ impl ops::Op for Identity {
         "Identity"
     }
 
-    fn compute(&self, _: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, _: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         // do nothing
         Err(::OpComputeErrorStatus::Delegate { to: 0 })
@@ -157,9 +158,10 @@ impl ops::Op for ELU {
         "ELU"
     }
 
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
-        let ret = xs[0].mapv(move |a| if a > 0. {
+        let x = ctx.grab_inputs()[0];
+        let ret = x.mapv(move |a| if a > 0. {
             a
         } else {
             self.alpha * (a.exp() - 1.)
@@ -184,8 +186,9 @@ impl ops::Op for ELUGrad {
         "ELUGrad"
     }
 
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
+        let xs = ctx.grab_inputs();
         let x = xs[0];
         let gy = xs[1];
         let a = x.mapv(move |a| if a > 0. {

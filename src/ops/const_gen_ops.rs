@@ -23,7 +23,7 @@ impl ops::Op for Scalar {
         "Scalar"
     }
 
-    fn compute(&self, _: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, _: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         Ok(ndarray::arr0(self.val).into_dyn())
     }
@@ -40,8 +40,9 @@ impl ops::Op for Zeros {
         "Zeros"
     }
 
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
+        let xs = ctx.grab_inputs();
         let shape: &NdArray = xs[0];
         if let Some(a) = shape.as_slice() {
             Ok(ndarray_ext::zeros(
@@ -70,8 +71,9 @@ impl ops::Op for Ones {
         "Ones"
     }
 
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
+        let xs = ctx.grab_inputs();
         let shape: &NdArray = xs[0];
         if let Some(a) = shape.as_slice() {
             Ok(ndarray_ext::ones(
@@ -100,8 +102,9 @@ impl ops::Op for Range {
         "Range"
     }
 
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
+        let xs = ctx.grab_inputs();
         let x0 = xs[0];
         let x1 = xs[1];
         let x2 = xs[2];
@@ -138,7 +141,7 @@ impl ops::Op for ConvertToTensor {
         "ConvertToTensor"
     }
 
-    fn compute(&self, _: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, _: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
         Ok(self.arr.clone())
     }

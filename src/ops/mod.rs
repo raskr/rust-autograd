@@ -18,20 +18,11 @@ mod const_gen_ops;
 pub mod gradient_descent_ops;
 
 
-#[doc(hidden)]
-// TODO: Ugly `compute` and `compute_inplace`.
-// TODO: Use associated constants for name.
 /// Represents a operation node in a computation graph.
 /// `Tensor` wraps trait-object of this.
 pub trait Op {
     /// Name of this op
     fn name(&self) -> &str;
-
-    /// Flag: inplace or not. (Don't touch)
-    fn inplace(&self) -> bool
-    {
-        false
-    }
 
     /// Flag: stops gradient propagation or not. (Don't touch)
     fn stop_gradient(&self) -> bool
@@ -42,20 +33,7 @@ pub trait Op {
     /// Actually runs this op.
     ///
     /// N inputs, 1 output.
-    #[allow(unused_variables)]
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, OpComputeErrorStatus>
-    {
-        unimplemented!()
-    }
-
-    /// Actually runs this op.
-    ///
-    /// Inplace operators such as InplaceAddOp override this.
-    #[allow(unused_variables)]
-    fn compute_inplace(&self, xs: &mut [&mut NdArray]) -> Result<(), OpComputeErrorStatus>
-    {
-        unimplemented!()
-    }
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, OpComputeErrorStatus>;
 
     /// Returns symbolic gradients for input nodes by use of output gradient etc.
     ///
@@ -66,19 +44,20 @@ pub trait Op {
     /// * `y` - Symbolic representation of `compute`'s return value
     ///
     /// NOTE:
-    /// The number of return values must match `inputs.len()`.
+    /// The number of return values must match `xs.len()`.
     fn grad(&self, gy: &Tensor, xs: &[&Tensor], y: &Tensor) -> Vec<Option<Tensor>>;
 }
 
-/// Error status in Op#compute and Op#compute_inplace.
-#[doc(hidden)]
+/// Error status in Op#compute.
+// TODO: Move some entries to "non" error enum.
 #[derive(Clone, Debug)]
 pub enum OpComputeErrorStatus {
-    /// This denotes that the op didn't any computation with no errors; i.e., this op
-    /// delegates the result to its input node at the index `to`.
+    /// Computation finished correctly but delegates the result to its `to` th input.
     Delegate { to: usize },
     /// Could'nt compute output array because of bad inputs.
     BadInput(String),
+    /// Computation finished correctly with no output
+    NoOutput,
 }
 
 impl Tensor {
@@ -159,19 +138,12 @@ impl Op for DummyOp {
         )
     }
 
-    fn compute(&self, _: &[&::NdArray]) -> Result<NdArray, OpComputeErrorStatus>
+    fn compute(&self, _: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
-        let msg = if self.name == "PH" {
-            "Wrong `Context` object usage,\
-            or there exists placeholder(s) couldn't get initial value"
-        } else if self.name == "Variable" {
-            "Current graph evaluation context doesn't match with what generated this variable."
-        } else if self.name == "Constant" {
-            "Current graph evaluation context doesn't match with what generated this constant."
-        } else {
-            unreachable!()
-        };
-        panic!(msg);
+        unreachable!(
+            "must not be called ({}#grad). This is probably bug.",
+            self.name
+        )
     }
 }
 

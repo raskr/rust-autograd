@@ -101,8 +101,9 @@ impl ops::Op for ReduceSum {
         "ReduceSum"
     }
 
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
+        let xs = ctx.grab_inputs();
         comopute_reduce_sum(xs[0], xs[1], true, self.keep_dims, self.sparse_axes)
     }
 
@@ -129,8 +130,9 @@ impl ops::Op for ReduceMean {
         "ReduceMean"
     }
 
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
+        let xs = ctx.grab_inputs();
         let sum = comopute_reduce_sum(xs[0], xs[1], false, self.keep_dims, self.sparse_axes);
         sum.map(|mut ok| {
             let x_shape = xs[0].shape();
@@ -165,8 +167,9 @@ impl ops::Op for ReduceProd {
         "ReduceProd"
     }
 
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
+        let xs = ctx.grab_inputs();
         comopute_reduce_prod(xs[0], xs[1], true, self.keep_dims, self.sparse_axes)
     }
 
@@ -192,8 +195,9 @@ impl ops::Op for ReduceMin {
         "ReduceMin"
     }
 
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
+        let xs = ctx.grab_inputs();
         comopute_reduce_min(xs[0], xs[1], true, self.keep_dims, self.sparse_axes)
     }
 
@@ -209,8 +213,9 @@ impl ops::Op for ReduceMax {
         "ReduceMax"
     }
 
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
+        let xs = ctx.grab_inputs();
         comopute_reduce_max(xs[0], xs[1], true, self.keep_dims, self.sparse_axes)
     }
 
@@ -246,8 +251,9 @@ impl ops::Op for ArgMax {
     }
 
     // cf. https://github.com/tensorflow/compiler/tf2xla/kernels/index_ops.cc
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
+        let xs = ctx.grab_inputs();
         let x = xs[0];
         let axis = if self.axis < 0 {
             (x.ndim() as isize + self.axis) as usize

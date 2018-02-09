@@ -21,8 +21,9 @@ impl ops::Op for LogSoftmax {
         "LogSoftmax"
     }
 
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
+        let xs = ctx.grab_inputs();
         Ok(
             xs[0] - &ops::math_ops::logsumexp_forward(xs[0], self.axis, true),
         )
@@ -43,8 +44,9 @@ impl ops::Op for SigmoidCrossEntropy {
         "SigmoidCrossEntropy"
     }
 
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
+        let xs = ctx.grab_inputs();
         let x = xs[0];
         let t = xs[1];
 
@@ -83,8 +85,9 @@ impl ops::Op for SparseSoftmaxCrossEntropyLatter {
         "SparseSoftmaxCrossEntropyLatter"
     }
 
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
+        let xs = ctx.grab_inputs();
         let (log_x, t) = (xs[0], xs[1]);
 
         // validation
@@ -151,8 +154,9 @@ impl ops::Op for SparseSoftmaxCrossEntropyGrad {
         "SparseSoftmaxCrossEntropyGrad"
     }
 
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
+        let xs = ctx.grab_inputs();
         let log_x = xs[0]; // x is softmax
         let t = xs[1];
         let gy = xs[2];
@@ -181,8 +185,9 @@ impl ops::Op for SoftmaxCrossEntropyLatter {
         "SoftmaxCrossEntropyLatter"
     }
 
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
+        let xs = ctx.grab_inputs();
         let log_x = xs[0];
         // `t` must be one-hot
         let t = xs[1];

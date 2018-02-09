@@ -11,9 +11,9 @@ impl ops::Op for StopGradient {
         "StopGradient"
     }
 
-    fn compute(&self, _: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, _: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
-        return Err(::OpComputeErrorStatus::Delegate { to: 0 });
+        Err(::OpComputeErrorStatus::Delegate { to: 0 })
     }
 
     fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>

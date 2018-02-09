@@ -12,7 +12,11 @@ use tensor::Tensor;
 
 /// Trait for any gradient descent optimizer
 pub trait Optimizer<'a> {
-    fn compute_updates<T: AsRef<Tensor>>(&mut self, param: &[&'a Tensor], grad: &[T]) -> Vec<Tensor>;
+    fn compute_updates<T: AsRef<Tensor>>(
+        &mut self,
+        param: &[&'a Tensor],
+        grad: &[T],
+    ) -> Vec<Tensor>;
 }
 
 /// Key to access a state tensor.

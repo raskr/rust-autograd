@@ -54,8 +54,10 @@ macro_rules! impl_cmp_op {
                 stringify!($struct_name)
             }
 
-            fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+            fn compute(&self, ctx: ::eval::OpComputeContext)
+                -> Result<NdArray, ::OpComputeErrorStatus>
             {
+                let xs = ctx.grab_inputs();
                 let x0 = xs[0];
                 let x1 = xs[1];
                 let shape0 = x0.shape();
@@ -149,8 +151,9 @@ impl ops::Op for Abs {
         "Abs"
     }
 
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
+        let xs = ctx.grab_inputs();
         Ok(xs[0].map(|x| x.abs()))
     }
 
@@ -166,8 +169,9 @@ impl ops::Op for NegOp {
         "Neg"
     }
 
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
+        let xs = ctx.grab_inputs();
         Ok(xs[0].map(|x| x.neg()))
     }
 
@@ -183,8 +187,9 @@ impl ops::Op for Square {
         "Square"
     }
 
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
+        let xs = ctx.grab_inputs();
         Ok(xs[0].map(|x| x * x))
     }
 
@@ -200,8 +205,9 @@ impl ops::Op for Reciprocal {
         "Reciprocal"
     }
 
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
+        let xs = ctx.grab_inputs();
         Ok(xs[0].map(|x| x.recip()))
     }
 
@@ -217,8 +223,9 @@ impl ops::Op for Sign {
         "Sign"
     }
 
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
+        let xs = ctx.grab_inputs();
         Ok(xs[0].mapv(|x| if x == 0. { 0. } else { x.signum() }))
     }
 
@@ -234,8 +241,9 @@ impl ops::Op for Floor {
         "Floor"
     }
 
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
+        let xs = ctx.grab_inputs();
         Ok(xs[0].map(|x| x.floor()))
     }
 
@@ -251,8 +259,9 @@ impl ops::Op for Ceil {
         "Ceil"
     }
 
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
+        let xs = ctx.grab_inputs();
         Ok(xs[0].map(|x| x.ceil()))
     }
 
@@ -268,8 +277,9 @@ impl ops::Op for Transpose {
         "Transpose"
     }
 
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
+        let xs = ctx.grab_inputs();
         let x = xs[0].view();
         let perm: &NdArray = &xs[1];
         assert!(perm.len() >= 2);
@@ -403,9 +413,9 @@ impl ops::Op for LogSumExp {
         "LogSumExp"
     }
 
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
-        let x = xs[0];
+        let x = ctx.grab_inputs()[0];
         Ok(logsumexp_forward(x, self.axis, self.keep_dims))
     }
 
@@ -426,9 +436,9 @@ impl ops::Op for Pow {
         "Pow"
     }
 
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
-        let x0: &NdArray = xs[0];
+        let x0 = ctx.grab_inputs()[0];
         let a = self.a;
         Ok(x0.map(move |x| x.powf(a)))
     }
@@ -447,9 +457,9 @@ impl ops::Op for Sqrt {
         "Sqrt"
     }
 
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
-        let x0: &NdArray = xs[0];
+        let x0 = ctx.grab_inputs()[0];
         Ok(x0.map(|a| a.sqrt()))
     }
 
@@ -467,9 +477,10 @@ impl ops::Op for Log {
         "Log"
     }
 
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
-        Ok(xs[0].map(move |a| a.log(self.a)))
+        let x = ctx.grab_inputs()[0];
+        Ok(x.map(move |a| a.log(self.a)))
     }
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
@@ -484,9 +495,10 @@ impl ops::Op for Exp {
         "Exp"
     }
 
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
-        Ok(xs[0].map(|a| a.exp()))
+        let x = ctx.grab_inputs()[0];
+        Ok(x.map(|a| a.exp()))
     }
 
     fn grad(&self, gy: &Tensor, _: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
@@ -508,9 +520,10 @@ impl ops::Op for Atanh {
         vec![Some(y * gy)]
     }
 
-    fn compute(&self, xs: &[&::NdArray]) -> Result<::NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<::NdArray, ::OpComputeErrorStatus>
     {
-        Ok(xs[0].map(|a| a.atanh()))
+        let x = ctx.grab_inputs()[0];
+        Ok(x.map(|a| a.atanh()))
     }
 }
 
@@ -527,9 +540,10 @@ impl ops::Op for Acosh {
         vec![Some(y * gy)]
     }
 
-    fn compute(&self, xs: &[&::NdArray]) -> Result<::NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<::NdArray, ::OpComputeErrorStatus>
     {
-        Ok(xs[0].map(|a| a.acosh()))
+        let x = ctx.grab_inputs()[0];
+        Ok(x.map(|a| a.acosh()))
     }
 }
 
@@ -546,9 +560,10 @@ impl ops::Op for Asinh {
         vec![Some(y * gy)]
     }
 
-    fn compute(&self, xs: &[&::NdArray]) -> Result<::NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<::NdArray, ::OpComputeErrorStatus>
     {
-        Ok(xs[0].map(|a| a.asinh()))
+        let x = ctx.grab_inputs()[0];
+        Ok(x.map(|a| a.asinh()))
     }
 }
 
@@ -558,9 +573,10 @@ impl ops::Op for Tanh {
         "Tanh"
     }
 
-    fn compute(&self, xs: &[&NdArray]) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
     {
-        Ok(xs[0].map(|a| a.tanh()))
+        let x = ctx.grab_inputs()[0];
+        Ok(x.map(|a| a.tanh()))
     }
 
     fn grad(&self, gy: &Tensor, _: &[&Tensor], y: &Tensor) -> Vec<Option<Tensor>>
@@ -580,9 +596,10 @@ impl ops::Op for Cosh {
         vec![Some(ops::sinh(inputs[0]) * gy)]
     }
 
-    fn compute(&self, xs: &[&::NdArray]) -> Result<::NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<::NdArray, ::OpComputeErrorStatus>
     {
-        Ok(xs[0].map(|a| a.cosh()))
+        let x = ctx.grab_inputs()[0];
+        Ok(x.map(|a| a.cosh()))
     }
 }
 
@@ -597,9 +614,10 @@ impl ops::Op for Sinh {
         vec![Some(ops::cosh(inputs[0]) * gy)]
     }
 
-    fn compute(&self, xs: &[&::NdArray]) -> Result<::NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<::NdArray, ::OpComputeErrorStatus>
     {
-        Ok(xs[0].map(|a| a.sinh()))
+        let x = ctx.grab_inputs()[0];
+        Ok(x.map(|a| a.sinh()))
     }
 }
 
@@ -616,9 +634,10 @@ impl ops::Op for Atan {
         vec![Some(y * gy)]
     }
 
-    fn compute(&self, xs: &[&::NdArray]) -> Result<::NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<::NdArray, ::OpComputeErrorStatus>
     {
-        Ok(xs[0].map(|a| a.atan()))
+        let x = ctx.grab_inputs()[0];
+        Ok(x.map(|a| a.atan()))
     }
 }
 
@@ -635,9 +654,10 @@ impl ops::Op for Acos {
         vec![Some(y * gy)]
     }
 
-    fn compute(&self, xs: &[&::NdArray]) -> Result<::NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<::NdArray, ::OpComputeErrorStatus>
     {
-        Ok(xs[0].map(|a| a.acos()))
+        let x = ctx.grab_inputs()[0];
+        Ok(x.map(|a| a.acos()))
     }
 }
 
@@ -654,9 +674,10 @@ impl ops::Op for Asin {
         vec![Some(y * gy)]
     }
 
-    fn compute(&self, xs: &[&::NdArray]) -> Result<::NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<::NdArray, ::OpComputeErrorStatus>
     {
-        Ok(xs[0].map(|a| a.asin()))
+        let x = ctx.grab_inputs()[0];
+        Ok(x.map(|a| a.asin()))
     }
 }
 
@@ -671,9 +692,10 @@ impl ops::Op for Sin {
         vec![Some(ops::cos(inputs[0]) * gy)]
     }
 
-    fn compute(&self, xs: &[&::NdArray]) -> Result<::NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<::NdArray, ::OpComputeErrorStatus>
     {
-        Ok(xs[0].map(|a| a.sin()))
+        let x = ctx.grab_inputs()[0];
+        Ok(x.map(|a| a.sin()))
     }
 }
 
@@ -688,9 +710,10 @@ impl ops::Op for Cos {
         vec![Some(ops::neg(&(ops::sin(inputs[0]) * gy)))]
     }
 
-    fn compute(&self, xs: &[&::NdArray]) -> Result<::NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<::NdArray, ::OpComputeErrorStatus>
     {
-        Ok(xs[0].map(|a| a.cos()))
+        let x = ctx.grab_inputs()[0];
+        Ok(x.map(|a| a.cos()))
     }
 }
 
@@ -706,8 +729,9 @@ impl ops::Op for Tan {
         vec![Some(gy / (ops::square(cos)))]
     }
 
-    fn compute(&self, xs: &[&::NdArray]) -> Result<::NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::eval::OpComputeContext) -> Result<::NdArray, ::OpComputeErrorStatus>
     {
-        Ok(xs[0].map(|a| a.tan()))
+        let x = ctx.grab_inputs()[0];
+        Ok(x.map(|a| a.tan()))
     }
 }
