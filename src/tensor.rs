@@ -2,20 +2,18 @@ extern crate ndarray;
 
 use ndarray_ext::NdArray;
 use ops;
+use ops::Op;
 use std::cell::Cell;
 use std::fmt;
-use std::hash::{Hash, Hasher};
 use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
 
 /// Symbolic multi-dimensional array.
-pub struct Tensor(pub Rc<RawTensor>);
+pub struct Tensor(pub Rc<TensorCore>);
 
-#[doc(hidden)]
-/// Symbolic multi-dimensional array.
-pub struct RawTensor {
+pub struct TensorCore {
     /// Operation created this node.
     pub op: Box<ops::Op>,
 
@@ -36,10 +34,120 @@ pub struct RawTensor {
 
     /// Immutable flag of tensor is placeholder or not.
     pub is_placeholder: bool,
+
+    /// `op` can have gradient?
+    pub has_gradient: bool,
+}
+
+pub struct TensorBuilder {
+    shape: Option<Tensor>,
+    has_gradient: bool,
+    is_placeholder: bool,
+    inputs: Vec<Tensor>,
+    persistent_array: Option<NdArray>,
+}
+
+impl TensorBuilder {
+    #[inline]
+    pub fn set_shape(mut self, s: Tensor) -> TensorBuilder
+    {
+        self.shape = Some(s);
+        self
+    }
+
+    #[inline]
+    pub fn set_has_gradient(mut self, a: bool) -> TensorBuilder
+    {
+        self.has_gradient = a;
+        self
+    }
+
+    #[inline]
+    pub fn set_inputs(mut self, a: Vec<&Tensor>) -> TensorBuilder
+    {
+        self.inputs = a.iter().map(|b| (*b).clone()).collect::<Vec<Tensor>>();
+        self
+    }
+
+    #[inline]
+    pub fn set_inputs_slice(mut self, a: &[&Tensor]) -> TensorBuilder
+    {
+        self.inputs = a.iter().map(|b| (*b).clone()).collect::<Vec<Tensor>>();
+        self
+    }
+
+    #[inline]
+    pub fn set_input(mut self, a: &Tensor) -> TensorBuilder
+    {
+        self.inputs = vec![a.clone()];
+        self
+    }
+
+    #[inline]
+    pub fn set_is_placeholder(mut self, a: bool) -> TensorBuilder
+    {
+        self.is_placeholder = a;
+        self
+    }
+
+    pub fn set_persistent_array(mut self, a: NdArray) -> TensorBuilder
+    {
+        self.persistent_array = Some(a);
+        self
+    }
+
+    /// ```
+    /// extern crate ndarray;
+    /// extern crate autograd as ag;
+    ///
+    /// let ref a = ag::zeros(&[4, 2]);
+    /// let ref v = ag::zeros(&[2, 3]);
+    /// let ref b = ag::zeros(&[4, 3]);
+    /// let ref z = ag::matmul(a, v) + b;
+    /// let mut vars = [a, v, b, z];
+    /// // `sort_by_key` don't reverse the order of `a` and `v`
+    /// vars.sort_by_key(|a| a.top_rank);
+    /// assert!(vars == [a, v, b, z])
+    /// ```
+    pub fn build<T: Op + 'static>(self, op: T) -> Tensor
+    {
+        let rank = if self.inputs.len() == 0 {
+            0
+        } else {
+            self.inputs
+                .iter()
+                .map(|a| a.top_rank)
+                .max()
+                .map(|a| a + 1)
+                .unwrap_or(0)
+        };
+        Tensor(Rc::new(TensorCore {
+            op: Box::new(op),
+            inputs: self.inputs,
+            top_rank: rank,
+            shape: self.shape,
+            persistent_array: self.persistent_array,
+            is_placeholder: self.is_placeholder,
+            resource_lookup_key: Cell::new(!0),
+            has_gradient: self.has_gradient,
+        }))
+    }
 }
 
 
 impl Tensor {
+    #[inline]
+    pub fn builder() -> TensorBuilder
+    {
+        TensorBuilder {
+            shape: None,
+            has_gradient: true,
+            persistent_array: None,
+            inputs: Vec::new(),
+            is_placeholder: false,
+        }
+    }
+
     // TODO: Use UnsafeCell
     #[allow(mutable_transmutes)]
     pub unsafe fn get_persistent_array_mut(&self) -> Option<&mut NdArray>
@@ -96,14 +204,6 @@ impl Tensor {
     }
 }
 
-impl AsRef<Tensor> for Tensor {
-    #[inline(always)]
-    fn as_ref(&self) -> &Tensor
-    {
-        self
-    }
-}
-
 // empty implementation
 impl Eq for Tensor {}
 
@@ -115,10 +215,11 @@ impl PartialEq for Tensor {
     }
 }
 
-// empty implementation
-impl Hash for Tensor {
-    fn hash<H: Hasher>(&self, _: &mut H)
+impl AsRef<Tensor> for Tensor {
+    #[inline(always)]
+    fn as_ref(&self) -> &Tensor
     {
+        self
     }
 }
 
@@ -131,7 +232,7 @@ impl Clone for Tensor {
 }
 
 impl Deref for Tensor {
-    type Target = Rc<RawTensor>;
+    type Target = Rc<TensorCore>;
     fn deref(&self) -> &Self::Target
     {
         &self.0
@@ -139,7 +240,7 @@ impl Deref for Tensor {
 }
 
 impl DerefMut for Tensor {
-    fn deref_mut<'a>(&'a mut self) -> &'a mut Rc<RawTensor>
+    fn deref_mut<'a>(&'a mut self) -> &'a mut Rc<TensorCore>
     {
         &mut self.0
     }

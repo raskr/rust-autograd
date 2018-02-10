@@ -61,12 +61,21 @@ impl ops::Op for MatMul {
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
-        let opa = MatMul { transpose_a: false, transpose_b: true };
-        let opb = MatMul { transpose_a: true, transpose_b: false };
-        vec![
-            Some(ops::apply_op(opa, &[gy, inputs[1]], None)),
-            Some(ops::apply_op(opb, &[inputs[0], gy], None)),
-        ]
+        let opa = Tensor::builder().set_inputs(vec![gy, inputs[1]]).build(
+            MatMul {
+                transpose_a: false,
+                transpose_b: true,
+            },
+        );
+
+        let opb = Tensor::builder().set_inputs(vec![inputs[0], gy]).build(
+            MatMul {
+                transpose_a: true,
+                transpose_b: false,
+            },
+        );
+
+        vec![Some(opa), Some(opb)]
     }
 }
 
@@ -168,13 +177,14 @@ impl ops::Op for BatchMatMul {
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
-        // Using `ops::swap_axes()` here causes "invalid memory layout error"
-        // so transpose_* flags is used in BatchMatMul.
-        let opa = BatchMatMul { transpose_a: false, transpose_b: true };
-        let opb = BatchMatMul { transpose_a: true, transpose_b: false };
-        vec![
-            Some(ops::apply_op(opa, &[gy, inputs[1]], None)),
-            Some(ops::apply_op(opb, &[inputs[0], gy], None)),
-        ]
+        let opa = Tensor::builder().set_inputs(vec![gy, inputs[1]]).build(
+            BatchMatMul { transpose_a: false, transpose_b: true },
+        );
+
+        let opb = Tensor::builder().set_inputs(vec![inputs[0], gy]).build(
+            BatchMatMul { transpose_a: true, transpose_b: false },
+        );
+
+        vec![Some(opa), Some(opb)]
     }
 }

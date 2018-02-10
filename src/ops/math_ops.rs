@@ -286,11 +286,11 @@ impl ops::Op for Transpose {
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
-        let op = Transpose { zip: !self.zip };
-        vec![
-            Some(ops::apply_op(op, &[gy, inputs[1]], Some(inputs[0].shape()))),
-            None,
-        ]
+        let gx = Tensor::builder()
+            .set_inputs(vec![gy, inputs[1]])
+            .set_shape(inputs[0].shape())
+            .build(Transpose { zip: !self.zip });
+        vec![Some(gx), None]
     }
 }
 

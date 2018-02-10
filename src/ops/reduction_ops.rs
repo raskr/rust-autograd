@@ -113,14 +113,10 @@ impl ops::Op for ReduceSum {
             keep_dims: self.keep_dims,
             sparse_axes: self.sparse_axes,
         };
-        vec![
-            Some(ops::apply_op(
-                grad_op,
-                &[gy, &inputs[0].shape(), inputs[1]],
-                None,
-            )),
-            None,
-        ]
+        let gx = Tensor::builder()
+            .set_inputs(vec![gy, &inputs[0].shape(), inputs[1]])
+            .build(grad_op);
+        vec![Some(gx), None]
     }
 }
 
@@ -155,8 +151,10 @@ impl ops::Op for ReduceMean {
         let x = inputs[0];
         let axes = inputs[1]; // this is preprocessed
         let ref reduction_len = ops::reduce_prod(&ops::gather(&x.shape(), axes, 0), &[0], false);
-        let gx = ops::apply_op(grad_op, &[gy, &inputs[0].shape(), inputs[1]], None) *
-            ops::reciprocal(reduction_len);
+        let tmp = Tensor::builder()
+            .set_inputs(vec![gy, &inputs[0].shape(), inputs[1]])
+            .build(grad_op);
+        let gx = tmp * ops::reciprocal(reduction_len);
         vec![Some(gx), None]
     }
 }
@@ -179,11 +177,10 @@ impl ops::Op for ReduceProd {
             keep_dims: self.keep_dims,
             sparse_axes: self.sparse_axes,
         };
-        let gx = ops::apply_op(
-            grad_op,
-            &[&(gy * output), &inputs[0].shape(), inputs[1]],
-            None,
-        ) / inputs[0];
+        let tmp = Tensor::builder()
+            .set_inputs(vec![&(gy * output), &inputs[0].shape(), inputs[1]])
+            .build(grad_op);
+        let gx = tmp / inputs[0];
         vec![Some(gx), None]
     }
 }
@@ -237,8 +234,12 @@ fn min_max_grad(
     let grad_op2 = ops::array_ops::Broadcast { keep_dims, sparse_axes };
     let x = inputs[0];
     let x_shape = inputs[0].shape();
-    let y = ops::apply_op(grad_op1, &[output, &x_shape, inputs[1]], None);
-    let gy = ops::apply_op(grad_op2, &[gy, &x_shape, inputs[1]], None);
+    let y = Tensor::builder()
+        .set_inputs(vec![output, &x_shape, inputs[1]])
+        .build(grad_op1);
+    let gy = Tensor::builder()
+        .set_inputs(vec![gy, &x_shape, inputs[1]])
+        .build(grad_op2);
     let eq = ops::equal(&x, &y);
     vec![Some(ops::mul_inplace(eq, &gy)), None]
 }

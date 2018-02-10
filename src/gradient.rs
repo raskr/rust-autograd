@@ -87,7 +87,7 @@ fn mark_gradient_path<'a>(ys: &[&'a Tensor], xs: &[&'a Tensor]) -> Vec<GradInfo<
                     k < path.len() && Rc::ptr_eq(child, path[k].node)
                 };
                 if !visited {
-                    if child.is_source() || child.op.stop_gradient() {
+                    if child.is_source() || !child.has_gradient {
                         // Add to result, but don't allow more recursive search
                         child.resource_lookup_key.set(path.len());
                         path.push(GradInfo::new(child, xs.contains(&child), None));
@@ -105,7 +105,6 @@ fn mark_gradient_path<'a>(ys: &[&'a Tensor], xs: &[&'a Tensor]) -> Vec<GradInfo<
 #[test]
 fn test_gradient_path()
 {
-    use std::rc::Rc;
     // dummy graph
     // y = 3 * x1 * x1 + 5 * x2 + x3;
     let ref x1 = ::ops::placeholder(&[]);
@@ -269,7 +268,6 @@ pub fn symbolic_gradients(
         .collect::<Vec<Tensor>>()
 }
 
-// Module private.
 struct TensorWrapper<'a> {
     inner: &'a Tensor,
 }
@@ -297,7 +295,7 @@ impl<'a> PartialEq for TensorWrapper<'a> {
     #[inline]
     fn eq(&self, other: &TensorWrapper<'a>) -> bool
     {
-        self.inner.eq(&other.inner)
+        Rc::ptr_eq(&self.inner, &other.inner)
     }
 }
 

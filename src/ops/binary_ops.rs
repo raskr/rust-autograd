@@ -220,18 +220,15 @@ fn maybe_reduce_gy(x0: &Tensor, x1: &Tensor, gy: &Tensor) -> (Tensor, Tensor)
     let gy_shape = gy.shape();
     let sum0 = ops::reduction_ops::ReduceSum { keep_dims: true, sparse_axes: true };
     let sum1 = ops::reduction_ops::ReduceSum { keep_dims: true, sparse_axes: true };
-    return (
-        ops::apply_op(
-            sum0,
-            &[gy, &ops::not_equal(&gy_shape, &shape0)],
-            Some(shape0),
-        ), // gy1
-        ops::apply_op(
-            sum1,
-            &[gy, &ops::not_equal(&gy_shape, &shape1)],
-            Some(shape1),
-        ), /* gy2 */
-    );
+    let gy1 = Tensor::builder()
+        .set_inputs(vec![gy, &ops::not_equal(&gy_shape, &shape0)])
+        .set_shape(shape0)
+        .build(sum0);
+    let gy2 = Tensor::builder()
+        .set_inputs(vec![gy, &ops::not_equal(&gy_shape, &shape1)])
+        .set_shape(shape1)
+        .build(sum1);
+    (gy1, gy2)
 }
 
 
@@ -252,7 +249,10 @@ macro_rules! impl_bin_op_between_tensor_and_scalar {
             type Output = Tensor;
             fn $func(self, rhs: Tensor) -> Self::Output
             {
-                ops::apply_op($op, &[&ops::scalar(self as f32), &rhs], Some(rhs.shape()))
+                Tensor::builder()
+                    .set_inputs(vec![&ops::scalar(self as f32), &rhs])
+                    .set_shape(rhs.shape())
+                    .build($op)
             }
         }
 
@@ -261,7 +261,10 @@ macro_rules! impl_bin_op_between_tensor_and_scalar {
             type Output = Tensor;
             fn $func(self, rhs: &'a Tensor) -> Self::Output
             {
-                ops::apply_op($op, &[&ops::scalar(self as f32), rhs], Some(rhs.shape()))
+                Tensor::builder()
+                    .set_inputs(vec![&ops::scalar(self as f32), &rhs])
+                    .set_shape(rhs.shape())
+                    .build($op)
             }
         }
 
@@ -270,7 +273,10 @@ macro_rules! impl_bin_op_between_tensor_and_scalar {
             type Output = Tensor;
             fn $func(self, rhs: $scalar_type) -> Self::Output
             {
-                ops::apply_op($op, &[&self, &ops::scalar(rhs as f32)], Some(self.shape()))
+                Tensor::builder()
+                    .set_inputs(vec![&self, &ops::scalar(rhs as f32)])
+                    .set_shape(self.shape())
+                    .build($op)
             }
         }
 
@@ -279,7 +285,10 @@ macro_rules! impl_bin_op_between_tensor_and_scalar {
             type Output = Tensor;
             fn $func(self, rhs: $scalar_type) -> Self::Output
             {
-                ops::apply_op($op, &[self, &ops::scalar(rhs as f32)], Some(self.shape()))
+                Tensor::builder()
+                    .set_inputs(vec![&self, &ops::scalar(rhs as f32)])
+                    .set_shape(self.shape())
+                    .build($op)
             }
         }
     }

@@ -126,11 +126,15 @@ impl<'a> super::Optimizer<'a> for Adam<'a> {
                                     v: ::ops::variable(NdArray::zeros(param_arr.shape())),
                                     t: ::ops::variable(::ndarray_ext::from_scalar(1.)),
                                 });
-                            ::ops::apply_op(op, &[param, grad.as_ref(), m, v, t], None)
+                            Tensor::builder()
+                                .set_inputs(vec![param, grad.as_ref(), m, v, t])
+                                .build(op)
                         }
                         Entry::Occupied(ent) => {
                             let StatefulParams { ref m, ref v, ref t } = *ent.get();
-                            ::ops::apply_op(op, &[param, grad.as_ref(), m, v, t], None)
+                            Tensor::builder()
+                                .set_inputs(vec![param, grad.as_ref(), m, v, t])
+                                .build(op)
                         }
                     }
                 } else {

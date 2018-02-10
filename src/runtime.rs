@@ -365,7 +365,6 @@ fn test_eval_internal()
             "ConvertToTensor",
             "Squeeze", // forward end
             "Shape",
-            "StopGradient",
             "Ones",
             "ExpandDims",
         ]

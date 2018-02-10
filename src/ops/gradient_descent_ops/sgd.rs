@@ -20,7 +20,7 @@ impl ::ops::Op for SGDOp {
             grad * self.lr
         };
         xs[0].zip_mut_with(&updates, |a, &b| *a -= b);
-        Err(::ops::OpComputeErrorStatus::NoOutput)
+        Err(::errors::OpComputeErrorStatus::NoOutput)
     }
 
     fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
@@ -46,7 +46,10 @@ impl<'a> super::Optimizer<'a> for SGD {
             .into_iter()
             .zip(grads)
             .map(|(param, grad)| {
-                ::ops::apply_op(SGDOp { lr: self.lr }, &[param, grad.as_ref()], None)
+                let op = SGDOp { lr: self.lr };
+                Tensor::builder()
+                    .set_inputs(vec![param, grad.as_ref()])
+                    .build(op)
             })
             .collect()
     }

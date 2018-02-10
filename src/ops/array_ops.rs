@@ -183,10 +183,10 @@ impl ops::Op for Reshape {
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
-        vec![
-            Some(ops::apply_op(Reshape, &[gy, &ops::shape(inputs[0])], None)),
-            None,
-        ]
+        let gx = Tensor::builder()
+            .set_inputs(vec![gy, &ops::shape(inputs[0])])
+            .build(Reshape);
+        vec![Some(gx), None]
     }
 }
 
@@ -255,9 +255,11 @@ impl ops::Op for IndexOp {
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         let op = IndexOpGrad { index: self.index };
-        vec![
-            Some(ops::apply_op(op, &[inputs[0], gy], Some(inputs[0].shape()))),
-        ]
+        let gx = Tensor::builder()
+            .set_shape(inputs[0].shape())
+            .set_inputs(vec![inputs[0], gy])
+            .build(op);
+        vec![Some(gx)]
     }
 }
 
@@ -338,16 +340,11 @@ impl ops::Op for Gather {
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
-        let grad_op = GatherGrad { axis: self.axis };
-
-        vec![
-            None,
-            Some(ops::apply_op(
-                grad_op,
-                &[inputs[0], inputs[1], gy],
-                Some(inputs[0].shape()),
-            )),
-        ]
+        let gx = Tensor::builder()
+            .set_shape(inputs[0].shape())
+            .set_inputs(vec![inputs[0], inputs[1], gy])
+            .build(GatherGrad { axis: self.axis });
+        vec![None, Some(gx)]
     }
 }
 
@@ -463,12 +460,11 @@ impl ops::Op for Clip {
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
-        let op = ops::apply_op(
-            ClipGrad { min: self.min, max: self.max },
-            &[inputs[0], gy],
-            Some(gy.shape()),
-        );
-        vec![Some(op)]
+        let gx = Tensor::builder()
+            .set_shape(gy.shape())
+            .set_inputs(vec![inputs[0], gy])
+            .build(ClipGrad { min: self.min, max: self.max });
+        vec![Some(gx)]
     }
 }
 
@@ -530,16 +526,15 @@ impl ops::Op for Concat {
         // [x1, x2, x3, ..., gy]
         let mut merged_inputs: Vec<&Tensor> = inputs.to_vec();
         merged_inputs.insert(0, gy);
-        let merged_inputs: &[&Tensor] = merged_inputs.as_slice();
+        let merged_inputs = merged_inputs.as_slice();
 
         let gxs = (0..inputs.len())
             .map(move |i| {
-                let grad_op = ConcatGrad { index: i, axis: self.axis };
-                Some(ops::apply_op(
-                    grad_op,
-                    merged_inputs,
-                    Some(inputs[0].shape()),
-                ))
+                let gx = Tensor::builder()
+                    .set_shape(inputs[0].shape())
+                    .set_inputs_slice(merged_inputs)
+                    .build(ConcatGrad { index: i, axis: self.axis });
+                Some(gx)
             })
             .collect::<Vec<Option<Tensor>>>();
         gxs
@@ -659,9 +654,11 @@ impl ops::Op for Split {
             sizes: self.sizes.clone(),
             index: self.index,
         };
-        vec![
-            Some(ops::apply_op(op, &[inputs[0], gy], Some(inputs[0].shape()))),
-        ]
+        let gx = Tensor::builder()
+            .set_inputs(vec![inputs[0], gy])
+            .set_shape(inputs[0].shape())
+            .build(op);
+        vec![Some(gx)]
     }
 }
 
@@ -746,9 +743,11 @@ impl ops::Op for Slice {
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         let op = SliceGrad { indices: self.indices.clone() };
-        vec![
-            Some(ops::apply_op(op, &[inputs[0], gy], Some(inputs[0].shape()))),
-        ]
+        let gx = Tensor::builder()
+            .set_inputs(vec![inputs[0], gy])
+            .set_shape(inputs[0].shape())
+            .build(op);
+        vec![Some(gx)]
     }
 }
 
@@ -872,7 +871,7 @@ impl ops::Op for Broadcast {
             sparse_axes: self.sparse_axes,
         };
         let axes = inputs[2];
-        let grad_op = ops::apply_op(sum, &[gy, axes], None);
-        vec![Some(grad_op), None, None]
+        let gx = Tensor::builder().set_inputs(vec![gy, axes]).build(sum);
+        vec![Some(gx), None, None]
     }
 }

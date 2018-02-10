@@ -131,11 +131,10 @@ impl ops::Op for SparseSoftmaxCrossEntropyLatter {
         let log_x = inputs[0];
         let t = inputs[1];
 
-        let gx1 = ops::apply_op(
-            SparseSoftmaxCrossEntropyGrad,
-            &[log_x, t, gy],
-            Some(log_x.shape()),
-        );
+        let gx1 = Tensor::builder()
+            .set_inputs(vec![log_x, t, gy])
+            .set_shape(log_x.shape())
+            .build(SparseSoftmaxCrossEntropyGrad);
 
         // gx2 won't be used
         let gx2 = {

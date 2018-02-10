@@ -171,11 +171,10 @@ impl ops::Op for ELU {
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
-        let gx = ops::apply_op(
-            ELUGrad { alpha: self.alpha },
-            &[inputs[0], gy],
-            Some(gy.shape()),
-        );
+        let gx = Tensor::builder()
+            .set_inputs(vec![inputs[0], gy])
+            .set_shape(gy.shape())
+            .build(ELUGrad { alpha: self.alpha });
         vec![Some(gx)]
     }
 }
