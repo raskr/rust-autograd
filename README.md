@@ -13,8 +13,6 @@ Here we are computing partial derivatives of `z = 2x^2 + 3y + 1`.
 
 extern crate autograd as ag;
 
-use self::ag::gradient_descent_ops::Optimizer;
-
 let ref x = ag::placeholder(&[]);
 let ref y = ag::placeholder(&[]);
 let ref z = 2*x*x + 3*y + 1;
@@ -39,6 +37,8 @@ println!("{}", gx.eval(&[(x, &ag::ndarray::arr0(2.))]));  // => 8.
 Another example: multi layer perceptron for MNIST digits classification.
 
 ```rust
+use self::ag::gradient_descent_ops::Optimizer;
+
 // -- graph def --
 let ref x = ag::placeholder(&[-1, 28*28]);
 let ref y = ag::placeholder(&[-1]);
