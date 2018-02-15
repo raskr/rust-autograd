@@ -1,6 +1,5 @@
 extern crate ndarray;
 
-use errors::OpComputeErrorStatus;
 use ndarray_ext::NdArray;
 use tensor::{ArrayLike, Tensor};
 
@@ -17,29 +16,6 @@ mod reduction_ops;
 mod const_gen_ops;
 pub mod gradient_descent_ops;
 
-
-/// Operation trait. `Tensor` wraps trait-object of this.
-pub trait Op {
-    /// Name of this op
-    fn name(&self) -> &str;
-
-    /// Actually runs this op.
-    ///
-    /// N inputs, 1 output.
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, OpComputeErrorStatus>;
-
-    /// Returns symbolic gradients for input nodes by use of output gradient etc.
-    ///
-    /// # Arguments
-    ///
-    /// * `gy` - Symbolic representation of the gradient of `compute`'s return value
-    /// * `xs` - Symbolic representation of `compute::xs`
-    /// * `y` - Symbolic representation of `compute`'s return value
-    ///
-    /// NOTE:
-    /// The number of return values must match `xs.len()`.
-    fn grad(&self, gy: &Tensor, xs: &[&Tensor], y: &Tensor) -> Vec<Option<Tensor>>;
-}
 
 impl Tensor {
     /// Gets a symbolic element from this tensor with shape `[]`.
@@ -475,7 +451,19 @@ pub fn atanh(x: &Tensor) -> Tensor
 }
 
 
-/// Identity function
+/// Gets i th output value of `x`
+///
+/// NOTE: `x` should be a result of a multi-outputs op;
+/// otherwise index-out-of-bounds error may happen.
+pub fn select_ith_of(x: &Tensor, i: usize) -> Tensor
+{
+    Tensor::builder()
+        .set_input(x)
+        .set_input_indices(vec![i])
+        .build(activation_ops::Identity)
+}
+
+/// Identity function without copy.
 pub fn identity(x: &Tensor) -> Tensor
 {
     Tensor::builder().set_input(x).set_shape(x.shape()).build(
@@ -484,7 +472,7 @@ pub fn identity(x: &Tensor) -> Tensor
 }
 
 #[inline]
-fn bin_op_helper<T: Op + 'static>(a: &Tensor, b: &Tensor, op: T) -> Tensor
+fn bin_op_helper<T: ::op::Op + 'static>(a: &Tensor, b: &Tensor, op: T) -> Tensor
 {
     let ref a_shape = a.shape();
     let ref b_shape = b.shape();
@@ -1350,7 +1338,7 @@ pub fn reduce_logsumexp(x: &Tensor, axis: isize, keep_dims: bool) -> Tensor
 pub fn log_softmax(x: &Tensor, axis: isize) -> Tensor
 {
     Tensor::builder().set_shape(x.shape()).set_input(x).build(
-        xent_ops::LogSoftmax { axis }
+        xent_ops::LogSoftmax { axis },
     )
 }
 
@@ -1402,10 +1390,8 @@ pub fn sigmoid_cross_entropy(y: &Tensor, t: &Tensor) -> Tensor
 /// Loss tensor with shape (batch_size, 1)
 pub fn softmax_cross_entropy(y: &Tensor, t: &Tensor) -> Tensor
 {
-    let op = xent_ops::SoftmaxCrossEntropyLatter;
-    Tensor::builder()
-        .set_inputs(vec![&log_softmax(y, 1), t])
-        .build(op)
+    let op = xent_ops::SoftmaxCrossEntropy;
+    Tensor::builder().set_inputs(vec![y, t]).build(op)
 }
 
 
@@ -1422,10 +1408,8 @@ pub fn softmax_cross_entropy(y: &Tensor, t: &Tensor) -> Tensor
 /// Loss tensor with shape (batch_size, 1)
 pub fn sparse_softmax_cross_entropy(y: &Tensor, t: &Tensor) -> Tensor
 {
-    let op = xent_ops::SparseSoftmaxCrossEntropyLatter;
-    Tensor::builder()
-        .set_inputs(vec![&log_softmax(y, 1), t])
-        .build(op)
+    let op = xent_ops::SparseSoftmaxCrossEntropy;
+    Tensor::builder().set_inputs(vec![y, t]).build(op)
 }
 
 
@@ -1770,7 +1754,7 @@ pub fn random_normal<T: ArrayLike>(shape: &T, mean: f64, stddev: f64) -> Tensor
 {
     let shape = shape.as_tensor();
     Tensor::builder().set_input(&shape).set_shape(shape).build(
-        random_ops::RandomNormal { mean, stddev }
+        random_ops::RandomNormal { mean, stddev },
     )
 }
 
@@ -1781,7 +1765,7 @@ pub fn random_uniform<T: ArrayLike>(shape: &T, min: f64, max: f64) -> Tensor
 
     let shape = shape.as_tensor();
     Tensor::builder().set_input(&shape).set_shape(shape).build(
-        random_ops::RandomUniform { min, max }
+        random_ops::RandomUniform { min, max },
     )
 }
 
@@ -1791,7 +1775,7 @@ pub fn standard_normal<T: ArrayLike>(shape: &T) -> Tensor
 {
     let shape = shape.as_tensor();
     Tensor::builder().set_input(&shape).set_shape(shape).build(
-        random_ops::StandardNormal
+        random_ops::StandardNormal,
     )
 }
 
@@ -1801,7 +1785,7 @@ pub fn standard_uniform<T: ArrayLike>(shape: &T) -> Tensor
 {
     let shape = shape.as_tensor();
     Tensor::builder().set_input(&shape).set_shape(shape).build(
-        random_ops::StandardUniform
+        random_ops::StandardUniform,
     )
 }
 
@@ -1811,7 +1795,7 @@ pub fn bernoulli<T: ArrayLike>(shape: &T, p: f64) -> Tensor
 {
     let shape = shape.as_tensor();
     Tensor::builder().set_input(&shape).set_shape(shape).build(
-        random_ops::Bernoulli { p }
+        random_ops::Bernoulli { p },
     )
 }
 
@@ -1821,7 +1805,7 @@ pub fn random_exp<T: ArrayLike>(shape: &T, lambda: f64) -> Tensor
 {
     let shape = shape.as_tensor();
     Tensor::builder().set_input(&shape).set_shape(shape).build(
-        random_ops::Exponential { lambda }
+        random_ops::Exponential { lambda },
     )
 }
 
@@ -1831,7 +1815,7 @@ pub fn random_gamma<T: ArrayLike>(shape: &T, shape_param: f64, scale: f64) -> Te
 {
     let shape = shape.as_tensor();
     Tensor::builder().set_input(&shape).set_shape(shape).build(
-        random_ops::Gamma { shape_param, scale }
+        random_ops::Gamma { shape_param, scale },
     )
 }
 
@@ -1841,7 +1825,7 @@ pub fn log_normal<T: ArrayLike>(shape: &T, mean: f64, stddev: f64) -> Tensor
 {
     let shape = shape.as_tensor();
     Tensor::builder().set_input(&shape).set_shape(shape).build(
-        random_ops::LogNormal { mean, stddev }
+        random_ops::LogNormal { mean, stddev },
     )
 }
 

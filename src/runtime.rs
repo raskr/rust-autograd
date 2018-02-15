@@ -1,6 +1,7 @@
 extern crate ndarray;
 
 use ndarray_ext::NdArray;
+use op;
 use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
 use std::mem;
@@ -8,6 +9,7 @@ use std::rc::Rc;
 use tensor::Tensor;
 
 
+// Context in evaluation of `node`
 pub struct OpComputeContext<'a, 'b: 'a> {
     pub node: &'b Tensor, // Expose to its op for convenience
     resource_store: &'a ResourceStore<'b>,
@@ -38,13 +40,14 @@ impl<'a, 'b> OpComputeContext<'a, 'b> {
     }
 
     #[inline]
-    fn grab_inputs_internal(&self, mutable: bool) -> Vec<&NdArray>
+    fn grab_inputs_internal(&self, is_mutable: bool) -> Vec<&NdArray>
     {
-        fn seek<'a, 'b: 'a>(
+        fn find_value_of<'a, 'b: 'a>(
             x: &'b Tensor,
             store: &'a ResourceStore,
             feed_store: &FeedStore<'a>,
             mutable: bool,
+            value_index: usize,
         ) -> &'a NdArray
         {
             if let Some(ref per) = x.persistent_array {
@@ -53,16 +56,15 @@ impl<'a, 'b> OpComputeContext<'a, 'b> {
             } else if x.is_placeholder {
                 feed_store[x.resource_lookup_key.get()]
             } else {
-                match store[x.resource_lookup_key.get()].value {
+                match store[x.resource_lookup_key.get()].value[value_index] {
                     Ok(ref res) => res,
                     // hoping for x.inputs[i] to have the value
-                    Err(::OpComputeErrorStatus::Delegate { to: i }) => {
-                        seek(&x.inputs[i], store, feed_store, mutable)
+                    Err(::errors::OpComputeErrorStatus::Delegate { to: i }) => {
+                        find_value_of(&x.inputs[i], store, feed_store, mutable, x.input_indices[i])
                     }
-                    Err(::OpComputeErrorStatus::NoOutput) => {
+                    Err(::errors::OpComputeErrorStatus::NoOutput) => {
                         panic!("autograd failed: {}'s output not usable", x)
                     }
-                    // panic
                     Err(::OpComputeErrorStatus::BadInput(ref msg)) => {
                         panic!("autograd failed: {}, msg: {}", x, msg)
                     }
@@ -70,18 +72,24 @@ impl<'a, 'b> OpComputeContext<'a, 'b> {
             }
         }
 
-        let inputs = &self.node.inputs;
-        let mut ret = Vec::with_capacity(inputs.len());
-        for x in inputs {
-            ret.push(seek(x, self.resource_store, self.feed_store, mutable));
+        let input_nodes = &self.node.inputs;
+        let mut input_arrays = Vec::with_capacity(input_nodes.len());
+        for (x, &i) in input_nodes.into_iter().zip(self.node.input_indices.iter()) {
+            input_arrays.push(find_value_of(
+                x,
+                self.resource_store,
+                self.feed_store,
+                is_mutable,
+                i,
+            ));
         }
-        ret
+        input_arrays
     }
 }
 
 struct NodeWithValue<'a> {
     node: &'a Tensor,
-    value: OpComputeResult,
+    value: op::ComputeResult,
     // How many resources of this node does user requires.
     // When this is reduced to one, `value` is ready to be moved out (without copy).
     pending_count: usize,
@@ -89,7 +97,7 @@ struct NodeWithValue<'a> {
 
 impl<'a> Tensor {
     #[inline]
-    fn with_value(&'a self, val: OpComputeResult) -> NodeWithValue<'a>
+    fn with_value(&'a self, val: op::ComputeResult) -> NodeWithValue<'a>
     {
         NodeWithValue { node: self, value: val, pending_count: 0 }
     }
@@ -155,13 +163,13 @@ where
                     Entry::Occupied(mut ent) => {
                         // pending_count = 1, so move out
                         if ent.get().pending_count == 1 {
-                            let got = ent.remove();
-                            got.value.expect(got.node.op.name())
+                            let mut got = ent.remove();
+                            got.value.remove(0).expect(got.node.op.name())
                         } else {
                             // pending_count > 1, so copy the resource
-                            let got = ent.get_mut();
+                            let mut got = ent.get_mut();
                             got.pending_count -= 1;
-                            got.value.as_ref().expect(got.node.op.name()).clone()
+                            got.value[0].as_ref().expect(got.node.op.name()).clone()
                         }
                     }
                     _ => unreachable!(),
@@ -169,7 +177,7 @@ where
                 res
             }
         })
-        .collect::<Vec<_>>()
+        .collect()
 }
 
 
@@ -208,22 +216,24 @@ where
 // Actual recursion "rarely" happens.
 fn find_resource_creator<'a, 'b>(storage: &ResourceStore, x: &'b Tensor) -> &'b Tensor
 {
-    match storage[x.resource_lookup_key.get()].value {
+    match storage[x.resource_lookup_key.get()].value[0] {
         Ok(_) => x,
-        Err(::OpComputeErrorStatus::Delegate { to: i }) =>
-            find_resource_creator(storage, &x.inputs[i])  // recurse
-        ,
-        Err(::OpComputeErrorStatus::BadInput(ref msg)) =>
-            panic!("autograd failed: {}, msg: {}", x, msg),
-        // TODO: Implementing
-        Err(::OpComputeErrorStatus::NoOutput) =>
-            unimplemented!("\"eval\" for {}", x)
+
+        // recurse
+        Err(::OpComputeErrorStatus::Delegate { to: i }) => {
+            find_resource_creator(storage, &x.inputs[i])
+        }
+
+        Err(::OpComputeErrorStatus::BadInput(ref msg)) => {
+            panic!("autograd failed: {}, msg: {}", x, msg)
+        }
+
+        // TODO: Implementing (Returning None is good probably)
+        Err(::OpComputeErrorStatus::NoOutput) => unimplemented!("\"eval\" for {}", x),
     }
 }
 
 
-// private type alias
-type OpComputeResult = Result<NdArray, ::errors::OpComputeErrorStatus>;
 type ResourceStore<'a> = Vec<NodeWithValue<'a>>;
 type FeedStore<'a> = Vec<&'a NdArray>;
 
@@ -240,9 +250,9 @@ fn get_fed_resource<'a>(node: &Tensor, feeds: &Vec<&(&Tensor, &'a NdArray)>) -> 
 }
 
 
-// Actually evaluates "endpoints".
+// Actually evaluates nodes "targets".
 fn eval_internal<'a>(
-    endpoints: &Vec<&'a Tensor>,
+    targets: &Vec<&'a Tensor>,
     feeds: &Vec<&(&'a Tensor, &NdArray)>,
 ) -> ResourceStore<'a>
 {
@@ -251,7 +261,7 @@ fn eval_internal<'a>(
 
     // Obtain array resources while visiting nodes in topological order.
     // Stack-based DFS is used, to avoid stack overflow in explicit recursion.
-    let mut dfs_stack: Vec<(&Tensor, bool)> = endpoints.iter().map(|&x| (x, false)).collect();
+    let mut dfs_stack: Vec<(&Tensor, bool)> = targets.iter().map(|&x| (x, false)).collect();
     while let Some((node, is_parent)) = dfs_stack.pop() {
         if is_parent {
             // Visit this node
@@ -261,11 +271,12 @@ fn eval_internal<'a>(
             } else {
                 node.resource_lookup_key.set(resource_store.len());
                 if node.persistent_array.is_none() {
-                    let y = {
-                        let ctx = OpComputeContext::new(node, &resource_store, &feed_store);
-                        node.with_value(node.op.compute(ctx))
-                    };
-                    resource_store.push(y);
+                    let y = node.op.compute(OpComputeContext::new(
+                        node,
+                        &resource_store,
+                        &feed_store,
+                    ));
+                    resource_store.push(node.with_value(y));
                 }
             }
         } else {

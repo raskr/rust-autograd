@@ -1,8 +1,9 @@
 extern crate ndarray;
 
 use ndarray_ext::NdArray;
+use op;
+use op::Op;
 use ops;
-use ops::Op;
 use std::cell::Cell;
 use std::fmt;
 use std::mem;
@@ -14,8 +15,8 @@ use std::rc::Rc;
 pub struct Tensor(pub Rc<TensorCore>);
 
 pub struct TensorCore {
-    /// Operation created this node.
-    pub op: Box<ops::Op>,
+    /// Operation of this node.
+    pub op: Box<op::Op>,
 
     /// References to immediate predecessors.
     pub inputs: Vec<Tensor>,
@@ -29,7 +30,7 @@ pub struct TensorCore {
     /// Variable or constant array is placed here.
     pub persistent_array: Option<NdArray>,
 
-    /// Used to lookup a resource of this tensor.
+    /// Used to look up a resource of this tensor.
     pub resource_lookup_key: Cell<usize>,
 
     /// Immutable flag of tensor is placeholder or not.
@@ -37,6 +38,9 @@ pub struct TensorCore {
 
     /// `op` can have gradient?
     pub has_gradient: bool,
+
+    /// Indices of arrays used in `compute`
+    pub input_indices: Vec<usize>,
 }
 
 pub struct TensorBuilder {
@@ -45,6 +49,7 @@ pub struct TensorBuilder {
     is_placeholder: bool,
     inputs: Vec<Tensor>,
     persistent_array: Option<NdArray>,
+    input_indices: Option<Vec<usize>>,
 }
 
 impl TensorBuilder {
@@ -90,9 +95,17 @@ impl TensorBuilder {
         self
     }
 
+    #[inline]
     pub fn set_persistent_array(mut self, a: NdArray) -> TensorBuilder
     {
         self.persistent_array = Some(a);
+        self
+    }
+
+    #[inline]
+    pub fn set_input_indices(mut self, a: Vec<usize>) -> TensorBuilder
+    {
+        self.input_indices = Some(a);
         self
     }
 
@@ -109,6 +122,7 @@ impl TensorBuilder {
     /// vars.sort_by_key(|a| a.top_rank);
     /// assert!(vars == [a, v, b, z])
     /// ```
+    #[inline]
     pub fn build<T: Op + 'static>(self, op: T) -> Tensor
     {
         let rank = if self.inputs.len() == 0 {
@@ -121,6 +135,15 @@ impl TensorBuilder {
                 .map(|a| a + 1)
                 .unwrap_or(0)
         };
+
+        let input_indices = if let Some(a) = self.input_indices {
+            // a: [100]
+            assert_eq!(a.len(), self.inputs.len());
+            a
+        } else {
+            vec![0; self.inputs.len()]
+        };
+
         Tensor(Rc::new(TensorCore {
             op: Box::new(op),
             inputs: self.inputs,
@@ -130,6 +153,7 @@ impl TensorBuilder {
             is_placeholder: self.is_placeholder,
             resource_lookup_key: Cell::new(!0),
             has_gradient: self.has_gradient,
+            input_indices,
         }))
     }
 }
@@ -145,6 +169,7 @@ impl Tensor {
             persistent_array: None,
             inputs: Vec::new(),
             is_placeholder: false,
+            input_indices: None,
         }
     }
 

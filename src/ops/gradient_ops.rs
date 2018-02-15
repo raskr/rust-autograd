@@ -1,19 +1,18 @@
-use ndarray_ext::NdArray;
-use ops;
+use op;
 use tensor::Tensor;
 
 
 pub struct StopGradient;
 
-impl ops::Op for StopGradient {
+impl op::Op for StopGradient {
     fn name(&self) -> &str
     {
         "StopGradient"
     }
 
-    fn compute(&self, _: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, _: ::runtime::OpComputeContext) -> op::ComputeResult
     {
-        Err(::OpComputeErrorStatus::Delegate { to: 0 })
+        vec![Err(::OpComputeErrorStatus::Delegate { to: 0 })]
     }
 
     fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>

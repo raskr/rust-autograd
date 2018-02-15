@@ -2,6 +2,7 @@ extern crate ndarray;
 
 use self::ndarray::Zip;
 use ndarray_ext::NdArray;
+use op;
 use ops;
 use std::f32;
 use std::ops::Neg;
@@ -48,14 +49,13 @@ macro_rules! impl_cmp_op {
 
         pub struct $struct_name;
 
-        impl ops::Op for $struct_name {
+        impl op::Op for $struct_name {
             fn name(&self) -> &str
             {
                 stringify!($struct_name)
             }
 
-            fn compute(&self, ctx: ::runtime::OpComputeContext)
-                -> Result<NdArray, ::OpComputeErrorStatus>
+            fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
             {
                 let xs = ctx.grab_inputs();
                 let x0 = xs[0];
@@ -67,7 +67,7 @@ macro_rules! impl_cmp_op {
                 let x0_is_scalar = shape0 == scalar_shape;
                 let x1_is_scalar = !x0_is_scalar;
 
-                if x0_is_scalar {
+                let ret = if x0_is_scalar {
                     let mut result = NdArray::zeros(shape1);
                     Zip::from(&mut result).and_broadcast(x0).and(x1).apply($assign);
                     Ok(result)
@@ -79,7 +79,8 @@ macro_rules! impl_cmp_op {
                     let mut result = NdArray::zeros(shape0);
                     Zip::from(&mut result).and(x0).and(x1).apply($assign);
                     Ok(result)
-                }
+                };
+                vec![ret]
             }
 
             fn grad(&self, gy: &Tensor, xs: &[&Tensor], y: &Tensor) -> Vec<Option<Tensor>>
@@ -121,16 +122,16 @@ fn min_max_grad(gy: &Tensor, xs: &[&Tensor], y: &Tensor) -> Vec<Option<Tensor>>
     ]
 }
 
-impl ops::Op for Abs {
+impl op::Op for Abs {
     fn name(&self) -> &str
     {
         "Abs"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let xs = ctx.grab_inputs();
-        Ok(xs[0].map(|x| x.abs()))
+        vec![Ok(xs[0].map(|x| x.abs()))]
     }
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
@@ -139,16 +140,16 @@ impl ops::Op for Abs {
     }
 }
 
-impl ops::Op for NegOp {
+impl op::Op for NegOp {
     fn name(&self) -> &str
     {
         "Neg"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let xs = ctx.grab_inputs();
-        Ok(xs[0].map(|x| x.neg()))
+        vec![Ok(xs[0].map(|x| x.neg()))]
     }
 
     fn grad(&self, gy: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
@@ -157,16 +158,16 @@ impl ops::Op for NegOp {
     }
 }
 
-impl ops::Op for Square {
+impl op::Op for Square {
     fn name(&self) -> &str
     {
         "Square"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let xs = ctx.grab_inputs();
-        Ok(xs[0].map(|x| x * x))
+        vec![Ok(xs[0].map(|x| x * x))]
     }
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
@@ -175,16 +176,16 @@ impl ops::Op for Square {
     }
 }
 
-impl ops::Op for Reciprocal {
+impl op::Op for Reciprocal {
     fn name(&self) -> &str
     {
         "Reciprocal"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let xs = ctx.grab_inputs();
-        Ok(xs[0].map(|x| x.recip()))
+        vec![Ok(xs[0].map(|x| x.recip()))]
     }
 
     fn grad(&self, gy: &Tensor, _: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
@@ -193,16 +194,16 @@ impl ops::Op for Reciprocal {
     }
 }
 
-impl ops::Op for Sign {
+impl op::Op for Sign {
     fn name(&self) -> &str
     {
         "Sign"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let xs = ctx.grab_inputs();
-        Ok(xs[0].mapv(|x| if x == 0. { 0. } else { x.signum() }))
+        vec![Ok(xs[0].mapv(|x| if x == 0. { 0. } else { x.signum() }))]
     }
 
     fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
@@ -211,16 +212,16 @@ impl ops::Op for Sign {
     }
 }
 
-impl ops::Op for Floor {
+impl op::Op for Floor {
     fn name(&self) -> &str
     {
         "Floor"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let xs = ctx.grab_inputs();
-        Ok(xs[0].map(|x| x.floor()))
+        vec![Ok(xs[0].map(|x| x.floor()))]
     }
 
     fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
@@ -229,16 +230,16 @@ impl ops::Op for Floor {
     }
 }
 
-impl ops::Op for Ceil {
+impl op::Op for Ceil {
     fn name(&self) -> &str
     {
         "Ceil"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let xs = ctx.grab_inputs();
-        Ok(xs[0].map(|x| x.ceil()))
+        vec![Ok(xs[0].map(|x| x.ceil()))]
     }
 
     fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
@@ -247,13 +248,13 @@ impl ops::Op for Ceil {
     }
 }
 
-impl ops::Op for Transpose {
+impl op::Op for Transpose {
     fn name(&self) -> &str
     {
         "Transpose"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let xs = ctx.grab_inputs();
         let x = xs[0].view();
@@ -261,7 +262,7 @@ impl ops::Op for Transpose {
         assert!(perm.len() >= 2);
 
 
-        if transpose_reversed(perm) {
+        let ret = if transpose_reversed(perm) {
             Ok(xs[0].clone().reversed_axes())
         } else {
             // preprocess
@@ -281,7 +282,8 @@ impl ops::Op for Transpose {
 
             // permutes dimensions
             Ok(do_transpose(x, src_dst))
-        }
+        };
+        vec![ret]
     }
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
@@ -383,16 +385,16 @@ pub fn logsumexp_forward(x: &NdArray, axis: isize, keep_dims: bool) -> NdArray
 }
 
 
-impl ops::Op for LogSumExp {
+impl op::Op for LogSumExp {
     fn name(&self) -> &str
     {
         "LogSumExp"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let x = ctx.grab_inputs()[0];
-        Ok(logsumexp_forward(x, self.axis, self.keep_dims))
+        vec![Ok(logsumexp_forward(x, self.axis, self.keep_dims))]
     }
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
@@ -406,17 +408,17 @@ impl ops::Op for LogSumExp {
 }
 
 
-impl ops::Op for Pow {
+impl op::Op for Pow {
     fn name(&self) -> &str
     {
         "Pow"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let x0 = ctx.grab_inputs()[0];
         let a = self.a;
-        Ok(x0.map(move |x| x.powf(a)))
+        vec![Ok(x0.map(move |x| x.powf(a)))]
     }
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
@@ -427,16 +429,16 @@ impl ops::Op for Pow {
     }
 }
 
-impl ops::Op for Sqrt {
+impl op::Op for Sqrt {
     fn name(&self) -> &str
     {
         "Sqrt"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let x0 = ctx.grab_inputs()[0];
-        Ok(x0.map(|a| a.sqrt()))
+        vec![Ok(x0.map(|a| a.sqrt()))]
     }
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
@@ -447,16 +449,16 @@ impl ops::Op for Sqrt {
     }
 }
 
-impl ops::Op for Log {
+impl op::Op for Log {
     fn name(&self) -> &str
     {
         "Log"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let x = ctx.grab_inputs()[0];
-        Ok(x.map(move |a| a.log(self.a)))
+        vec![Ok(x.map(move |a| a.log(self.a)))]
     }
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
@@ -465,16 +467,16 @@ impl ops::Op for Log {
     }
 }
 
-impl ops::Op for Exp {
+impl op::Op for Exp {
     fn name(&self) -> &str
     {
         "Exp"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let x = ctx.grab_inputs()[0];
-        Ok(x.map(|a| a.exp()))
+        vec![Ok(x.map(|a| a.exp()))]
     }
 
     fn grad(&self, gy: &Tensor, _: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
@@ -483,7 +485,7 @@ impl ops::Op for Exp {
     }
 }
 
-impl ops::Op for Atanh {
+impl op::Op for Atanh {
     fn name(&self) -> &str
     {
         "Atanh"
@@ -496,15 +498,14 @@ impl ops::Op for Atanh {
         vec![Some(y * gy)]
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext)
-        -> Result<::NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let x = ctx.grab_inputs()[0];
-        Ok(x.map(|a| a.atanh()))
+        vec![Ok(x.map(|a| a.atanh()))]
     }
 }
 
-impl ops::Op for Acosh {
+impl op::Op for Acosh {
     fn name(&self) -> &str
     {
         "Acosh"
@@ -517,15 +518,14 @@ impl ops::Op for Acosh {
         vec![Some(y * gy)]
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext)
-        -> Result<::NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let x = ctx.grab_inputs()[0];
-        Ok(x.map(|a| a.acosh()))
+        vec![Ok(x.map(|a| a.acosh()))]
     }
 }
 
-impl ops::Op for Asinh {
+impl op::Op for Asinh {
     fn name(&self) -> &str
     {
         "Asinh"
@@ -538,24 +538,23 @@ impl ops::Op for Asinh {
         vec![Some(y * gy)]
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext)
-        -> Result<::NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let x = ctx.grab_inputs()[0];
-        Ok(x.map(|a| a.asinh()))
+        vec![Ok(x.map(|a| a.asinh()))]
     }
 }
 
-impl ops::Op for Tanh {
+impl op::Op for Tanh {
     fn name(&self) -> &str
     {
         "Tanh"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let x = ctx.grab_inputs()[0];
-        Ok(x.map(|a| a.tanh()))
+        vec![Ok(x.map(|a| a.tanh()))]
     }
 
     fn grad(&self, gy: &Tensor, _: &[&Tensor], y: &Tensor) -> Vec<Option<Tensor>>
@@ -564,7 +563,7 @@ impl ops::Op for Tanh {
     }
 }
 
-impl ops::Op for Cosh {
+impl op::Op for Cosh {
     fn name(&self) -> &str
     {
         "Cosh"
@@ -575,15 +574,14 @@ impl ops::Op for Cosh {
         vec![Some(ops::sinh(inputs[0]) * gy)]
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext)
-        -> Result<::NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let x = ctx.grab_inputs()[0];
-        Ok(x.map(|a| a.cosh()))
+        vec![Ok(x.map(|a| a.cosh()))]
     }
 }
 
-impl ops::Op for Sinh {
+impl op::Op for Sinh {
     fn name(&self) -> &str
     {
         "Sinh"
@@ -594,15 +592,14 @@ impl ops::Op for Sinh {
         vec![Some(ops::cosh(inputs[0]) * gy)]
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext)
-        -> Result<::NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let x = ctx.grab_inputs()[0];
-        Ok(x.map(|a| a.sinh()))
+        vec![Ok(x.map(|a| a.sinh()))]
     }
 }
 
-impl ops::Op for Atan {
+impl op::Op for Atan {
     fn name(&self) -> &str
     {
         "Atan"
@@ -615,15 +612,14 @@ impl ops::Op for Atan {
         vec![Some(y * gy)]
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext)
-        -> Result<::NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let x = ctx.grab_inputs()[0];
-        Ok(x.map(|a| a.atan()))
+        vec![Ok(x.map(|a| a.atan()))]
     }
 }
 
-impl ops::Op for Acos {
+impl op::Op for Acos {
     fn name(&self) -> &str
     {
         "Acos"
@@ -636,15 +632,14 @@ impl ops::Op for Acos {
         vec![Some(y * gy)]
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext)
-        -> Result<::NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let x = ctx.grab_inputs()[0];
-        Ok(x.map(|a| a.acos()))
+        vec![Ok(x.map(|a| a.acos()))]
     }
 }
 
-impl ops::Op for Asin {
+impl op::Op for Asin {
     fn name(&self) -> &str
     {
         "Asin"
@@ -657,15 +652,14 @@ impl ops::Op for Asin {
         vec![Some(y * gy)]
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext)
-        -> Result<::NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let x = ctx.grab_inputs()[0];
-        Ok(x.map(|a| a.asin()))
+        vec![Ok(x.map(|a| a.asin()))]
     }
 }
 
-impl ops::Op for Sin {
+impl op::Op for Sin {
     fn name(&self) -> &str
     {
         "Sin"
@@ -676,15 +670,14 @@ impl ops::Op for Sin {
         vec![Some(ops::cos(inputs[0]) * gy)]
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext)
-        -> Result<::NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let x = ctx.grab_inputs()[0];
-        Ok(x.map(|a| a.sin()))
+        vec![Ok(x.map(|a| a.sin()))]
     }
 }
 
-impl ops::Op for Cos {
+impl op::Op for Cos {
     fn name(&self) -> &str
     {
         "Cos"
@@ -695,15 +688,14 @@ impl ops::Op for Cos {
         vec![Some(ops::neg(&(ops::sin(inputs[0]) * gy)))]
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext)
-        -> Result<::NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let x = ctx.grab_inputs()[0];
-        Ok(x.map(|a| a.cos()))
+        vec![Ok(x.map(|a| a.cos()))]
     }
 }
 
-impl ops::Op for Tan {
+impl op::Op for Tan {
     fn name(&self) -> &str
     {
         "Tan"
@@ -715,10 +707,9 @@ impl ops::Op for Tan {
         vec![Some(gy / (ops::square(cos)))]
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext)
-        -> Result<::NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let x = ctx.grab_inputs()[0];
-        Ok(x.map(|a| a.tan()))
+        vec![Ok(x.map(|a| a.tan()))]
     }
 }

@@ -19,6 +19,8 @@ pub mod ndarray_ext;
 
 pub mod errors;
 
+pub mod op;
+
 pub use ndarray_ext::array_gen;
 
 pub use tensor::Tensor;

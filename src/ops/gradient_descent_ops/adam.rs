@@ -1,6 +1,7 @@
 extern crate ndarray;
 
 use ndarray_ext::NdArray;
+use op;
 use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
 use tensor::Tensor;
@@ -10,13 +11,13 @@ struct AdamOp {
     static_params: StaticParams,
 }
 
-impl ::ops::Op for AdamOp {
+impl ::op::Op for AdamOp {
     fn name(&self) -> &str
     {
         "Adam"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let StaticParams { alpha, eps, b1, b2 } = self.static_params;
         let mut xs = unsafe { ctx.grab_assignable_inputs() };
@@ -49,7 +50,7 @@ impl ::ops::Op for AdamOp {
         // Update t and param
         xs[4][ndarray::IxDyn(&[])] += 1.;
         xs[0].scaled_add(-alpha, &m_hat);
-        Err(::ops::OpComputeErrorStatus::NoOutput)
+        vec![Err(::errors::OpComputeErrorStatus::NoOutput)]
     }
 
     fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>

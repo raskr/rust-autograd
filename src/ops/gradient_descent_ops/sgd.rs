@@ -1,4 +1,5 @@
 use ndarray_ext::NdArray;
+use op;
 use tensor::Tensor;
 
 
@@ -6,13 +7,13 @@ struct SGDOp {
     pub lr: f32,
 }
 
-impl ::ops::Op for SGDOp {
+impl ::op::Op for SGDOp {
     fn name(&self) -> &str
     {
         "SGD"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let mut xs = unsafe { ctx.grab_assignable_inputs() };
         let updates = {
@@ -20,7 +21,7 @@ impl ::ops::Op for SGDOp {
             grad * self.lr
         };
         xs[0].zip_mut_with(&updates, |a, &b| *a -= b);
-        Err(::errors::OpComputeErrorStatus::NoOutput)
+        vec![Err(::errors::OpComputeErrorStatus::NoOutput)]
     }
 
     fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>

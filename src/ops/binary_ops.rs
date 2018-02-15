@@ -4,10 +4,10 @@
 extern crate ndarray;
 
 use ndarray_ext::NdArray;
+use op;
 use ops;
 use std::mem;
 use std::ops::{Add, Div, Mul, Sub};
-use std::result::Result;
 use tensor::Tensor;
 
 
@@ -21,13 +21,13 @@ pub struct InplaceMulOp;
 pub struct InplaceDivOp;
 
 
-impl ops::Op for AddOp {
+impl op::Op for AddOp {
     fn name(&self) -> &str
     {
         "Add"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let xs = ctx.grab_inputs();
         add_forward(xs[0], xs[1])
@@ -41,25 +41,26 @@ impl ops::Op for AddOp {
 }
 
 
-impl ops::Op for SubOp {
+impl op::Op for SubOp {
     fn name(&self) -> &str
     {
         "Sub"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let xs = ctx.grab_inputs();
         let x0 = xs[0];
         let x1 = xs[1];
         let shape0: &[usize] = x0.shape();
-        if shape0 == &[] {
+        let ret = if shape0 == &[] {
             // a is scalar
             let x0_elem = x0[ndarray::IxDyn(&[])];
             Ok(x1.map(move |a| x0_elem - a))
         } else {
             Ok(x0 - x1)
-        }
+        };
+        vec![ret]
     }
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
@@ -69,13 +70,13 @@ impl ops::Op for SubOp {
     }
 }
 
-impl ops::Op for MulOp {
+impl op::Op for MulOp {
     fn name(&self) -> &str
     {
         "Mul"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let xs = ctx.grab_inputs();
         mul_forward(xs[0], xs[1])
@@ -90,25 +91,26 @@ impl ops::Op for MulOp {
     }
 }
 
-impl ops::Op for DivOp {
+impl op::Op for DivOp {
     fn name(&self) -> &str
     {
         "Div"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let xs = ctx.grab_inputs();
         let x0 = xs[0];
         let x1 = xs[1];
         let shape0: &[usize] = x0.shape();
-        if shape0 == &[] {
+        let ret = if shape0 == &[] {
             // a is scalar
             let x0_elem = x0[ndarray::IxDyn(&[])];
             Ok(x1.map(move |a| x0_elem / a))
         } else {
             Ok(x0 / x1)
-        }
+        };
+        vec![ret]
     }
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
@@ -120,20 +122,20 @@ impl ops::Op for DivOp {
     }
 }
 
-impl ops::Op for InplaceAddOp {
+impl op::Op for InplaceAddOp {
     fn name(&self) -> &str
     {
         "InplaceAdd"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let mut xs = unsafe { ctx.grab_assignable_inputs() };
         // safe transmute probably
         let x1: &&NdArray = unsafe { mem::transmute(&mut xs[1]) };
         let x0 = &mut xs[0];
         x0.zip_mut_with(x1, |a, &b| *a += b);
-        Err(::ops::OpComputeErrorStatus::Delegate { to: 0 })
+        vec![Err(::errors::OpComputeErrorStatus::Delegate { to: 0 })]
     }
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
@@ -144,20 +146,20 @@ impl ops::Op for InplaceAddOp {
 }
 
 
-impl ops::Op for InplaceSubOp {
+impl op::Op for InplaceSubOp {
     fn name(&self) -> &str
     {
         "InplaceSub"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let mut xs = unsafe { ctx.grab_assignable_inputs() };
         // safe transmute probably
         let x1: &&NdArray = unsafe { mem::transmute(&mut xs[1]) };
         let x0 = &mut xs[0];
         x0.zip_mut_with(x1, |a, &b| *a -= b);
-        Err(::ops::OpComputeErrorStatus::Delegate { to: 0 })
+        vec![Err(::errors::OpComputeErrorStatus::Delegate { to: 0 })]
     }
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
@@ -167,20 +169,20 @@ impl ops::Op for InplaceSubOp {
     }
 }
 
-impl ops::Op for InplaceMulOp {
+impl op::Op for InplaceMulOp {
     fn name(&self) -> &str
     {
         "InplaceMul"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let mut xs = unsafe { ctx.grab_assignable_inputs() };
         // safe transmute probably
         let x1: &&NdArray = unsafe { mem::transmute(&mut xs[1]) };
         let x0 = &mut xs[0];
         x0.zip_mut_with(x1, |a, &b| *a *= b);
-        Err(::ops::OpComputeErrorStatus::Delegate { to: 0 })
+        vec![Err(::errors::OpComputeErrorStatus::Delegate { to: 0 })]
     }
 
     fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
@@ -189,20 +191,20 @@ impl ops::Op for InplaceMulOp {
     }
 }
 
-impl ops::Op for InplaceDivOp {
+impl op::Op for InplaceDivOp {
     fn name(&self) -> &str
     {
         "InplaceDiv"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let mut xs = unsafe { ctx.grab_assignable_inputs() };
         // safe transmute probably
         let x1: &&NdArray = unsafe { mem::transmute(&mut xs[1]) };
         let x0 = &mut xs[0];
         x0.zip_mut_with(x1, |a, &b| *a /= b);
-        Err(::ops::OpComputeErrorStatus::Delegate { to: 0 })
+        vec![Err(::errors::OpComputeErrorStatus::Delegate { to: 0 })]
     }
 
     fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
@@ -341,7 +343,7 @@ macro_rules! impl_bin_op_between_tensors {
 
 macro_rules! impl_bin_op_forward {
     ($forward_name:ident, $bin_op:tt) => {
-        fn $forward_name(x0: &NdArray, x1: &NdArray) -> Result<NdArray, ::OpComputeErrorStatus>
+        fn $forward_name(x0: &NdArray, x1: &NdArray) -> op::ComputeResult
         {
             let shape0: &[usize]  = x0.shape();
             let shape1: &[usize]  = x1.shape();
@@ -351,7 +353,7 @@ macro_rules! impl_bin_op_forward {
             let x0_is_scalar = shape0 == scalar_shape || shape0 == scalar_shape1;
             let x1_is_scalar = shape1 == scalar_shape || shape1 == scalar_shape1;
 
-            if x0_is_scalar && !x1_is_scalar {
+            let ret = if x0_is_scalar && !x1_is_scalar {
                 let elem = x0[ndarray::IxDyn(&[])];
                 Ok(x1.map(move |a| a $bin_op elem ))
             } else if x1_is_scalar && !x0_is_scalar {
@@ -367,7 +369,8 @@ macro_rules! impl_bin_op_forward {
                 }
             } else {
                 Ok(x0 $bin_op x1)
-            }
+            };
+            vec![ret]
         }
     };
 }

@@ -1,11 +1,10 @@
-
-use ndarray_ext::NdArray;
+use op;
 use tensor::Tensor;
 
 macro_rules! impl_op {
     ($name:ident) => {
         pub struct $name;
-        impl ::ops::Op for $name {
+        impl ::op::Op for $name {
             fn name(&self) -> &str
             {
                 stringify!($name)
@@ -16,8 +15,7 @@ macro_rules! impl_op {
                 unreachable!()
             }
 
-            fn compute(&self, _: ::runtime::OpComputeContext)
-                -> Result<NdArray, ::errors::OpComputeErrorStatus>
+            fn compute(&self, _: ::runtime::OpComputeContext) -> op::ComputeResult
             {
                 unreachable!()
             }

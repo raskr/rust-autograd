@@ -2,7 +2,7 @@ extern crate ndarray;
 
 use ndarray_ext;
 use ndarray_ext::NdArray;
-use ops;
+use op;
 use tensor::Tensor;
 
 
@@ -17,15 +17,15 @@ pub struct Scalar {
 }
 
 
-impl ops::Op for Scalar {
+impl op::Op for Scalar {
     fn name(&self) -> &str
     {
         "Scalar"
     }
 
-    fn compute(&self, _: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, _: ::runtime::OpComputeContext) -> op::ComputeResult
     {
-        Ok(ndarray::arr0(self.val).into_dyn())
+        vec![Ok(ndarray::arr0(self.val).into_dyn())]
     }
 
     fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
@@ -34,17 +34,17 @@ impl ops::Op for Scalar {
     }
 }
 
-impl ops::Op for Zeros {
+impl op::Op for Zeros {
     fn name(&self) -> &str
     {
         "Zeros"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let xs = ctx.grab_inputs();
         let shape: &NdArray = xs[0];
-        if let Some(a) = shape.as_slice() {
+        let ret = if let Some(a) = shape.as_slice() {
             Ok(ndarray_ext::zeros(
                 a.iter().map(|&b| b as usize).collect::<Vec<_>>().as_slice(),
             ))
@@ -56,7 +56,8 @@ impl ops::Op for Zeros {
                     .collect::<Vec<_>>()
                     .as_slice(),
             ))
-        }
+        };
+        vec![ret]
     }
 
     fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
@@ -65,17 +66,17 @@ impl ops::Op for Zeros {
     }
 }
 
-impl ops::Op for Ones {
+impl op::Op for Ones {
     fn name(&self) -> &str
     {
         "Ones"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let xs = ctx.grab_inputs();
         let shape: &NdArray = xs[0];
-        if let Some(a) = shape.as_slice() {
+        let ret = if let Some(a) = shape.as_slice() {
             Ok(ndarray_ext::ones(
                 a.iter().map(|&b| b as usize).collect::<Vec<_>>().as_slice(),
             ))
@@ -87,7 +88,8 @@ impl ops::Op for Ones {
                     .collect::<Vec<_>>()
                     .as_slice(),
             ))
-        }
+        };
+        vec![ret]
     }
 
     fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
@@ -96,13 +98,13 @@ impl ops::Op for Ones {
     }
 }
 
-impl ops::Op for Range {
+impl op::Op for Range {
     fn name(&self) -> &str
     {
         "Range"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let xs = ctx.grab_inputs();
         let x0 = xs[0];
@@ -111,9 +113,11 @@ impl ops::Op for Range {
 
         let true_shape = &[];
         if x0.shape() != true_shape || x1.shape() != true_shape || x2.shape() != true_shape {
-            return Err(::OpComputeErrorStatus::BadInput(
-                "Inputs to `range` should be 0-ranked tensors".to_string(),
-            ));
+            return vec![
+                Err(::OpComputeErrorStatus::BadInput(
+                    "Inputs to `range` should be 0-ranked tensors".to_string(),
+                )),
+            ];
         }
 
         let start = x0[ndarray::IxDyn(&[])];
@@ -121,12 +125,14 @@ impl ops::Op for Range {
         let step = x2[ndarray::IxDyn(&[])];
 
         if start > end {
-            return Err(::OpComputeErrorStatus::BadInput(
-                "Start and end of `range` is wrong.".to_string(),
-            ));
+            return vec![
+                Err(::OpComputeErrorStatus::BadInput(
+                    "Start and end of `range` is wrong.".to_string(),
+                )),
+            ];
         }
 
-        Ok(ndarray::Array1::range(start, end, step).into_dyn())
+        vec![Ok(ndarray::Array1::range(start, end, step).into_dyn())]
     }
 
     fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
@@ -135,15 +141,15 @@ impl ops::Op for Range {
     }
 }
 
-impl ops::Op for ConvertToTensor {
+impl op::Op for ConvertToTensor {
     fn name(&self) -> &str
     {
         "ConvertToTensor"
     }
 
-    fn compute(&self, _: ::runtime::OpComputeContext) -> Result<NdArray, ::OpComputeErrorStatus>
+    fn compute(&self, _: ::runtime::OpComputeContext) -> op::ComputeResult
     {
-        Ok(self.arr.clone())
+        vec![Ok(self.arr.clone())]
     }
 
     fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
