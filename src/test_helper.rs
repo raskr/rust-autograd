@@ -21,9 +21,13 @@ pub fn gradient_check<'a, 'b, T>(
 
     // for each variable nodes
     for (var_node, th_grad) in variables.iter().zip(theoretical_grads) {
-        // Sorry for unwrap
-        let v_arr = unsafe { var_node.get_persistent_array_mut().unwrap() };
-
+        let v_arr = unsafe {
+            var_node
+                .persistent_array
+                .as_ref()
+                .expect("This is not variable")
+                .get_as_variable_mut()
+        };
         let head_ptr: *mut f32 = v_arr.as_mut_ptr();
 
         // for each values

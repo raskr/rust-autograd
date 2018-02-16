@@ -221,7 +221,7 @@ where
     let arr = arr.into_dyn();
     Tensor::builder()
         .set_shape(convert_to_tensor(::ndarray_ext::shape_of(&arr)))
-        .set_persistent_array(arr)
+        .set_variable_array(arr)
         .build(basic_source_ops::Variable)
 }
 
@@ -275,7 +275,7 @@ where
     let arr = arr.into_dyn();
     Tensor::builder()
         .set_shape(convert_to_tensor(::ndarray_ext::shape_of(&arr)))
-        .set_persistent_array(arr)
+        .set_constant_array(arr)
         .build(basic_source_ops::Const)
 }
 

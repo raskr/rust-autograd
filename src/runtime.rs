@@ -51,8 +51,7 @@ impl<'a, 'b> OpComputeContext<'a, 'b> {
         ) -> &'a NdArray
         {
             if let Some(ref per) = x.persistent_array {
-                assert!(!mutable || x.op.name() != "Const");
-                per
+                per.get_array()
             } else if x.is_placeholder {
                 feed_store[x.resource_lookup_key.get()]
             } else {
@@ -154,7 +153,10 @@ where
         .map(|ref creator| {
             if let Some(ref per) = creator.persistent_array {
                 // Rarely happens (case that a persistent array given by user is required)
-                per.clone()
+                match *per {
+                    ::tensor::PersistentArray::Variable(ref a) => a.clone(),
+                    ::tensor::PersistentArray::Constant(ref a) => a.clone(),
+                }
             } else if creator.is_placeholder {
                 // Rarely happens (case that a feed by user is required)
                 get_fed_resource(creator, &feeds).clone()

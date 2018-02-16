@@ -28,7 +28,7 @@ pub struct TensorCore {
     pub shape: Option<Tensor>,
 
     /// Variable or constant array is placed here.
-    pub persistent_array: Option<NdArray>,
+    pub persistent_array: Option<PersistentArray>,
 
     /// Used to look up a resource of this tensor.
     pub resource_lookup_key: Cell<usize>,
@@ -43,12 +43,49 @@ pub struct TensorCore {
     pub input_indices: Vec<usize>,
 }
 
+pub enum PersistentArray {
+    Variable(NdArray),
+    Constant(NdArray),
+}
+
+impl PersistentArray {
+    pub fn get_as_variable(&self) -> &NdArray
+    {
+        match *self {
+            PersistentArray::Variable(ref a) => a,
+            PersistentArray::Constant(_) => panic!("Can't mutate constant tensor"),
+        }
+    }
+
+    #[allow(mutable_transmutes)]
+    pub unsafe fn get_as_variable_mut(&self) -> &mut NdArray
+    {
+        mem::transmute(self.get_as_variable())
+    }
+
+    pub fn get_array(&self) -> &NdArray
+    {
+        match *self {
+            PersistentArray::Variable(ref a) => a,
+            PersistentArray::Constant(ref a) => a,
+        }
+    }
+
+    pub fn shape(&self) -> &[usize]
+    {
+        match *self {
+            PersistentArray::Variable(ref a) => a.shape(),
+            PersistentArray::Constant(ref a) => a.shape(),
+        }
+    }
+}
+
 pub struct TensorBuilder {
     shape: Option<Tensor>,
     has_gradient: bool,
     is_placeholder: bool,
     inputs: Vec<Tensor>,
-    persistent_array: Option<NdArray>,
+    persistent_array: Option<PersistentArray>,
     input_indices: Option<Vec<usize>>,
 }
 
@@ -96,9 +133,16 @@ impl TensorBuilder {
     }
 
     #[inline]
-    pub fn set_persistent_array(mut self, a: NdArray) -> TensorBuilder
+    pub fn set_constant_array(mut self, a: NdArray) -> TensorBuilder
     {
-        self.persistent_array = Some(a);
+        self.persistent_array = Some(PersistentArray::Constant(a));
+        self
+    }
+
+    #[inline]
+    pub fn set_variable_array(mut self, a: NdArray) -> TensorBuilder
+    {
+        self.persistent_array = Some(PersistentArray::Variable(a));
         self
     }
 
@@ -137,7 +181,6 @@ impl TensorBuilder {
         };
 
         let input_indices = if let Some(a) = self.input_indices {
-            // a: [100]
             assert_eq!(a.len(), self.inputs.len());
             a
         } else {
@@ -172,15 +215,6 @@ impl Tensor {
             input_indices: None,
         }
     }
-
-    // TODO: Use UnsafeCell
-    #[allow(mutable_transmutes)]
-    pub unsafe fn get_persistent_array_mut(&self) -> Option<&mut NdArray>
-    {
-        let m: &mut Option<NdArray> = mem::transmute(&self.persistent_array);
-        m.as_mut()
-    }
-
 
     /// Evaluates this tensor as a ndarray's array object.
     ///
