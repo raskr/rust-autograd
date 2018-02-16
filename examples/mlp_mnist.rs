@@ -1,10 +1,9 @@
+extern crate autograd as ag;
 #[macro_use(s)]
 extern crate ndarray;
-extern crate autograd as ag;
 
 use self::ag::gradient_descent_ops::Optimizer;
 use std::time::Instant;
-
 
 // This is softmax regression with Adam optimizer for mnist.
 // 0.918 test accuracy after 3 epochs,
@@ -69,7 +68,8 @@ fn main()
     );
 }
 
-pub mod dataset {
+pub mod dataset
+{
     extern crate ndarray;
     use std::fs::File;
     use std::io;
@@ -105,9 +105,9 @@ pub mod dataset {
 
     fn load_images<P: AsRef<Path>>(path: P) -> (Vec<f32>, usize)
     {
-        let ref mut buf_reader = io::BufReader::new(File::open(path).expect(
-            "Please run ./download_mnist.sh beforehand",
-        ));
+        let ref mut buf_reader = io::BufReader::new(
+            File::open(path).expect("Please run ./download_mnist.sh beforehand"),
+        );
         let magic = u32::from_be(read_u32(buf_reader));
         if magic != 2051 {
             panic!("Invalid magic number. expected 2051, got {}", magic)

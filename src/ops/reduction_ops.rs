@@ -11,37 +11,41 @@ use std::ops::Add;
 use std::ops::Mul;
 use tensor::Tensor;
 
-
-pub struct ReduceMin {
-    pub keep_dims: bool,
+pub struct ReduceMin
+{
+    pub keep_dims:   bool,
     pub sparse_axes: bool,
 }
 
-pub struct ReduceMax {
-    pub keep_dims: bool,
+pub struct ReduceMax
+{
+    pub keep_dims:   bool,
     pub sparse_axes: bool,
 }
 
-pub struct ReduceProd {
-    pub keep_dims: bool,
+pub struct ReduceProd
+{
+    pub keep_dims:   bool,
     pub sparse_axes: bool,
 }
 
-pub struct ReduceSum {
-    pub keep_dims: bool,
+pub struct ReduceSum
+{
+    pub keep_dims:   bool,
     pub sparse_axes: bool,
 }
 
-pub struct ReduceMean {
-    pub keep_dims: bool,
+pub struct ReduceMean
+{
+    pub keep_dims:   bool,
     pub sparse_axes: bool,
 }
 
-pub struct ArgMax {
-    pub axis: isize,
+pub struct ArgMax
+{
+    pub axis:     isize,
     pub keep_dim: bool,
 }
-
 
 macro_rules! impl_reduce_forward {
     ($forward_name:ident, $reduce_fn_name:ident, $reduce_default:expr) => {
@@ -90,13 +94,13 @@ macro_rules! impl_reduce_forward {
     };
 }
 
-
 impl_reduce_forward!(comopute_reduce_sum, add, 0.);
 impl_reduce_forward!(comopute_reduce_min, min, f32::MAX);
 impl_reduce_forward!(comopute_reduce_max, max, f32::MIN);
 impl_reduce_forward!(comopute_reduce_prod, mul, 1.);
 
-impl op::Op for ReduceSum {
+impl op::Op for ReduceSum
+{
     fn name(&self) -> &str
     {
         "ReduceSum"
@@ -113,7 +117,7 @@ impl op::Op for ReduceSum {
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         let grad_op = ops::array_ops::Broadcast {
-            keep_dims: self.keep_dims,
+            keep_dims:   self.keep_dims,
             sparse_axes: self.sparse_axes,
         };
         let gx = Tensor::builder()
@@ -123,7 +127,8 @@ impl op::Op for ReduceSum {
     }
 }
 
-impl op::Op for ReduceMean {
+impl op::Op for ReduceMean
+{
     fn name(&self) -> &str
     {
         "ReduceMean"
@@ -150,7 +155,7 @@ impl op::Op for ReduceMean {
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         let grad_op = ops::array_ops::Broadcast {
-            keep_dims: self.keep_dims,
+            keep_dims:   self.keep_dims,
             sparse_axes: self.sparse_axes,
         };
         let x = inputs[0];
@@ -164,7 +169,8 @@ impl op::Op for ReduceMean {
     }
 }
 
-impl op::Op for ReduceProd {
+impl op::Op for ReduceProd
+{
     fn name(&self) -> &str
     {
         "ReduceProd"
@@ -181,7 +187,7 @@ impl op::Op for ReduceProd {
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
     {
         let grad_op = ops::array_ops::Broadcast {
-            keep_dims: self.keep_dims,
+            keep_dims:   self.keep_dims,
             sparse_axes: self.sparse_axes,
         };
         let tmp = Tensor::builder()
@@ -192,8 +198,8 @@ impl op::Op for ReduceProd {
     }
 }
 
-
-impl op::Op for ReduceMin {
+impl op::Op for ReduceMin
+{
     fn name(&self) -> &str
     {
         "ReduceMin"
@@ -213,7 +219,8 @@ impl op::Op for ReduceMin {
     }
 }
 
-impl op::Op for ReduceMax {
+impl op::Op for ReduceMax
+{
     fn name(&self) -> &str
     {
         "ReduceMax"
@@ -241,8 +248,14 @@ fn min_max_grad(
     sparse_axes: bool,
 ) -> Vec<Option<Tensor>>
 {
-    let grad_op1 = ops::array_ops::Broadcast { keep_dims, sparse_axes };
-    let grad_op2 = ops::array_ops::Broadcast { keep_dims, sparse_axes };
+    let grad_op1 = ops::array_ops::Broadcast {
+        keep_dims,
+        sparse_axes,
+    };
+    let grad_op2 = ops::array_ops::Broadcast {
+        keep_dims,
+        sparse_axes,
+    };
     let x = inputs[0];
     let x_shape = inputs[0].shape();
     let y = Tensor::builder()
@@ -255,8 +268,8 @@ fn min_max_grad(
     vec![Some(ops::mul_inplace(eq, &gy)), None]
 }
 
-
-impl op::Op for ArgMax {
+impl op::Op for ArgMax
+{
     fn name(&self) -> &str
     {
         "ArgMax"
@@ -280,11 +293,10 @@ impl op::Op for ArgMax {
             let maxed = x.fold_axis(ndarray::Axis(axis), f32::MIN, move |&a, &b| max_fn(a, b));
             let maxed = ndarray_ext::expand_dims(maxed, axis);
             let mut mask = NdArray::zeros(x.shape());
-            Zip::from(&mut mask).and(x).and_broadcast(&maxed).apply(|r,
-             a,
-             b| {
-                *r = ((a == b) as i32) as f32
-            });
+            Zip::from(&mut mask)
+                .and(x)
+                .and_broadcast(&maxed)
+                .apply(|r, a, b| *r = ((a == b) as i32) as f32);
             mask
         };
 

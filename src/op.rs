@@ -5,9 +5,9 @@ use tensor::Tensor;
 
 pub type ComputeResult = Vec<Result<NdArray, ::errors::OpComputeErrorStatus>>;
 
-
 /// Operation trait. `Tensor` wraps trait-object of this.
-pub trait Op {
+pub trait Op
+{
     /// Name of this op
     fn name(&self) -> &str;
 

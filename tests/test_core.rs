@@ -2,7 +2,8 @@ extern crate autograd as ag;
 
 struct MultiOutputOp;
 
-impl ag::op::Op for MultiOutputOp {
+impl ag::op::Op for MultiOutputOp
+{
     fn name(&self) -> &str
     {
         "MultiOutputOp"

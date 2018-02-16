@@ -5,19 +5,20 @@ use ndarray_ext::NdArray;
 use op;
 use tensor::Tensor;
 
-
 pub struct Zeros;
 pub struct Ones;
 pub struct Range;
-pub struct ConvertToTensor {
+pub struct ConvertToTensor
+{
     pub arr: NdArray,
 }
-pub struct Scalar {
+pub struct Scalar
+{
     pub val: f32,
 }
 
-
-impl op::Op for Scalar {
+impl op::Op for Scalar
+{
     fn name(&self) -> &str
     {
         "Scalar"
@@ -34,7 +35,8 @@ impl op::Op for Scalar {
     }
 }
 
-impl op::Op for Zeros {
+impl op::Op for Zeros
+{
     fn name(&self) -> &str
     {
         "Zeros"
@@ -66,7 +68,8 @@ impl op::Op for Zeros {
     }
 }
 
-impl op::Op for Ones {
+impl op::Op for Ones
+{
     fn name(&self) -> &str
     {
         "Ones"
@@ -98,7 +101,8 @@ impl op::Op for Ones {
     }
 }
 
-impl op::Op for Range {
+impl op::Op for Range
+{
     fn name(&self) -> &str
     {
         "Range"
@@ -141,7 +145,8 @@ impl op::Op for Range {
     }
 }
 
-impl op::Op for ConvertToTensor {
+impl op::Op for ConvertToTensor
+{
     fn name(&self) -> &str
     {
         "ConvertToTensor"

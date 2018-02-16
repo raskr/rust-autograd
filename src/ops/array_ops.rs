@@ -8,9 +8,9 @@ use ops;
 use std::collections::HashSet;
 use std::iter::FromIterator;
 
-
-pub struct Broadcast {
-    pub keep_dims: bool,
+pub struct Broadcast
+{
+    pub keep_dims:   bool,
     pub sparse_axes: bool,
 }
 
@@ -18,65 +18,78 @@ pub struct ExpandDims;
 
 pub struct Squeeze;
 
-pub struct Slice {
+pub struct Slice
+{
     pub indices: Box<[ndarray::Si]>,
 }
 
-pub struct SliceGrad {
+pub struct SliceGrad
+{
     pub indices: Box<[ndarray::Si]>,
 }
 
-pub struct Split {
-    pub axis: isize,
+pub struct Split
+{
+    pub axis:  isize,
     pub sizes: Vec<usize>,
     pub index: usize,
 }
 
-pub struct SplitGrad {
-    pub axis: isize,
+pub struct SplitGrad
+{
+    pub axis:  isize,
     pub sizes: Vec<usize>,
     pub index: usize,
 }
 
-pub struct Tile {
+pub struct Tile
+{
     pub axis: isize,
-    pub num: usize,
+    pub num:  usize,
 }
 
-pub struct Concat {
+pub struct Concat
+{
     pub axis: isize,
 }
 
-pub struct ConcatGrad {
-    pub axis: isize,
+pub struct ConcatGrad
+{
+    pub axis:  isize,
     pub index: usize,
 }
 
-pub struct Clip {
+pub struct Clip
+{
     pub min: f32,
     pub max: f32,
 }
 
-pub struct ClipGrad {
+pub struct ClipGrad
+{
     pub min: f32,
     pub max: f32,
 }
 
 pub struct AddN;
 
-pub struct Gather {
+pub struct Gather
+{
     pub axis: isize,
 }
 
-pub struct GatherGrad {
+pub struct GatherGrad
+{
     pub axis: isize,
 }
 
-pub struct IndexOp {
+pub struct IndexOp
+{
     pub index: isize,
 }
 
-pub struct IndexOpGrad {
+pub struct IndexOpGrad
+{
     pub index: isize,
 }
 
@@ -90,8 +103,8 @@ pub struct Size;
 
 pub struct Reshape;
 
-
-impl op::Op for Shape {
+impl op::Op for Shape
+{
     fn name(&self) -> &str
     {
         "Shape"
@@ -110,7 +123,8 @@ impl op::Op for Shape {
     }
 }
 
-impl op::Op for Rank {
+impl op::Op for Rank
+{
     fn name(&self) -> &str
     {
         "Rank"
@@ -129,7 +143,8 @@ impl op::Op for Rank {
     }
 }
 
-impl op::Op for Size {
+impl op::Op for Size
+{
     fn name(&self) -> &str
     {
         "Size"
@@ -148,8 +163,8 @@ impl op::Op for Size {
     }
 }
 
-
-impl op::Op for Reshape {
+impl op::Op for Reshape
+{
     fn name(&self) -> &str
     {
         "Reshape"
@@ -162,11 +177,13 @@ impl op::Op for Reshape {
         let shape_arr: &NdArray = xs[1];
         let target = shape_arr
             .iter()
-            .map(|&dim_size| if dim_size != -1. {
-                dim_size as usize
-            } else {
-                let product: f32 = shape_arr.iter().product();
-                ret.len() / -product as usize
+            .map(|&dim_size| {
+                if dim_size != -1. {
+                    dim_size as usize
+                } else {
+                    let product: f32 = shape_arr.iter().product();
+                    ret.len() / -product as usize
+                }
             })
             .collect::<Vec<_>>();
 
@@ -189,7 +206,8 @@ impl op::Op for Reshape {
     }
 }
 
-impl op::Op for SetDiff1D {
+impl op::Op for SetDiff1D
+{
     fn name(&self) -> &str
     {
         "SetDiff1D"
@@ -214,9 +232,7 @@ impl op::Op for SetDiff1D {
         let vec = vec.into_iter().map(|&a| a as f32).collect::<Vec<f32>>();
         let len = vec.len();
         // safe unwrap
-        let ret = Ok(
-            NdArray::from_shape_vec(ndarray::IxDyn(&[len]), vec).unwrap(),
-        );
+        let ret = Ok(NdArray::from_shape_vec(ndarray::IxDyn(&[len]), vec).unwrap());
         vec![ret]
     }
 
@@ -226,7 +242,8 @@ impl op::Op for SetDiff1D {
     }
 }
 
-impl op::Op for IndexOp {
+impl op::Op for IndexOp
+{
     fn name(&self) -> &str
     {
         "IndexOp"
@@ -264,7 +281,8 @@ impl op::Op for IndexOp {
     }
 }
 
-impl op::Op for IndexOpGrad {
+impl op::Op for IndexOpGrad
+{
     fn name(&self) -> &str
     {
         "IndexOpGrad"
@@ -306,7 +324,8 @@ impl op::Op for IndexOpGrad {
     }
 }
 
-impl op::Op for Gather {
+impl op::Op for Gather
+{
     fn name(&self) -> &str
     {
         "Gather"
@@ -351,8 +370,8 @@ impl op::Op for Gather {
     }
 }
 
-
-impl op::Op for GatherGrad {
+impl op::Op for GatherGrad
+{
     fn name(&self) -> &str
     {
         "GatherGrad"
@@ -405,7 +424,9 @@ impl op::Op for GatherGrad {
             // squeeze
             let mut gx_sliced = gx_sliced.remove_axis(ndarray::Axis(axis));
             // assign gy to sliced view
-            gx_sliced.zip_mut_with(&gy_sub, |gx, &gy| { *gx += gy; });
+            gx_sliced.zip_mut_with(&gy_sub, |gx, &gy| {
+                *gx += gy;
+            });
         }
 
         vec![Ok(gx)]
@@ -417,7 +438,8 @@ impl op::Op for GatherGrad {
     }
 }
 
-impl op::Op for AddN {
+impl op::Op for AddN
+{
     fn name(&self) -> &str
     {
         "AddN"
@@ -450,7 +472,8 @@ impl op::Op for AddN {
     }
 }
 
-impl op::Op for Clip {
+impl op::Op for Clip
+{
     fn name(&self) -> &str
     {
         "Clip"
@@ -467,12 +490,16 @@ impl op::Op for Clip {
         let gx = Tensor::builder()
             .set_shape(gy.shape())
             .set_inputs(vec![inputs[0], gy])
-            .build(ClipGrad { min: self.min, max: self.max });
+            .build(ClipGrad {
+                min: self.min,
+                max: self.max,
+            });
         vec![Some(gx)]
     }
 }
 
-impl op::Op for ClipGrad {
+impl op::Op for ClipGrad
+{
     fn name(&self) -> &str
     {
         "ClipGrad"
@@ -494,7 +521,8 @@ impl op::Op for ClipGrad {
     }
 }
 
-impl op::Op for Concat {
+impl op::Op for Concat
+{
     fn name(&self) -> &str
     {
         "Concat"
@@ -518,8 +546,7 @@ impl op::Op for Concat {
             Ok(y)
         } else {
             Err(::OpComputeErrorStatus::BadInput(
-                "Can't concat arrays whose shapes are incompatible."
-                    .to_string(),
+                "Can't concat arrays whose shapes are incompatible.".to_string(),
             ))
         };
         vec![ret]
@@ -537,7 +564,10 @@ impl op::Op for Concat {
                 let gx = Tensor::builder()
                     .set_shape(inputs[0].shape())
                     .set_inputs_slice(merged_inputs)
-                    .build(ConcatGrad { index: i, axis: self.axis });
+                    .build(ConcatGrad {
+                        index: i,
+                        axis:  self.axis,
+                    });
                 Some(gx)
             })
             .collect::<Vec<Option<Tensor>>>();
@@ -545,7 +575,8 @@ impl op::Op for Concat {
     }
 }
 
-impl op::Op for ConcatGrad {
+impl op::Op for ConcatGrad
+{
     fn name(&self) -> &str
     {
         "ConcatGrad"
@@ -591,7 +622,8 @@ impl op::Op for ConcatGrad {
     }
 }
 
-impl op::Op for Tile {
+impl op::Op for Tile
+{
     fn name(&self) -> &str
     {
         "Tile"
@@ -628,7 +660,8 @@ impl op::Op for Tile {
     }
 }
 
-impl op::Op for Split {
+impl op::Op for Split
+{
     fn name(&self) -> &str
     {
         "Split"
@@ -654,7 +687,7 @@ impl op::Op for Split {
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         let op = SplitGrad {
-            axis: self.axis,
+            axis:  self.axis,
             sizes: self.sizes.clone(),
             index: self.index,
         };
@@ -666,7 +699,8 @@ impl op::Op for Split {
     }
 }
 
-impl op::Op for SplitGrad {
+impl op::Op for SplitGrad
+{
     fn name(&self) -> &str
     {
         "SplitGrad"
@@ -689,10 +723,8 @@ impl op::Op for SplitGrad {
         let end_index = start_index + self.sizes[self.index] as isize;
         let indices = make_indices_split(x, start_index, end_index, axis);
 
-        gx.slice_mut(indices.as_slice()).zip_mut_with(
-            gy,
-            |a, &g| *a = g,
-        );
+        gx.slice_mut(indices.as_slice())
+            .zip_mut_with(gy, |a, &g| *a = g);
         vec![Ok(gx)]
     }
 
@@ -724,7 +756,8 @@ fn make_indices_split(
         .collect::<Vec<ndarray::Si>>()
 }
 
-impl op::Op for Slice {
+impl op::Op for Slice
+{
     fn name(&self) -> &str
     {
         "Slice"
@@ -746,7 +779,9 @@ impl op::Op for Slice {
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
-        let op = SliceGrad { indices: self.indices.clone() };
+        let op = SliceGrad {
+            indices: self.indices.clone(),
+        };
         let gx = Tensor::builder()
             .set_inputs(vec![inputs[0], gy])
             .set_shape(inputs[0].shape())
@@ -755,7 +790,8 @@ impl op::Op for Slice {
     }
 }
 
-impl op::Op for SliceGrad {
+impl op::Op for SliceGrad
+{
     fn name(&self) -> &str
     {
         "SliceGrad"
@@ -768,10 +804,8 @@ impl op::Op for SliceGrad {
         let gy = xs[1];
         let mut gx = NdArray::zeros(x.shape());
         // sliced view
-        gx.slice_mut(&*self.indices).zip_mut_with(
-            &gy,
-            |a, &g| *a = g,
-        );
+        gx.slice_mut(&*self.indices)
+            .zip_mut_with(&gy, |a, &g| *a = g);
         vec![Ok(gx)]
     }
 
@@ -781,7 +815,8 @@ impl op::Op for SliceGrad {
         vec![None, None]
     }
 }
-impl op::Op for Squeeze {
+impl op::Op for Squeeze
+{
     fn name(&self) -> &str
     {
         "Squeeze"
@@ -815,7 +850,8 @@ impl op::Op for Squeeze {
     }
 }
 
-impl op::Op for ExpandDims {
+impl op::Op for ExpandDims
+{
     fn name(&self) -> &str
     {
         "ExpandDims"
@@ -845,7 +881,8 @@ impl op::Op for ExpandDims {
     }
 }
 
-impl op::Op for Broadcast {
+impl op::Op for Broadcast
+{
     fn name(&self) -> &str
     {
         "Broadcast"
@@ -872,7 +909,7 @@ impl op::Op for Broadcast {
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         let sum = ops::reduction_ops::ReduceSum {
-            keep_dims: self.keep_dims,
+            keep_dims:   self.keep_dims,
             sparse_axes: self.sparse_axes,
         };
         let axes = inputs[2];

@@ -10,7 +10,6 @@ use std::mem;
 use std::ops::{Add, Div, Mul, Sub};
 use tensor::Tensor;
 
-
 pub struct AddOp;
 pub struct SubOp;
 pub struct MulOp;
@@ -20,8 +19,8 @@ pub struct InplaceSubOp;
 pub struct InplaceMulOp;
 pub struct InplaceDivOp;
 
-
-impl op::Op for AddOp {
+impl op::Op for AddOp
+{
     fn name(&self) -> &str
     {
         "Add"
@@ -40,8 +39,8 @@ impl op::Op for AddOp {
     }
 }
 
-
-impl op::Op for SubOp {
+impl op::Op for SubOp
+{
     fn name(&self) -> &str
     {
         "Sub"
@@ -70,7 +69,8 @@ impl op::Op for SubOp {
     }
 }
 
-impl op::Op for MulOp {
+impl op::Op for MulOp
+{
     fn name(&self) -> &str
     {
         "Mul"
@@ -91,7 +91,8 @@ impl op::Op for MulOp {
     }
 }
 
-impl op::Op for DivOp {
+impl op::Op for DivOp
+{
     fn name(&self) -> &str
     {
         "Div"
@@ -122,7 +123,8 @@ impl op::Op for DivOp {
     }
 }
 
-impl op::Op for InplaceAddOp {
+impl op::Op for InplaceAddOp
+{
     fn name(&self) -> &str
     {
         "InplaceAdd"
@@ -145,8 +147,8 @@ impl op::Op for InplaceAddOp {
     }
 }
 
-
-impl op::Op for InplaceSubOp {
+impl op::Op for InplaceSubOp
+{
     fn name(&self) -> &str
     {
         "InplaceSub"
@@ -169,7 +171,8 @@ impl op::Op for InplaceSubOp {
     }
 }
 
-impl op::Op for InplaceMulOp {
+impl op::Op for InplaceMulOp
+{
     fn name(&self) -> &str
     {
         "InplaceMul"
@@ -191,7 +194,8 @@ impl op::Op for InplaceMulOp {
     }
 }
 
-impl op::Op for InplaceDivOp {
+impl op::Op for InplaceDivOp
+{
     fn name(&self) -> &str
     {
         "InplaceDiv"
@@ -220,8 +224,14 @@ fn maybe_reduce_gy(x0: &Tensor, x1: &Tensor, gy: &Tensor) -> (Tensor, Tensor)
     let shape0 = x0.shape();
     let shape1 = x1.shape();
     let gy_shape = gy.shape();
-    let sum0 = ops::reduction_ops::ReduceSum { keep_dims: true, sparse_axes: true };
-    let sum1 = ops::reduction_ops::ReduceSum { keep_dims: true, sparse_axes: true };
+    let sum0 = ops::reduction_ops::ReduceSum {
+        keep_dims:   true,
+        sparse_axes: true,
+    };
+    let sum1 = ops::reduction_ops::ReduceSum {
+        keep_dims:   true,
+        sparse_axes: true,
+    };
     let gy1 = Tensor::builder()
         .set_inputs(vec![gy, &ops::not_equal(&gy_shape, &shape0)])
         .set_shape(shape0)
@@ -233,10 +243,7 @@ fn maybe_reduce_gy(x0: &Tensor, x1: &Tensor, gy: &Tensor) -> (Tensor, Tensor)
     (gy1, gy2)
 }
 
-
-
 // -- std::ops::{Add, Sub, Mul, Div} implementations --
-
 
 macro_rules! impl_bin_op_between_tensor_and_scalar {
     (

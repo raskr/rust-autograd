@@ -10,45 +10,39 @@ use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
-
 /// Symbolic multi-dimensional array.
 pub struct Tensor(pub Rc<TensorCore>);
 
-pub struct TensorCore {
+pub struct TensorCore
+{
     /// Operation of this node.
     pub op: Box<op::Op>,
-
     /// References to immediate predecessors.
     pub inputs: Vec<Tensor>,
-
     /// Rank number for topological ordering in a graph.
     pub top_rank: usize,
-
     /// Symbolic shape of this tensor.
     pub shape: Option<Tensor>,
-
     /// Variable or constant array is placed here.
     pub persistent_array: Option<PersistentArray>,
-
     /// Used to look up a resource of this tensor.
     pub resource_lookup_key: Cell<usize>,
-
     /// Immutable flag of tensor is placeholder or not.
     pub is_placeholder: bool,
-
     /// `op` can have gradient?
     pub has_gradient: bool,
-
     /// Indices of arrays used in `compute`
     pub input_indices: Vec<usize>,
 }
 
-pub enum PersistentArray {
+pub enum PersistentArray
+{
     Variable(NdArray),
     Constant(NdArray),
 }
 
-impl PersistentArray {
+impl PersistentArray
+{
     pub fn get_as_variable(&self) -> &NdArray
     {
         match *self {
@@ -80,16 +74,18 @@ impl PersistentArray {
     }
 }
 
-pub struct TensorBuilder {
-    shape: Option<Tensor>,
-    has_gradient: bool,
-    is_placeholder: bool,
-    inputs: Vec<Tensor>,
+pub struct TensorBuilder
+{
+    shape:            Option<Tensor>,
+    inputs:           Vec<Tensor>,
+    has_gradient:     bool,
+    is_placeholder:   bool,
     persistent_array: Option<PersistentArray>,
-    input_indices: Option<Vec<usize>>,
+    input_indices:    Option<Vec<usize>>,
 }
 
-impl TensorBuilder {
+impl TensorBuilder
+{
     #[inline]
     pub fn set_shape(mut self, s: Tensor) -> TensorBuilder
     {
@@ -201,18 +197,18 @@ impl TensorBuilder {
     }
 }
 
-
-impl Tensor {
+impl Tensor
+{
     #[inline]
     pub fn builder() -> TensorBuilder
     {
         TensorBuilder {
-            shape: None,
-            has_gradient: true,
+            shape:            None,
+            inputs:           Vec::new(),
+            has_gradient:     true,
             persistent_array: None,
-            inputs: Vec::new(),
-            is_placeholder: false,
-            input_indices: None,
+            is_placeholder:   false,
+            input_indices:    None,
         }
     }
 
@@ -226,7 +222,6 @@ impl Tensor {
         ::runtime::eval(&[self], feeds).swap_remove(0)
     }
 
-
     /// Returns the (symbolic) shape of this tensor.
     ///
     /// See [shape](../ops/fn.shape.html).
@@ -234,7 +229,6 @@ impl Tensor {
     {
         ::ops::shape(self)
     }
-
 
     /// Returns the (symbolic) rank of this tensor.
     ///
@@ -244,7 +238,6 @@ impl Tensor {
         ::ops::rank(self)
     }
 
-
     /// Returns the (symbolic) size of this tensor.
     ///
     /// See [size](../ops/fn.size.html).
@@ -252,7 +245,6 @@ impl Tensor {
     {
         ::ops::size(self)
     }
-
 
     #[doc(hidden)]
     #[inline]
@@ -266,7 +258,8 @@ impl Tensor {
 // empty implementation
 impl Eq for Tensor {}
 
-impl PartialEq for Tensor {
+impl PartialEq for Tensor
+{
     fn eq(&self, other: &Tensor) -> bool
     {
         // compare addresses on the heap
@@ -274,7 +267,8 @@ impl PartialEq for Tensor {
     }
 }
 
-impl AsRef<Tensor> for Tensor {
+impl AsRef<Tensor> for Tensor
+{
     #[inline(always)]
     fn as_ref(&self) -> &Tensor
     {
@@ -283,14 +277,16 @@ impl AsRef<Tensor> for Tensor {
 }
 
 // data is not cloned; only reference count is incremented.
-impl Clone for Tensor {
+impl Clone for Tensor
+{
     fn clone(&self) -> Tensor
     {
         Tensor(self.0.clone())
     }
 }
 
-impl Deref for Tensor {
+impl Deref for Tensor
+{
     type Target = Rc<TensorCore>;
     fn deref(&self) -> &Self::Target
     {
@@ -298,14 +294,16 @@ impl Deref for Tensor {
     }
 }
 
-impl DerefMut for Tensor {
+impl DerefMut for Tensor
+{
     fn deref_mut<'a>(&'a mut self) -> &'a mut Rc<TensorCore>
     {
         &mut self.0
     }
 }
 
-impl fmt::Display for Tensor {
+impl fmt::Display for Tensor
+{
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result
     {
         let input_names = self.0
@@ -322,38 +320,37 @@ impl fmt::Display for Tensor {
     }
 }
 
-
 /// Implementors can be converted to `Tensor`.
-pub trait ArrayLike {
+pub trait ArrayLike
+{
     fn as_tensor(&self) -> Tensor;
 }
 
-impl ArrayLike for Tensor {
+impl ArrayLike for Tensor
+{
     fn as_tensor(&self) -> Tensor
     {
         self.clone()
     }
 }
 
-
 macro_rules! impl_array_like_for_array {
     ($scalar_type:ty, $num_elems:expr) => {
         impl ArrayLike for [$scalar_type; $num_elems] {
             fn as_tensor(&self) -> Tensor
             {
-                    let vec = self
-                        .iter()
-                        .map(|&a| a as f32 )
-                        .collect::<Vec<f32>>();
+                let vec = self
+                    .iter()
+                    .map(|&a| a as f32 )
+                    .collect::<Vec<f32>>();
 
-                    // unwrap is safe
-                    let arr = NdArray::from_shape_vec(ndarray::IxDyn(&[self.len()]), vec).unwrap();
-                    ops::convert_to_tensor(arr)
+                // unwrap is safe
+                let arr = NdArray::from_shape_vec(ndarray::IxDyn(&[self.len()]), vec).unwrap();
+                ops::convert_to_tensor(arr)
             }
         }
     };
 }
-
 
 impl_array_like_for_array!(f32, 0);
 impl_array_like_for_array!(f32, 1);

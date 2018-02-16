@@ -6,17 +6,18 @@ use std::mem;
 use std::rc::Rc;
 use tensor::Tensor;
 
-
 // module private
-struct GradInfo<'a> {
-    node: &'a Tensor, // information of this node
-    has_gradient: bool,
-    grad_called: bool,
+struct GradInfo<'a>
+{
+    node:           &'a Tensor, // information of this node
+    has_gradient:   bool,
+    grad_called:    bool,
     computed_grads: Vec<Tensor>,
-    default_grad: Option<&'a Tensor>,
+    default_grad:   Option<&'a Tensor>,
 }
 
-impl<'a> GradInfo<'a> {
+impl<'a> GradInfo<'a>
+{
     #[inline]
     fn new(t: &'a Tensor, has_gradient: bool, default_grad: Option<&'a Tensor>) -> GradInfo<'a>
     {
@@ -30,14 +31,16 @@ impl<'a> GradInfo<'a> {
     }
 }
 
-impl<'a> fmt::Debug for GradInfo<'a> {
+impl<'a> fmt::Debug for GradInfo<'a>
+{
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result
     {
         write!(f, "{}", self.node.op.name())
     }
 }
 
-impl fmt::Debug for Tensor {
+impl fmt::Debug for Tensor
+{
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result
     {
         write!(f, "{}", self.op.name())
@@ -49,7 +52,6 @@ macro_rules! access_grad_info_of {
         $path[$node.resource_lookup_key.get()]
     };
 }
-
 
 #[inline]
 fn has_marked_child(parent: &Tensor, path: &Vec<GradInfo>) -> bool
@@ -268,11 +270,13 @@ pub fn symbolic_gradients(
         .collect::<Vec<Tensor>>()
 }
 
-struct TensorWrapper<'a> {
+struct TensorWrapper<'a>
+{
     inner: &'a Tensor,
 }
 
-impl<'a> Ord for TensorWrapper<'a> {
+impl<'a> Ord for TensorWrapper<'a>
+{
     // Compares the ranks in topological ordering
     fn cmp(&self, other: &Self) -> Ordering
     {
@@ -280,7 +284,8 @@ impl<'a> Ord for TensorWrapper<'a> {
     }
 }
 
-impl<'a> PartialOrd for TensorWrapper<'a> {
+impl<'a> PartialOrd for TensorWrapper<'a>
+{
     #[inline]
     // Compares the ranks in topological ordering
     fn partial_cmp(&self, other: &Self) -> Option<Ordering>
@@ -291,7 +296,8 @@ impl<'a> PartialOrd for TensorWrapper<'a> {
 
 impl<'a> Eq for TensorWrapper<'a> {}
 
-impl<'a> PartialEq for TensorWrapper<'a> {
+impl<'a> PartialEq for TensorWrapper<'a>
+{
     #[inline]
     fn eq(&self, other: &TensorWrapper<'a>) -> bool
     {
@@ -299,7 +305,8 @@ impl<'a> PartialEq for TensorWrapper<'a> {
     }
 }
 
-impl Tensor {
+impl Tensor
+{
     #[inline]
     fn wrapped(&self) -> TensorWrapper
     {

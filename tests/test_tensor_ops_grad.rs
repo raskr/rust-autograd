@@ -1,7 +1,6 @@
 extern crate autograd as ag;
 extern crate ndarray;
 
-
 #[test]
 fn get()
 {
@@ -606,9 +605,7 @@ fn primitive_back_propagation_through_time()
                 &id,
             ));
             // new `h`
-            ag::tanh(
-                &(ag::gather(&lookup_table, &id, 0) + ag::matmul(last_h, wh)),
-            )
+            ag::tanh(&(ag::gather(&lookup_table, &id, 0) + ag::matmul(last_h, wh)))
         };
 
         h_buf.push(new_h);

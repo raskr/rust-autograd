@@ -16,8 +16,8 @@ mod reduction_ops;
 mod const_gen_ops;
 pub mod gradient_descent_ops;
 
-
-impl Tensor {
+impl Tensor
+{
     /// Gets a symbolic element from this tensor with shape `[]`.
     ///
     /// Index `i` can be negative.
@@ -38,11 +38,9 @@ impl Tensor {
     }
 }
 
-
 // ---------------------------------------
 // -- Ops to manipulate `Tensor` object --
 // ---------------------------------------
-
 
 /// Returns gradient tensors wrt input tensors.
 ///
@@ -90,7 +88,6 @@ pub fn grad(ys: &[&Tensor], xs: &[&Tensor]) -> Vec<Tensor>
     ::gradient::symbolic_gradients(ys, xs, &ys.iter().map(|_| None).collect::<Vec<_>>())
 }
 
-
 /// Returns gradient tensors wrt input tensors.
 ///
 /// # Arguments
@@ -117,7 +114,6 @@ pub fn grad_with_default(ys: &[&Tensor], xs: &[&Tensor], output_grads: &[&Tensor
             .as_slice(),
     )
 }
-
 
 /// Computes jacobians for variables.
 ///
@@ -163,7 +159,6 @@ pub fn jacobians(y: &Tensor, xs: &[&Tensor], objective_len: usize) -> Vec<Tensor
         .collect::<Vec<_>>()
 }
 
-
 /// (Experimental) Computes hessian vector product
 ///
 /// `ys` must be scalars.
@@ -183,7 +178,6 @@ pub fn _hessian_vector_product(ys: &[&Tensor], xs: &[&Tensor], vectors: &[&Tenso
     ::gradient::symbolic_gradients(products.as_slice(), xs, &[None])
 }
 
-
 /// Stops gradient propagation.
 ///
 /// Guarantees that the gradient is not propagated to the tensor behind this
@@ -195,7 +189,6 @@ pub fn stop_gradient(x: &Tensor) -> Tensor
         .set_has_gradient(false)
         .build(gradient_ops::StopGradient)
 }
-
 
 /// Creates a shared variable tensor from rust-ndarray's array object.
 ///
@@ -224,7 +217,6 @@ where
         .set_variable_array(arr)
         .build(basic_source_ops::Variable)
 }
-
 
 /// Creates a placeholder tensor.
 ///
@@ -256,7 +248,6 @@ pub fn placeholder(shape_: &[isize]) -> Tensor
     b.build(basic_source_ops::Placeholder)
 }
 
-
 /// Creates a constant tensor.
 ///
 /// ```
@@ -278,7 +269,6 @@ where
         .set_constant_array(arr)
         .build(basic_source_ops::Const)
 }
-
 
 /// Returns the (symbolic) shape of input tensor
 ///
@@ -302,7 +292,6 @@ pub fn shape(x: &Tensor) -> Tensor
     }
 }
 
-
 /// Returns the (symbolic) size of input tensor
 ///
 /// ```
@@ -321,7 +310,6 @@ pub fn size(x: &Tensor) -> Tensor
         .set_has_gradient(false)
         .build(array_ops::Size)
 }
-
 
 /// Returns the (symbolic) rank of input tensor
 ///
@@ -342,114 +330,113 @@ pub fn rank(x: &Tensor) -> Tensor
         .build(array_ops::Rank)
 }
 
-
 /// Elementwise sine
 pub fn sin(x: &Tensor) -> Tensor
 {
-    Tensor::builder().set_input(x).set_shape(x.shape()).build(
-        math_ops::Sin,
-    )
+    Tensor::builder()
+        .set_input(x)
+        .set_shape(x.shape())
+        .build(math_ops::Sin)
 }
-
 
 /// Elementwise cosine
 pub fn cos(x: &Tensor) -> Tensor
 {
-    Tensor::builder().set_input(x).set_shape(x.shape()).build(
-        math_ops::Cos,
-    )
+    Tensor::builder()
+        .set_input(x)
+        .set_shape(x.shape())
+        .build(math_ops::Cos)
 }
-
 
 /// Elementwise tangent
 pub fn tan(x: &Tensor) -> Tensor
 {
-    Tensor::builder().set_input(x).set_shape(x.shape()).build(
-        math_ops::Tan,
-    )
+    Tensor::builder()
+        .set_input(x)
+        .set_shape(x.shape())
+        .build(math_ops::Tan)
 }
-
 
 /// Elementwise arcsin
 pub fn asin(x: &Tensor) -> Tensor
 {
-    Tensor::builder().set_input(x).set_shape(x.shape()).build(
-        math_ops::Asin,
-    )
+    Tensor::builder()
+        .set_input(x)
+        .set_shape(x.shape())
+        .build(math_ops::Asin)
 }
-
 
 /// Elementwise arccos
 pub fn acos(x: &Tensor) -> Tensor
 {
-    Tensor::builder().set_input(x).set_shape(x.shape()).build(
-        math_ops::Acos,
-    )
+    Tensor::builder()
+        .set_input(x)
+        .set_shape(x.shape())
+        .build(math_ops::Acos)
 }
-
 
 /// Elementwise arctan
 pub fn atan(x: &Tensor) -> Tensor
 {
-    Tensor::builder().set_input(x).set_shape(x.shape()).build(
-        math_ops::Atan,
-    )
+    Tensor::builder()
+        .set_input(x)
+        .set_shape(x.shape())
+        .build(math_ops::Atan)
 }
-
 
 /// Elementwise hyperbolic sine
 pub fn sinh(x: &Tensor) -> Tensor
 {
-    Tensor::builder().set_input(x).set_shape(x.shape()).build(
-        math_ops::Sinh,
-    )
+    Tensor::builder()
+        .set_input(x)
+        .set_shape(x.shape())
+        .build(math_ops::Sinh)
 }
-
 
 /// Elementwise hyperbolic cosine
 pub fn cosh(x: &Tensor) -> Tensor
 {
-    Tensor::builder().set_input(x).set_shape(x.shape()).build(
-        math_ops::Cosh,
-    )
+    Tensor::builder()
+        .set_input(x)
+        .set_shape(x.shape())
+        .build(math_ops::Cosh)
 }
-
 
 /// Elementwise hyperbolic tangent
 pub fn tanh(x: &Tensor) -> Tensor
 {
-    Tensor::builder().set_input(x).set_shape(x.shape()).build(
-        math_ops::Tanh,
-    )
+    Tensor::builder()
+        .set_input(x)
+        .set_shape(x.shape())
+        .build(math_ops::Tanh)
 }
-
 
 /// Elementwise hyperbolic arcsin
 pub fn asinh(x: &Tensor) -> Tensor
 {
-    Tensor::builder().set_input(x).set_shape(x.shape()).build(
-        math_ops::Asinh,
-    )
+    Tensor::builder()
+        .set_input(x)
+        .set_shape(x.shape())
+        .build(math_ops::Asinh)
 }
-
 
 /// Elementwise hyperbolic arccos
 pub fn acosh(x: &Tensor) -> Tensor
 {
-    Tensor::builder().set_input(x).set_shape(x.shape()).build(
-        math_ops::Acosh,
-    )
+    Tensor::builder()
+        .set_input(x)
+        .set_shape(x.shape())
+        .build(math_ops::Acosh)
 }
-
 
 /// Elementwise hyperbolic arctan
 pub fn atanh(x: &Tensor) -> Tensor
 {
-    Tensor::builder().set_input(x).set_shape(x.shape()).build(
-        math_ops::Atanh,
-    )
+    Tensor::builder()
+        .set_input(x)
+        .set_shape(x.shape())
+        .build(math_ops::Atanh)
 }
-
 
 /// Gets i th output value of `x`
 ///
@@ -466,9 +453,10 @@ pub fn select_ith_of(x: &Tensor, i: usize) -> Tensor
 /// Identity function without copy.
 pub fn identity(x: &Tensor) -> Tensor
 {
-    Tensor::builder().set_input(x).set_shape(x.shape()).build(
-        activation_ops::Identity,
-    )
+    Tensor::builder()
+        .set_input(x)
+        .set_shape(x.shape())
+        .build(activation_ops::Identity)
 }
 
 #[inline]
@@ -480,7 +468,6 @@ fn bin_op_helper<T: ::op::Op + 'static>(a: &Tensor, b: &Tensor, op: T) -> Tensor
         .set_shape(maximum(a_shape, b_shape))
         .set_inputs(vec![a, b])
         .build(op)
-
 }
 
 /// Addition.
@@ -501,7 +488,6 @@ pub fn add(a: &Tensor, b: &Tensor) -> Tensor
     bin_op_helper(a, b, binary_ops::AddOp)
 }
 
-
 /// Subtraction.
 ///
 /// `-` operator can be used instead.
@@ -520,7 +506,6 @@ pub fn sub(a: &Tensor, b: &Tensor) -> Tensor
 {
     bin_op_helper(a, b, binary_ops::SubOp)
 }
-
 
 /// Multiplication.
 ///
@@ -541,7 +526,6 @@ pub fn mul(a: &Tensor, b: &Tensor) -> Tensor
     bin_op_helper(a, b, binary_ops::MulOp)
 }
 
-
 /// Division.
 ///
 /// `/` operator can be used instead.
@@ -559,7 +543,6 @@ pub fn div(a: &Tensor, b: &Tensor) -> Tensor
 {
     bin_op_helper(a, b, binary_ops::DivOp)
 }
-
 
 #[doc(hidden)]
 /// Should be limited to internal use.
@@ -583,7 +566,6 @@ pub fn mul_inplace(a: Tensor, b: &Tensor) -> Tensor
         .build(binary_ops::InplaceMulOp)
 }
 
-
 #[doc(hidden)]
 /// Should be limited to internal use.
 ///
@@ -603,7 +585,6 @@ pub fn div_inplace(a: Tensor, b: &Tensor) -> Tensor
         .set_shape(a.shape())
         .build(binary_ops::InplaceDivOp)
 }
-
 
 /// Inplace addition
 ///
@@ -632,7 +613,6 @@ pub fn add_inplace(a: Tensor, b: &Tensor) -> Tensor
         .build(binary_ops::InplaceAddOp)
 }
 
-
 /// Inplace subtraction
 ///
 /// Returns `a` after performing `a -= b`.
@@ -660,42 +640,41 @@ pub fn sub_inplace(a: Tensor, b: &Tensor) -> Tensor
         .build(binary_ops::InplaceSubOp)
 }
 
-
 /// Elementwise sqrt
 pub fn sqrt(x: &Tensor) -> Tensor
 {
-    Tensor::builder().set_input(x).set_shape(x.shape()).build(
-        math_ops::Sqrt,
-    )
+    Tensor::builder()
+        .set_input(x)
+        .set_shape(x.shape())
+        .build(math_ops::Sqrt)
 }
-
 
 /// Elementwise pow
 pub fn pow(x: &Tensor, a: f32) -> Tensor
 {
-    Tensor::builder().set_input(x).set_shape(x.shape()).build(
-        math_ops::Pow { a },
-    )
+    Tensor::builder()
+        .set_input(x)
+        .set_shape(x.shape())
+        .build(math_ops::Pow { a })
 }
-
 
 /// Elementwise log
 pub fn log(x: &Tensor, a: f32) -> Tensor
 {
-    Tensor::builder().set_input(x).set_shape(x.shape()).build(
-        math_ops::Log { a },
-    )
+    Tensor::builder()
+        .set_input(x)
+        .set_shape(x.shape())
+        .build(math_ops::Log { a })
 }
-
 
 /// Elementwise exponential
 pub fn exp(x: &Tensor) -> Tensor
 {
-    Tensor::builder().set_input(x).set_shape(x.shape()).build(
-        math_ops::Exp,
-    )
+    Tensor::builder()
+        .set_input(x)
+        .set_shape(x.shape())
+        .build(math_ops::Exp)
 }
-
 
 /// Returns the max of x and y (i.e. x > y ? x : y) element-wise.
 ///
@@ -710,11 +689,10 @@ pub fn exp(x: &Tensor) -> Tensor
 /// ```
 pub fn maximum(a: &Tensor, b: &Tensor) -> Tensor
 {
-    Tensor::builder().set_inputs(vec![a, b]).build(
-        math_ops::Maximum,
-    )
+    Tensor::builder()
+        .set_inputs(vec![a, b])
+        .build(math_ops::Maximum)
 }
-
 
 /// Returns the min of x and y (i.e. x > y ? y : x) element-wise.
 ///
@@ -729,11 +707,10 @@ pub fn maximum(a: &Tensor, b: &Tensor) -> Tensor
 /// ```
 pub fn minimum(a: &Tensor, b: &Tensor) -> Tensor
 {
-    Tensor::builder().set_inputs(vec![a, b]).build(
-        math_ops::Minimum,
-    )
+    Tensor::builder()
+        .set_inputs(vec![a, b])
+        .build(math_ops::Minimum)
 }
-
 
 /// Adds all input tensors.
 ///
@@ -765,7 +742,6 @@ pub fn add_n(xs: &[&Tensor]) -> Tensor
     }
 }
 
-
 /// Compares two tensors and returns a binary tensor.
 ///
 /// if `a[i] == b[i]` then `return_value[i]` will be 1 else 0
@@ -785,11 +761,10 @@ pub fn add_n(xs: &[&Tensor]) -> Tensor
 /// ```
 pub fn equal(a: &Tensor, b: &Tensor) -> Tensor
 {
-    Tensor::builder().set_inputs(vec![a, b]).build(
-        math_ops::Equal,
-    )
+    Tensor::builder()
+        .set_inputs(vec![a, b])
+        .build(math_ops::Equal)
 }
-
 
 /// Compares two tensors and returns a binary tensor.
 ///
@@ -810,11 +785,10 @@ pub fn equal(a: &Tensor, b: &Tensor) -> Tensor
 /// ```
 pub fn not_equal(a: &Tensor, b: &Tensor) -> Tensor
 {
-    Tensor::builder().set_inputs(vec![a, b]).build(
-        math_ops::NotEqual,
-    )
+    Tensor::builder()
+        .set_inputs(vec![a, b])
+        .build(math_ops::NotEqual)
 }
-
 
 /// Takes argmax along specified axis.
 ///
@@ -834,7 +808,6 @@ pub fn argmax(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
     let op = reduction_ops::ArgMax { axis, keep_dim };
     Tensor::builder().set_input(x).build(op)
 }
-
 
 /// Expands specified dims.
 ///
@@ -856,7 +829,6 @@ pub fn expand_dims<T: ArrayLike>(x: &Tensor, axes: &T) -> Tensor
         .build(op)
 }
 
-
 /// Squeezes specified dims.
 ///
 /// Each axis can be negative.
@@ -876,7 +848,6 @@ pub fn squeeze<T: ArrayLike>(x: &Tensor, axes: &T) -> Tensor
         .set_inputs(vec![x, &axes.as_tensor()])
         .build(op)
 }
-
 
 /// Tiles input tensor along specified axis.
 ///
@@ -901,7 +872,6 @@ pub fn tile(x: &Tensor, axis: isize, num: usize) -> Tensor
     Tensor::builder().set_input(x).build(op)
 }
 
-
 /// Limits all elements so as to be within `[min, max]`
 ///
 /// ```
@@ -919,7 +889,6 @@ pub fn clip(x: &Tensor, min: f32, max: f32) -> Tensor
     Tensor::builder().set_input(x).build(op)
 }
 
-
 /// Takes max along specified axes.
 ///
 /// Elements of `axes` can be negative.
@@ -935,12 +904,14 @@ pub fn clip(x: &Tensor, min: f32, max: f32) -> Tensor
 /// ```
 pub fn reduce_max<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tensor
 {
-    let op = reduction_ops::ReduceMax { keep_dims, sparse_axes: false };
+    let op = reduction_ops::ReduceMax {
+        keep_dims,
+        sparse_axes: false,
+    };
     Tensor::builder()
         .set_inputs(vec![x, &axes.as_tensor()])
         .build(op)
 }
-
 
 /// Takes min along specified axes.
 ///
@@ -957,12 +928,14 @@ pub fn reduce_max<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tensor
 /// ```
 pub fn reduce_min<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tensor
 {
-    let op = reduction_ops::ReduceMin { keep_dims, sparse_axes: false };
+    let op = reduction_ops::ReduceMin {
+        keep_dims,
+        sparse_axes: false,
+    };
     Tensor::builder()
         .set_inputs(vec![x, &axes.as_tensor()])
         .build(op)
 }
-
 
 /// Takes sum along specified axes.
 ///
@@ -979,12 +952,14 @@ pub fn reduce_min<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tensor
 /// ```
 pub fn reduce_sum<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tensor
 {
-    let op = reduction_ops::ReduceSum { keep_dims, sparse_axes: false };
+    let op = reduction_ops::ReduceSum {
+        keep_dims,
+        sparse_axes: false,
+    };
     Tensor::builder()
         .set_inputs(vec![x, &axes.as_tensor()])
         .build(op)
 }
-
 
 /// Takes mean along specified axes.
 ///
@@ -1002,10 +977,12 @@ pub fn reduce_sum<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tensor
 pub fn reduce_mean<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tensor
 {
     let axes = rectify_negative_axes(&axes.as_tensor(), &x.rank());
-    let op = reduction_ops::ReduceMean { keep_dims, sparse_axes: false };
+    let op = reduction_ops::ReduceMean {
+        keep_dims,
+        sparse_axes: false,
+    };
     Tensor::builder().set_inputs(vec![x, &axes]).build(op)
 }
-
 
 #[inline]
 fn rectify_negative_axes(axes: &Tensor, x_rank: &Tensor) -> Tensor
@@ -1015,7 +992,6 @@ fn rectify_negative_axes(axes: &Tensor, x_rank: &Tensor) -> Tensor
     let lt = lesser(axes, zero);
     add_inplace(mul_inplace(ge, axes), &mul_inplace(lt, &(axes + x_rank)))
 }
-
 
 /// Takes product along specified axes.
 ///
@@ -1032,12 +1008,14 @@ fn rectify_negative_axes(axes: &Tensor, x_rank: &Tensor) -> Tensor
 /// ```
 pub fn reduce_prod<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tensor
 {
-    let op = reduction_ops::ReduceProd { keep_dims, sparse_axes: false };
+    let op = reduction_ops::ReduceProd {
+        keep_dims,
+        sparse_axes: false,
+    };
     Tensor::builder()
         .set_inputs(vec![x, &axes.as_tensor()])
         .build(op)
 }
-
 
 /// Reshapes input tensor.
 ///
@@ -1059,7 +1037,6 @@ pub fn reshape<T: ArrayLike>(x: &Tensor, shape: &T) -> Tensor
         .build(array_ops::Reshape)
 }
 
-
 /// Flattens input tensor into 1-ranked (vector)
 ///
 /// ```
@@ -1077,7 +1054,6 @@ pub fn flatten(x: &Tensor) -> Tensor
         .build(array_ops::Reshape)
 }
 
-
 /// Returns -1 if x < 0, 0 if x==0, 1 if x > 0, element-wise.
 ///
 /// ```
@@ -1093,11 +1069,11 @@ pub fn flatten(x: &Tensor) -> Tensor
 /// ```
 pub fn sign(a: &Tensor) -> Tensor
 {
-    Tensor::builder().set_shape(a.shape()).set_input(a).build(
-        math_ops::Sign,
-    )
+    Tensor::builder()
+        .set_shape(a.shape())
+        .set_input(a)
+        .build(math_ops::Sign)
 }
-
 
 /// Returns the largest integer less than or equal to a number, element-wise.
 ///
@@ -1114,11 +1090,11 @@ pub fn sign(a: &Tensor) -> Tensor
 /// ```
 pub fn abs(a: &Tensor) -> Tensor
 {
-    Tensor::builder().set_shape(a.shape()).set_input(a).build(
-        math_ops::Abs,
-    )
+    Tensor::builder()
+        .set_shape(a.shape())
+        .set_input(a)
+        .build(math_ops::Abs)
 }
-
 
 /// Returns the largest integer less than or equal to a number, element-wise.
 ///
@@ -1135,11 +1111,11 @@ pub fn abs(a: &Tensor) -> Tensor
 /// ```
 pub fn floor(a: &Tensor) -> Tensor
 {
-    Tensor::builder().set_shape(a.shape()).set_input(a).build(
-        math_ops::Floor,
-    )
+    Tensor::builder()
+        .set_shape(a.shape())
+        .set_input(a)
+        .build(math_ops::Floor)
 }
-
 
 /// Performs the - operation.
 ///
@@ -1156,11 +1132,11 @@ pub fn floor(a: &Tensor) -> Tensor
 /// ```
 pub fn neg(a: &Tensor) -> Tensor
 {
-    Tensor::builder().set_shape(a.shape()).set_input(a).build(
-        math_ops::NegOp,
-    )
+    Tensor::builder()
+        .set_shape(a.shape())
+        .set_input(a)
+        .build(math_ops::NegOp)
 }
-
 
 /// Returns square of the input.
 ///
@@ -1177,11 +1153,11 @@ pub fn neg(a: &Tensor) -> Tensor
 /// ```
 pub fn square(a: &Tensor) -> Tensor
 {
-    Tensor::builder().set_shape(a.shape()).set_input(a).build(
-        math_ops::Square,
-    )
+    Tensor::builder()
+        .set_shape(a.shape())
+        .set_input(a)
+        .build(math_ops::Square)
 }
-
 
 /// Returns the 1/x, element-wise.
 ///
@@ -1198,11 +1174,11 @@ pub fn square(a: &Tensor) -> Tensor
 /// ```
 pub fn reciprocal(x: &Tensor) -> Tensor
 {
-    Tensor::builder().set_shape(x.shape()).set_input(x).build(
-        math_ops::Reciprocal,
-    )
+    Tensor::builder()
+        .set_shape(x.shape())
+        .set_input(x)
+        .build(math_ops::Reciprocal)
 }
-
 
 /// Returns the smallest integer greater than or equal to a number, element-wise.
 ///
@@ -1219,11 +1195,11 @@ pub fn reciprocal(x: &Tensor) -> Tensor
 /// ```
 pub fn ceil(a: &Tensor) -> Tensor
 {
-    Tensor::builder().set_shape(a.shape()).set_input(a).build(
-        math_ops::Ceil,
-    )
+    Tensor::builder()
+        .set_shape(a.shape())
+        .set_input(a)
+        .build(math_ops::Ceil)
 }
-
 
 /// Returns a binary tensor.
 ///
@@ -1231,11 +1207,10 @@ pub fn ceil(a: &Tensor) -> Tensor
 /// When broadcast is impossible
 pub fn greater(a: &Tensor, b: &Tensor) -> Tensor
 {
-    Tensor::builder().set_inputs(vec![a, b]).build(
-        math_ops::Greater,
-    )
+    Tensor::builder()
+        .set_inputs(vec![a, b])
+        .build(math_ops::Greater)
 }
-
 
 /// Returns a binary tensor.
 ///
@@ -1243,11 +1218,10 @@ pub fn greater(a: &Tensor, b: &Tensor) -> Tensor
 /// When broadcast is impossible
 pub fn greater_equal(a: &Tensor, b: &Tensor) -> Tensor
 {
-    Tensor::builder().set_inputs(vec![a, b]).build(
-        math_ops::GreaterEqual,
-    )
+    Tensor::builder()
+        .set_inputs(vec![a, b])
+        .build(math_ops::GreaterEqual)
 }
-
 
 /// Returns a binary tensor.
 ///
@@ -1255,11 +1229,10 @@ pub fn greater_equal(a: &Tensor, b: &Tensor) -> Tensor
 /// When broadcast is impossible
 pub fn lesser(a: &Tensor, b: &Tensor) -> Tensor
 {
-    Tensor::builder().set_inputs(vec![a, b]).build(
-        math_ops::Lesser,
-    )
+    Tensor::builder()
+        .set_inputs(vec![a, b])
+        .build(math_ops::Lesser)
 }
-
 
 /// Returns a binary tensor.
 ///
@@ -1267,38 +1240,38 @@ pub fn lesser(a: &Tensor, b: &Tensor) -> Tensor
 /// When broadcast is impossible
 pub fn lesser_equal(a: &Tensor, b: &Tensor) -> Tensor
 {
-    Tensor::builder().set_inputs(vec![a, b]).build(
-        math_ops::LesserEqual,
-    )
+    Tensor::builder()
+        .set_inputs(vec![a, b])
+        .build(math_ops::LesserEqual)
 }
-
 
 /// Elementwise logistic sigmoid function.
 pub fn sigmoid(x: &Tensor) -> Tensor
 {
-    Tensor::builder().set_shape(x.shape()).set_input(x).build(
-        activation_ops::Sigmoid,
-    )
+    Tensor::builder()
+        .set_shape(x.shape())
+        .set_input(x)
+        .build(activation_ops::Sigmoid)
 }
-
 
 /// Elementwise exponential linear unit.
 ///
 /// See https://arxiv.org/abs/1511.07289
 pub fn elu(x: &Tensor, alpha: f32) -> Tensor
 {
-    Tensor::builder().set_shape(x.shape()).set_input(x).build(
-        activation_ops::ELU { alpha },
-    )
+    Tensor::builder()
+        .set_shape(x.shape())
+        .set_input(x)
+        .build(activation_ops::ELU { alpha })
 }
-
 
 /// Elementwise rectified linear unit.
 pub fn relu(x: &Tensor) -> Tensor
 {
-    Tensor::builder().set_shape(x.shape()).set_input(x).build(
-        activation_ops::ReLU,
-    )
+    Tensor::builder()
+        .set_shape(x.shape())
+        .set_input(x)
+        .build(activation_ops::ReLU)
 }
 
 /// Elementwise leaky relu.
@@ -1311,15 +1284,14 @@ pub fn leaky_relu(x: &Tensor, alpha: f32) -> Tensor
     maximum(x, &(alpha * x))
 }
 
-
 /// Elementwise softplus.
 pub fn softplus(x: &Tensor) -> Tensor
 {
-    Tensor::builder().set_shape(x.shape()).set_input(x).build(
-        activation_ops::Softplus,
-    )
+    Tensor::builder()
+        .set_shape(x.shape())
+        .set_input(x)
+        .build(activation_ops::Softplus)
 }
-
 
 /// Computes `log(sum(exp(x)))` along specified axis.
 /// `axis` can be negative.
@@ -1329,7 +1301,6 @@ pub fn reduce_logsumexp(x: &Tensor, axis: isize, keep_dims: bool) -> Tensor
     Tensor::builder().set_input(x).build(op)
 }
 
-
 /// Log softmax function.
 ///
 /// Computes `softmax(x)` along specified axis and
@@ -1337,11 +1308,11 @@ pub fn reduce_logsumexp(x: &Tensor, axis: isize, keep_dims: bool) -> Tensor
 /// `axis` can be negative.
 pub fn log_softmax(x: &Tensor, axis: isize) -> Tensor
 {
-    Tensor::builder().set_shape(x.shape()).set_input(x).build(
-        xent_ops::LogSoftmax { axis },
-    )
+    Tensor::builder()
+        .set_shape(x.shape())
+        .set_input(x)
+        .build(xent_ops::LogSoftmax { axis })
 }
-
 
 /// Computes softmax along specified axis
 ///
@@ -1351,7 +1322,6 @@ pub fn softmax(x: &Tensor, axis: isize) -> Tensor
     let op = activation_ops::Softmax { axis };
     Tensor::builder().set_input(x).build(op)
 }
-
 
 /// Computes `binary_cross_entropy(sigmoid(y), t)`.
 ///
@@ -1376,7 +1346,6 @@ pub fn sigmoid_cross_entropy(y: &Tensor, t: &Tensor) -> Tensor
         .build(op)
 }
 
-
 /// Computes `categorical_cross_entropy(softmax(y), t)`.
 ///
 /// This function is better than that combination in that it can prevent
@@ -1393,7 +1362,6 @@ pub fn softmax_cross_entropy(y: &Tensor, t: &Tensor) -> Tensor
     let op = xent_ops::SoftmaxCrossEntropy;
     Tensor::builder().set_inputs(vec![y, t]).build(op)
 }
-
 
 /// A variant of `softmax_cross_entropy`.
 ///
@@ -1412,7 +1380,6 @@ pub fn sparse_softmax_cross_entropy(y: &Tensor, t: &Tensor) -> Tensor
     Tensor::builder().set_inputs(vec![y, t]).build(op)
 }
 
-
 /// Matrix multiplication.
 ///
 /// Both `a` and `b` must be 2-ranked tensors.
@@ -1428,10 +1395,12 @@ pub fn sparse_softmax_cross_entropy(y: &Tensor, t: &Tensor) -> Tensor
 /// ```
 pub fn matmul(a: &Tensor, b: &Tensor) -> Tensor
 {
-    let op = dot_ops::MatMul { transpose_a: false, transpose_b: false };
+    let op = dot_ops::MatMul {
+        transpose_a: false,
+        transpose_b: false,
+    };
     Tensor::builder().set_inputs(vec![a, b]).build(op)
 }
-
 
 /// Matrix multiplication with inputs's transposition.
 ///
@@ -1451,10 +1420,12 @@ pub fn matmul(a: &Tensor, b: &Tensor) -> Tensor
 /// ```
 pub fn matmul_t(a: &Tensor, b: &Tensor, transpose_a: bool, transpose_b: bool) -> Tensor
 {
-    let op = dot_ops::MatMul { transpose_a, transpose_b };
+    let op = dot_ops::MatMul {
+        transpose_a,
+        transpose_b,
+    };
     Tensor::builder().set_inputs(vec![a, b]).build(op)
 }
-
 
 /// Computes tensor dot product (tensor contraction) along specified axes.
 ///
@@ -1517,7 +1488,6 @@ pub fn tensordot<T: ArrayLike>(a: &Tensor, b: &Tensor, a_axes: &T, b_axes: &T) -
     reshape(mm, &final_shape)
 }
 
-
 /// Batched matrix multiplication.
 ///
 /// The rank of `a` and `b` must be equals.
@@ -1535,10 +1505,12 @@ pub fn tensordot<T: ArrayLike>(a: &Tensor, b: &Tensor, a_axes: &T, b_axes: &T) -
 /// For detailed description, see https://www.tensorflow.org/api_docs/python/tf/matmul
 pub fn batch_matmul(a: &Tensor, b: &Tensor) -> Tensor
 {
-    let op = dot_ops::BatchMatMul { transpose_a: false, transpose_b: false };
+    let op = dot_ops::BatchMatMul {
+        transpose_a: false,
+        transpose_b: false,
+    };
     Tensor::builder().set_inputs(vec![a, b]).build(op)
 }
-
 
 /// Takes diff between two tensors
 ///
@@ -1561,7 +1533,6 @@ pub fn setdiff1d(a: &Tensor, b: &Tensor) -> Tensor
     Tensor::builder().set_inputs(vec![a, b]).build(op)
 }
 
-
 /// Permutes dimensions.
 ///
 /// ```
@@ -1579,7 +1550,6 @@ pub fn transpose<T: ArrayLike>(x: &Tensor, perm: &T) -> Tensor
         .set_inputs(vec![x, &perm.as_tensor()])
         .build(op)
 }
-
 
 /// Splits input tensors into parts.
 ///
@@ -1604,12 +1574,15 @@ pub fn split(x: &Tensor, sizes: &[usize], axis: isize) -> Vec<Tensor>
 {
     (0..sizes.len())
         .map(|i| {
-            let op = array_ops::Split { sizes: sizes.to_vec(), index: i, axis };
+            let op = array_ops::Split {
+                sizes: sizes.to_vec(),
+                index: i,
+                axis,
+            };
             Tensor::builder().set_input(x).build(op)
         })
         .collect::<Vec<_>>()
 }
-
 
 /// Slices input tensor with indices.
 ///
@@ -1634,15 +1607,14 @@ pub fn slice(x: &Tensor, starts: &[isize], ends: &[isize]) -> Tensor
     let starts_ends = starts.iter().zip(ends.iter());
 
     let indices = starts_ends
-        .map(|(s, e)| {
-            ndarray::Si(*s, if *e == -1 { None } else { Some(*e) }, 1)
-        })
+        .map(|(s, e)| ndarray::Si(*s, if *e == -1 { None } else { Some(*e) }, 1))
         .collect::<Vec<ndarray::Si>>();
 
-    let op = array_ops::Slice { indices: indices.into_boxed_slice() };
+    let op = array_ops::Slice {
+        indices: indices.into_boxed_slice(),
+    };
     Tensor::builder().set_input(x).build(op)
 }
-
 
 /// Concatenates input tensors along specified axis.
 ///
@@ -1663,7 +1635,6 @@ pub fn concat(tensors: &[&Tensor], axis: isize) -> Tensor
     let op = array_ops::Concat { axis };
     Tensor::builder().set_inputs(tensors.to_vec()).build(op)
 }
-
 
 /// Gathers subviews from the input tensor.
 ///
@@ -1691,7 +1662,6 @@ pub fn gather<T: ArrayLike>(param: &Tensor, indices: &T, axis: isize) -> Tensor
         .build(op)
 }
 
-
 /// Normalizes input tensor with its mean and variance along specified axis.
 ///
 /// ```
@@ -1715,7 +1685,6 @@ pub fn normalize<T: ArrayLike>(x: &Tensor, axes: &T) -> Tensor
     (x - mean) / sqrt(&(variance + 1e-5))
 }
 
-
 /// Applies batch normalization.
 ///
 /// `scale` and `shift` should be shared variables.
@@ -1738,7 +1707,6 @@ pub fn batch_norm(x: &Tensor, scale: &Tensor, shift: &Tensor) -> Tensor
     normalize(x, &[0]) * scale + shift
 }
 
-
 /// Generates a zero-ranked tensor from a scalar value.
 pub fn scalar(val: f32) -> Tensor
 {
@@ -1748,87 +1716,85 @@ pub fn scalar(val: f32) -> Tensor
         .build(op)
 }
 
-
 /// Outputs values sampled from the normal distribution.
 pub fn random_normal<T: ArrayLike>(shape: &T, mean: f64, stddev: f64) -> Tensor
 {
     let shape = shape.as_tensor();
-    Tensor::builder().set_input(&shape).set_shape(shape).build(
-        random_ops::RandomNormal { mean, stddev },
-    )
+    Tensor::builder()
+        .set_input(&shape)
+        .set_shape(shape)
+        .build(random_ops::RandomNormal { mean, stddev })
 }
-
 
 /// Outputs values sampled from the uniform distribution.
 pub fn random_uniform<T: ArrayLike>(shape: &T, min: f64, max: f64) -> Tensor
 {
-
     let shape = shape.as_tensor();
-    Tensor::builder().set_input(&shape).set_shape(shape).build(
-        random_ops::RandomUniform { min, max },
-    )
+    Tensor::builder()
+        .set_input(&shape)
+        .set_shape(shape)
+        .build(random_ops::RandomUniform { min, max })
 }
-
 
 /// Outputs values sampled from the standard normal distribution.
 pub fn standard_normal<T: ArrayLike>(shape: &T) -> Tensor
 {
     let shape = shape.as_tensor();
-    Tensor::builder().set_input(&shape).set_shape(shape).build(
-        random_ops::StandardNormal,
-    )
+    Tensor::builder()
+        .set_input(&shape)
+        .set_shape(shape)
+        .build(random_ops::StandardNormal)
 }
-
 
 /// Outputs values sampled from the standard uniform distribution.
 pub fn standard_uniform<T: ArrayLike>(shape: &T) -> Tensor
 {
     let shape = shape.as_tensor();
-    Tensor::builder().set_input(&shape).set_shape(shape).build(
-        random_ops::StandardUniform,
-    )
+    Tensor::builder()
+        .set_input(&shape)
+        .set_shape(shape)
+        .build(random_ops::StandardUniform)
 }
-
 
 /// Outputs values sampled from the bernoulli distribution.
 pub fn bernoulli<T: ArrayLike>(shape: &T, p: f64) -> Tensor
 {
     let shape = shape.as_tensor();
-    Tensor::builder().set_input(&shape).set_shape(shape).build(
-        random_ops::Bernoulli { p },
-    )
+    Tensor::builder()
+        .set_input(&shape)
+        .set_shape(shape)
+        .build(random_ops::Bernoulli { p })
 }
-
 
 /// Outputs values sampled from the exponential distribution.
 pub fn random_exp<T: ArrayLike>(shape: &T, lambda: f64) -> Tensor
 {
     let shape = shape.as_tensor();
-    Tensor::builder().set_input(&shape).set_shape(shape).build(
-        random_ops::Exponential { lambda },
-    )
+    Tensor::builder()
+        .set_input(&shape)
+        .set_shape(shape)
+        .build(random_ops::Exponential { lambda })
 }
-
 
 /// Outputs values sampled from the gamma distribution.
 pub fn random_gamma<T: ArrayLike>(shape: &T, shape_param: f64, scale: f64) -> Tensor
 {
     let shape = shape.as_tensor();
-    Tensor::builder().set_input(&shape).set_shape(shape).build(
-        random_ops::Gamma { shape_param, scale },
-    )
+    Tensor::builder()
+        .set_input(&shape)
+        .set_shape(shape)
+        .build(random_ops::Gamma { shape_param, scale })
 }
-
 
 /// Outputs values sampled from the log-normal distribution.
 pub fn log_normal<T: ArrayLike>(shape: &T, mean: f64, stddev: f64) -> Tensor
 {
     let shape = shape.as_tensor();
-    Tensor::builder().set_input(&shape).set_shape(shape).build(
-        random_ops::LogNormal { mean, stddev },
-    )
+    Tensor::builder()
+        .set_input(&shape)
+        .set_shape(shape)
+        .build(random_ops::LogNormal { mean, stddev })
 }
-
 
 /// Converts `ndarray::Array` to `ag::Tensor`.
 ///
@@ -1846,14 +1812,15 @@ where
 {
     let arr = arr.into_dyn();
     let shape = {
-        let op = const_gen_ops::ConvertToTensor { arr: ::ndarray_ext::shape_of(&arr) };
+        let op = const_gen_ops::ConvertToTensor {
+            arr: ::ndarray_ext::shape_of(&arr),
+        };
         Tensor::builder().build(op)
     };
-    Tensor::builder().set_shape(shape).build(
-        const_gen_ops::ConvertToTensor { arr },
-    )
+    Tensor::builder()
+        .set_shape(shape)
+        .build(const_gen_ops::ConvertToTensor { arr })
 }
-
 
 /// Returns zeros with given shape
 ///
@@ -1866,11 +1833,10 @@ where
 /// ```
 pub fn zeros<T: ArrayLike>(shape: &T) -> Tensor
 {
-    Tensor::builder().set_input(&shape.as_tensor()).build(
-        const_gen_ops::Zeros,
-    )
+    Tensor::builder()
+        .set_input(&shape.as_tensor())
+        .build(const_gen_ops::Zeros)
 }
-
 
 /// Returns ones with given shape
 ///
@@ -1883,11 +1849,10 @@ pub fn zeros<T: ArrayLike>(shape: &T) -> Tensor
 /// ```
 pub fn ones<T: ArrayLike>(shape: &T) -> Tensor
 {
-    Tensor::builder().set_input(&shape.as_tensor()).build(
-        const_gen_ops::Ones,
-    )
+    Tensor::builder()
+        .set_input(&shape.as_tensor())
+        .build(const_gen_ops::Ones)
 }
-
 
 /// Returns a range
 ///

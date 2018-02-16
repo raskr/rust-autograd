@@ -6,17 +6,17 @@ use ops;
 use std::f32;
 use tensor::Tensor;
 
-
 pub struct SoftmaxCrossEntropy;
 pub struct SparseSoftmaxCrossEntropy;
 pub struct SparseSoftmaxCrossEntropyGrad;
 pub struct SigmoidCrossEntropy;
-pub struct LogSoftmax {
+pub struct LogSoftmax
+{
     pub axis: isize,
 }
 
-
-impl op::Op for LogSoftmax {
+impl op::Op for LogSoftmax
+{
     fn name(&self) -> &str
     {
         "LogSoftmax"
@@ -39,7 +39,8 @@ impl op::Op for LogSoftmax {
     }
 }
 
-impl op::Op for SigmoidCrossEntropy {
+impl op::Op for SigmoidCrossEntropy
+{
     fn name(&self) -> &str
     {
         "SigmoidCrossEntropy"
@@ -82,7 +83,8 @@ impl op::Op for SigmoidCrossEntropy {
     }
 }
 
-impl op::Op for SparseSoftmaxCrossEntropy {
+impl op::Op for SparseSoftmaxCrossEntropy
+{
     fn name(&self) -> &str
     {
         "SparseSoftmaxCrossEntropy"
@@ -98,9 +100,10 @@ impl op::Op for SparseSoftmaxCrossEntropy {
         {
             if log_x.ndim() != 2 {
                 return vec![
-                    Err(::OpComputeErrorStatus::BadInput(
-                        format!("Bad first argument's shape {:?}", log_x.shape()),
-                    )),
+                    Err(::OpComputeErrorStatus::BadInput(format!(
+                        "Bad first argument's shape {:?}",
+                        log_x.shape()
+                    ))),
                 ];
             }
 
@@ -109,16 +112,18 @@ impl op::Op for SparseSoftmaxCrossEntropy {
             if t_rank == 2 {
                 if t_shape[1] != 1 {
                     return vec![
-                        Err(::OpComputeErrorStatus::BadInput(
-                            format!("Bad second argument's shape {:?}", t_shape),
-                        )),
+                        Err(::OpComputeErrorStatus::BadInput(format!(
+                            "Bad second argument's shape {:?}",
+                            t_shape
+                        ))),
                     ];
                 }
             } else if t_rank != 1 {
                 return vec![
-                    Err(::OpComputeErrorStatus::BadInput(
-                        format!("Bad second argument's shape {:?}", t_shape),
-                    )),
+                    Err(::OpComputeErrorStatus::BadInput(format!(
+                        "Bad second argument's shape {:?}",
+                        t_shape
+                    ))),
                 ];
             }
         }
@@ -141,9 +146,9 @@ impl op::Op for SparseSoftmaxCrossEntropy {
         let t = inputs[1];
         let ref log_x = ops::select_ith_of(output, 1);
 
-        let gx1 = Tensor::builder().set_inputs(vec![log_x, t, gy]).build(
-            SparseSoftmaxCrossEntropyGrad,
-        );
+        let gx1 = Tensor::builder()
+            .set_inputs(vec![log_x, t, gy])
+            .build(SparseSoftmaxCrossEntropyGrad);
 
         // gx2 won't be used
         let gx2 = {
@@ -156,7 +161,8 @@ impl op::Op for SparseSoftmaxCrossEntropy {
     }
 }
 
-impl op::Op for SparseSoftmaxCrossEntropyGrad {
+impl op::Op for SparseSoftmaxCrossEntropyGrad
+{
     fn name(&self) -> &str
     {
         "SparseSoftmaxCrossEntropyGrad"
@@ -176,7 +182,6 @@ impl op::Op for SparseSoftmaxCrossEntropyGrad {
 
         x *= gy;
         vec![Ok(x)]
-
     }
 
     fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
@@ -185,8 +190,8 @@ impl op::Op for SparseSoftmaxCrossEntropyGrad {
     }
 }
 
-
-impl op::Op for SoftmaxCrossEntropy {
+impl op::Op for SoftmaxCrossEntropy
+{
     fn name(&self) -> &str
     {
         "SoftmaxCrossEntropy"

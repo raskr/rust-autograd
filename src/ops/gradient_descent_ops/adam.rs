@@ -6,12 +6,13 @@ use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
 use tensor::Tensor;
 
-
-struct AdamOp {
+struct AdamOp
+{
     static_params: StaticParams,
 }
 
-impl ::op::Op for AdamOp {
+impl ::op::Op for AdamOp
+{
     fn name(&self) -> &str
     {
         "Adam"
@@ -59,46 +60,50 @@ impl ::op::Op for AdamOp {
     }
 }
 
-
 /// Adam optimizer
 ///
 /// This implementation is based on http://arxiv.org/abs/1412.6980v8
-pub struct Adam<'a> {
-    pub alpha: f32,
-    pub eps: f32,
-    pub b1: f32,
-    pub b2: f32,
+pub struct Adam<'a>
+{
+    pub alpha:           f32,
+    pub eps:             f32,
+    pub b1:              f32,
+    pub b2:              f32,
     pub stateful_params: BTreeMap<super::StateKey<'a>, StatefulParams>,
 }
 
-impl<'a> Default for Adam<'a> {
+impl<'a> Default for Adam<'a>
+{
     fn default() -> Adam<'a>
     {
         Adam {
-            alpha: 0.001,
-            eps: 1e-08,
-            b1: 0.9,
-            b2: 0.999,
+            alpha:           0.001,
+            eps:             1e-08,
+            b1:              0.9,
+            b2:              0.999,
             stateful_params: BTreeMap::new(),
         }
     }
 }
 
 #[derive(Copy, Clone)]
-pub struct StaticParams {
+pub struct StaticParams
+{
     pub alpha: f32,
-    pub eps: f32,
-    pub b1: f32,
-    pub b2: f32,
+    pub eps:   f32,
+    pub b1:    f32,
+    pub b2:    f32,
 }
 
-pub struct StatefulParams {
+pub struct StatefulParams
+{
     pub m: Tensor,
     pub v: Tensor,
     pub t: Tensor, // shape: []
 }
 
-impl<'a> super::Optimizer<'a> for Adam<'a> {
+impl<'a> super::Optimizer<'a> for Adam<'a>
+{
     fn compute_updates<T: AsRef<Tensor>>(
         &mut self,
         params: &[&'a Tensor],
@@ -112,27 +117,34 @@ impl<'a> super::Optimizer<'a> for Adam<'a> {
                 let op = AdamOp {
                     static_params: StaticParams {
                         alpha: self.alpha,
-                        eps: self.eps,
-                        b1: self.b1,
-                        b2: self.b2,
+                        eps:   self.eps,
+                        b1:    self.b1,
+                        b2:    self.b2,
                     },
                 };
 
                 if let Some(ref param_arr) = param.persistent_array {
                     match self.stateful_params.entry(super::StateKey(param)) {
                         Entry::Vacant(ent) => {
-                            let StatefulParams { ref m, ref v, ref t } =
-                                *ent.insert(StatefulParams {
-                                    m: ::ops::variable(NdArray::zeros(param_arr.shape())),
-                                    v: ::ops::variable(NdArray::zeros(param_arr.shape())),
-                                    t: ::ops::variable(::ndarray_ext::from_scalar(1.)),
-                                });
+                            let StatefulParams {
+                                ref m,
+                                ref v,
+                                ref t,
+                            } = *ent.insert(StatefulParams {
+                                m: ::ops::variable(NdArray::zeros(param_arr.shape())),
+                                v: ::ops::variable(NdArray::zeros(param_arr.shape())),
+                                t: ::ops::variable(::ndarray_ext::from_scalar(1.)),
+                            });
                             Tensor::builder()
                                 .set_inputs(vec![param, grad.as_ref(), m, v, t])
                                 .build(op)
                         }
                         Entry::Occupied(ent) => {
-                            let StatefulParams { ref m, ref v, ref t } = *ent.get();
+                            let StatefulParams {
+                                ref m,
+                                ref v,
+                                ref t,
+                            } = *ent.get();
                             Tensor::builder()
                                 .set_inputs(vec![param, grad.as_ref(), m, v, t])
                                 .build(op)

@@ -9,18 +9,20 @@ use tensor::Tensor;
 
 // `Tensordot` is implemented in `ops/mod.rs`.
 
-pub struct MatMul {
+pub struct MatMul
+{
     pub transpose_a: bool,
     pub transpose_b: bool,
 }
 
-pub struct BatchMatMul {
+pub struct BatchMatMul
+{
     pub transpose_a: bool,
     pub transpose_b: bool,
 }
 
-
-impl op::Op for MatMul {
+impl op::Op for MatMul
+{
     fn name(&self) -> &str
     {
         "MatMul"
@@ -65,26 +67,26 @@ impl op::Op for MatMul {
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
-        let opa = Tensor::builder().set_inputs(vec![gy, inputs[1]]).build(
-            MatMul {
+        let opa = Tensor::builder()
+            .set_inputs(vec![gy, inputs[1]])
+            .build(MatMul {
                 transpose_a: false,
                 transpose_b: true,
-            },
-        );
+            });
 
-        let opb = Tensor::builder().set_inputs(vec![inputs[0], gy]).build(
-            MatMul {
+        let opb = Tensor::builder()
+            .set_inputs(vec![inputs[0], gy])
+            .build(MatMul {
                 transpose_a: true,
                 transpose_b: false,
-            },
-        );
+            });
 
         vec![Some(opa), Some(opb)]
     }
 }
 
-
-impl op::Op for BatchMatMul {
+impl op::Op for BatchMatMul
+{
     fn name(&self) -> &str
     {
         "BatchMatMul"
@@ -104,8 +106,7 @@ impl op::Op for BatchMatMul {
             return vec![
                 Err(::OpComputeErrorStatus::BadInput(format!(
                     "Input shape mismatch: {:?} vs {:?}",
-                    shape0,
-                    shape1
+                    shape0, shape1
                 ))),
             ];
         }
@@ -174,24 +175,27 @@ impl op::Op for BatchMatMul {
 
         // reshape to dst shape with safe unwrapping
         vec![
-            Ok(
-                stacked
-                    .into_shape(ndarray::IxDyn(dst_shape.as_slice()))
-                    .unwrap()
-            ),
+            Ok(stacked
+                .into_shape(ndarray::IxDyn(dst_shape.as_slice()))
+                .unwrap()),
         ]
-
     }
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
-        let opa = Tensor::builder().set_inputs(vec![gy, inputs[1]]).build(
-            BatchMatMul { transpose_a: false, transpose_b: true },
-        );
+        let opa = Tensor::builder()
+            .set_inputs(vec![gy, inputs[1]])
+            .build(BatchMatMul {
+                transpose_a: false,
+                transpose_b: true,
+            });
 
-        let opb = Tensor::builder().set_inputs(vec![inputs[0], gy]).build(
-            BatchMatMul { transpose_a: true, transpose_b: false },
-        );
+        let opb = Tensor::builder()
+            .set_inputs(vec![inputs[0], gy])
+            .build(BatchMatMul {
+                transpose_a: true,
+                transpose_b: false,
+            });
 
         vec![Some(opa), Some(opb)]
     }

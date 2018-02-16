@@ -1,18 +1,18 @@
-extern crate ndarray;
 extern crate autograd as ag;
+extern crate ndarray;
 
-
-struct LSTM {
+struct LSTM
+{
     pub vector_dim: usize,
-    pub hs: Vec<ag::Tensor>,
-    pub cells: Vec<ag::Tensor>,
-    pub wx: ag::Tensor,
-    pub wh: ag::Tensor,
-    pub b: ag::Tensor,
+    pub hs:         Vec<ag::Tensor>,
+    pub cells:      Vec<ag::Tensor>,
+    pub wx:         ag::Tensor,
+    pub wh:         ag::Tensor,
+    pub b:          ag::Tensor,
 }
 
-
-impl LSTM {
+impl LSTM
+{
     pub fn new(vector_dim: usize) -> LSTM
     {
         LSTM {

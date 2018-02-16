@@ -8,15 +8,16 @@ use std::mem;
 use std::rc::Rc;
 use tensor::Tensor;
 
-
 // Context in evaluation of `node`
-pub struct OpComputeContext<'a, 'b: 'a> {
-    pub node: &'b Tensor, // Expose to its op for convenience
+pub struct OpComputeContext<'a, 'b: 'a>
+{
+    pub node:       &'b Tensor, // Expose to its op for convenience
     resource_store: &'a ResourceStore<'b>,
-    feed_store: &'a FeedStore<'b>,
+    feed_store:     &'a FeedStore<'b>,
 }
 
-impl<'a, 'b> OpComputeContext<'a, 'b> {
+impl<'a, 'b> OpComputeContext<'a, 'b>
+{
     #[inline]
     fn new(
         node: &'b Tensor,
@@ -24,7 +25,11 @@ impl<'a, 'b> OpComputeContext<'a, 'b> {
         feed_store: &'a FeedStore<'b>,
     ) -> Self
     {
-        OpComputeContext { node, resource_store, feed_store }
+        OpComputeContext {
+            node,
+            resource_store,
+            feed_store,
+        }
     }
 
     #[inline]
@@ -86,19 +91,25 @@ impl<'a, 'b> OpComputeContext<'a, 'b> {
     }
 }
 
-struct NodeWithValue<'a> {
-    node: &'a Tensor,
+struct NodeWithValue<'a>
+{
+    node:  &'a Tensor,
     value: op::ComputeResult,
     // How many resources of this node does user requires.
     // When this is reduced to one, `value` is ready to be moved out (without copy).
     pending_count: usize,
 }
 
-impl<'a> Tensor {
+impl<'a> Tensor
+{
     #[inline]
     fn with_value(&'a self, val: op::ComputeResult) -> NodeWithValue<'a>
     {
-        NodeWithValue { node: self, value: val, pending_count: 0 }
+        NodeWithValue {
+            node:          self,
+            value:         val,
+            pending_count: 0,
+        }
     }
 }
 
@@ -153,10 +164,7 @@ where
         .map(|ref creator| {
             if let Some(ref per) = creator.persistent_array {
                 // Rarely happens (case that a persistent array given by user is required)
-                match *per {
-                    ::tensor::PersistentArray::Variable(ref a) => a.clone(),
-                    ::tensor::PersistentArray::Constant(ref a) => a.clone(),
-                }
+                per.get_array().clone()
             } else if creator.is_placeholder {
                 // Rarely happens (case that a feed by user is required)
                 get_fed_resource(creator, &feeds).clone()
@@ -181,7 +189,6 @@ where
         })
         .collect()
 }
-
 
 /// Runs given symbolic tensors.
 ///
@@ -235,7 +242,6 @@ fn find_resource_creator<'a, 'b>(storage: &ResourceStore, x: &'b Tensor) -> &'b 
     }
 }
 
-
 type ResourceStore<'a> = Vec<NodeWithValue<'a>>;
 type FeedStore<'a> = Vec<&'a NdArray>;
 
@@ -250,7 +256,6 @@ fn get_fed_resource<'a>(node: &Tensor, feeds: &Vec<&(&Tensor, &'a NdArray)>) -> 
     }
     panic!("Placeholder unfilled");
 }
-
 
 // Actually evaluates nodes "targets".
 fn eval_internal<'a>(
@@ -273,11 +278,9 @@ fn eval_internal<'a>(
             } else {
                 node.resource_lookup_key.set(resource_store.len());
                 if node.persistent_array.is_none() {
-                    let y = node.op.compute(OpComputeContext::new(
-                        node,
-                        &resource_store,
-                        &feed_store,
-                    ));
+                    let y =
+                        node.op
+                            .compute(OpComputeContext::new(node, &resource_store, &feed_store));
                     resource_store.push(node.with_value(y));
                 }
             }
@@ -299,7 +302,6 @@ fn eval_internal<'a>(
     }
     resource_store
 }
-
 
 // Shrink it by dropping useless resources
 // and convert it into mappings of {lookup key => resource}
@@ -336,7 +338,6 @@ fn finalize_resource_store(mut vec: ResourceStore) -> BTreeMap<usize, NodeWithVa
     // `vec` is moved into Map.
     retained_keys.into_iter().zip(vec).collect()
 }
-
 
 #[test]
 fn test_eval()

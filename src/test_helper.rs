@@ -3,7 +3,6 @@ extern crate ndarray;
 use ndarray_ext::NdArray;
 use tensor::Tensor;
 
-
 /// Checks the validity of `gradients` with finite difference trick.
 /// For this test only, `variables` must be "shared" variables.
 pub fn gradient_check<'a, 'b, T>(
@@ -64,14 +63,12 @@ pub fn gradient_check<'a, 'b, T>(
             if diff > tol {
                 panic!(
                     "Gradient checking failed with too large error: num={}, bp={}",
-                    g_num,
-                    g_th
+                    g_num, g_th
                 );
             }
         }
     }
 }
-
 
 #[doc(hidden)]
 #[macro_export]

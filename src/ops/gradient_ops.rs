@@ -1,10 +1,10 @@
 use op;
 use tensor::Tensor;
 
-
 pub struct StopGradient;
 
-impl op::Op for StopGradient {
+impl op::Op for StopGradient
+{
     fn name(&self) -> &str
     {
         "StopGradient"

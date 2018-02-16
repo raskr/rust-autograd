@@ -6,11 +6,13 @@ use ops;
 use std::f32;
 use tensor::Tensor;
 
-pub struct ELU {
+pub struct ELU
+{
     pub alpha: f32,
 }
 
-pub struct ELUGrad {
+pub struct ELUGrad
+{
     pub alpha: f32,
 }
 
@@ -22,7 +24,8 @@ pub struct Sigmoid;
 
 pub struct Softplus;
 
-pub struct Softmax {
+pub struct Softmax
+{
     pub axis: isize,
 }
 
@@ -54,7 +57,8 @@ pub fn softmax_forward(x: &NdArray, axis: isize) -> NdArray
     tmp
 }
 
-impl op::Op for Softmax {
+impl op::Op for Softmax
+{
     fn name(&self) -> &str
     {
         "Softmax"
@@ -72,7 +76,8 @@ impl op::Op for Softmax {
     }
 }
 
-impl op::Op for Softplus {
+impl op::Op for Softplus
+{
     fn name(&self) -> &str
     {
         "Softplus"
@@ -94,7 +99,8 @@ impl op::Op for Softplus {
     }
 }
 
-impl op::Op for Sigmoid {
+impl op::Op for Sigmoid
+{
     fn name(&self) -> &str
     {
         "Sigmoid"
@@ -112,7 +118,8 @@ impl op::Op for Sigmoid {
     }
 }
 
-impl op::Op for ReLU {
+impl op::Op for ReLU
+{
     fn name(&self) -> &str
     {
         "ReLU"
@@ -133,7 +140,8 @@ impl op::Op for ReLU {
     }
 }
 
-impl op::Op for Identity {
+impl op::Op for Identity
+{
     fn name(&self) -> &str
     {
         "Identity"
@@ -152,7 +160,8 @@ impl op::Op for Identity {
     }
 }
 
-impl op::Op for ELU {
+impl op::Op for ELU
+{
     fn name(&self) -> &str
     {
         "ELU"
@@ -161,10 +170,12 @@ impl op::Op for ELU {
     fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let x = ctx.grab_inputs()[0];
-        let ret = x.mapv(move |a| if a > 0. {
-            a
-        } else {
-            self.alpha * (a.exp() - 1.)
+        let ret = x.mapv(move |a| {
+            if a > 0. {
+                a
+            } else {
+                self.alpha * (a.exp() - 1.)
+            }
         });
         vec![Ok(ret)]
     }
@@ -179,7 +190,8 @@ impl op::Op for ELU {
     }
 }
 
-impl op::Op for ELUGrad {
+impl op::Op for ELUGrad
+{
     fn name(&self) -> &str
     {
         "ELUGrad"
@@ -190,10 +202,12 @@ impl op::Op for ELUGrad {
         let xs = ctx.grab_inputs();
         let x = xs[0];
         let gy = xs[1];
-        let a = x.mapv(move |a| if a > 0. {
-            1.
-        } else {
-            self.alpha * (a.exp() - 1.) + self.alpha
+        let a = x.mapv(move |a| {
+            if a > 0. {
+                1.
+            } else {
+                self.alpha * (a.exp() - 1.) + self.alpha
+            }
         });
         vec![Ok(a * gy)]
     }

@@ -1,8 +1,6 @@
 extern crate autograd as ag;
 extern crate ndarray;
 
-
-
 #[test]
 fn scalar_add()
 {
@@ -118,7 +116,6 @@ fn differentiate_twice()
     let ref g2 = ag::grad(&[g1], &[x])[0];
     assert_eq!(2., g2.eval(&[])[ndarray::IxDyn(&[])]);
 }
-
 
 #[test]
 fn expr7()

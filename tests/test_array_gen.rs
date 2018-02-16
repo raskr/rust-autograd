@@ -1,7 +1,6 @@
 extern crate autograd as ag;
 extern crate ndarray;
 
-
 #[test]
 fn random_uniform()
 {

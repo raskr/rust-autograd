@@ -8,36 +8,42 @@ pub struct StandardNormal;
 
 pub struct StandardUniform;
 
-pub struct RandomUniform {
+pub struct RandomUniform
+{
     pub max: f64,
     pub min: f64,
 }
 
-pub struct RandomNormal {
-    pub mean: f64,
+pub struct RandomNormal
+{
+    pub mean:   f64,
     pub stddev: f64,
 }
 
-pub struct Bernoulli {
+pub struct Bernoulli
+{
     pub p: f64,
 }
 
-pub struct Exponential {
+pub struct Exponential
+{
     pub lambda: f64,
 }
 
-pub struct LogNormal {
-    pub mean: f64,
+pub struct LogNormal
+{
+    pub mean:   f64,
     pub stddev: f64,
 }
 
-pub struct Gamma {
+pub struct Gamma
+{
     pub shape_param: f64,
-    pub scale: f64,
+    pub scale:       f64,
 }
 
-
-impl op::Op for RandomNormal {
+impl op::Op for RandomNormal
+{
     fn name(&self) -> &str
     {
         "RandomNormal"
@@ -62,7 +68,8 @@ impl op::Op for RandomNormal {
     }
 }
 
-impl op::Op for RandomUniform {
+impl op::Op for RandomUniform
+{
     fn name(&self) -> &str
     {
         "RandomUniform"
@@ -87,7 +94,8 @@ impl op::Op for RandomUniform {
     }
 }
 
-impl op::Op for StandardNormal {
+impl op::Op for StandardNormal
+{
     fn name(&self) -> &str
     {
         "StandardNormal"
@@ -106,7 +114,8 @@ impl op::Op for StandardNormal {
     }
 }
 
-impl op::Op for StandardUniform {
+impl op::Op for StandardUniform
+{
     fn name(&self) -> &str
     {
         "StandardUniform"
@@ -125,7 +134,8 @@ impl op::Op for StandardUniform {
     }
 }
 
-impl op::Op for Bernoulli {
+impl op::Op for Bernoulli
+{
     fn name(&self) -> &str
     {
         "Bernoulli"
@@ -144,7 +154,8 @@ impl op::Op for Bernoulli {
     }
 }
 
-impl op::Op for Exponential {
+impl op::Op for Exponential
+{
     fn name(&self) -> &str
     {
         "Exponential"
@@ -165,7 +176,8 @@ impl op::Op for Exponential {
     }
 }
 
-impl op::Op for LogNormal {
+impl op::Op for LogNormal
+{
     fn name(&self) -> &str
     {
         "LogNormal"
@@ -190,7 +202,8 @@ impl op::Op for LogNormal {
     }
 }
 
-impl op::Op for Gamma {
+impl op::Op for Gamma
+{
     fn name(&self) -> &str
     {
         "Gamma"

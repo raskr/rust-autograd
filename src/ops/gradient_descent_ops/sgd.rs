@@ -2,12 +2,13 @@ use ndarray_ext::NdArray;
 use op;
 use tensor::Tensor;
 
-
-struct SGDOp {
+struct SGDOp
+{
     pub lr: f32,
 }
 
-impl ::op::Op for SGDOp {
+impl ::op::Op for SGDOp
+{
     fn name(&self) -> &str
     {
         "SGD"
@@ -30,13 +31,14 @@ impl ::op::Op for SGDOp {
     }
 }
 
-
 /// Vanilla SGD optimizer
-pub struct SGD {
+pub struct SGD
+{
     pub lr: f32,
 }
 
-impl<'a> super::Optimizer<'a> for SGD {
+impl<'a> super::Optimizer<'a> for SGD
+{
     fn compute_updates<T: AsRef<Tensor>>(
         &mut self,
         params: &[&'a Tensor],

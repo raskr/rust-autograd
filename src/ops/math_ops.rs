@@ -29,20 +29,23 @@ pub struct Sign;
 pub struct Reciprocal;
 pub struct Square;
 pub struct Abs;
-pub struct Log {
+pub struct Log
+{
     pub a: f32,
 }
-pub struct Pow {
+pub struct Pow
+{
     pub a: f32,
 }
-pub struct LogSumExp {
-    pub axis: isize,
+pub struct LogSumExp
+{
+    pub axis:      isize,
     pub keep_dims: bool,
 }
-pub struct Transpose {
+pub struct Transpose
+{
     pub zip: bool,
 }
-
 
 macro_rules! impl_cmp_op {
     ($struct_name:ident, $assign:expr, $grad_fn:expr) => {
@@ -109,7 +112,6 @@ impl_cmp_op!(Maximum, move |r, a, b| *r = if a > b { *a } else { *b }, min_max_g
 #[cfg_attr(rustfmt, rustfmt_skip)]
 impl_cmp_op!(Minimum, move |r, a, b| *r = if a < b { *a } else { *b }, min_max_grad );
 
-
 fn min_max_grad(gy: &Tensor, xs: &[&Tensor], y: &Tensor) -> Vec<Option<Tensor>>
 {
     let a = xs[0];
@@ -122,7 +124,8 @@ fn min_max_grad(gy: &Tensor, xs: &[&Tensor], y: &Tensor) -> Vec<Option<Tensor>>
     ]
 }
 
-impl op::Op for Abs {
+impl op::Op for Abs
+{
     fn name(&self) -> &str
     {
         "Abs"
@@ -140,7 +143,8 @@ impl op::Op for Abs {
     }
 }
 
-impl op::Op for NegOp {
+impl op::Op for NegOp
+{
     fn name(&self) -> &str
     {
         "Neg"
@@ -158,7 +162,8 @@ impl op::Op for NegOp {
     }
 }
 
-impl op::Op for Square {
+impl op::Op for Square
+{
     fn name(&self) -> &str
     {
         "Square"
@@ -176,7 +181,8 @@ impl op::Op for Square {
     }
 }
 
-impl op::Op for Reciprocal {
+impl op::Op for Reciprocal
+{
     fn name(&self) -> &str
     {
         "Reciprocal"
@@ -194,7 +200,8 @@ impl op::Op for Reciprocal {
     }
 }
 
-impl op::Op for Sign {
+impl op::Op for Sign
+{
     fn name(&self) -> &str
     {
         "Sign"
@@ -203,7 +210,15 @@ impl op::Op for Sign {
     fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let xs = ctx.grab_inputs();
-        vec![Ok(xs[0].mapv(|x| if x == 0. { 0. } else { x.signum() }))]
+        vec![
+            Ok(xs[0].mapv(|x| {
+                if x == 0. {
+                    0.
+                } else {
+                    x.signum()
+                }
+            })),
+        ]
     }
 
     fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
@@ -212,7 +227,8 @@ impl op::Op for Sign {
     }
 }
 
-impl op::Op for Floor {
+impl op::Op for Floor
+{
     fn name(&self) -> &str
     {
         "Floor"
@@ -230,7 +246,8 @@ impl op::Op for Floor {
     }
 }
 
-impl op::Op for Ceil {
+impl op::Op for Ceil
+{
     fn name(&self) -> &str
     {
         "Ceil"
@@ -248,7 +265,8 @@ impl op::Op for Ceil {
     }
 }
 
-impl op::Op for Transpose {
+impl op::Op for Transpose
+{
     fn name(&self) -> &str
     {
         "Transpose"
@@ -260,7 +278,6 @@ impl op::Op for Transpose {
         let x = xs[0].view();
         let perm: &NdArray = &xs[1];
         assert!(perm.len() >= 2);
-
 
         let ret = if transpose_reversed(perm) {
             Ok(xs[0].clone().reversed_axes())
@@ -311,7 +328,7 @@ fn do_transpose(mut x: ::ndarray_ext::NdArrayView, mut src_dst: Vec<(usize, usiz
         for j in (dst..src).rev() {
             // "bigger to smaller" iteration is important
             x.swap_axes(j, j + 1); // Swaps two axes
-            // Increments "src"es I passed by.
+                                   // Increments "src"es I passed by.
             for sd in src_dst.iter_mut() {
                 if sd.0 == j {
                     sd.0 += 1;
@@ -327,7 +344,6 @@ fn do_transpose(mut x: ::ndarray_ext::NdArrayView, mut src_dst: Vec<(usize, usiz
     } else {
         NdArray::from_shape_fn(x.shape(), |i| x[i])
     }
-
 }
 
 // Helper for transpose. Returns true if axes are just reversed
@@ -384,8 +400,8 @@ pub fn logsumexp_forward(x: &NdArray, axis: isize, keep_dims: bool) -> NdArray
     sum
 }
 
-
-impl op::Op for LogSumExp {
+impl op::Op for LogSumExp
+{
     fn name(&self) -> &str
     {
         "LogSumExp"
@@ -407,8 +423,8 @@ impl op::Op for LogSumExp {
     }
 }
 
-
-impl op::Op for Pow {
+impl op::Op for Pow
+{
     fn name(&self) -> &str
     {
         "Pow"
@@ -429,7 +445,8 @@ impl op::Op for Pow {
     }
 }
 
-impl op::Op for Sqrt {
+impl op::Op for Sqrt
+{
     fn name(&self) -> &str
     {
         "Sqrt"
@@ -449,7 +466,8 @@ impl op::Op for Sqrt {
     }
 }
 
-impl op::Op for Log {
+impl op::Op for Log
+{
     fn name(&self) -> &str
     {
         "Log"
@@ -467,7 +485,8 @@ impl op::Op for Log {
     }
 }
 
-impl op::Op for Exp {
+impl op::Op for Exp
+{
     fn name(&self) -> &str
     {
         "Exp"
@@ -485,7 +504,8 @@ impl op::Op for Exp {
     }
 }
 
-impl op::Op for Atanh {
+impl op::Op for Atanh
+{
     fn name(&self) -> &str
     {
         "Atanh"
@@ -505,7 +525,8 @@ impl op::Op for Atanh {
     }
 }
 
-impl op::Op for Acosh {
+impl op::Op for Acosh
+{
     fn name(&self) -> &str
     {
         "Acosh"
@@ -525,7 +546,8 @@ impl op::Op for Acosh {
     }
 }
 
-impl op::Op for Asinh {
+impl op::Op for Asinh
+{
     fn name(&self) -> &str
     {
         "Asinh"
@@ -545,7 +567,8 @@ impl op::Op for Asinh {
     }
 }
 
-impl op::Op for Tanh {
+impl op::Op for Tanh
+{
     fn name(&self) -> &str
     {
         "Tanh"
@@ -563,7 +586,8 @@ impl op::Op for Tanh {
     }
 }
 
-impl op::Op for Cosh {
+impl op::Op for Cosh
+{
     fn name(&self) -> &str
     {
         "Cosh"
@@ -581,7 +605,8 @@ impl op::Op for Cosh {
     }
 }
 
-impl op::Op for Sinh {
+impl op::Op for Sinh
+{
     fn name(&self) -> &str
     {
         "Sinh"
@@ -599,7 +624,8 @@ impl op::Op for Sinh {
     }
 }
 
-impl op::Op for Atan {
+impl op::Op for Atan
+{
     fn name(&self) -> &str
     {
         "Atan"
@@ -619,7 +645,8 @@ impl op::Op for Atan {
     }
 }
 
-impl op::Op for Acos {
+impl op::Op for Acos
+{
     fn name(&self) -> &str
     {
         "Acos"
@@ -639,7 +666,8 @@ impl op::Op for Acos {
     }
 }
 
-impl op::Op for Asin {
+impl op::Op for Asin
+{
     fn name(&self) -> &str
     {
         "Asin"
@@ -659,7 +687,8 @@ impl op::Op for Asin {
     }
 }
 
-impl op::Op for Sin {
+impl op::Op for Sin
+{
     fn name(&self) -> &str
     {
         "Sin"
@@ -677,7 +706,8 @@ impl op::Op for Sin {
     }
 }
 
-impl op::Op for Cos {
+impl op::Op for Cos
+{
     fn name(&self) -> &str
     {
         "Cos"
@@ -695,7 +725,8 @@ impl op::Op for Cos {
     }
 }
 
-impl op::Op for Tan {
+impl op::Op for Tan
+{
     fn name(&self) -> &str
     {
         "Tan"

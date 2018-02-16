@@ -10,14 +10,11 @@ pub type NdArrayView<'a> = ndarray::ArrayView<'a, f32, ndarray::IxDyn>;
 /// exposes array_gen
 pub use array_gen::*;
 
-
-
 #[inline]
 pub fn arr_to_shape(arr: &NdArray) -> Vec<usize>
 {
     arr.iter().map(|&a| a as usize).collect::<Vec<_>>()
 }
-
 
 #[doc(hidden)]
 #[inline]
@@ -58,7 +55,6 @@ pub fn roll_axis(arg: &mut NdArray, to: ndarray::Axis, from: ndarray::Axis)
     }
 }
 
-
 #[inline]
 #[doc(hidden)]
 pub fn axes_as_vec(axes_: &NdArray, ndim: usize, sparse_axes: bool) -> Vec<usize>
@@ -84,7 +80,6 @@ pub fn axes_as_vec(axes_: &NdArray, ndim: usize, sparse_axes: bool) -> Vec<usize
         axes
     }
 }
-
 
 #[doc(hidden)]
 pub fn broadcast_to(
@@ -146,7 +141,6 @@ pub fn shape_of(x: &NdArray) -> NdArray
     NdArray::from_shape_vec(ndarray::IxDyn(&[rank]), shape).unwrap()
 }
 
-
 #[doc(hidden)]
 #[inline]
 pub fn into_mat(x: NdArray) -> ndarray::Array<f32, ndarray::Ix2>
@@ -158,11 +152,11 @@ pub fn into_mat(x: NdArray) -> ndarray::Array<f32, ndarray::Ix2>
     x.into_shape(ndarray::Ix2(a, b)).unwrap()
 }
 
-
 /// Generates ndarray which can be fed to `autograd::variable()` etc.
-pub mod array_gen {
-    extern crate rand;
+pub mod array_gen
+{
     extern crate ndarray;
+    extern crate rand;
 
     // `Rng` trait must be included
 
