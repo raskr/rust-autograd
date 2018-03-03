@@ -1,48 +1,135 @@
 extern crate ndarray;
 
-use ndarray_ext;
+use ndarray_ext::{self, ArrRng};
 use op;
 use tensor::Tensor;
+use rand::Rng;
 
-pub struct StandardNormal;
-
-pub struct StandardUniform;
-
-pub struct RandomUniform
+pub struct StandardNormal<R>
 {
+    pub arr_rng: ArrRng<R>,
+}
+
+impl<R> StandardNormal<R> {
+    pub fn new(arr_rng: ArrRng<R>) -> Self {
+        Self {
+            arr_rng: arr_rng,
+        }
+    }
+}
+
+pub struct StandardUniform<R>
+{
+    pub arr_rng: ArrRng<R>,
+}
+
+impl<R> StandardUniform<R> {
+    pub fn new(arr_rng: ArrRng<R>) -> Self {
+        Self {
+            arr_rng: arr_rng,
+        }
+    }
+}
+
+pub struct RandomUniform<R>
+{
+    pub arr_rng: ArrRng<R>,
     pub max: f64,
     pub min: f64,
 }
 
-pub struct RandomNormal
+impl<R> RandomUniform<R> {
+    pub fn new(arr_rng: ArrRng<R>, min: f64, max: f64) -> Self {
+        Self {
+            arr_rng: arr_rng,
+            max: max,
+            min: min,
+        }
+    }
+}
+
+pub struct RandomNormal<R>
 {
+    pub arr_rng: ArrRng<R>,
     pub mean:   f64,
     pub stddev: f64,
 }
 
-pub struct Bernoulli
+impl<R> RandomNormal<R> {
+    pub fn new(arr_rng: ArrRng<R>, mean: f64, stddev: f64) -> Self {
+        Self {
+            arr_rng: arr_rng,
+            mean: mean,
+            stddev: stddev,
+        }
+    }
+}
+
+pub struct Bernoulli<R>
 {
+    pub arr_rng: ArrRng<R>,
     pub p: f64,
 }
 
-pub struct Exponential
+impl<R> Bernoulli<R> {
+    pub fn new(arr_rng: ArrRng<R>, p: f64) -> Self {
+        Self {
+            arr_rng: arr_rng,
+            p: p,
+        }
+    }
+}
+
+pub struct Exponential<R>
 {
+    pub arr_rng: ArrRng<R>,
     pub lambda: f64,
 }
 
-pub struct LogNormal
+impl<R> Exponential<R> {
+    pub fn new(arr_rng: ArrRng<R>, lambda: f64) -> Self {
+        Self {
+            arr_rng: arr_rng,
+            lambda: lambda,
+        }
+    }
+}
+
+pub struct LogNormal<R>
 {
+    pub arr_rng: ArrRng<R>,
     pub mean:   f64,
     pub stddev: f64,
 }
 
-pub struct Gamma
+impl<R> LogNormal<R> {
+    pub fn new(arr_rng: ArrRng<R>, mean: f64, stddev: f64) -> Self {
+        Self {
+            arr_rng: arr_rng,
+            mean: mean,
+            stddev: stddev,
+        }
+    }
+}
+
+pub struct Gamma<R>
 {
+    pub arr_rng: ArrRng<R>,
     pub shape_param: f64,
     pub scale:       f64,
 }
 
-impl op::Op for RandomNormal
+impl<R> Gamma<R> {
+    pub fn new(arr_rng: ArrRng<R>, shape_param: f64, scale: f64) -> Self {
+        Self {
+            arr_rng: arr_rng,
+            shape_param: shape_param,
+            scale: scale,
+        }
+    }
+}
+
+impl<R: Rng> op::Op for RandomNormal<R>
 {
     fn name(&self) -> &str
     {
@@ -59,7 +146,7 @@ impl op::Op for RandomNormal
         let xs = ctx.grab_inputs();
         let shape = ndarray_ext::arr_to_shape(xs[0]);
         vec![
-            Ok(::ndarray_ext::random_normal(
+            Ok(self.arr_rng.random_normal(
                 shape.as_slice(),
                 self.mean,
                 self.stddev,
@@ -68,7 +155,7 @@ impl op::Op for RandomNormal
     }
 }
 
-impl op::Op for RandomUniform
+impl<R: Rng> op::Op for RandomUniform<R>
 {
     fn name(&self) -> &str
     {
@@ -85,7 +172,7 @@ impl op::Op for RandomUniform
         let xs = ctx.grab_inputs();
         let shape = ndarray_ext::arr_to_shape(xs[0]);
         vec![
-            Ok(::ndarray_ext::random_uniform(
+            Ok(self.arr_rng.random_uniform(
                 shape.as_slice(),
                 self.min,
                 self.max,
@@ -94,7 +181,7 @@ impl op::Op for RandomUniform
     }
 }
 
-impl op::Op for StandardNormal
+impl<R: Rng> op::Op for StandardNormal<R>
 {
     fn name(&self) -> &str
     {
@@ -110,11 +197,11 @@ impl op::Op for StandardNormal
     {
         let xs = ctx.grab_inputs();
         let shape = ndarray_ext::arr_to_shape(xs[0]);
-        vec![Ok(::ndarray_ext::standard_normal(shape.as_slice()))]
+        vec![Ok(self.arr_rng.standard_normal(shape.as_slice()))]
     }
 }
 
-impl op::Op for StandardUniform
+impl<R: Rng> op::Op for StandardUniform<R>
 {
     fn name(&self) -> &str
     {
@@ -130,11 +217,11 @@ impl op::Op for StandardUniform
     {
         let xs = ctx.grab_inputs();
         let shape = ndarray_ext::arr_to_shape(xs[0]);
-        vec![Ok(::ndarray_ext::standard_uniform(shape.as_slice()))]
+        vec![Ok(self.arr_rng.standard_uniform(shape.as_slice()))]
     }
 }
 
-impl op::Op for Bernoulli
+impl<R: Rng> op::Op for Bernoulli<R>
 {
     fn name(&self) -> &str
     {
@@ -150,11 +237,11 @@ impl op::Op for Bernoulli
     {
         let xs = ctx.grab_inputs();
         let shape = ndarray_ext::arr_to_shape(xs[0]);
-        vec![Ok(::ndarray_ext::bernoulli(shape.as_slice(), self.p))]
+        vec![Ok(self.arr_rng.bernoulli(shape.as_slice(), self.p))]
     }
 }
 
-impl op::Op for Exponential
+impl<R: Rng> op::Op for Exponential<R>
 {
     fn name(&self) -> &str
     {
@@ -171,12 +258,12 @@ impl op::Op for Exponential
         let xs = ctx.grab_inputs();
         let shape = ndarray_ext::arr_to_shape(xs[0]);
         vec![
-            Ok(::ndarray_ext::exponential(shape.as_slice(), self.lambda)),
+            Ok(self.arr_rng.exponential(shape.as_slice(), self.lambda)),
         ]
     }
 }
 
-impl op::Op for LogNormal
+impl<R: Rng> op::Op for LogNormal<R>
 {
     fn name(&self) -> &str
     {
@@ -193,7 +280,7 @@ impl op::Op for LogNormal
         let xs = ctx.grab_inputs();
         let shape = ndarray_ext::arr_to_shape(xs[0]);
         vec![
-            Ok(::ndarray_ext::log_normal(
+            Ok(self.arr_rng.log_normal(
                 shape.as_slice(),
                 self.mean,
                 self.stddev,
@@ -202,7 +289,7 @@ impl op::Op for LogNormal
     }
 }
 
-impl op::Op for Gamma
+impl<R: Rng> op::Op for Gamma<R>
 {
     fn name(&self) -> &str
     {
@@ -219,7 +306,7 @@ impl op::Op for Gamma
         let xs = ctx.grab_inputs();
         let shape = ndarray_ext::arr_to_shape(xs[0]);
         vec![
-            Ok(::ndarray_ext::gamma(
+            Ok(self.arr_rng.gamma(
                 shape.as_slice(),
                 self.shape_param,
                 self.scale,

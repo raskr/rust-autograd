@@ -1,6 +1,7 @@
 extern crate ndarray;
 
-use ndarray_ext::NdArray;
+use ndarray_ext::{NdArray, ArrRng};
+use rand::Rng;
 use tensor::{ArrayLike, Tensor};
 
 mod basic_source_ops;
@@ -1719,81 +1720,129 @@ pub fn scalar(val: f32) -> Tensor
 /// Outputs values sampled from the normal distribution.
 pub fn random_normal<T: ArrayLike>(shape: &T, mean: f64, stddev: f64) -> Tensor
 {
+    random_normal_rng(Default::default(), shape, mean, stddev)
+}
+
+/// Outputs values sampled from the normal distribution.
+pub fn random_normal_rng<T: ArrayLike, R: Rng + 'static>(arr_rng: ArrRng<R>, shape: &T, mean: f64, stddev: f64) -> Tensor
+{
     let shape = shape.as_tensor();
     Tensor::builder()
         .set_input(&shape)
         .set_shape(shape)
-        .build(random_ops::RandomNormal { mean, stddev })
+        .build(random_ops::RandomNormal::new(arr_rng, mean, stddev))
 }
 
 /// Outputs values sampled from the uniform distribution.
 pub fn random_uniform<T: ArrayLike>(shape: &T, min: f64, max: f64) -> Tensor
 {
+    random_uniform_rng(Default::default(), shape, min, max)
+}
+
+/// Outputs values sampled from the uniform distribution.
+pub fn random_uniform_rng<T: ArrayLike, R: Rng + 'static>(arr_rng: ArrRng<R>, shape: &T, min: f64, max: f64) -> Tensor
+{
     let shape = shape.as_tensor();
     Tensor::builder()
         .set_input(&shape)
         .set_shape(shape)
-        .build(random_ops::RandomUniform { min, max })
+        .build(random_ops::RandomUniform::new(arr_rng, min, max))
 }
 
 /// Outputs values sampled from the standard normal distribution.
 pub fn standard_normal<T: ArrayLike>(shape: &T) -> Tensor
 {
+    standard_normal_rng(Default::default(), shape)
+}
+
+/// Outputs values sampled from the standard normal distribution.
+pub fn standard_normal_rng<T: ArrayLike, R: Rng + 'static>(arr_rng: ArrRng<R>, shape: &T) -> Tensor
+{
     let shape = shape.as_tensor();
     Tensor::builder()
         .set_input(&shape)
         .set_shape(shape)
-        .build(random_ops::StandardNormal)
+        .build(random_ops::StandardNormal::new(arr_rng))
 }
 
 /// Outputs values sampled from the standard uniform distribution.
 pub fn standard_uniform<T: ArrayLike>(shape: &T) -> Tensor
 {
+    standard_uniform_rng(Default::default(), shape)
+}
+
+/// Outputs values sampled from the standard uniform distribution.
+pub fn standard_uniform_rng<T: ArrayLike, R: Rng + 'static>(arr_rng: ArrRng<R>, shape: &T) -> Tensor
+{
     let shape = shape.as_tensor();
     Tensor::builder()
         .set_input(&shape)
         .set_shape(shape)
-        .build(random_ops::StandardUniform)
+        .build(random_ops::StandardUniform::new(arr_rng))
 }
 
 /// Outputs values sampled from the bernoulli distribution.
 pub fn bernoulli<T: ArrayLike>(shape: &T, p: f64) -> Tensor
 {
+    bernoulli_rng(Default::default(), shape, p)
+}
+
+/// Outputs values sampled from the bernoulli distribution.
+pub fn bernoulli_rng<T: ArrayLike, R: Rng + 'static>(arr_rng: ArrRng<R>, shape: &T, p: f64) -> Tensor
+{
     let shape = shape.as_tensor();
     Tensor::builder()
         .set_input(&shape)
         .set_shape(shape)
-        .build(random_ops::Bernoulli { p })
+        .build(random_ops::Bernoulli::new(arr_rng, p))
 }
 
 /// Outputs values sampled from the exponential distribution.
 pub fn random_exp<T: ArrayLike>(shape: &T, lambda: f64) -> Tensor
 {
+    random_exp_rng(Default::default(), shape, lambda)
+}
+
+/// Outputs values sampled from the exponential distribution.
+pub fn random_exp_rng<T: ArrayLike, R: Rng + 'static>(arr_rng: ArrRng<R>, shape: &T, lambda: f64) -> Tensor
+{
     let shape = shape.as_tensor();
     Tensor::builder()
         .set_input(&shape)
         .set_shape(shape)
-        .build(random_ops::Exponential { lambda })
+        .build(random_ops::Exponential::new(arr_rng, lambda))
 }
 
 /// Outputs values sampled from the gamma distribution.
 pub fn random_gamma<T: ArrayLike>(shape: &T, shape_param: f64, scale: f64) -> Tensor
 {
-    let shape = shape.as_tensor();
-    Tensor::builder()
-        .set_input(&shape)
-        .set_shape(shape)
-        .build(random_ops::Gamma { shape_param, scale })
+    random_gamma_rng(Default::default(), shape, shape_param, scale)
 }
 
-/// Outputs values sampled from the log-normal distribution.
-pub fn log_normal<T: ArrayLike>(shape: &T, mean: f64, stddev: f64) -> Tensor
+/// Outputs values sampled from the gamma distribution.
+pub fn random_gamma_rng<T: ArrayLike, R: Rng + 'static>(arr_rng: ArrRng<R>, shape: &T, shape_param: f64, scale: f64) -> Tensor
 {
     let shape = shape.as_tensor();
     Tensor::builder()
         .set_input(&shape)
         .set_shape(shape)
-        .build(random_ops::LogNormal { mean, stddev })
+        .build(random_ops::Gamma::new(arr_rng, shape_param, scale))
+}
+
+/// Outputs values sampled from the log-normal distribution.
+pub fn log_normal<T: ArrayLike>(shape: &T, mean: f64, stddev: f64) -> Tensor
+{
+    log_normal_rng(Default::default(), shape, mean, stddev)
+}
+
+/// Outputs values sampled from the log-normal distribution.
+pub fn log_normal_rng<T: ArrayLike, R: Rng + 'static>(arr_rng: ArrRng<R>, shape: &T, mean: f64, stddev: f64) -> Tensor
+{
+    let shape = shape.as_tensor();
+    Tensor::builder()
+        .set_input(&shape)
+        .set_shape(shape)
+        .build(random_ops::LogNormal::new(arr_rng, mean, stddev))
 }
 
 /// Converts `ndarray::Array` to `ag::Tensor`.
