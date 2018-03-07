@@ -193,6 +193,7 @@ where
 /// Runs given symbolic tensors.
 ///
 /// Runs, but returns nothing.
+///
 /// ```
 /// extern crate ndarray;
 /// extern crate autograd as ag;
@@ -203,10 +204,6 @@ where
 ///
 /// // runs inplace op.
 /// ag::run(&[&c], &[]);
-/// // pull out shared variable
-/// let should_be_zeros = &c.persistent_array;
-/// assert_eq!(should_be_zeros, ndarray::arr1(&[0., 0.]).into_dyn());
-///
 /// ```
 pub fn run<'a, 'b: 'a, 'c: 'a, T, U>(tensors: &[T], feeds: U)
 where
