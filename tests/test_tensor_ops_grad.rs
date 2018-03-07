@@ -229,7 +229,7 @@ fn wx_plus_b()
 #[test]
 fn reduce_min()
 {
-    let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[3, 2, 2]));
+    let ref v = ag::variable(ndarray::arr2(&[[0., 1.], [3., 2.]]));
     let ref z = ag::reduce_min(v, &[1], false); // keep_dims=false
     let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -238,7 +238,7 @@ fn reduce_min()
 #[test]
 fn reduce_min_keep()
 {
-    let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[3, 2, 2]));
+    let ref v = ag::variable(ndarray::arr2(&[[0., 1.], [3., 2.]]));
     let ref z = ag::reduce_min(v, &[1], true); // keep_dims=true
     let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -247,7 +247,7 @@ fn reduce_min_keep()
 #[test]
 fn reduce_max()
 {
-    let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[3, 2, 2]));
+    let ref v = ag::variable(ndarray::arr2(&[[0., 1.], [3., 2.]]));
     let ref z = ag::reduce_max(v, &[1], false); // keep_dims=false
     let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -256,7 +256,7 @@ fn reduce_max()
 #[test]
 fn reduce_max_keep()
 {
-    let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[3, 2, 2]));
+    let ref v = ag::variable(ndarray::arr2(&[[0., 1.], [3., 2.]]));
     let ref z = ag::reduce_max(v, &[1], true); // keep_dims=true
     let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -310,8 +310,8 @@ fn reduce_prod()
 #[test]
 fn maximum()
 {
-    let ref v1 = ag::variable(ag::ndarray_ext::standard_normal(&[3, 2, 2]));
-    let ref v2 = ag::variable(ag::ndarray_ext::standard_normal(&[3, 2, 2]));
+    let ref v1 = ag::variable(ndarray::arr1(&[1., 2., 3.]));
+    let ref v2 = ag::variable(ndarray::arr1(&[4., 5., 6.]));
     let ref z = ag::maximum(v1, v2);
     let ref g = ag::grad_with_default(&[z], &[v1, v2], &[&ag::ones(&z.shape())]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v1, v2], &[], 1e-3, 1e-3);
@@ -320,8 +320,8 @@ fn maximum()
 #[test]
 fn minimum()
 {
-    let ref v1 = ag::variable(ag::ndarray_ext::standard_normal(&[3, 2, 2]));
-    let ref v2 = ag::variable(ag::ndarray_ext::standard_normal(&[3, 2, 2]));
+    let ref v1 = ag::variable(ndarray::arr1(&[1., 2., 3.]));
+    let ref v2 = ag::variable(ndarray::arr1(&[4., 5., 6.]));
     let ref z = ag::minimum(v1, v2);
     let ref g = ag::grad_with_default(&[z], &[v1, v2], &[&ag::ones(&z.shape())]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v1, v2], &[], 1e-3, 1e-3);
