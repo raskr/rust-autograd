@@ -8,9 +8,9 @@ use ops;
 use std::collections::HashSet;
 use std::iter::FromIterator;
 
-pub struct Broadcast
+pub struct ReduceGrad
 {
-    pub keep_dims:   bool,
+    pub should_make_broadcast_dims:   bool,
     pub sparse_axes: bool,
 }
 
@@ -76,6 +76,7 @@ pub struct AddN;
 pub struct Gather
 {
     pub axis: isize,
+    pub should_normalize_negative_indices: bool
 }
 
 pub struct GatherGrad
@@ -334,14 +335,11 @@ impl op::Op for Gather
     fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let xs = ctx.grab_inputs();
-        let indices = xs[0].map(|a| *a as usize);
-        let param = &xs[1];
+        let param = xs[1];
+        let indices = xs[0];
+        let indices_shape = indices.shape();
         let param_shape = param.shape();
-        let axis = if self.axis < 0 {
-            (param.ndim() as isize + self.axis) as usize
-        } else {
-            self.axis as usize
-        };
+        let axis = ndarray_ext::normalize_negative_axis(self.axis, param.ndim());
 
         let output_shape: Vec<usize> = {
             let former: &[usize] = &param_shape[..axis];
@@ -349,13 +347,17 @@ impl op::Op for Gather
             // doing former + indices.shape() + latter
             former
                 .into_iter()
-                .chain(indices.shape())
+                .chain(indices_shape)
                 .chain(latter)
                 .cloned()
                 .collect()
         };
 
-        let flat_indices = indices.into_raw_vec();
+        let flat_indices = if self.should_normalize_negative_indices {
+            ndarray_ext::normalize_negative_axes(indices, param_shape[axis])
+        } else {
+            indices.map(|a| *a as usize).into_raw_vec()
+        };
         let selected = param.select(ndarray::Axis(axis), flat_indices.as_slice());
         vec![Ok(selected.into_shape(output_shape.as_slice()).unwrap())]
     }
@@ -881,11 +883,11 @@ impl op::Op for ExpandDims
     }
 }
 
-impl op::Op for Broadcast
+impl op::Op for ReduceGrad
 {
     fn name(&self) -> &str
     {
-        "Broadcast"
+        "ReduceGrad"
     }
 
     fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
@@ -895,21 +897,42 @@ impl op::Op for Broadcast
         let target_shape = ndarray_ext::vec_as_shape(xs[1]);
         let axes = xs[2];
 
-        vec![
-            Ok(ndarray_ext::broadcast_to(
-                x,
-                target_shape.as_slice(),
-                axes,
-                self.keep_dims,
-                self.sparse_axes,
-            )),
-        ]
+        // convert axes_ to usize vec
+        let mut axes = if self.sparse_axes {
+            ndarray_ext::sparse_to_dense(axes)
+        } else {
+            ndarray_ext::normalize_negative_axes(axes, target_shape.len())
+        };
+
+        let ret = {
+            let mut x = x.view();
+
+            // make broadcast dims as needed
+            if self.should_make_broadcast_dims {
+                axes.sort();
+                for &axis in axes.iter() {
+                    x = ndarray_ext::expand_dims_view(x, axis);
+                }
+            }
+
+            // do broadcast
+            println!("broadcast objective shape: {:?}", x.shape());
+            println!("dst_shape: {:?}", target_shape);
+            if let Some(ret) = x.broadcast(target_shape) {
+                ret.to_owned()
+            } else {
+                let msg = "Cant't broadcast.".to_string();
+                return vec![Err(::errors::OpComputeErrorStatus::BadInput(msg))];
+            }
+        };
+
+        vec![Ok(ret)]
     }
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         let sum = ops::reduction_ops::ReduceSum {
-            keep_dims:   self.keep_dims,
+            keep_dims:   self.should_make_broadcast_dims,
             sparse_axes: self.sparse_axes,
         };
         let axes = inputs[2];

@@ -977,12 +977,11 @@ pub fn reduce_sum<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tensor
 /// ```
 pub fn reduce_mean<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tensor
 {
-    let axes = rectify_negative_axes(&axes.as_tensor(), &x.rank());
     let op = reduction_ops::ReduceMean {
         keep_dims,
         sparse_axes: false,
     };
-    Tensor::builder().set_inputs(vec![x, &axes]).build(op)
+    Tensor::builder().set_inputs(vec![x, &axes.as_tensor()]).build(op)
 }
 
 #[inline]
@@ -1642,6 +1641,34 @@ pub fn concat(tensors: &[&Tensor], axis: isize) -> Tensor
 /// Same spec as https://www.tensorflow.org/api_docs/python/tf/gather.
 /// For example, this can be used for embedding vectors lookup etc.
 ///
+/// Unlike `ag::gather`, `indices` can contain negative elements.
+///
+/// # Returns
+/// Tensor with shape `param.shape[..axis] + indices.shape + param.shape[axis+1..]`
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let ref param = ag::constant(ag::ndarray_ext::zeros(&[5, 4, 8, 2]));
+/// let ref indices = ag::constant(ndarray::arr2(&[[5., -1., 3.], [2., 1., -2.]]));
+/// let ref y = ag::gather_common(param, indices, 2);
+///
+/// assert_eq!(y.eval(&[]).shape(), &[5, 4, 2, 3, 2])
+/// ```
+pub fn gather_common<T: ArrayLike>(param: &Tensor, indices: &T, axis: isize) -> Tensor
+{
+    let op = array_ops::Gather { axis, should_normalize_negative_indices: true };
+    Tensor::builder()
+        .set_inputs(vec![&indices.as_tensor(), param])
+        .build(op)
+}
+
+/// Gathers subviews from the input tensor.
+///
+/// Same spec as https://www.tensorflow.org/api_docs/python/tf/gather.
+/// For example, this can be used for embedding vectors lookup etc.
+///
 /// # Returns
 /// Tensor with shape `param.shape[..axis] + indices.shape + param.shape[axis+1..]`
 ///
@@ -1657,7 +1684,7 @@ pub fn concat(tensors: &[&Tensor], axis: isize) -> Tensor
 /// ```
 pub fn gather<T: ArrayLike>(param: &Tensor, indices: &T, axis: isize) -> Tensor
 {
-    let op = array_ops::Gather { axis };
+    let op = array_ops::Gather { axis, should_normalize_negative_indices: false };
     Tensor::builder()
         .set_inputs(vec![&indices.as_tensor(), param])
         .build(op)

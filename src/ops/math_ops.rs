@@ -47,6 +47,23 @@ pub struct Transpose
     pub zip: bool,
 }
 
+#[inline(always)]
+fn equal(a: f32, b: f32) -> f32 { ((a == b) as i32) as f32 }
+#[inline(always)]
+fn not_equal(a: f32, b: f32) -> f32 { ((a != b) as i32) as f32 }
+#[inline(always)]
+fn greater(a: f32, b: f32) -> f32 { ((a > b) as i32) as f32 }
+#[inline(always)]
+fn lesser(a: f32, b: f32) -> f32 { ((a < b) as i32) as f32 }
+#[inline(always)]
+fn greater_equal(a: f32, b: f32) -> f32 { ((a >= b) as i32) as f32 }
+#[inline(always)]
+fn lesser_equal(a: f32, b: f32) -> f32 { ((a <= b) as i32) as f32 }
+#[inline(always)]
+fn maximum(a: f32, b: f32) -> f32 { if a > b { a } else { b } }
+#[inline(always)]
+fn minimum(a: f32, b: f32) -> f32 { if a < b { a } else { b } }
+
 macro_rules! impl_cmp_op {
     ($struct_name:ident, $assign:expr, $grad_fn:expr) => {
 
@@ -65,24 +82,62 @@ macro_rules! impl_cmp_op {
                 let x1 = xs[1];
                 let shape0 = x0.shape();
                 let shape1 = x1.shape();
-                let scalar_shape = &[0];
 
-                let x0_is_scalar = shape0 == scalar_shape;
-                let x1_is_scalar = !x0_is_scalar;
+                let x0_is_scalar = ::ndarray_ext::is_scalar_shape(shape0);
+                let x1_is_scalar = ::ndarray_ext::is_scalar_shape(shape1);
 
-                let ret = if x0_is_scalar {
-                    let mut result = NdArray::zeros(shape1);
-                    Zip::from(&mut result).and_broadcast(x0).and(x1).apply($assign);
-                    Ok(result)
-                } else if x1_is_scalar {
-                    let mut result = NdArray::zeros(shape0);
-                    Zip::from(&mut result).and(x0).and_broadcast(x1).apply($assign);
-                    Ok(result)
+                let ret = if x0_is_scalar && x1_is_scalar {
+                    let x1_elem = x1[ndarray::IxDyn(&[])];
+                    Ok(x0.map(move |a| $assign(a.clone(), x1_elem)))
+                } else if x0_is_scalar && !x1_is_scalar {
+                    let x0_elem = x0[ndarray::IxDyn(&[])];
+                    Ok(x1.map(move |a| $assign(x0_elem, a.clone())))
+                } else if !x0_is_scalar && x1_is_scalar {
+                    let x1_elem = x1[ndarray::IxDyn(&[])];
+                    Ok(x0.map(move |a| $assign(a.clone(), x1_elem)))
                 } else {
-                    let mut result = NdArray::zeros(shape0);
-                    Zip::from(&mut result).and(x0).and(x1).apply($assign);
-                    Ok(result)
+                    // case that scalar is not involved
+                    // Check the input ranks.
+                    // Errors couldn't we catch here cause ndarray's panics.
+                    if shape0.len() != shape1.len() {
+                        let name0 = &ctx.node.inputs[0].op.name();
+                        let name1 = &ctx.node.inputs[1].op.name();
+                        let msg = format!(
+                            "Tensor ranks mismatch: {}({}) vs {}({})",
+                            shape0.len(), name0, shape1.len(), name1);
+                        return vec![Err(::errors::OpComputeErrorStatus::BadInput(msg))];
+                    }
+
+                    let size0: usize = shape0.iter().product();
+                    let size1: usize = shape1.iter().product();
+
+                    // Whether broadcast of x0 and x1 is needed or not is depends on
+                    // their shapes.
+                    // FIXME: Is this cond branch ok?
+                    if size0 < size1 {
+                        let mut result = NdArray::zeros(shape1);
+                        Zip::from(&mut result).and_broadcast(x0).and(x1).apply(
+                            |r, a, b| *r = $assign(a.clone(), b.clone()));
+                        Ok(result)
+                    } else if size0 > size1 {
+                        let mut result = NdArray::zeros(shape0);
+                        let name0 = &ctx.node.inputs[0].op.name();
+                        let name1 = &ctx.node.inputs[1].op.name();
+                        println!("Tensor ranks mismatch: {}({}) vs {}({})",
+                            shape0.len(), name0, shape1.len(), name1);
+
+                        Zip::from(&mut result).and(x0).and_broadcast(x1).apply(
+                            |r, a, b| *r = $assign(a.clone(), b.clone()));
+                        Ok(result)
+                    } else {
+                        // same
+                        let mut result = NdArray::zeros(shape0);
+                        Zip::from(&mut result).and(x0).and(x1).apply(
+                            |r, a, b| *r = $assign(a.clone(), b.clone()));
+                        Ok(result)
+                    }
                 };
+
                 vec![ret]
             }
 
@@ -95,22 +150,18 @@ macro_rules! impl_cmp_op {
     };
 }
 
-#[cfg_attr(rustfmt, rustfmt_skip)]
-impl_cmp_op!(Equal, move |r, a, b| *r = ((a == b) as i32) as f32, |_, _, _| vec![None] );
-#[cfg_attr(rustfmt, rustfmt_skip)]
-impl_cmp_op!(NotEqual, move |r, a, b| *r = ((a != b) as i32) as f32, |_, _, _| vec![None] );
-#[cfg_attr(rustfmt, rustfmt_skip)]
-impl_cmp_op!(Greater, move |r, a, b| *r = ((a > b) as i32) as f32, |_, _, _| vec![None] );
-#[cfg_attr(rustfmt, rustfmt_skip)]
-impl_cmp_op!(Lesser, move |r, a, b| *r = ((a < b) as i32) as f32, |_, _, _| vec![None] );
-#[cfg_attr(rustfmt, rustfmt_skip)]
-impl_cmp_op!(GreaterEqual, move |r, a, b| *r = ((a >= b) as i32) as f32, |_, _, _| vec![None] );
-#[cfg_attr(rustfmt, rustfmt_skip)]
-impl_cmp_op!(LesserEqual, move |r, a, b| *r = ((a <= b) as i32) as f32, |_, _, _| vec![None] );
-#[cfg_attr(rustfmt, rustfmt_skip)]
-impl_cmp_op!(Maximum, move |r, a, b| *r = if a > b { *a } else { *b }, min_max_grad );
-#[cfg_attr(rustfmt, rustfmt_skip)]
-impl_cmp_op!(Minimum, move |r, a, b| *r = if a < b { *a } else { *b }, min_max_grad );
+impl_cmp_op!(Equal, equal, none_grad);
+impl_cmp_op!(NotEqual, not_equal, none_grad);
+impl_cmp_op!(Greater, greater, none_grad);
+impl_cmp_op!(Lesser, lesser, none_grad);
+impl_cmp_op!(GreaterEqual, greater_equal, none_grad);
+impl_cmp_op!(LesserEqual, lesser_equal, none_grad);
+impl_cmp_op!(Maximum, maximum, min_max_grad);
+impl_cmp_op!(Minimum, minimum, min_max_grad);
+
+fn none_grad(_: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
+    vec![None]
+}
 
 fn min_max_grad(gy: &Tensor, xs: &[&Tensor], y: &Tensor) -> Vec<Option<Tensor>>
 {

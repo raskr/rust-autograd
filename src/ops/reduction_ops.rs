@@ -51,29 +51,26 @@ macro_rules! impl_reduce_forward {
     ($forward_name:ident, $reduce_fn_name:ident, $reduce_default:expr) => {
         fn $forward_name(
             x: &NdArray,
-            axes: &NdArray,
-            should_preprocess_axes: bool,
+            mut axes: Vec<usize>,
             keep_dims: bool,
-            sparse_axes: bool,
         ) -> Result<NdArray, ::errors::OpComputeErrorStatus>
         {
             let x_shape = x.shape();
-            if x_shape == &[] {
+
+            if ndarray_ext::is_scalar_shape(x_shape) {
                 // case of 0 rank
                 Ok((*x).clone())
             } else {
-                let axes: Vec<usize> = if should_preprocess_axes {
-                    ndarray_ext::axes_as_vec(axes, x_shape.len(), sparse_axes)
-                } else {
-                    axes.iter().map(|&a| a as usize).collect()
-                };
+                // reduction axes are empty => do nothing
                 if axes.is_empty() {
-                    return Err(::OpComputeErrorStatus::Delegate { to: 0 });
+                    return Err(::errors::OpComputeErrorStatus::Delegate { to: 0 });
                 }
 
+                // -- main logic --
                 let mut folded: Option<NdArray> = None;
+                axes.sort();
 
-                for axis in axes.into_iter() {
+                for axis in axes.into_iter().rev() {
                     let func = f32::$reduce_fn_name;
                     let ret = folded.as_ref().unwrap_or(x).fold_axis(
                         ndarray::Axis(axis),
@@ -94,10 +91,20 @@ macro_rules! impl_reduce_forward {
     };
 }
 
-impl_reduce_forward!(comopute_reduce_sum, add, 0.);
-impl_reduce_forward!(comopute_reduce_min, min, f32::MAX);
-impl_reduce_forward!(comopute_reduce_max, max, f32::MIN);
-impl_reduce_forward!(comopute_reduce_prod, mul, 1.);
+impl_reduce_forward!(compute_reduce_sum, add, 0.);
+impl_reduce_forward!(compute_reduce_min, min, f32::MAX);
+impl_reduce_forward!(compute_reduce_max, max, f32::MIN);
+impl_reduce_forward!(compute_reduce_prod, mul, 1.);
+
+#[inline]
+fn preprocess_axes(x: &NdArray, axes: &NdArray, sparse_axes: bool) -> Vec<usize> {
+    if sparse_axes {
+        ndarray_ext::sparse_to_dense(axes)
+    } else {
+        ndarray_ext::normalize_negative_axes(axes, x.ndim())
+    }
+}
+
 
 impl op::Op for ReduceSum
 {
@@ -109,15 +116,17 @@ impl op::Op for ReduceSum
     fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let xs = ctx.grab_inputs();
+        let x = xs[0];
+        let axes = preprocess_axes(x, xs[1], self.sparse_axes);
         vec![
-            comopute_reduce_sum(xs[0], xs[1], true, self.keep_dims, self.sparse_axes),
+            compute_reduce_sum(x, axes, self.keep_dims),
         ]
     }
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
-        let grad_op = ops::array_ops::Broadcast {
-            keep_dims:   self.keep_dims,
+        let grad_op = ops::array_ops::ReduceGrad {
+            should_make_broadcast_dims: !self.keep_dims,
             sparse_axes: self.sparse_axes,
         };
         let gx = Tensor::builder()
@@ -137,34 +146,53 @@ impl op::Op for ReduceMean
     fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let xs = ctx.grab_inputs();
-        let sum = comopute_reduce_sum(xs[0], xs[1], false, self.keep_dims, self.sparse_axes);
-        vec![
-            sum.map(|mut ok| {
-                let x_shape = xs[0].shape();
-                let reduction_axes: Vec<usize> = xs[1].iter().map(|&a| a as usize).collect();
-                let reduction_len: f32 = reduction_axes
-                    .into_iter()
-                    .map(|i| x_shape[i] as f32)
-                    .product();
-                ok *= 1. / reduction_len;
-                ok
-            }),
-        ]
+        let x = xs[0];
+        let axes = preprocess_axes(x, xs[1], self.sparse_axes);
+        let x_shape = x.shape();
+        if axes.is_empty() {
+            return vec![Err(::errors::OpComputeErrorStatus::Delegate { to: 0 })];
+        }
+
+        // Make reduction_len
+        let mut reduction_len = 1.;
+        for &axis in axes.iter() {
+            reduction_len *= x_shape[axis as usize] as f32;
+        }
+
+        // Do summation
+        let sum: Result<NdArray, ::errors::OpComputeErrorStatus> =
+            compute_reduce_sum(x, axes, self.keep_dims);
+
+        // Do division
+        let ret = sum.map(|mut ok| {
+            ok *= 1. / reduction_len;
+            ok
+        });
+
+        vec![ret]
     }
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
-        let grad_op = ops::array_ops::Broadcast {
-            keep_dims:   self.keep_dims,
-            sparse_axes: self.sparse_axes,
-        };
         let x = inputs[0];
-        let axes = inputs[1]; // this is preprocessed
-        let ref reduction_len = ops::reduce_prod(&ops::gather(&x.shape(), axes, 0), &[0], false);
-        let tmp = Tensor::builder()
+        let axes = inputs[1];
+
+        // Broadcast gy into x's shape
+        let broadcast = Tensor::builder()
             .set_inputs(vec![gy, &inputs[0].shape(), inputs[1]])
-            .build(grad_op);
-        let gx = tmp * ops::reciprocal(reduction_len);
+            .build(
+                ops::array_ops::ReduceGrad {
+                    should_make_broadcast_dims: !self.keep_dims,
+                    sparse_axes: self.sparse_axes,
+                }
+            );
+
+        // Divide
+        let reduction_sizes = &ops::gather_common(&x.shape(), axes, 0);
+        let reduction_len = &ops::reduce_prod(reduction_sizes, &[0], false);  // 1: &[]
+        let reciprocal = ops::reciprocal(reduction_len);  // 1: &[]
+        let gx = broadcast * reciprocal;
+
         vec![Some(gx), None]
     }
 }
@@ -179,15 +207,18 @@ impl op::Op for ReduceProd
     fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let xs = ctx.grab_inputs();
+        let x = xs[0];
+        let axes = preprocess_axes(x, xs[1], self.sparse_axes);
+        let ret = compute_reduce_prod(x, axes, self.keep_dims);
         vec![
-            comopute_reduce_prod(xs[0], xs[1], true, self.keep_dims, self.sparse_axes),
+            ret,
         ]
     }
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
     {
-        let grad_op = ops::array_ops::Broadcast {
-            keep_dims:   self.keep_dims,
+        let grad_op = ops::array_ops::ReduceGrad {
+            should_make_broadcast_dims:  !self.keep_dims,
             sparse_axes: self.sparse_axes,
         };
         let tmp = Tensor::builder()
@@ -208,8 +239,10 @@ impl op::Op for ReduceMin
     fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let xs = ctx.grab_inputs();
+        let x = xs[0];
+        let axes = preprocess_axes(x, xs[1], self.sparse_axes);
         vec![
-            comopute_reduce_min(xs[0], xs[1], true, self.keep_dims, self.sparse_axes),
+            compute_reduce_min(x, axes, self.keep_dims),
         ]
     }
 
@@ -229,8 +262,10 @@ impl op::Op for ReduceMax
     fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let xs = ctx.grab_inputs();
+        let x = xs[0];
+        let axes = preprocess_axes(x, xs[1], self.sparse_axes);
         vec![
-            comopute_reduce_max(xs[0], xs[1], true, self.keep_dims, self.sparse_axes),
+            compute_reduce_max(x, axes, self.keep_dims),
         ]
     }
 
@@ -248,12 +283,12 @@ fn min_max_grad(
     sparse_axes: bool,
 ) -> Vec<Option<Tensor>>
 {
-    let grad_op1 = ops::array_ops::Broadcast {
-        keep_dims,
+    let grad_op1 = ops::array_ops::ReduceGrad {
+        should_make_broadcast_dims: !keep_dims,
         sparse_axes,
     };
-    let grad_op2 = ops::array_ops::Broadcast {
-        keep_dims,
+    let grad_op2 = ops::array_ops::ReduceGrad {
+        should_make_broadcast_dims: !keep_dims,
         sparse_axes,
     };
     let x = inputs[0];

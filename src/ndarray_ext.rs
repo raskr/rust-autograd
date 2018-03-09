@@ -56,59 +56,37 @@ pub fn roll_axis(arg: &mut NdArray, to: ndarray::Axis, from: ndarray::Axis)
 }
 
 #[inline]
-#[doc(hidden)]
-pub fn axes_as_vec(axes_: &NdArray, ndim: usize, sparse_axes: bool) -> Vec<usize>
-{
-    if sparse_axes {
-        let mut axes: Vec<usize> = vec![];
-        for (i, &a) in axes_.iter().enumerate() {
-            if a == 1. {
-                axes.push(i as usize);
-            }
-        }
-        axes
+pub fn normalize_negative_axis(axis: isize, ndim: usize) -> usize {
+    if axis < 0 {
+        (ndim as isize + axis) as usize
     } else {
-        let mut axes: Vec<usize> = Vec::with_capacity(axes_.len());
-        for &axis in axes_.iter() {
-            let axis = if axis < 0. {
-                (ndim as f32 + axis) as usize
-            } else {
-                axis as usize
-            };
-            axes.push(axis);
-        }
-        axes
+        axis as usize
     }
 }
 
-#[doc(hidden)]
-pub fn broadcast_to(
-    broadcast_objective: &NdArray,
-    target: &[usize],
-    reduction_axes: &NdArray,
-    keep_dims: bool,
-    sparse_axes: bool,
-) -> NdArray
-{
-    let mut gy = broadcast_objective.view();
+#[inline]
+pub fn normalize_negative_axes(axes: &NdArray, ndim: usize) -> Vec<usize> {
+    let mut axes_ret: Vec<usize> = Vec::with_capacity(axes.len());
+    for &axis in axes.iter() {
+        let axis = if axis < 0. {
+            (ndim as f32 + axis) as usize
+        } else {
+            axis as usize
+        };
+        axes_ret.push(axis);
+    }
+    axes_ret
+}
 
-    // convert axes_ to usize vec
-    let mut axes = axes_as_vec(reduction_axes, target.len(), sparse_axes);
-
-    // make broadcast dims
-    if !keep_dims {
-        axes.sort();
-        for &axis in axes.iter() {
-            gy = expand_dims_view(gy, axis);
+#[inline]
+pub fn sparse_to_dense(arr: &NdArray) -> Vec<usize> {
+    let mut axes: Vec<usize> = vec![];
+    for (i, &a) in arr.iter().enumerate() {
+        if a == 1. {
+            axes.push(i as usize);
         }
     }
-
-    // do broadcast
-    if let Some(gx) = gy.broadcast(target) {
-        gx.to_owned()
-    } else {
-        panic!("Broadcast failed. This is probably a bug.")
-    }
+    axes
 }
 
 #[doc(hidden)]
@@ -129,6 +107,12 @@ pub fn scalar_shape() -> NdArray
 {
     // safe unwrap
     NdArray::from_shape_vec(ndarray::IxDyn(&[0]), vec![]).unwrap()
+}
+
+#[doc(hidden)]
+#[inline]
+pub fn is_scalar_shape(shape: &[usize]) -> bool {
+    shape == &[] || shape == &[0]
 }
 
 #[doc(hidden)]
