@@ -104,6 +104,48 @@ pub struct Size;
 
 pub struct Reshape;
 
+pub struct InferBinOpShape;
+
+impl op::Op for InferBinOpShape
+{
+    fn name(&self) -> &str
+    {
+        "InferBinOpShape"
+    }
+
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
+    {
+        let xs = ctx.grab_inputs();
+        let a_shape_float = xs[0];
+        let b_shape_float = xs[1];
+        let a_shape = a_shape_float.map(|x| x.clone() as usize).into_raw_vec();
+        let b_shape = b_shape_float.map(|x| x.clone() as usize).into_raw_vec();
+        let a_is_scalar = ndarray_ext::is_scalar_shape(a_shape.as_slice());
+        let b_is_scalar = ndarray_ext::is_scalar_shape(b_shape.as_slice());
+
+        let ret = if !a_is_scalar && !b_is_scalar {
+            let a_rank = a_shape.len();
+            let b_rank = b_shape.len();
+            assert_eq!(a_rank, b_rank);
+            let max = a_shape.iter()
+                             .zip(b_shape)
+                             .map(|(a, b)| a.clone().max(b.clone()) as f32)
+                             .collect::<Vec<f32>>();
+            Ok(NdArray::from_shape_vec(ndarray::IxDyn(&[a_rank]), max).unwrap())
+        } else if !a_is_scalar {
+            Err(::errors::OpComputeErrorStatus::Delegate { to: 0 })
+        } else {
+            Err(::errors::OpComputeErrorStatus::Delegate { to: 1 })
+        };
+        vec![ret]
+    }
+
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
+        vec![None, None]
+    }
+}
+
 impl op::Op for Shape
 {
     fn name(&self) -> &str

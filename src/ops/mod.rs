@@ -461,12 +461,19 @@ pub fn identity(x: &Tensor) -> Tensor
 }
 
 #[inline]
+fn infer_bin_op_shape<T: AsRef<Tensor>, U: AsRef<Tensor>>(a: T, b: U) -> Tensor {
+    Tensor::builder()
+        .set_inputs(vec![a.as_ref(), b.as_ref()])
+        .build(array_ops::InferBinOpShape)
+}
+
+#[inline]
 fn bin_op_helper<T: ::op::Op + 'static>(a: &Tensor, b: &Tensor, op: T) -> Tensor
 {
     let ref a_shape = a.shape();
     let ref b_shape = b.shape();
     Tensor::builder()
-        .set_shape(maximum(a_shape, b_shape))
+        .set_shape(infer_bin_op_shape(a_shape, b_shape))
         .set_inputs(vec![a, b])
         .build(op)
 }
