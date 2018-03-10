@@ -293,10 +293,15 @@ impl op::Op for ArgMax
             let maxed = x.fold_axis(ndarray::Axis(axis), f32::MIN, move |&a, &b| max_fn(a, b));
             let maxed = ndarray_ext::expand_dims(maxed, axis);
             let mut mask = NdArray::zeros(x.shape());
+            let mut found = false;
             Zip::from(&mut mask)
                 .and(x)
                 .and_broadcast(&maxed)
-                .apply(|r, a, b| *r = ((a == b) as i32) as f32);
+                .apply(|r, a, b| *r = match (found, a == b) {
+                    (true, _) => 0.,
+                    (false, true) => { found = true; 1. },
+                    (false, false) => 0.,
+                });
             mask
         };
 
