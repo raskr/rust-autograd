@@ -18,6 +18,129 @@ pub struct InplaceAddOp;
 pub struct InplaceSubOp;
 pub struct InplaceMulOp;
 pub struct InplaceDivOp;
+pub struct PreprocessBinOpGrad;
+pub struct PreprocessBinOpGradGrad;
+
+impl op::Op for PreprocessBinOpGrad {
+    fn name(&self) -> &str
+    {
+        "PreprocessBinOpGradGrad"
+    }
+
+    // Computes x's gradient.
+    // Involves reduction as necessary.
+    // Inputs: [gy, target_shape]
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
+    {
+        let xs = ctx.grab_inputs();
+        let gy = xs[0];
+        let x_shape_ = ::ndarray_ext::vec_as_shape(xs[1]);
+        let x_shape = x_shape_.as_slice();
+        let gy_shape = gy.shape();
+
+        let ret = if x_shape == gy_shape {
+            // The case where forward path didn't cause broadcast.
+            Err(::errors::OpComputeErrorStatus::Delegate { to: 0 })
+        } else {
+            // Broadcast occurred. We need reduction of `gy`.
+            // First, handle the case where x is scalar.
+            let x_is_scalar = ::ndarray_ext::is_scalar_shape(x_shape);
+            let x_shape = if x_is_scalar {
+                vec![1; gy_shape.len()]
+            } else {
+                x_shape.to_vec()
+            };
+            // Reduce each dim as necessary
+            let mut folded: Option<NdArray> = None;
+            for (i, (x_axis, gy_axis)) in x_shape.iter().zip(gy_shape).enumerate() {
+                if x_axis < gy_axis  {
+                    if *x_axis == 1 {
+                        // `fold_axis` squashes the axis automatically.
+                        let axis = ndarray::Axis(if x_is_scalar { 0 } else { i });
+                        let ret = folded.as_ref()
+                                        .unwrap_or(gy)
+                                        .fold_axis(axis.clone(), 0., |a, b| a.clone() + b.clone());
+                        if x_is_scalar {
+                            mem::swap(&mut folded, &mut Some(ret));
+                        } else {
+                            // Expands squashed axis.
+                            mem::swap(&mut folded, &mut Some(::ndarray_ext::expand_dims(ret, i)));
+                        }
+                    } else {
+                        return vec![Err(::errors::OpComputeErrorStatus::BadInput(
+                            format!("{}'s axis {} don't broadcast", ctx.node.inputs[0], i)))];
+                    }
+                }
+                // case of x_axis < gy_axis: unreachable
+                // case of x_axis == gy_axis: nothing to do
+            }
+            // TODO
+            Ok(folded.unwrap())
+        };
+        vec![ret]
+    }
+
+    // Do broadcast
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
+        let x_shape = inputs[1];
+        let gx = Tensor::builder()
+            .set_inputs(vec![gy, x_shape])
+            .build(PreprocessBinOpGradGrad);
+        vec![Some(gx), None]
+    }
+}
+
+// Do broadcast.
+// Inputs: [gy, target_shape]
+impl op::Op for PreprocessBinOpGradGrad {
+    fn name(&self) -> &str
+    {
+        "BinOpGradGradCommon"
+    }
+
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
+    {
+        let xs = ctx.grab_inputs();
+        let gy = xs[0];
+        let target_shape_ = xs[1];
+        let target_shape_ = ::ndarray_ext::vec_as_shape(target_shape_);
+        let target_shape = target_shape_.as_slice();
+
+        if gy.shape() == target_shape {
+            return vec![Err(::errors::OpComputeErrorStatus::Delegate { to: 0 })];
+        }
+
+        let gy_is_scalar = ::ndarray_ext::is_scalar_shape(gy.shape());
+
+        let ret = {
+            let mut gy = gy.view();
+
+            // make broadcast dims if needed
+            if gy_is_scalar {
+                for &axis in target_shape.iter() {
+                    gy = ::ndarray_ext::expand_dims_view(gy, axis);
+                }
+            }
+
+            // do broadcast
+            if let Some(ret) = gy.broadcast(target_shape) {
+                ret.to_owned()
+            } else {
+                let msg = "Cant't broadcast.".to_string();
+                return vec![Err(::errors::OpComputeErrorStatus::BadInput(msg))];
+            }
+        };
+
+        vec![Ok(ret)]
+    }
+
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
+        let gx = Tensor::builder().set_inputs(vec![inputs[0], gy]).build(PreprocessBinOpGrad);
+        vec![Some(gx), None]
+    }
+}
 
 impl op::Op for AddOp
 {
@@ -34,7 +157,7 @@ impl op::Op for AddOp
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
-        let (gy1, gy2) = maybe_reduce_gy(inputs[0], inputs[1], gy);
+        let (gy1, gy2) = preprocess_gy(inputs[0], inputs[1], gy);
         vec![Some(gy1), Some(gy2)]
     }
 }
@@ -53,7 +176,7 @@ impl op::Op for SubOp
         let x1 = xs[1];
         let shape0: &[usize] = x0.shape();
         let ret = if shape0 == &[] {
-            // a is scalar
+            // is scalar
             let x0_elem = x0[ndarray::IxDyn(&[])];
             Ok(x1.map(move |a| x0_elem - a))
         } else {
@@ -64,7 +187,7 @@ impl op::Op for SubOp
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
-        let (gy1, gy2) = maybe_reduce_gy(inputs[0], inputs[1], gy);
+        let (gy1, gy2) = preprocess_gy(inputs[0], inputs[1], gy);
         vec![Some(gy1), Some(ops::neg(&gy2))]
     }
 }
@@ -86,7 +209,7 @@ impl op::Op for MulOp
     {
         let x0 = inputs[0];
         let x1 = inputs[1];
-        let (gy1, gy2) = maybe_reduce_gy(x0, x1, gy);
+        let (gy1, gy2) = preprocess_gy(x0, x1, gy);
         vec![Some(gy1 * x1), Some(gy2 * x0)]
     }
 }
@@ -118,7 +241,7 @@ impl op::Op for DivOp
     {
         let x0 = inputs[0];
         let x1 = inputs[1];
-        let (gy1, gy2) = maybe_reduce_gy(x0, x1, gy);
+        let (gy1, gy2) = preprocess_gy(x0, x1, gy);
         vec![Some(gy1 / x1), Some(ops::neg(x0) * ops::pow(x1, -2.) * gy2)]
     }
 }
@@ -142,7 +265,7 @@ impl op::Op for InplaceAddOp
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
-        let (gy1, gy2) = maybe_reduce_gy(inputs[0], inputs[1], gy);
+        let (gy1, gy2) = preprocess_gy(inputs[0], inputs[1], gy);
         vec![Some(gy1), Some(gy2)]
     }
 }
@@ -166,7 +289,7 @@ impl op::Op for InplaceSubOp
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
-        let (gy1, gy2) = maybe_reduce_gy(inputs[0], inputs[1], gy);
+        let (gy1, gy2) = preprocess_gy(inputs[0], inputs[1], gy);
         vec![Some(gy1), Some(ops::neg(&gy2))]
     }
 }
@@ -218,29 +341,19 @@ impl op::Op for InplaceDivOp
 }
 
 #[inline]
-// Reduce gy if broadcast occurred in the forward path
-fn maybe_reduce_gy(x0: &Tensor, x1: &Tensor, gy: &Tensor) -> (Tensor, Tensor)
-{
+// Reduce gy if broadcast occurred in the forward path.
+fn preprocess_gy(x0: &Tensor, x1: &Tensor, gy: &Tensor) -> (Tensor, Tensor) {
     let shape0 = x0.shape();
     let shape1 = x1.shape();
-    let gy_shape = gy.shape();
-    let sum0 = ops::reduction_ops::ReduceSum {
-        keep_dims:   true,
-        sparse_axes: true,
-    };
-    let sum1 = ops::reduction_ops::ReduceSum {
-        keep_dims:   true,
-        sparse_axes: true,
-    };
-    let gy1 = Tensor::builder()
-        .set_inputs(vec![gy, &ops::not_equal(&gy_shape, &shape0)])
+    let gy0 = Tensor::builder()
+        .set_inputs(vec![gy, &shape0])
         .set_shape(shape0)
-        .build(sum0);
-    let gy2 = Tensor::builder()
-        .set_inputs(vec![gy, &ops::not_equal(&gy_shape, &shape1)])
+        .build(PreprocessBinOpGrad);
+    let gy1 = Tensor::builder()
+        .set_inputs(vec![gy, &shape1])
         .set_shape(shape1)
-        .build(sum1);
-    (gy1, gy2)
+        .build(PreprocessBinOpGrad);
+    (gy0, gy1)
 }
 
 // -- std::ops::{Add, Sub, Mul, Div} implementations --

@@ -35,10 +35,11 @@ fn main()
     let ref b = ag::variable(ag::ndarray_ext::zeros(&[1, 10]));
     let ref z = ag::matmul(x, w) + b;
     let ref loss = ag::sparse_softmax_cross_entropy(z, y);
+    let ref mean_loss = ag::reduce_mean(loss, &[0, 1], false);
     let ref params = [w, b];
-    let ref grads = ag::grad(&[loss], params);
+    let ref grads = ag::grad(&[mean_loss], params);
     let ref predictions = ag::argmax(z, -1, true);
-    let ref accuracy = ag::reduce_mean(&ag::equal(predictions, y), &[0], false);
+    let ref accuracy = ag::reduce_mean(&ag::equal(predictions, y), &[0, 1], false);
     let mut adam = ag::gradient_descent_ops::Adam::default();
     let ref update_ops = adam.compute_updates(params, grads);
 

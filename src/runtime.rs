@@ -251,7 +251,8 @@ fn get_fed_resource<'a>(node: &Tensor, feeds: &Vec<&(&Tensor, &'a NdArray)>) -> 
             return feed.1;
         }
     }
-    panic!("Placeholder unfilled");
+    // panic
+    panic!("Placeholder unfilled. See backtrace.");
 }
 
 // Actually evaluates nodes "targets".

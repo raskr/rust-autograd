@@ -47,6 +47,12 @@ pub struct ArgMax
     pub keep_dim: bool,
 }
 
+pub struct ReduceGradCommon
+{
+    pub should_make_broadcast_dims:   bool,
+    pub sparse_axes: bool,
+}
+
 macro_rules! impl_reduce_forward {
     ($forward_name:ident, $reduce_fn_name:ident, $reduce_default:expr) => {
         fn $forward_name(
@@ -125,7 +131,7 @@ impl op::Op for ReduceSum
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
-        let grad_op = ops::array_ops::ReduceGrad {
+        let grad_op = ReduceGradCommon {
             should_make_broadcast_dims: !self.keep_dims,
             sparse_axes: self.sparse_axes,
         };
@@ -160,8 +166,7 @@ impl op::Op for ReduceMean
         }
 
         // Do summation
-        let sum: Result<NdArray, ::errors::OpComputeErrorStatus> =
-            compute_reduce_sum(x, axes, self.keep_dims);
+        let sum: Result<NdArray, _> = compute_reduce_sum(x, axes, self.keep_dims);
 
         // Do division
         let ret = sum.map(|mut ok| {
@@ -181,7 +186,7 @@ impl op::Op for ReduceMean
         let broadcast = Tensor::builder()
             .set_inputs(vec![gy, &inputs[0].shape(), inputs[1]])
             .build(
-                ops::array_ops::ReduceGrad {
+                ReduceGradCommon {
                     should_make_broadcast_dims: !self.keep_dims,
                     sparse_axes: self.sparse_axes,
                 }
@@ -217,7 +222,7 @@ impl op::Op for ReduceProd
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
     {
-        let grad_op = ops::array_ops::ReduceGrad {
+        let grad_op = ReduceGradCommon {
             should_make_broadcast_dims:  !self.keep_dims,
             sparse_axes: self.sparse_axes,
         };
@@ -283,11 +288,11 @@ fn min_max_grad(
     sparse_axes: bool,
 ) -> Vec<Option<Tensor>>
 {
-    let grad_op1 = ops::array_ops::ReduceGrad {
+    let grad_op1 = ReduceGradCommon {
         should_make_broadcast_dims: !keep_dims,
         sparse_axes,
     };
-    let grad_op2 = ops::array_ops::ReduceGrad {
+    let grad_op2 = ReduceGradCommon {
         should_make_broadcast_dims: !keep_dims,
         sparse_axes,
     };
@@ -384,5 +389,77 @@ impl op::Op for ArgMax
     fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         vec![None]
+    }
+}
+
+impl op::Op for ReduceGradCommon
+{
+    fn name(&self) -> &str
+    {
+        "ReduceGradCommon"
+    }
+
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
+    {
+        let xs = ctx.grab_inputs();
+        //  broadcast `gy` into `target_shape`
+        let gy = xs[0];
+        let target_shape = ndarray_ext::vec_as_shape(xs[1]);  // x's shape
+
+        if gy.shape() == target_shape.as_slice() {
+            return vec![Err(::errors::OpComputeErrorStatus::Delegate { to: 0 })];
+        }
+
+        let x_is_scalar = ndarray_ext::is_scalar_shape(gy.shape());
+
+        let ret = {
+            let mut gy_view = gy.view();
+
+            // make broadcast dims if needed
+            if self.should_make_broadcast_dims || x_is_scalar {
+                let axes = xs[2];
+
+                // convert axes to usize vec
+                let mut axes = if self.sparse_axes {
+                    ndarray_ext::sparse_to_dense(axes)
+                } else {
+                    ndarray_ext::normalize_negative_axes(axes, target_shape.len())
+                };
+
+                let mut gy_shape = gy.shape().to_vec();
+                axes.sort();
+                for &axis in axes.iter() {
+                    if axis > gy_shape.len() {
+                        return vec![Err(::errors::OpComputeErrorStatus::BadInput(
+                            "Bad gradient. You may passed non-scalar value to ag::grad?".to_string()
+                        ))];
+                    }
+                    gy_shape.insert(axis, 1);
+                }
+                gy_view = gy_view.into_shape(gy_shape).unwrap()
+            }
+
+            // do broadcast
+            if let Some(ret) = gy_view.broadcast(target_shape) {
+                ret.to_owned()
+            } else {
+                return vec![Err(::errors::OpComputeErrorStatus::BadInput(
+                    "Bad gradient. You may passed non-scalar value to ag::grad?".to_string()
+                ))];
+            }
+        };
+
+        vec![Ok(ret)]
+    }
+
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
+        let sum = ops::reduction_ops::ReduceSum {
+            keep_dims:   self.should_make_broadcast_dims,
+            sparse_axes: self.sparse_axes,
+        };
+        let axes = inputs[2];
+        let gx = Tensor::builder().set_inputs(vec![gy, axes]).build(sum);
+        vec![Some(gx), None, None]
     }
 }

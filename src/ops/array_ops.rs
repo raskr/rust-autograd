@@ -8,12 +8,6 @@ use ops;
 use std::collections::HashSet;
 use std::iter::FromIterator;
 
-pub struct ReduceGrad
-{
-    pub should_make_broadcast_dims:   bool,
-    pub sparse_axes: bool,
-}
-
 pub struct ExpandDims;
 
 pub struct Squeeze;
@@ -105,6 +99,7 @@ pub struct Size;
 pub struct Reshape;
 
 pub struct InferBinOpShape;
+
 
 impl op::Op for InferBinOpShape
 {
@@ -922,63 +917,5 @@ impl op::Op for ExpandDims
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         vec![Some(ops::squeeze(gy, inputs[1])), None]
-    }
-}
-
-impl op::Op for ReduceGrad
-{
-    fn name(&self) -> &str
-    {
-        "ReduceGrad"
-    }
-
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
-        let xs = ctx.grab_inputs();
-        let x = xs[0];
-        let target_shape = ndarray_ext::vec_as_shape(xs[1]);
-        let axes = xs[2];
-
-        // convert axes_ to usize vec
-        let mut axes = if self.sparse_axes {
-            ndarray_ext::sparse_to_dense(axes)
-        } else {
-            ndarray_ext::normalize_negative_axes(axes, target_shape.len())
-        };
-
-        let ret = {
-            let mut x = x.view();
-
-            // make broadcast dims as needed
-            if self.should_make_broadcast_dims {
-                axes.sort();
-                for &axis in axes.iter() {
-                    x = ndarray_ext::expand_dims_view(x, axis);
-                }
-            }
-
-            // do broadcast
-            println!("broadcast objective shape: {:?}", x.shape());
-            println!("dst_shape: {:?}", target_shape);
-            if let Some(ret) = x.broadcast(target_shape) {
-                ret.to_owned()
-            } else {
-                let msg = "Cant't broadcast.".to_string();
-                return vec![Err(::errors::OpComputeErrorStatus::BadInput(msg))];
-            }
-        };
-
-        vec![Ok(ret)]
-    }
-
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
-        let sum = ops::reduction_ops::ReduceSum {
-            keep_dims:   self.should_make_broadcast_dims,
-            sparse_axes: self.sparse_axes,
-        };
-        let axes = inputs[2];
-        let gx = Tensor::builder().set_inputs(vec![gy, axes]).build(sum);
-        vec![Some(gx), None, None]
     }
 }

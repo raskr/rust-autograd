@@ -1,5 +1,7 @@
 extern crate ndarray;
 
+use std::cmp::Ordering;
+use std::collections::btree_set::BTreeSet;
 use ndarray_ext::NdArray;
 use tensor::Tensor;
 
@@ -67,6 +69,56 @@ pub fn gradient_check<'a, 'b, T>(
                 );
             }
         }
+    }
+}
+
+/// Traverse a graph from endpoint "t".
+pub fn visit_once<F>(t: &Tensor, f: &mut F)
+where
+    F: FnMut(&Tensor) -> (),
+{
+    visit_once_internal(t, f, &mut BTreeSet::new())
+}
+
+
+fn visit_once_internal<'a, F>(t: &'a Tensor, f: &mut F, visited: &mut BTreeSet<&'a Tensor>)
+where
+    F: FnMut(&'a Tensor) -> (),
+{
+    if visited.contains(&t) {
+        return; // exit early
+    } else {
+        visited.insert(t); // first visit
+    }
+
+    f(&t);
+
+    for child in t.inputs.iter() {
+        visit_once_internal(child, f, visited)
+    }
+}
+
+impl<'a> Ord for &'a Tensor
+{
+    #[inline]
+    /// Compares addresses of the two tensors.
+    /// This can be used for ordering-based data structures (e.g. BinaryTree).
+    fn cmp(&self, other: &&'a Tensor) -> Ordering
+    {
+        let a = (*self) as *const Tensor;
+        let b = (*other) as *const Tensor;
+        a.cmp(&b)
+    }
+}
+
+impl<'a> PartialOrd for &'a Tensor
+{
+    #[inline]
+    /// Compares addresses of the two tensors.
+    /// This can be used for ordering-based data structures (e.g. BinaryTree).
+    fn partial_cmp(&self, other: &&'a Tensor) -> Option<Ordering>
+    {
+        Some(self.cmp(&other))
     }
 }
 

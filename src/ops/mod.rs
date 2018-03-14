@@ -461,9 +461,9 @@ pub fn identity(x: &Tensor) -> Tensor
 }
 
 #[inline]
-fn infer_bin_op_shape<T: AsRef<Tensor>, U: AsRef<Tensor>>(a: T, b: U) -> Tensor {
+fn infer_bin_op_shape<T: AsRef<Tensor>, U: AsRef<Tensor>>(shape_a: T, shape_b: U) -> Tensor {
     Tensor::builder()
-        .set_inputs(vec![a.as_ref(), b.as_ref()])
+        .set_inputs(vec![shape_a.as_ref(), shape_b.as_ref()])
         .build(array_ops::InferBinOpShape)
 }
 

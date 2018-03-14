@@ -126,7 +126,6 @@ fn expr7()
     let ref g1 = ag::grad(&[y], &[x1])[0];
     let ref g2 = ag::grad(&[y], &[x2])[0];
     let ref gg1 = ag::grad(&[g1], &[x1])[0];
-
     assert_eq!(3., g2.eval(&[])[ndarray::IxDyn(&[])]);
     assert_eq!(4., gg1.eval(&[])[ndarray::IxDyn(&[])]);
     assert_eq!(
