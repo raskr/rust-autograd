@@ -50,8 +50,10 @@ impl Tensor
 /// * `xs` - tensors with which differentiate `ys`.
 /// So the length must be same as `ys`'s.
 ///
-/// NOTE: Each objective must be a scalar (0-ranked tensor).
-/// For multi dimensional objectives, use [grad_with_default](fn.grad_with_default.html).
+/// NOTE: Each objective **must** be a scalar (0-ranked tensor); otherwise it causes **undefined**
+/// behavior.
+/// For multi dimensional objectives, do `reduce_sum`ing all dimensionality or
+/// use [grad_with_default](fn.grad_with_default.html).
 ///
 /// # Returns
 /// Symbolic gradient tensors corresponding to `xs` in the same order as `xs`
