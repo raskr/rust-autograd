@@ -1,6 +1,5 @@
 extern crate ndarray;
 
-use self::ndarray::Zip;
 use ndarray_ext;
 use ndarray_ext::NdArray;
 use op;
@@ -320,28 +319,25 @@ impl op::Op for ArgMax
     {
         let xs = ctx.grab_inputs();
         let x = xs[0];
-        let axis = if self.axis < 0 {
-            (x.ndim() as isize + self.axis) as usize
-        } else {
-            self.axis as usize
-        };
+        let axis = ndarray_ext::normalize_negative_axis(self.axis, x.ndim());
         let x_shape = x.shape();
 
         // 1. Make binary mask tensor (maximum is 1)
         let mut mask = {
             let max_fn = f32::max;
             let maxed = x.fold_axis(ndarray::Axis(axis), f32::MIN, move |&a, &b| max_fn(a, b));
-            let maxed = ndarray_ext::expand_dims(maxed, axis);
-            let mut mask = NdArray::zeros(x.shape());
-            let mut found = false;
-            Zip::from(&mut mask)
-                .and(x)
-                .and_broadcast(&maxed)
-                .apply(|r, a, b| *r = match (found, a == b) {
-                    (true, _) => 0.,
-                    (false, true) => { found = true; 1. },
-                    (false, false) => 0.,
-                });
+            let mut mask = x.clone();
+            let mut found = ndarray::Array::<bool, ndarray::IxDyn>::from_elem(maxed.shape(), false);
+            for mut sub in mask.axis_iter_mut(ndarray::Axis(axis)) {
+                ndarray::Zip::from(&mut sub)
+                    .and(&mut found)
+                    .and(&maxed)
+                    .apply(|r, f, m| {
+                        let z = r == m && !*f;
+                        *f = z;
+                        *r = (z as i32) as f32;
+                    });
+            }
             mask
         };
 

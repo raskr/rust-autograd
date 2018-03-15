@@ -12,9 +12,9 @@ fn reduce_prod()
 
 #[test]
 fn argmax() {
-    let ref x = ag::constant(ndarray::arr2(&[[3., 4.], [6., 5.]]));
-    let ref y = ag::argmax(x, 1, false);
-    assert_eq!(y.eval(&[]), ndarray::arr1(&[1., 0.]).into_dyn());
+    let ref x = ag::constant(ndarray::arr2(&[[3., 4.], [5., 6.]]));
+    let ref y = ag::argmax(x, -1, false);
+    assert_eq!(y.eval(&[]), ndarray::arr1(&[1., 1.]).into_dyn());
 }
 
 #[test]
@@ -27,7 +27,16 @@ fn argmax_with_multi_max_args() {
 #[test]
 fn reduce_mean()
 {
-    let ref v = ag::variable(array![2., 3., 4.]);
+    let ref v = ag::variable(ndarray::arr1(&[2., 3., 4.]));
     let ref z = ag::reduce_mean(v, &[0], false); // keep_dims=false
     assert_eq!(3., z.eval(&[])[ndarray::IxDyn(&[])]);
+}
+
+#[test]
+fn reduce_grad()
+{
+    let ref v = ag::variable(ndarray::arr1(&[2., 3., 4.]));
+    let ref z = ag::reduce_mean(v, &[0], false); // keep_dims=false
+    let ref g = ag::grad(&[z], &[v])[0];
+    assert_eq!(g.eval(&[]).shape(), &[3]);
 }
