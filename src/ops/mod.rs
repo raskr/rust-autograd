@@ -30,7 +30,7 @@ impl Tensor
     /// let ref a = ag::variable(ndarray::arr2(&[[2., 3.], [4., 5.]]));
     /// let ref b = a.get(2);
     ///
-    /// assert_eq!(b.eval(&[])[ndarray::IxDyn(&[])], 4.);
+    /// assert_eq!(b.eval(&[]).unwrap()[ndarray::IxDyn(&[])], 4.);
     /// ```
     pub fn get(&self, i: isize) -> Tensor
     {
@@ -79,11 +79,11 @@ impl Tensor
 /// let ref ggx = ag::grad(&[gx], &[x])[0];
 ///
 /// // evaluation of symbolic gradients
-/// assert_eq!(3., gy.eval(&[])[ndarray::IxDyn(&[])]);
-/// assert_eq!(4., ggx.eval(&[])[ndarray::IxDyn(&[])]);
+/// assert_eq!(3., gy.eval(&[]).unwrap()[ndarray::IxDyn(&[])]);
+/// assert_eq!(4., ggx.eval(&[]).unwrap()[ndarray::IxDyn(&[])]);
 ///
 /// // dz/dx requires to fill the placeholder `x`
-/// assert_eq!(8., gx.eval(&[(x, &ndarray::arr0(2.).into_dyn())])[ndarray::IxDyn(&[])]);
+/// assert_eq!(8., gx.eval(&[(x, &ndarray::arr0(2.).into_dyn())]).unwrap()[ndarray::IxDyn(&[])]);
 ///
 /// ```
 pub fn grad(ys: &[&Tensor], xs: &[&Tensor]) -> Vec<Tensor>
@@ -136,8 +136,8 @@ pub fn grad_with_default(ys: &[&Tensor], xs: &[&Tensor], output_grads: &[&Tensor
 /// let ref c = ag::matmul(a, b);
 /// let ref j = ag::jacobians(c, &[a, b], 4*3);
 ///
-/// assert_eq!(j[0].eval(&[]).shape(), &[4*3, 4*2]);
-/// assert_eq!(j[1].eval(&[]).shape(), &[4*3, 2*3]);
+/// assert_eq!(j[0].eval(&[]).unwrap().shape(), &[4*3, 4*2]);
+/// assert_eq!(j[1].eval(&[]).unwrap().shape(), &[4*3, 2*3]);
 /// ```
 pub fn jacobians(y: &Tensor, xs: &[&Tensor], objective_len: usize) -> Vec<Tensor>
 {
@@ -207,7 +207,7 @@ pub fn stop_gradient(x: &Tensor) -> Tensor
 /// let ref x: ag::Tensor = ag::variable(ndarray::arr1(&[2.]));
 /// let ref y: ag::Tensor = 3 * x;
 ///
-/// assert_eq!(6., y.eval(&[])[0]);
+/// assert_eq!(6., y.eval(&[]).unwrap()[0]);
 /// ```
 #[inline]
 pub fn variable<T>(arr: ndarray::Array<f32, T>) -> Tensor
@@ -231,7 +231,7 @@ where
 ///
 /// // Fills placeholder, then eval
 /// let arr = ndarray::arr1(&[1., 1.]).into_dyn();
-/// assert_eq!(x.eval(&[(&x, &arr.clone())]), arr);
+/// assert_eq!(x.eval(&[(&x, &arr.clone())]), Ok(arr));
 /// ```
 #[inline]
 pub fn placeholder(shape_: &[isize]) -> Tensor
@@ -259,7 +259,7 @@ pub fn placeholder(shape_: &[isize]) -> Tensor
 ///
 /// let arr = ndarray::arr1(&[0., 0., 0.]);
 /// let ref con = ag::constant(arr.clone());
-/// assert_eq!(con.eval(&[]), arr.into_dyn())
+/// assert_eq!(con.eval(&[]), Ok(arr.into_dyn()))
 /// ```
 #[inline]
 pub fn constant<T>(arr: ndarray::Array<f32, T>) -> Tensor
@@ -281,7 +281,7 @@ where
 /// let ref x = ag::zeros(&[2, 3]);
 /// let ref s = ag::shape(x);
 ///
-/// assert_eq!(&[2., 3.], s.eval(&[]).as_slice().unwrap());
+/// assert_eq!(&[2., 3.], s.eval(&[]).unwrap().as_slice().unwrap());
 /// ```
 pub fn shape(x: &Tensor) -> Tensor
 {
@@ -304,7 +304,7 @@ pub fn shape(x: &Tensor) -> Tensor
 /// let ref a = ag::zeros(&[4, 3]);
 /// let ref b = ag::size(a);
 ///
-/// assert_eq!(12., b.eval(&[])[ndarray::IxDyn(&[])]);
+/// assert_eq!(12., b.eval(&[]).unwrap()[ndarray::IxDyn(&[])]);
 /// ```
 pub fn size(x: &Tensor) -> Tensor
 {
@@ -323,7 +323,7 @@ pub fn size(x: &Tensor) -> Tensor
 /// let ref x = ag::zeros(&[2, 3, 4]);
 /// let ref r = ag::rank(x);
 ///
-/// assert_eq!(3., r.eval(&[])[ndarray::IxDyn(&[])]);
+/// assert_eq!(3., r.eval(&[]).unwrap()[ndarray::IxDyn(&[])]);
 /// ```
 pub fn rank(x: &Tensor) -> Tensor
 {
@@ -491,7 +491,7 @@ fn bin_op_helper<T: ::op::Op + 'static>(a: &Tensor, b: &Tensor, op: T) -> Tensor
 /// let ref a = ag::ones(&[2]);
 /// let ref b = ag::ones(&[2]);
 /// let ref z: ag::Tensor = a + b;
-/// assert_eq!(z.eval(&[]), ndarray::arr1(&[2., 2.]).into_dyn());
+/// assert_eq!(z.eval(&[]), Ok(ndarray::arr1(&[2., 2.]).into_dyn()));
 /// ```
 pub fn add(a: &Tensor, b: &Tensor) -> Tensor
 {
@@ -510,7 +510,7 @@ pub fn add(a: &Tensor, b: &Tensor) -> Tensor
 /// let ref b = ag::ones(&[2]);
 ///
 /// let ref z: ag::Tensor = a - b;
-/// assert_eq!(z.eval(&[]), ndarray::arr1(&[0., 0.]).into_dyn());
+/// assert_eq!(z.eval(&[]), Ok(ndarray::arr1(&[0., 0.]).into_dyn()));
 /// ```
 pub fn sub(a: &Tensor, b: &Tensor) -> Tensor
 {
@@ -529,7 +529,7 @@ pub fn sub(a: &Tensor, b: &Tensor) -> Tensor
 /// let ref a = ag::ones(&[2]);
 /// let ref b = ag::ones(&[2]);
 /// let ref z: ag::Tensor = a * b;
-/// assert_eq!(z.eval(&[]), ndarray::arr1(&[1., 1.]).into_dyn());
+/// assert_eq!(z.eval(&[]), Ok(ndarray::arr1(&[1., 1.]).into_dyn()));
 /// ```
 pub fn mul(a: &Tensor, b: &Tensor) -> Tensor
 {
@@ -547,7 +547,7 @@ pub fn mul(a: &Tensor, b: &Tensor) -> Tensor
 /// let ref a = ag::ones(&[2]);
 /// let ref b = ag::ones(&[2]);
 /// let ref z: ag::Tensor = a / b;
-/// assert_eq!(z.eval(&[]), ndarray::arr1(&[1., 1.]).into_dyn());
+/// assert_eq!(z.eval(&[]), Ok(ndarray::arr1(&[1., 1.]).into_dyn()));
 /// ```
 pub fn div(a: &Tensor, b: &Tensor) -> Tensor
 {
@@ -566,7 +566,7 @@ pub fn div(a: &Tensor, b: &Tensor) -> Tensor
 /// let ref b = ag::zeros(&[2]);
 /// let ref c = ag::mul_inplace(a, b);
 ///
-/// assert_eq!(c.eval(&[]), ndarray::arr1(&[0., 0.]).into_dyn());
+/// assert_eq!(c.eval(&[]), Ok(ndarray::arr1(&[0., 0.]).into_dyn()));
 /// ```
 pub fn mul_inplace(a: Tensor, b: &Tensor) -> Tensor
 {
@@ -586,7 +586,7 @@ pub fn mul_inplace(a: Tensor, b: &Tensor) -> Tensor
 /// let a = ag::ones(&[2]);
 /// let ref c = ag::div_inplace(a, &ag::scalar(2.));
 ///
-/// assert_eq!(c.eval(&[]), ndarray::arr1(&[0.5, 0.5]).into_dyn());
+/// assert_eq!(c.eval(&[]), Ok(ndarray::arr1(&[0.5, 0.5]).into_dyn()));
 /// ```
 pub fn div_inplace(a: Tensor, b: &Tensor) -> Tensor
 {
@@ -613,7 +613,7 @@ pub fn div_inplace(a: Tensor, b: &Tensor) -> Tensor
 /// let ref b = ag::ones(&[2]);
 /// let ref c = ag::add_inplace(a, b);
 ///
-/// assert_eq!(c.eval(&[]), ndarray::arr1(&[2., 2.]).into_dyn());
+/// assert_eq!(c.eval(&[]), Ok(ndarray::arr1(&[2., 2.]).into_dyn()));
 /// ```
 pub fn add_inplace(a: Tensor, b: &Tensor) -> Tensor
 {
@@ -640,7 +640,7 @@ pub fn add_inplace(a: Tensor, b: &Tensor) -> Tensor
 /// let ref b = ag::ones(&[2, 2]);
 /// let ref c = ag::sub_inplace(a, b);
 ///
-/// assert_eq!(c.eval(&[]), ndarray::arr2(&[[0., 0.], [0., 0.]]).into_dyn());
+/// assert_eq!(c.eval(&[]), Ok(ndarray::arr2(&[[0., 0.], [0., 0.]]).into_dyn()));
 /// ```
 pub fn sub_inplace(a: Tensor, b: &Tensor) -> Tensor
 {
@@ -695,7 +695,7 @@ pub fn exp(x: &Tensor) -> Tensor
 /// let ref a = ag::constant(ndarray::arr1(&[1., 2., 3.]));
 /// let ref b = ag::constant(ndarray::arr1(&[3., 2., 1.]));
 /// let ref c = ag::maximum(a, b);
-/// assert_eq!(c.eval(&[]), ndarray::arr1(&[3., 2., 3.]).into_dyn());
+/// assert_eq!(c.eval(&[]), Ok(ndarray::arr1(&[3., 2., 3.]).into_dyn()));
 /// ```
 pub fn maximum(a: &Tensor, b: &Tensor) -> Tensor
 {
@@ -713,7 +713,7 @@ pub fn maximum(a: &Tensor, b: &Tensor) -> Tensor
 /// let ref a = ag::constant(ndarray::arr1(&[1., 2., 3.]));
 /// let ref b = ag::constant(ndarray::arr1(&[3., 2., 1.]));
 /// let ref c = ag::minimum(a, b);
-/// assert_eq!(c.eval(&[]), ndarray::arr1(&[1., 2., 1.]).into_dyn());
+/// assert_eq!(c.eval(&[]), Ok(ndarray::arr1(&[1., 2., 1.]).into_dyn()));
 /// ```
 pub fn minimum(a: &Tensor, b: &Tensor) -> Tensor
 {
@@ -735,8 +735,8 @@ pub fn minimum(a: &Tensor, b: &Tensor) -> Tensor
 /// let ref c = ag::ones(&[2, 2]);
 /// let ref d = ag::add_n(&[a, b, c]);
 ///
-/// assert_eq!(d.eval(&[]).shape(), &[2, 2]);
-/// assert_eq!(d.eval(&[]), ndarray::arr2(&[[3., 3.], [3., 3.]]).into_dyn());
+/// assert_eq!(d.eval(&[]).as_ref().unwrap().shape(), &[2, 2]);
+/// assert_eq!(d.eval(&[]), Ok(ndarray::arr2(&[[3., 3.], [3., 3.]]).into_dyn()));
 /// ```
 pub fn add_n(xs: &[&Tensor]) -> Tensor
 {
@@ -767,7 +767,7 @@ pub fn add_n(xs: &[&Tensor]) -> Tensor
 /// let ref b = ag::constant(ndarray::arr1(&[3., 2., 1.]));
 /// let ref c = ag::equal(a, b);
 ///
-/// assert_eq!(c.eval(&[]), ndarray::arr1(&[0., 1., 0.]).into_dyn());
+/// assert_eq!(c.eval(&[]), Ok(ndarray::arr1(&[0., 1., 0.]).into_dyn()));
 /// ```
 pub fn equal(a: &Tensor, b: &Tensor) -> Tensor
 {
@@ -791,7 +791,7 @@ pub fn equal(a: &Tensor, b: &Tensor) -> Tensor
 /// let ref b = ag::constant(ndarray::arr1(&[3., 2., 1.]));
 /// let ref c = ag::not_equal(a, b);
 ///
-/// assert_eq!(c.eval(&[]), ndarray::arr1(&[1., 0., 1.]).into_dyn());
+/// assert_eq!(c.eval(&[]), Ok(ndarray::arr1(&[1., 0., 1.]).into_dyn()));
 /// ```
 pub fn not_equal(a: &Tensor, b: &Tensor) -> Tensor
 {
@@ -811,7 +811,7 @@ pub fn not_equal(a: &Tensor, b: &Tensor) -> Tensor
 /// let ref x = ag::constant(ndarray::arr2(&[[3., 4.], [6., 5.]]));
 /// let ref y = ag::argmax(x, 1, false);
 ///
-/// assert_eq!(y.eval(&[]), ndarray::arr1(&[1., 0.]).into_dyn());
+/// assert_eq!(y.eval(&[]), Ok(ndarray::arr1(&[1., 0.]).into_dyn()));
 /// ```
 pub fn argmax(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 {
@@ -829,7 +829,7 @@ pub fn argmax(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 /// let ref a = ag::zeros(&[3]);
 /// let ref b = ag::expand_dims(a, &[0, 2]);
 ///
-/// assert_eq!(b.eval(&[]).shape(), &[1, 3, 1]);
+/// assert_eq!(b.eval(&[]).unwrap().shape(), &[1, 3, 1]);
 /// ```
 pub fn expand_dims<T: ArrayLike>(x: &Tensor, axes: &T) -> Tensor
 {
@@ -849,7 +849,7 @@ pub fn expand_dims<T: ArrayLike>(x: &Tensor, axes: &T) -> Tensor
 /// let ref a = ag::zeros(&[1, 3, 1]);
 /// let ref b = ag::squeeze(a, &[0, 2]);
 ///
-/// assert_eq!(b.eval(&[]).shape(), &[3]);
+/// assert_eq!(b.eval(&[]).unwrap().shape(), &[3]);
 /// ```
 pub fn squeeze<T: ArrayLike>(x: &Tensor, axes: &T) -> Tensor
 {
@@ -873,7 +873,7 @@ pub fn squeeze<T: ArrayLike>(x: &Tensor, axes: &T) -> Tensor
 ///
 /// assert_eq!(
 ///     y.eval(&[]),
-///     ndarray::arr2(&[[2., 2.], [3., 3.], [2., 2.], [3., 3.]]).into_dyn()
+///     Ok(ndarray::arr2(&[[2., 2.], [3., 3.], [2., 2.], [3., 3.]]).into_dyn())
 /// );
 /// ```
 pub fn tile(x: &Tensor, axis: isize, num: usize) -> Tensor
@@ -891,7 +891,7 @@ pub fn tile(x: &Tensor, axis: isize, num: usize) -> Tensor
 /// let ref x = ag::constant(ndarray::arr1(&[2., 4., 6.]));
 /// let ref y = ag::clip(x, 3., 5.);
 ///
-/// assert_eq!(y.eval(&[]), ndarray::arr1(&[3., 4., 5.]).into_dyn());
+/// assert_eq!(y.eval(&[]), Ok(ndarray::arr1(&[3., 4., 5.]).into_dyn()));
 /// ```
 pub fn clip(x: &Tensor, min: f32, max: f32) -> Tensor
 {
@@ -910,7 +910,7 @@ pub fn clip(x: &Tensor, min: f32, max: f32) -> Tensor
 /// let ref x = ag::constant(ndarray::arr2(&[[2., 4.], [3., 1.]]));
 /// let ref y = ag::reduce_max(&x, &[0], false);
 ///
-/// assert_eq!(y.eval(&[]), ndarray::arr1(&[3., 4.]).into_dyn());
+/// assert_eq!(y.eval(&[]), Ok(ndarray::arr1(&[3., 4.]).into_dyn()));
 /// ```
 pub fn reduce_max<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tensor
 {
@@ -934,7 +934,7 @@ pub fn reduce_max<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tensor
 /// let ref x = ag::constant(ndarray::arr2(&[[2., 4.], [3., 1.]]));
 /// let ref y = ag::reduce_min(&x, &[0], false);
 ///
-/// assert_eq!(y.eval(&[]), ndarray::arr1(&[2., 1.]).into_dyn());
+/// assert_eq!(y.eval(&[]), Ok(ndarray::arr1(&[2., 1.]).into_dyn()));
 /// ```
 pub fn reduce_min<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tensor
 {
@@ -958,7 +958,7 @@ pub fn reduce_min<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tensor
 /// let ref x = ag::constant(ndarray::arr2(&[[2., 4.], [3., 1.]]));
 /// let ref y = ag::reduce_sum(&x, &[1], false);
 ///
-/// assert_eq!(y.eval(&[]), ndarray::arr1(&[6., 4.]).into_dyn());
+/// assert_eq!(y.eval(&[]), Ok(ndarray::arr1(&[6., 4.]).into_dyn()));
 /// ```
 pub fn reduce_sum<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tensor
 {
@@ -982,7 +982,7 @@ pub fn reduce_sum<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tensor
 /// let ref x = ag::constant(ndarray::arr2(&[[2., 4.], [3., 1.]]));
 /// let ref y = ag::reduce_mean(x, &[1], false);
 ///
-/// assert_eq!(y.eval(&[]), ndarray::arr1(&[3., 2.]).into_dyn());
+/// assert_eq!(y.eval(&[]), Ok(ndarray::arr1(&[3., 2.]).into_dyn()));
 /// ```
 pub fn reduce_mean<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tensor
 {
@@ -1013,7 +1013,7 @@ fn rectify_negative_axes(axes: &Tensor, x_rank: &Tensor) -> Tensor
 /// let ref x = ag::constant(ndarray::arr2(&[[2., 4.], [3., 1.]]));
 /// let ref y = ag::reduce_prod(&x, &[1], false);
 ///
-/// assert_eq!(y.eval(&[]), ndarray::arr1(&[8., 3.]).into_dyn());
+/// assert_eq!(y.eval(&[]), Ok(ndarray::arr1(&[8., 3.]).into_dyn()));
 /// ```
 pub fn reduce_prod<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tensor
 {
@@ -1037,7 +1037,7 @@ pub fn reduce_prod<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tenso
 /// let ref x = ag::zeros(&[3, 2, 2]);
 /// let ref y = ag::reshape(&x, &[3, -1]);
 ///
-/// assert_eq!(y.eval(&[]), ag::ndarray_ext::zeros(&[3, 4]));
+/// assert_eq!(y.eval(&[]), Ok(ag::ndarray_ext::zeros(&[3, 4])));
 /// ```
 pub fn reshape<T: ArrayLike>(x: &Tensor, shape: &T) -> Tensor
 {
@@ -1053,7 +1053,7 @@ pub fn reshape<T: ArrayLike>(x: &Tensor, shape: &T) -> Tensor
 ///
 /// let ref x = ag::zeros(&[3, 2, 2]);
 /// let ref z = ag::flatten(x);
-/// assert_eq!(z.eval(&[]).shape(), &[12]);
+/// assert_eq!(z.eval(&[]).unwrap().shape(), &[12]);
 /// ```
 pub fn flatten(x: &Tensor) -> Tensor
 {
@@ -1072,7 +1072,7 @@ pub fn flatten(x: &Tensor) -> Tensor
 /// let ref a = ag::constant(ndarray::arr1(&[-5., 4.5, 0.]));
 /// let ref b = ag::sign(a);
 /// assert_eq!(
-///     b.eval(&[]).as_slice().unwrap(),
+///     b.eval(&[]).unwrap().as_slice().unwrap(),
 ///     &[-1., 1., 0.]
 /// );
 /// ```
@@ -1093,8 +1093,8 @@ pub fn sign(a: &Tensor) -> Tensor
 /// let ref a = ag::constant(ndarray::arr1(&[-0.2, 0., 0.2]));
 /// let ref b = ag::abs(a);
 /// assert_eq!(
-///     b.eval(&[]).as_slice().unwrap(),
-///     &[0.2, 0., 0.2]
+///     b.eval(&[]),
+///     Ok(ndarray::arr1(&[0.2, 0., 0.2]).into_dyn())
 /// );
 /// ```
 pub fn abs(a: &Tensor) -> Tensor
@@ -1114,8 +1114,8 @@ pub fn abs(a: &Tensor) -> Tensor
 /// let ref a = ag::constant(ndarray::arr1(&[-1.7, -1.5, -0.2, 0.2, 1.5, 1.7, 2.0]));
 /// let ref b = ag::floor(a);
 /// assert_eq!(
-///     b.eval(&[]).as_slice().unwrap(),
-///     &[-2., -2., -1.,  0.,  1.,  1.,  2.]
+///     b.eval(&[]),
+///     Ok(ndarray::arr1(&[-2., -2., -1.,  0.,  1.,  1.,  2.]).into_dyn())
 /// );
 /// ```
 pub fn floor(a: &Tensor) -> Tensor
@@ -1135,8 +1135,8 @@ pub fn floor(a: &Tensor) -> Tensor
 /// let ref a = ag::constant(ndarray::arr1(&[2., 3.]));
 /// let ref b = ag::neg(a);
 /// assert_eq!(
-///     b.eval(&[]).as_slice().unwrap(),
-///     &[-2., -3.]
+///     b.eval(&[]),
+///     Ok(ndarray::arr1(&[-2., -3.]).into_dyn())
 /// );
 /// ```
 pub fn neg(a: &Tensor) -> Tensor
@@ -1156,8 +1156,8 @@ pub fn neg(a: &Tensor) -> Tensor
 /// let ref a = ag::constant(ndarray::arr1(&[2., 3.]));
 /// let ref b = ag::square(a);
 /// assert_eq!(
-///     b.eval(&[]).as_slice().unwrap(),
-///     &[4., 9.]
+///     b.eval(&[]),
+///     Ok(ndarray::arr1(&[4., 9.]).into_dyn())
 /// );
 /// ```
 pub fn square(a: &Tensor) -> Tensor
@@ -1177,8 +1177,8 @@ pub fn square(a: &Tensor) -> Tensor
 /// let ref a = ag::constant(ndarray::arr1(&[2.]));
 /// let ref b = ag::reciprocal(a);
 /// assert_eq!(
-///     b.eval(&[]).as_slice().unwrap(),
-///     &[0.5]
+///     b.eval(&[]),
+///     Ok(ndarray::arr1(&[0.5]).into_dyn())
 /// );
 /// ```
 pub fn reciprocal(x: &Tensor) -> Tensor
@@ -1198,8 +1198,8 @@ pub fn reciprocal(x: &Tensor) -> Tensor
 /// let ref a = ag::constant(ndarray::arr1(&[-1.7, -1.5, -0.2, 0.2, 1.5, 1.7, 2.0]));
 /// let ref b = ag::ceil(a);
 /// assert_eq!(
-///     b.eval(&[]).as_slice().unwrap(),
-///     &[-1., -1., -0.,  1.,  2.,  2.,  2.]
+///     b.eval(&[]),
+///     Ok(ndarray::arr1(&[-1., -1., -0.,  1.,  2.,  2.,  2.]).into_dyn())
 /// );
 /// ```
 pub fn ceil(a: &Tensor) -> Tensor
@@ -1400,7 +1400,7 @@ pub fn sparse_softmax_cross_entropy(y: &Tensor, t: &Tensor) -> Tensor
 /// let ref b = ag::zeros(&[2, 3]);
 /// let ref c = ag::matmul(a, b);
 ///
-/// assert_eq!(c.eval(&[]).shape(), &[4, 3]);
+/// assert_eq!(c.eval(&[]).unwrap().shape(), &[4, 3]);
 /// ```
 pub fn matmul(a: &Tensor, b: &Tensor) -> Tensor
 {
@@ -1425,7 +1425,7 @@ pub fn matmul(a: &Tensor, b: &Tensor) -> Tensor
 /// let ref b = ag::zeros(&[2, 3]);
 /// let ref c = ag::matmul_t(a, b, true, false);
 ///
-/// assert_eq!(c.eval(&[]).shape(), &[4, 3]);
+/// assert_eq!(c.eval(&[]).unwrap().shape(), &[4, 3]);
 /// ```
 pub fn matmul_t(a: &Tensor, b: &Tensor, transpose_a: bool, transpose_b: bool) -> Tensor
 {
@@ -1455,7 +1455,7 @@ pub fn matmul_t(a: &Tensor, b: &Tensor, transpose_a: bool, transpose_b: bool) ->
 /// let ref a = ag::zeros(&[3, 4, 5]);
 /// let ref b = ag::zeros(&[4, 3, 2]);
 /// let ref c = ag::tensordot(a, b, &[1, 0], &[0, 1]);
-/// assert_eq!(c.eval(&[]).shape(), &[5, 2]);
+/// assert_eq!(c.eval(&[]).unwrap().shape(), &[5, 2]);
 /// ```
 ///
 /// For detailed description,
@@ -1508,7 +1508,7 @@ pub fn tensordot<T: ArrayLike>(a: &Tensor, b: &Tensor, a_axes: &T, b_axes: &T) -
 /// let ref b = ag::zeros(&[2, 3, 2, 3]);
 /// let ref c = ag::batch_matmul(a, b);
 ///
-/// assert_eq!(c.eval(&[]).shape(), &[2, 3, 4, 3]);
+/// assert_eq!(c.eval(&[]).unwrap().shape(), &[2, 3, 4, 3]);
 /// ```
 ///
 /// For detailed description, see https://www.tensorflow.org/api_docs/python/tf/matmul
@@ -1533,7 +1533,10 @@ pub fn batch_matmul(a: &Tensor, b: &Tensor) -> Tensor
 /// let ref b = ag::constant(ndarray::arr2(&[[2., 3.], [1., 4.]]));
 /// let ref c = ag::setdiff1d(a, b);
 ///
-/// assert_eq!(c.eval(&[]).as_slice().unwrap(), &[5., 6.])
+/// assert_eq!(
+///     c.eval(&[]),
+///     Ok(ndarray::arr1(&[5., 6.]).into_dyn())
+/// )
 /// ```
 ///
 pub fn setdiff1d(a: &Tensor, b: &Tensor) -> Tensor
@@ -1550,7 +1553,7 @@ pub fn setdiff1d(a: &Tensor, b: &Tensor) -> Tensor
 /// let ref a = ag::zeros(&[1, 2, 3, 4, 5]);
 /// let ref b = ag::transpose(a, &[4, 2, 3, 0, 1]);
 ///
-/// assert_eq!(b.eval(&[]).shape(), &[5, 3, 4, 1, 2]);
+/// assert_eq!(b.eval(&[]).unwrap().shape(), &[5, 3, 4, 1, 2]);
 /// ```
 pub fn transpose<T: ArrayLike>(x: &Tensor, perm: &T) -> Tensor
 {
@@ -1574,10 +1577,13 @@ pub fn transpose<T: ArrayLike>(x: &Tensor, perm: &T) -> Tensor
 /// let ref b = ag::split(a, &[2, 3, 2], 1);
 ///
 /// let evaluated = ag::eval(&[&b[0], &b[1], &b[2]], &[]);
+/// let e0 = &evaluated[0];
+/// let e1 = &evaluated[1];
+/// let e2 = &evaluated[2];
 ///
-/// assert_eq!(evaluated[0].shape(), &[3, 2, 5]);
-/// assert_eq!(evaluated[1].shape(), &[3, 3, 5]);
-/// assert_eq!(evaluated[2].shape(), &[3, 2, 5]);
+/// assert_eq!(e0.as_ref().unwrap().shape(), &[3, 2, 5]);
+/// assert_eq!(e1.as_ref().unwrap().shape(), &[3, 3, 5]);
+/// assert_eq!(e2.as_ref().unwrap().shape(), &[3, 2, 5]);
 /// ```
 pub fn split(x: &Tensor, sizes: &[usize], axis: isize) -> Vec<Tensor>
 {
@@ -1607,7 +1613,7 @@ pub fn split(x: &Tensor, sizes: &[usize], axis: isize) -> Vec<Tensor>
 /// let ref a = ag::zeros(&[4, 4]);
 /// let ref b = ag::slice(a, &[0, 0], &[-1, 2]); // numpy equivalent is a[:, 0:2]
 ///
-/// assert_eq!(b.eval(&[]).shape(), &[4, 2]);
+/// assert_eq!(b.eval(&[]).unwrap().shape(), &[4, 2]);
 /// ```
 pub fn slice(x: &Tensor, starts: &[isize], ends: &[isize]) -> Tensor
 {
@@ -1637,7 +1643,7 @@ pub fn slice(x: &Tensor, starts: &[isize], ends: &[isize]) -> Tensor
 /// let ref c = ag::zeros(&[3, 2]);
 /// let ref d = ag::concat(&[a, b, c], 0);
 ///
-/// assert_eq!(d.eval(&[]).shape(), &[9, 2]);
+/// assert_eq!(d.eval(&[]).unwrap().shape(), &[9, 2]);
 /// ```
 pub fn concat(tensors: &[&Tensor], axis: isize) -> Tensor
 {
@@ -1663,7 +1669,7 @@ pub fn concat(tensors: &[&Tensor], axis: isize) -> Tensor
 /// let ref indices = ag::constant(ndarray::arr2(&[[5., -1., 3.], [2., 1., -2.]]));
 /// let ref y = ag::gather_common(param, indices, 2);
 ///
-/// assert_eq!(y.eval(&[]).shape(), &[5, 4, 2, 3, 2])
+/// assert_eq!(y.eval(&[]).unwrap().shape(), &[5, 4, 2, 3, 2])
 /// ```
 pub fn gather_common<T: ArrayLike>(param: &Tensor, indices: &T, axis: isize) -> Tensor
 {
@@ -1689,7 +1695,7 @@ pub fn gather_common<T: ArrayLike>(param: &Tensor, indices: &T, axis: isize) -> 
 /// let ref indices = ag::constant(ndarray::arr2(&[[5., 4., 3.], [2., 1., 0.]]));
 /// let ref y = ag::gather(param, indices, 2);
 ///
-/// assert_eq!(y.eval(&[]).shape(), &[5, 4, 2, 3, 2])
+/// assert_eq!(y.eval(&[]).unwrap().shape(), &[5, 4, 2, 3, 2])
 /// ```
 pub fn gather<T: ArrayLike>(param: &Tensor, indices: &T, axis: isize) -> Tensor
 {
@@ -1710,8 +1716,10 @@ pub fn gather<T: ArrayLike>(param: &Tensor, indices: &T, axis: isize) -> Tensor
 /// let ref y2 = ag::normalize(x, &[0]);
 ///
 /// let evaluated = ag::eval(&[y1, y2], &[]);
-/// assert_eq!(&[3, 4], evaluated[0].shape());
-/// assert_eq!(&[3, 4], evaluated[1].shape());
+/// let e0 = &evaluated[0];
+/// let e1 = &evaluated[1];
+/// assert_eq!(e0.as_ref().unwrap().shape(), &[3, 4]);
+/// assert_eq!(e1.as_ref().unwrap().shape(), &[3, 4]);
 /// ```
 pub fn normalize<T: ArrayLike>(x: &Tensor, axes: &T) -> Tensor
 {
@@ -1737,7 +1745,7 @@ pub fn normalize<T: ArrayLike>(x: &Tensor, axes: &T) -> Tensor
 /// let ref shift = ag::variable(ag::ndarray_ext::zeros(&[1, 4]));
 /// let ref norm = ag::batch_norm(x, scale, shift);
 ///
-/// assert_eq!(norm.eval(&[]).shape(), &[3, 4]);
+/// assert_eq!(norm.eval(&[]).unwrap().shape(), &[3, 4]);
 /// ```
 pub fn batch_norm(x: &Tensor, scale: &Tensor, shift: &Tensor) -> Tensor
 {
@@ -1889,7 +1897,7 @@ pub fn log_normal_rng<T: ArrayLike, R: Rng + 'static>(arr_rng: ArrRng<R>, shape:
 ///
 /// let arr = ndarray::arr1(&[2., 3.]);
 /// let tensor = ag::convert_to_tensor(arr.clone());
-/// assert_eq!(tensor.eval(&[]), arr.into_dyn());
+/// assert_eq!(tensor.eval(&[]), Ok(arr.into_dyn()));
 /// ```
 pub fn convert_to_tensor<T>(arr: ndarray::Array<f32, T>) -> Tensor
 where
@@ -1914,7 +1922,7 @@ where
 /// extern crate autograd as ag;
 ///
 /// let a = ag::zeros(&[4, 2]);
-/// assert_eq!(a.eval(&[]), ndarray::Array2::<f32>::zeros((4, 2)).into_dyn());
+/// assert_eq!(a.eval(&[]), Ok(ndarray::Array2::<f32>::zeros((4, 2)).into_dyn()));
 /// ```
 pub fn zeros<T: ArrayLike>(shape: &T) -> Tensor
 {
@@ -1930,7 +1938,7 @@ pub fn zeros<T: ArrayLike>(shape: &T) -> Tensor
 /// extern crate autograd as ag;
 ///
 /// let a = ag::ones(&[4, 2]);
-/// assert_eq!(a.eval(&[]), ndarray::Array2::<f32>::from_elem((4, 2), 1.).into_dyn());
+/// assert_eq!(a.eval(&[]), Ok(ndarray::Array2::<f32>::from_elem((4, 2), 1.).into_dyn()));
 /// ```
 pub fn ones<T: ArrayLike>(shape: &T) -> Tensor
 {
@@ -1952,7 +1960,7 @@ pub fn ones<T: ArrayLike>(shape: &T) -> Tensor
 /// let ref step = ag::scalar(1.);
 /// let ref z = ag::range(start, end, step);
 ///
-/// assert_eq!(z.eval(&[]), ndarray::Array1::range(0., 5., 1.).into_dyn());
+/// assert_eq!(z.eval(&[]), Ok(ndarray::Array1::range(0., 5., 1.).into_dyn()));
 /// ```
 pub fn range<T: ArrayLike>(start: &T, end: &T, step: &T) -> Tensor
 {

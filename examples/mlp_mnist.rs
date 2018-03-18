@@ -64,7 +64,7 @@ fn main()
 
     // -- test --
     println!(
-        "test accuracy: {}",
+        "test accuracy: {:?}",
         accuracy.eval(&[(x, &x_test), (y, &y_test)])
     );
 }

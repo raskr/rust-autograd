@@ -18,10 +18,10 @@ impl ::op::Op for AdamOp
         "Adam"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
+    fn compute(&self, mut ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let StaticParams { alpha, eps, b1, b2 } = self.static_params;
-        let mut xs = unsafe { ctx.grab_assignable_inputs() };
+        let xs = unsafe { ctx.grab_assignable_inputs() };
 
         // Make new m
         let new_m = {

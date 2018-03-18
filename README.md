@@ -27,11 +27,11 @@ let ref gx = ag::grad(&[z], &[x])[0];
 let ref ggx = ag::grad(&[gx], &[x])[0];
 
 // evaluation of symbolic gradients
-println!("{}", gy.eval(&[]));   // => 3.
-println!("{}", ggx.eval(&[]));  // => 4.
+println!("{:?}", gy.eval(&[]));   // => Ok(3.)
+println!("{:?}", ggx.eval(&[]));  // => Ok(4.)
 
 // dz/dx requires to fill the placeholder `x`
-println!("{}", gx.eval(&[(x, &ag::ndarray::arr0(2.))]));  // => 8.
+println!("{:?}", gx.eval(&[(x, &ag::ndarray::arr0(2.))]));  // => Ok(8.)
 ```
 
 Another example: multi layer perceptron for MNIST digits classification.

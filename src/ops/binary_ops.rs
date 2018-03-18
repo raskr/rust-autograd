@@ -253,13 +253,12 @@ impl op::Op for InplaceAddOp
         "InplaceAdd"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
+    fn compute(&self, mut ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
-        let mut xs = unsafe { ctx.grab_assignable_inputs() };
+        let xs = unsafe { ctx.grab_assignable_inputs() };
         // safe transmute probably
         let x1: &&NdArray = unsafe { mem::transmute(&mut xs[1]) };
-        let x0 = &mut xs[0];
-        x0.zip_mut_with(x1, |a, &b| *a += b);
+        xs[0].zip_mut_with(x1, |a, &b| *a += b);
         vec![Err(::errors::OpComputeErrorStatus::Delegate { to: 0 })]
     }
 
@@ -277,13 +276,12 @@ impl op::Op for InplaceSubOp
         "InplaceSub"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
+    fn compute(&self, mut ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
-        let mut xs = unsafe { ctx.grab_assignable_inputs() };
+        let xs = unsafe { ctx.grab_assignable_inputs() };
         // safe transmute probably
         let x1: &&NdArray = unsafe { mem::transmute(&mut xs[1]) };
-        let x0 = &mut xs[0];
-        x0.zip_mut_with(x1, |a, &b| *a -= b);
+        xs[0].zip_mut_with(x1, |a, &b| *a -= b);
         vec![Err(::errors::OpComputeErrorStatus::Delegate { to: 0 })]
     }
 
@@ -301,13 +299,12 @@ impl op::Op for InplaceMulOp
         "InplaceMul"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
+    fn compute(&self, mut ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
-        let mut xs = unsafe { ctx.grab_assignable_inputs() };
+        let xs = unsafe { ctx.grab_assignable_inputs() };
         // safe transmute probably
         let x1: &&NdArray = unsafe { mem::transmute(&mut xs[1]) };
-        let x0 = &mut xs[0];
-        x0.zip_mut_with(x1, |a, &b| *a *= b);
+        xs[0].zip_mut_with(x1, |a, &b| *a *= b);
         vec![Err(::errors::OpComputeErrorStatus::Delegate { to: 0 })]
     }
 
@@ -324,13 +321,12 @@ impl op::Op for InplaceDivOp
         "InplaceDiv"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
+    fn compute(&self, mut ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
-        let mut xs = unsafe { ctx.grab_assignable_inputs() };
+        let xs = unsafe { ctx.grab_assignable_inputs() };
         // safe transmute probably
         let x1: &&NdArray = unsafe { mem::transmute(&mut xs[1]) };
-        let x0 = &mut xs[0];
-        x0.zip_mut_with(x1, |a, &b| *a /= b);
+        xs[0].zip_mut_with(x1, |a, &b| *a /= b);
         vec![Err(::errors::OpComputeErrorStatus::Delegate { to: 0 })]
     }
 

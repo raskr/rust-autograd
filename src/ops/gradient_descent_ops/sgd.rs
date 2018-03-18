@@ -14,9 +14,9 @@ impl ::op::Op for SGDOp
         "SGD"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
+    fn compute(&self, mut ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
-        let mut xs = unsafe { ctx.grab_assignable_inputs() };
+        let xs = unsafe { ctx.grab_assignable_inputs() };
         let updates = {
             let grad: &NdArray = xs[1];
             grad * self.lr

@@ -42,7 +42,7 @@ pub fn gradient_check<'a, 'b, T>(
             }
 
             // eval
-            let ref obj_pos = ::runtime::eval(&[objective], feeds)[0];
+            let obj_pos = objective.eval(feeds).unwrap();
 
             // perturbation (-)
             unsafe {
@@ -50,7 +50,7 @@ pub fn gradient_check<'a, 'b, T>(
             }
 
             // eval
-            let ref obj_neg = ::runtime::eval(&[objective], feeds)[0];
+            let obj_neg = objective.eval(feeds).unwrap();
 
             // restore
             unsafe {
@@ -58,7 +58,7 @@ pub fn gradient_check<'a, 'b, T>(
             }
 
             let g_num = (obj_pos - obj_neg).scalar_sum() / (2. * eps);
-            let g_th = unsafe { *th_grad.as_ptr().offset(i) };
+            let g_th = unsafe { *th_grad.as_ref().unwrap().as_ptr().offset(i) };
 
             // compare
             let diff = (g_num - g_th).abs();
