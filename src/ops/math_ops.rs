@@ -98,14 +98,14 @@ macro_rules! impl_cmp_op {
                 } else {
                     // case that scalar is not involved
                     // Check the input ranks.
-                    // Errors couldn't we catch here cause ndarray's panics.
+                    // op couldn't we catch here cause ndarray's panics.
                     if shape0.len() != shape1.len() {
                         let name0 = &ctx.node.inputs[0].op.name();
                         let name1 = &ctx.node.inputs[1].op.name();
                         let msg = format!(
                             "Tensor ranks mismatch: {}({}) vs {}({})",
                             shape0.len(), name0, shape1.len(), name1);
-                        return vec![Err(::errors::OpComputeErrorStatus::BadInput(msg))];
+                        return vec![Err(::op::ComputeError::BadInput(msg))];
                     }
 
                     let size0: usize = shape0.iter().product();

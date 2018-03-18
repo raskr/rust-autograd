@@ -62,7 +62,7 @@ fn _grab_input_arrays<'a, 'b: 'a>(node: &'b Tensor,
             match store[x.resource_lookup_key.get()].value[value_index] {
                 Ok(ref a) => Some(a),
                 // hoping for x.inputs[i] to have the value
-                Err(::errors::OpComputeErrorStatus::Delegate { to: i }) => {
+                Err(::op::ComputeError::Delegate { to: i }) => {
                     find_array_of(&x.inputs[i], store, feed_store, x.input_indices[i])
                 },
                 _ => None,  // None for hopeless errors
@@ -216,7 +216,7 @@ where
 fn find_resource_creator<'a, 'b>(storage: &ResourceStore, x: &'b Tensor) -> &'b Tensor
 {
     match storage[x.resource_lookup_key.get()].value[0] {
-        Err(::OpComputeErrorStatus::Delegate { to: i }) => {
+        Err(::op::ComputeError::Delegate { to: i }) => {
             find_resource_creator(storage, &x.inputs[i])
         }
         _ => x
@@ -226,16 +226,16 @@ fn find_resource_creator<'a, 'b>(storage: &ResourceStore, x: &'b Tensor) -> &'b 
 type EvalResult = Result<NdArray, EvaluationError>;
 
 #[inline]
-fn map_err<'a>(res: Result<NdArray, ::errors::OpComputeErrorStatus>,
+fn map_err<'a>(res: Result<NdArray, ::op::ComputeError>,
                node: &'a Tensor) -> EvalResult {
     match res {
         Ok(arr) => Ok(arr),
-        Err(::OpComputeErrorStatus::BadInput(ref msg)) =>
+        Err(::op::ComputeError::BadInput(ref msg)) =>
             Err(EvaluationError::ComputeFailed {
                 node_name: node.op.name().to_string(),
                 msg: msg.to_string() }
             ),
-        Err(::OpComputeErrorStatus::NoOutput) => Err(EvaluationError::NoOutput),
+        Err(::op::ComputeError::NoOutput) => Err(EvaluationError::NoOutput),
         _ => unreachable!()
     }
 }
@@ -281,7 +281,7 @@ fn eval_internal<'a>(
                     let y = if let Some(xs) = _grab_input_arrays(node, &resource_store, &feed_store) {
                         node.op.compute(OpComputeContext { node, xs })
                     } else {
-                        vec![Err(::errors::OpComputeErrorStatus::Delegate {to: 0})]
+                        vec![Err(::op::ComputeError::Delegate {to: 0})]
                     };
                     resource_store.push(node.with_value(y));
                 }
@@ -347,7 +347,7 @@ fn test_eval()
     let ref v = ::ops::placeholder(&[3, 2, 1]);
     let ref z = ::ops::reduce_sum(&::ops::squeeze(v, &[2]), &[0, 1], false);
     let ref g = ::ops::grad(&[z], &[v]);
-    let mut eval_result = &eval(g, &[(v, &::ndarray_ext::ones(&[3, 2, 1]))])[0];
+    let eval_result = &eval(g, &[(v, &::ndarray_ext::ones(&[3, 2, 1]))])[0];
     assert_eq!(eval_result.as_ref().unwrap().shape(), &[3, 2, 1]);
 }
 

@@ -150,7 +150,7 @@ impl op::Op for Identity
     fn compute(&self, _: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         // do nothing
-        vec![Err(::OpComputeErrorStatus::Delegate { to: 0 })]
+        vec![Err(::op::ComputeError::Delegate { to: 0 })]
     }
 
     fn grad(&self, gy: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>

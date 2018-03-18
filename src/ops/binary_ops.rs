@@ -40,7 +40,7 @@ impl op::Op for PreprocessBinOpGrad {
 
         let ret = if x_shape == gy_shape {
             // The case where forward path didn't cause broadcast.
-            Err(::errors::OpComputeErrorStatus::Delegate { to: 0 })
+            Err(::op::ComputeError::Delegate { to: 0 })
         } else {
             // Broadcast occurred. We need reduction of `gy`.
             // First, handle the case where x is scalar.
@@ -67,7 +67,7 @@ impl op::Op for PreprocessBinOpGrad {
                             mem::swap(&mut folded, &mut Some(::ndarray_ext::expand_dims(ret, i)));
                         }
                     } else {
-                        return vec![Err(::errors::OpComputeErrorStatus::BadInput(
+                        return vec![Err(::op::ComputeError::BadInput(
                             format!("{}'s axis {} don't broadcast", ctx.node.inputs[0], i)))];
                     }
                 }
@@ -108,7 +108,7 @@ impl op::Op for PreprocessBinOpGradGrad {
         let target_shape = target_shape_.as_slice();
 
         if gy.shape() == target_shape {
-            return vec![Err(::errors::OpComputeErrorStatus::Delegate { to: 0 })];
+            return vec![Err(::op::ComputeError::Delegate { to: 0 })];
         }
 
         let gy_is_scalar = ::ndarray_ext::is_scalar_shape(gy.shape());
@@ -128,7 +128,7 @@ impl op::Op for PreprocessBinOpGradGrad {
                 ret.to_owned()
             } else {
                 let msg = "Cant't broadcast.".to_string();
-                return vec![Err(::errors::OpComputeErrorStatus::BadInput(msg))];
+                return vec![Err(::op::ComputeError::BadInput(msg))];
             }
         };
 
@@ -259,7 +259,7 @@ impl op::Op for InplaceAddOp
         // safe transmute probably
         let x1: &&NdArray = unsafe { mem::transmute(&mut xs[1]) };
         xs[0].zip_mut_with(x1, |a, &b| *a += b);
-        vec![Err(::errors::OpComputeErrorStatus::Delegate { to: 0 })]
+        vec![Err(::op::ComputeError::Delegate { to: 0 })]
     }
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
@@ -282,7 +282,7 @@ impl op::Op for InplaceSubOp
         // safe transmute probably
         let x1: &&NdArray = unsafe { mem::transmute(&mut xs[1]) };
         xs[0].zip_mut_with(x1, |a, &b| *a -= b);
-        vec![Err(::errors::OpComputeErrorStatus::Delegate { to: 0 })]
+        vec![Err(::op::ComputeError::Delegate { to: 0 })]
     }
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
@@ -305,7 +305,7 @@ impl op::Op for InplaceMulOp
         // safe transmute probably
         let x1: &&NdArray = unsafe { mem::transmute(&mut xs[1]) };
         xs[0].zip_mut_with(x1, |a, &b| *a *= b);
-        vec![Err(::errors::OpComputeErrorStatus::Delegate { to: 0 })]
+        vec![Err(::op::ComputeError::Delegate { to: 0 })]
     }
 
     fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
@@ -327,7 +327,7 @@ impl op::Op for InplaceDivOp
         // safe transmute probably
         let x1: &&NdArray = unsafe { mem::transmute(&mut xs[1]) };
         xs[0].zip_mut_with(x1, |a, &b| *a /= b);
-        vec![Err(::errors::OpComputeErrorStatus::Delegate { to: 0 })]
+        vec![Err(::op::ComputeError::Delegate { to: 0 })]
     }
 
     fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>

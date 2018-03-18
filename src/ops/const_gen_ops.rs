@@ -118,7 +118,7 @@ impl op::Op for Range
         let true_shape = &[];
         if x0.shape() != true_shape || x1.shape() != true_shape || x2.shape() != true_shape {
             return vec![
-                Err(::OpComputeErrorStatus::BadInput(
+                Err(::op::ComputeError::BadInput(
                     "Inputs to `range` should be 0-ranked tensors".to_string(),
                 )),
             ];
@@ -130,7 +130,7 @@ impl op::Op for Range
 
         if start > end {
             return vec![
-                Err(::OpComputeErrorStatus::BadInput(
+                Err(::op::ComputeError::BadInput(
                     "Start and end of `range` is wrong.".to_string(),
                 )),
             ];

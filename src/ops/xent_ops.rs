@@ -54,7 +54,7 @@ impl op::Op for SigmoidCrossEntropy
 
         if x.shape() != t.shape() {
             return vec![
-                Err(::OpComputeErrorStatus::BadInput(
+                Err(::op::ComputeError::BadInput(
                     "x.shape must match t.shape".to_string(),
                 )),
             ];
@@ -100,7 +100,7 @@ impl op::Op for SparseSoftmaxCrossEntropy
         {
             if log_x.ndim() != 2 {
                 return vec![
-                    Err(::OpComputeErrorStatus::BadInput(format!(
+                    Err(::op::ComputeError::BadInput(format!(
                         "Bad first argument's shape {:?}",
                         log_x.shape()
                     ))),
@@ -112,7 +112,7 @@ impl op::Op for SparseSoftmaxCrossEntropy
             if t_rank == 2 {
                 if t_shape[1] != 1 {
                     return vec![
-                        Err(::OpComputeErrorStatus::BadInput(format!(
+                        Err(::op::ComputeError::BadInput(format!(
                             "Bad second argument's shape {:?}",
                             t_shape
                         ))),
@@ -120,7 +120,7 @@ impl op::Op for SparseSoftmaxCrossEntropy
                 }
             } else if t_rank != 1 {
                 return vec![
-                    Err(::OpComputeErrorStatus::BadInput(format!(
+                    Err(::op::ComputeError::BadInput(format!(
                         "Bad second argument's shape {:?}",
                         t_shape
                     ))),
@@ -207,14 +207,14 @@ impl op::Op for SoftmaxCrossEntropy
 
         if log_x.ndim() != 2 {
             return vec![
-                Err(::OpComputeErrorStatus::BadInput(
+                Err(::op::ComputeError::BadInput(
                     "x must be 2-ranked tensor".to_string(),
                 )),
             ];
         }
         if t.ndim() != 2 {
             return vec![
-                Err(::OpComputeErrorStatus::BadInput(
+                Err(::op::ComputeError::BadInput(
                     "t must be 2-ranked tensor".to_string(),
                 )),
             ];

@@ -37,14 +37,14 @@ impl op::Op for MatMul
         let x1_shape = x1.shape();
         if x0_shape.len() != 2 {
             return vec![
-                Err(::OpComputeErrorStatus::BadInput(
+                Err(::op::ComputeError::BadInput(
                     "First input to the matmul should be Matrix".to_string(),
                 )),
             ];
         }
         if x1_shape.len() != 2 {
             return vec![
-                Err(::OpComputeErrorStatus::BadInput(
+                Err(::op::ComputeError::BadInput(
                     "Second input to the matmul should be Matrix".to_string(),
                 )),
             ];
@@ -104,7 +104,7 @@ impl op::Op for BatchMatMul
 
         if rank0 != rank1 || shape0[..rank0 - 2] != shape1[..rank0 - 2] {
             return vec![
-                Err(::OpComputeErrorStatus::BadInput(format!(
+                Err(::op::ComputeError::BadInput(format!(
                     "Input shape mismatch: {:?} vs {:?}",
                     shape0, shape1
                 ))),

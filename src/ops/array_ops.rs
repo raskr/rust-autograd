@@ -128,9 +128,9 @@ impl op::Op for InferBinOpShape
                              .collect::<Vec<f32>>();
             Ok(NdArray::from_shape_vec(ndarray::IxDyn(&[a_rank]), max).unwrap())
         } else if !a_is_scalar {
-            Err(::errors::OpComputeErrorStatus::Delegate { to: 0 })
+            Err(::op::ComputeError::Delegate { to: 0 })
         } else {
-            Err(::errors::OpComputeErrorStatus::Delegate { to: 1 })
+            Err(::op::ComputeError::Delegate { to: 1 })
         };
         vec![ret]
     }
@@ -228,7 +228,7 @@ impl op::Op for Reshape
         let ret = if let Ok(a) = ret.into_shape(ndarray::IxDyn(target.as_slice())) {
             Ok(a)
         } else {
-            Err(::OpComputeErrorStatus::BadInput(
+            Err(::op::ComputeError::BadInput(
                 "Shape incompatible".to_string(),
             ))
         };
@@ -301,7 +301,7 @@ impl op::Op for IndexOp
         let ret = if let Some(ret) = flat_x.get(i) {
             Ok(ndarray::arr0(*ret).into_dyn())
         } else {
-            Err(::OpComputeErrorStatus::BadInput(
+            Err(::op::ComputeError::BadInput(
                 "Index out of bounds".to_string(),
             ))
         };
@@ -348,7 +348,7 @@ impl op::Op for IndexOpGrad
             *a = gy[ndarray::IxDyn(&[])];
         } else {
             return vec![
-                Err(::OpComputeErrorStatus::BadInput(
+                Err(::op::ComputeError::BadInput(
                     "Index out of bounds".to_string(),
                 )),
             ];
@@ -490,7 +490,7 @@ impl op::Op for AddN
         let ret = if 0 == xs.len() {
             unreachable!()
         } else if 1 == xs.len() {
-            Err(::OpComputeErrorStatus::Delegate { to: 0 })
+            Err(::op::ComputeError::Delegate { to: 0 })
         } else if 2 == xs.len() {
             Ok(xs[0] + xs[1])
         } else {
@@ -584,7 +584,7 @@ impl op::Op for Concat
         let ret = if let Ok(y) = ndarray::stack(ndarray::Axis(axis), views.as_slice()) {
             Ok(y)
         } else {
-            Err(::OpComputeErrorStatus::BadInput(
+            Err(::op::ComputeError::BadInput(
                 "Can't concat arrays whose shapes are incompatible.".to_string(),
             ))
         };
@@ -686,7 +686,7 @@ impl op::Op for Tile
         let ret = if let Ok(ret) = ndarray::stack(ndarray::Axis(axis), views.as_slice()) {
             Ok(ret)
         } else {
-            Err(::OpComputeErrorStatus::BadInput(
+            Err(::op::ComputeError::BadInput(
                 "Input shapes incompatible".to_string(),
             ))
         };

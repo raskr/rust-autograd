@@ -51,7 +51,7 @@ impl ::op::Op for AdamOp
         // Update t and param
         xs[4][ndarray::IxDyn(&[])] += 1.;
         xs[0].scaled_add(-alpha, &m_hat);
-        vec![Err(::errors::OpComputeErrorStatus::NoOutput)]
+        vec![Err(::op::ComputeError::NoOutput)]
     }
 
     fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>

@@ -58,7 +58,7 @@ macro_rules! impl_reduce_forward {
             x: &NdArray,
             mut axes: Vec<usize>,
             keep_dims: bool,
-        ) -> Result<NdArray, ::errors::OpComputeErrorStatus>
+        ) -> Result<NdArray, ::op::ComputeError>
         {
             let x_shape = x.shape();
 
@@ -68,7 +68,7 @@ macro_rules! impl_reduce_forward {
             } else {
                 // reduction axes are empty => do nothing
                 if axes.is_empty() {
-                    return Err(::errors::OpComputeErrorStatus::Delegate { to: 0 });
+                    return Err(::op::ComputeError::Delegate { to: 0 });
                 }
 
                 // -- main logic --
@@ -155,7 +155,7 @@ impl op::Op for ReduceMean
         let axes = preprocess_axes(x, xs[1], self.sparse_axes);
         let x_shape = x.shape();
         if axes.is_empty() {
-            return vec![Err(::errors::OpComputeErrorStatus::Delegate { to: 0 })];
+            return vec![Err(::op::ComputeError::Delegate { to: 0 })];
         }
 
         // Make reduction_len
@@ -403,7 +403,7 @@ impl op::Op for ReduceGradCommon
         let target_shape = ndarray_ext::vec_as_shape(xs[1]);  // x's shape
 
         if gy.shape() == target_shape.as_slice() {
-            return vec![Err(::errors::OpComputeErrorStatus::Delegate { to: 0 })];
+            return vec![Err(::op::ComputeError::Delegate { to: 0 })];
         }
 
         let x_is_scalar = ndarray_ext::is_scalar_shape(gy.shape());
@@ -426,7 +426,7 @@ impl op::Op for ReduceGradCommon
                 axes.sort();
                 for &axis in axes.iter() {
                     if axis > gy_shape.len() {
-                        return vec![Err(::errors::OpComputeErrorStatus::BadInput(
+                        return vec![Err(::op::ComputeError::BadInput(
                             "Bad gradient. You may passed non-scalar value to ag::grad?".to_string()
                         ))];
                     }
@@ -439,7 +439,7 @@ impl op::Op for ReduceGradCommon
             if let Some(ret) = gy_view.broadcast(target_shape) {
                 ret.to_owned()
             } else {
-                return vec![Err(::errors::OpComputeErrorStatus::BadInput(
+                return vec![Err(::op::ComputeError::BadInput(
                     "Bad gradient. You may passed non-scalar value to ag::grad?".to_string()
                 ))];
             }

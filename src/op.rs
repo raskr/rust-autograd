@@ -3,7 +3,21 @@ extern crate ndarray;
 use ndarray_ext::NdArray;
 use tensor::Tensor;
 
-pub type ComputeResult = Vec<Result<NdArray, ::errors::OpComputeErrorStatus>>;
+pub type ComputeResult = Vec<Result<NdArray, ComputeError>>;
+
+#[derive(Clone, Debug)]
+pub enum ComputeError
+{
+    /// Computation finished correctly but delegates the result to its `to` th input.
+    Delegate
+    {
+        to: usize
+    },
+    /// Could'nt compute output array because of bad inputs.
+    BadInput(String),
+    /// Computation finished correctly with no output
+    NoOutput,
+}
 
 /// Operation trait. `Tensor` wraps trait-object of this.
 pub trait Op
