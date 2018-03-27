@@ -38,49 +38,55 @@ impl<'a, 'b> OpComputeContext<'a, 'b>
     {
         mem::transmute(self.xs.as_slice())
     }
-}
 
-#[inline]
-// Grabs input arrays for `node`'s evaluation.
-// Returns "None" when failed to aggregate even one of input arrays.
-fn _grab_input_arrays<'a, 'b: 'a>(node: &'b Tensor,
-                                  store: &'a ResourceStore,
-                                  feed_store: &FeedStore<'a>) -> Option<Vec<&'a NdArray>> {
     #[inline]
-    fn find_array_of<'a, 'b: 'a>(
-        x: &'b Tensor,
-        store: &'a ResourceStore,
-        feed_store: &FeedStore<'a>,
-        value_index: usize,
-    ) -> Option<&'a NdArray>
+    pub fn grab_input_node(&self, i: usize) -> &Tensor
     {
-        if let Some(ref per) = x.persistent_array {
-            Some(per.get_array())
-        } else if x.is_placeholder {
-            Some(feed_store[x.resource_lookup_key.get()])
-        } else {
-            match store[x.resource_lookup_key.get()].value[value_index] {
-                Ok(ref a) => Some(a),
-                // hoping for x.inputs[i] to have the value
-                Err(::op::ComputeError::Delegate { to: i }) => {
-                    find_array_of(&x.inputs[i], store, feed_store, x.input_indices[i])
-                },
-                _ => None,  // None for hopeless errors
+        &self.node.inputs[i]
+    }
+
+    #[inline]
+    // Internal of `grab_inputs`.
+    // Grabs input arrays for `node`'s evaluation.
+    // Returns "None" when failed to aggregate even one of input arrays.
+    fn _grab_inputs<'n, 's: 'n>(node: &'s Tensor,
+                                store: &'n ResourceStore,
+                                feed_store: &FeedStore<'n>) -> Option<Vec<&'n NdArray>> {
+        fn recurse<'n, 's: 'n>(
+            x: &'s Tensor,
+            store: &'n ResourceStore,
+            feed_store: &FeedStore<'n>,
+            value_index: usize,
+        ) -> Option<&'n NdArray>
+        {
+            if let Some(ref per) = x.persistent_array {
+                Some(per.get_array())
+            } else if x.is_placeholder {
+                Some(feed_store[x.resource_lookup_key.get()])
+            } else {
+                match store[x.resource_lookup_key.get()].value[value_index] {
+                    Ok(ref a) => Some(a),
+                    // hoping for x.inputs[i] to have the value
+                    Err(::op::ComputeError::Delegate { to: i }) => {
+                        recurse(&x.inputs[i], store, feed_store, x.input_indices[i])
+                    },
+                    _ => None,  // None for hopeless errors
+                }
             }
         }
-    }
 
-    let input_nodes = &node.inputs;
-    let mut input_arrays = Vec::with_capacity(input_nodes.len());
-    for (x, &i) in input_nodes.into_iter().zip(node.input_indices.iter()) {
-        if let Some(res) = find_array_of(x, store, feed_store, i) {
-            input_arrays.push(res);
-        } else {
-            // Early return
-            return None
+        let input_nodes = &node.inputs;
+        let mut input_arrays = Vec::with_capacity(input_nodes.len());
+        for (x, &i) in input_nodes.into_iter().zip(node.input_indices.iter()) {
+            if let Some(res) = recurse(x, store, feed_store, i) {
+                input_arrays.push(res);
+            } else {
+                // Early return
+                return None
+            }
         }
+        Some(input_arrays)
     }
-    Some(input_arrays)
 }
 
 struct NodeWithValue<'a>
@@ -160,7 +166,7 @@ where
                 Ok(per.get_array().clone())
             } else if creator.is_placeholder {
                 // Rarely happens (case that a feed by user is required)
-                Ok(get_fed_resource(creator, &feeds).clone())
+                Ok(find_fed_resource(creator, &feeds).clone())
             } else {
                 let res = match key2res.entry(creator.resource_lookup_key.get()) {
                     Entry::Occupied(mut ent) => {
@@ -186,6 +192,8 @@ where
 /// Runs given symbolic tensors.
 ///
 /// Runs, but returns nothing.
+/// Any errors in this running session cause panics automatically.
+/// To avoid this, use `ag::eval` or `Tensor::eval`.
 ///
 /// ```
 /// extern crate ndarray;
@@ -226,7 +234,6 @@ fn panic_if_user_err(res: &Result<NdArray, op::ComputeError>)
     }
 }
 
-#[inline]
 // Recursive function which seeks a node holding the x's resource.
 // Actual recursion "rarely" happens.
 fn find_resource_creator<'a, 'b>(storage: &ResourceStore, x: &'b Tensor) -> &'b Tensor
@@ -242,6 +249,7 @@ fn find_resource_creator<'a, 'b>(storage: &ResourceStore, x: &'b Tensor) -> &'b 
 type EvalResult = Result<NdArray, EvaluationError>;
 
 #[inline]
+// Converts `ComputeError` to `EvaluationError`.
 fn map_err<'a>(res: Result<NdArray, ::op::ComputeError>,
                node: &'a Tensor) -> EvalResult {
     match res {
@@ -260,8 +268,7 @@ type ResourceStore<'a> = Vec<NodeWithValue<'a>>;
 type FeedStore<'a> = Vec<&'a NdArray>;
 
 #[inline]
-// TODO: Use raw pointer comparison after removing "Rc"
-fn get_fed_resource<'a>(node: &Tensor, feeds: &Vec<&(&Tensor, &'a NdArray)>) -> &'a NdArray
+fn find_fed_resource<'a>(node: &Tensor, feeds: &Vec<&(&Tensor, &'a NdArray)>) -> &'a NdArray
 {
     // Linear search is suitable because number of feeds are so small in most cases
     for feed in feeds {
@@ -279,27 +286,30 @@ fn eval_internal<'a>(
     feeds: &Vec<&(&'a Tensor, &NdArray)>,
 ) -> ResourceStore<'a>
 {
-    let mut resource_store = Vec::new();
+    let mut res_store = Vec::new();
     let mut feed_store = Vec::new();
 
     // Obtain array resources while visiting nodes in topological order.
-    // Stack-based DFS is used, to avoid stack overflow in explicit recursion.
+    // Stack-based DFS is used to avoid stack overflow in explicit recursion.
     let mut dfs_stack: Vec<(&Tensor, bool)> = targets.iter().map(|&x| (x, false)).collect();
     while let Some((node, is_parent)) = dfs_stack.pop() {
         if is_parent {
             // Visit this node
             if node.is_placeholder {
                 node.resource_lookup_key.set(feed_store.len());
-                feed_store.push(get_fed_resource(node, &feeds));
+                feed_store.push(find_fed_resource(node, &feeds));
             } else {
-                node.resource_lookup_key.set(resource_store.len());
+                node.resource_lookup_key.set(res_store.len());
                 if node.persistent_array.is_none() {
-                    let y = if let Some(xs) = _grab_input_arrays(node, &resource_store, &feed_store) {
-                        node.op.compute(OpComputeContext { node, xs })
-                    } else {
-                        vec![Err(::op::ComputeError::Delegate {to: 0})]
+                    let y = {
+                        let ins = OpComputeContext::_grab_inputs(node, &res_store, &feed_store);
+                        if let Some(xs) = ins {
+                            node.op.compute(OpComputeContext { node, xs })
+                        } else {
+                            vec![Err(::op::ComputeError::Delegate {to: 0})]
+                        }
                     };
-                    resource_store.push(node.with_value(y));
+                    res_store.push(node.with_value(y));
                 }
             }
         } else {
@@ -307,10 +317,9 @@ fn eval_internal<'a>(
             dfs_stack.push((node, true));
             // Push children if needed
             for child in &node.inputs {
-                // TODO: Use raw pointer comparison after removing "Rc"
                 let visited = {
                     let k = child.resource_lookup_key.get();
-                    k < resource_store.len() && Rc::ptr_eq(child, resource_store[k].node)
+                    k < res_store.len() && Rc::ptr_eq(child, res_store[k].node)
                 };
                 if !visited {
                     dfs_stack.push((child, false));
@@ -318,7 +327,7 @@ fn eval_internal<'a>(
             }
         }
     }
-    resource_store
+    res_store
 }
 
 // Shrink it by dropping useless resources
@@ -352,7 +361,7 @@ fn finalize_resource_store(mut vec: ResourceStore) -> BTreeMap<usize, NodeWithVa
         }
     }
     debug_assert_eq!(vec.len(), retained_keys.len());
-    // `retained_keys` are sorted.
+    // `retained_keys` are sorted automatically.
     // `vec` is moved into Map.
     retained_keys.into_iter().zip(vec).collect()
 }

@@ -100,8 +100,8 @@ macro_rules! impl_cmp_op {
                     // Check the input ranks.
                     // op couldn't we catch here cause ndarray's panics.
                     if shape0.len() != shape1.len() {
-                        let name0 = &ctx.node.inputs[0].op.name();
-                        let name1 = &ctx.node.inputs[1].op.name();
+                        let name0 = ctx.grab_input_node(0).op.name();
+                        let name1 = ctx.grab_input_node(1).op.name();
                         let msg = format!(
                             "Tensor ranks mismatch: {}({}) vs {}({})",
                             shape0.len(), name0, shape1.len(), name1);
@@ -121,8 +121,8 @@ macro_rules! impl_cmp_op {
                         Ok(result)
                     } else if size0 > size1 {
                         let mut result = NdArray::zeros(shape0);
-                        let name0 = &ctx.node.inputs[0].op.name();
-                        let name1 = &ctx.node.inputs[1].op.name();
+                        let name0 = &ctx.grab_input_node(0).op.name();
+                        let name1 = &ctx.grab_input_node(1).op.name();
                         println!("Tensor ranks mismatch: {}({}) vs {}({})",
                             shape0.len(), name0, shape1.len(), name1);
 

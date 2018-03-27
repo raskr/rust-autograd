@@ -68,7 +68,7 @@ impl op::Op for PreprocessBinOpGrad {
                         }
                     } else {
                         return vec![Err(::op::ComputeError::BadInput(
-                            format!("{}'s axis {} don't broadcast", ctx.node.inputs[0], i)))];
+                            format!("{}'s axis {} don't broadcast", ctx.grab_input_node(0), i)))];
                     }
                 }
                 // case of x_axis < gy_axis: unreachable
