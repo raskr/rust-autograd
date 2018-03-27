@@ -204,10 +204,26 @@ where
     U: IntoIterator<Item = &'a (&'b Tensor, &'c NdArray)>,
 {
     // Just run the graph
-    eval_internal(
+    let ret = eval_internal(
         &tensors.iter().map(|t| t.as_ref()).collect(),
         &feeds.into_iter().collect(),
     );
+    // Panic as necessary
+    for r in ret {
+        panic_if_user_err(&r.value[0])
+    }
+}
+
+
+#[inline]
+fn panic_if_user_err(res: &Result<NdArray, op::ComputeError>)
+{
+    match res {
+        &Err(op::ComputeError::BadInput(_)) => {
+            res.as_ref().unwrap();
+        },
+        _ => {},
+    }
 }
 
 #[inline]
