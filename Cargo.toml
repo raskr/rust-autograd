@@ -12,9 +12,9 @@ documentation = "https://docs.rs/autograd/"
 
 [dependencies]
 rand = "0.3.15"
-ndarray = { version = "0.10.11" }
+ndarray = { version = "0.10.11", features = [] }
 glob = "0.2"
-# blas-sys = { version = "0.6", default-features = true, features = ["openblas"] }
+blas-sys = { version = "0.6", optional = true, default-features = true, features = ["openblas"] }
 rayon = "0.8.2"
 
 [lib]
@@ -28,3 +28,7 @@ path = "examples/mlp_mnist.rs"
 [[example]]
 name = "lstm_lm"
 path = "examples/lstm_lm.rs"
+
+[features]
+default-features = []
+blas = ["ndarray/blas", "blas-sys"]
