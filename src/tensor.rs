@@ -41,6 +41,40 @@ pub enum PersistentArray
     Constant(NdArray),
 }
 
+impl Tensor {
+    /// Returns a reference to the backing array, if one exists. A `Tensor`
+    /// that's a placeholder won't have a backing array, and will return
+    /// `None`.
+    pub fn get_array(&self) -> Option<&NdArray> {
+        self.0.persistent_array.as_ref()
+            .map(|p| {
+                match p {
+                    &PersistentArray::Variable(ref arr) => arr,
+                    &PersistentArray::Constant(ref arr) => arr,
+                }
+            })
+    }
+
+    /// Returns a mutable reference to the backing array, if one exists, the
+    /// `Tensor` has not been copied, and is permissible to mutate. A placeholder
+    /// `Tensor` has no backing array, and will return `None`. If the `Tensor` is
+    /// a constant, this will also return `None`, as mutating a constant is not
+    /// permitted. If any copies have been made, accessing a `&mut` of the
+    /// inner `Rc<TensorCore>` that houses the backing array will be impossible.
+    pub fn get_array_mut(&mut self) -> Option<&mut NdArray> {
+        //inner.persistent_array.as_mut()
+        Rc::get_mut(&mut self.0)
+            .and_then(|t| {
+                t.persistent_array.as_mut()
+            }).and_then(|p| {
+                match p {
+                    &mut PersistentArray::Variable(ref mut arr) => Some(arr),
+                    _ => None
+                }
+            })
+    }
+}
+
 impl PersistentArray
 {
     pub fn get_as_variable(&self) -> &NdArray
