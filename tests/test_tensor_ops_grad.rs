@@ -330,7 +330,7 @@ fn minimum()
 #[test]
 fn abs()
 {
-    let ref v = ag::variable(ag::ndarray_ext::standard_uniform(&[2, 3]));
+    let ref v = ag::variable(ndarray::arr1(&[1., 2., 3.]));
     let ref z = ag::abs(v);
     let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
     ag::test_helper::gradient_check(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
