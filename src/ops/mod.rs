@@ -88,7 +88,7 @@ impl Tensor
 /// ```
 pub fn grad(ys: &[&Tensor], xs: &[&Tensor]) -> Vec<Tensor>
 {
-    ::gradient::symbolic_gradients(ys, xs, &vec![None; xs.len()])
+    ::gradient::symbolic_gradients(ys, xs, &vec![None; ys.len()])
 }
 
 /// Returns gradient tensors wrt input tensors.
