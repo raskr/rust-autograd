@@ -5,7 +5,7 @@ extern crate ndarray;
 use self::ag::gradient_descent_ops::Optimizer;
 use std::time::Instant;
 
-// This is softmax regression with Adam optimizer for mnist.
+// This is a softmax regression with Adam optimizer for mnist.
 // 0.918 test accuracy after 3 epochs,
 // 0.26 sec/epoch on 2.7GHz Intel Core i5 (blas feature is disabled)
 //

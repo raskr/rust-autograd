@@ -88,7 +88,7 @@ impl Tensor
 /// ```
 pub fn grad(ys: &[&Tensor], xs: &[&Tensor]) -> Vec<Tensor>
 {
-    ::gradient::symbolic_gradients(ys, xs, &ys.iter().map(|_| None).collect::<Vec<_>>())
+    ::gradient::symbolic_gradients(ys, xs, &vec![None; xs.len()])
 }
 
 /// Returns gradient tensors wrt input tensors.
@@ -112,7 +112,7 @@ pub fn grad_with_default(ys: &[&Tensor], xs: &[&Tensor], output_grads: &[&Tensor
         xs,
         output_grads
             .into_iter()
-            .map(|&a| Some(a))
+            .map(|a| Some(a.as_ref()))
             .collect::<Vec<_>>()
             .as_slice(),
     )
@@ -185,10 +185,10 @@ pub fn _hessian_vector_product(ys: &[&Tensor], xs: &[&Tensor], vectors: &[&Tenso
 ///
 /// Guarantees that the gradient is not propagated to the tensor behind this
 /// during gradient computation.
-pub fn stop_gradient(x: &Tensor) -> Tensor
+pub fn stop_gradient<A: AsRef<Tensor>>(x: A) -> Tensor
 {
     Tensor::builder()
-        .set_input(x)
+        .set_input(x.as_ref())
         .set_has_gradient(false)
         .build(gradient_ops::StopGradient)
 }
@@ -210,9 +210,7 @@ pub fn stop_gradient(x: &Tensor) -> Tensor
 /// assert_eq!(6., y.eval(&[]).unwrap()[0]);
 /// ```
 #[inline]
-pub fn variable<T>(arr: ndarray::Array<f32, T>) -> Tensor
-where
-    T: ndarray::Dimension,
+pub fn variable<T: ndarray::Dimension>(arr: ndarray::Array<f32, T>) -> Tensor
 {
     let arr = arr.into_dyn();
     Tensor::builder()
@@ -283,13 +281,13 @@ where
 ///
 /// assert_eq!(&[2., 3.], s.eval(&[]).unwrap().as_slice().unwrap());
 /// ```
-pub fn shape(x: &Tensor) -> Tensor
+pub fn shape<A: AsRef<Tensor>>(x: A) -> Tensor
 {
-    if let Some(ref inner) = x.shape {
+    if let Some(ref inner) = x.as_ref().shape {
         inner.clone()
     } else {
         Tensor::builder()
-            .set_input(x)
+            .set_input(x.as_ref())
             .set_has_gradient(false)
             .build(array_ops::Shape)
     }
@@ -306,10 +304,10 @@ pub fn shape(x: &Tensor) -> Tensor
 ///
 /// assert_eq!(12., b.eval(&[]).unwrap()[ndarray::IxDyn(&[])]);
 /// ```
-pub fn size(x: &Tensor) -> Tensor
+pub fn size<A: AsRef<Tensor>>(x: A) -> Tensor
 {
     Tensor::builder()
-        .set_input(x)
+        .set_input(x.as_ref())
         .set_has_gradient(false)
         .build(array_ops::Size)
 }
@@ -325,158 +323,159 @@ pub fn size(x: &Tensor) -> Tensor
 ///
 /// assert_eq!(3., r.eval(&[]).unwrap()[ndarray::IxDyn(&[])]);
 /// ```
-pub fn rank(x: &Tensor) -> Tensor
+pub fn rank<A: AsRef<Tensor>>(x: A) -> Tensor
 {
     Tensor::builder()
-        .set_input(x)
+        .set_input(x.as_ref())
         .set_has_gradient(false)
         .build(array_ops::Rank)
 }
 
 /// Elementwise sine
-pub fn sin(x: &Tensor) -> Tensor
+pub fn sin<A: AsRef<Tensor>>(x: A) -> Tensor
 {
     Tensor::builder()
-        .set_input(x)
-        .set_shape(x.shape())
+        .set_input(x.as_ref())
+        .set_shape(x.as_ref().shape())
         .build(math_ops::Sin)
 }
 
 /// Elementwise cosine
-pub fn cos(x: &Tensor) -> Tensor
+pub fn cos<A: AsRef<Tensor>>(x: A) -> Tensor
 {
     Tensor::builder()
-        .set_input(x)
-        .set_shape(x.shape())
+        .set_input(x.as_ref())
+        .set_shape(x.as_ref().shape())
         .build(math_ops::Cos)
 }
 
 /// Elementwise tangent
-pub fn tan(x: &Tensor) -> Tensor
+pub fn tan<A: AsRef<Tensor>>(x: A) -> Tensor
 {
     Tensor::builder()
-        .set_input(x)
-        .set_shape(x.shape())
+        .set_input(x.as_ref())
+        .set_shape(x.as_ref().shape())
         .build(math_ops::Tan)
 }
 
 /// Elementwise arcsin
-pub fn asin(x: &Tensor) -> Tensor
+pub fn asin<A: AsRef<Tensor>>(x: A) -> Tensor
 {
     Tensor::builder()
-        .set_input(x)
-        .set_shape(x.shape())
+        .set_input(x.as_ref())
+        .set_shape(x.as_ref().shape())
         .build(math_ops::Asin)
 }
 
 /// Elementwise arccos
-pub fn acos(x: &Tensor) -> Tensor
+pub fn acos<A: AsRef<Tensor>>(x: A) -> Tensor
 {
     Tensor::builder()
-        .set_input(x)
-        .set_shape(x.shape())
+        .set_input(x.as_ref())
+        .set_shape(x.as_ref().shape())
         .build(math_ops::Acos)
 }
 
 /// Elementwise arctan
-pub fn atan(x: &Tensor) -> Tensor
+pub fn atan<A: AsRef<Tensor>>(x: A) -> Tensor
 {
     Tensor::builder()
-        .set_input(x)
-        .set_shape(x.shape())
+        .set_input(x.as_ref())
+        .set_shape(x.as_ref().shape())
         .build(math_ops::Atan)
 }
 
 /// Elementwise hyperbolic sine
-pub fn sinh(x: &Tensor) -> Tensor
+pub fn sinh<A: AsRef<Tensor>>(x: A) -> Tensor
 {
     Tensor::builder()
-        .set_input(x)
-        .set_shape(x.shape())
+        .set_input(x.as_ref())
+        .set_shape(x.as_ref().shape())
         .build(math_ops::Sinh)
 }
 
 /// Elementwise hyperbolic cosine
-pub fn cosh(x: &Tensor) -> Tensor
+pub fn cosh<A: AsRef<Tensor>>(x: A) -> Tensor
 {
     Tensor::builder()
-        .set_input(x)
-        .set_shape(x.shape())
+        .set_input(x.as_ref())
+        .set_shape(x.as_ref().shape())
         .build(math_ops::Cosh)
 }
 
 /// Elementwise hyperbolic tangent
-pub fn tanh(x: &Tensor) -> Tensor
+pub fn tanh<A: AsRef<Tensor>>(x: A) -> Tensor
 {
     Tensor::builder()
-        .set_input(x)
-        .set_shape(x.shape())
+        .set_input(x.as_ref())
+        .set_shape(x.as_ref().shape())
         .build(math_ops::Tanh)
 }
 
 /// Elementwise hyperbolic arcsin
-pub fn asinh(x: &Tensor) -> Tensor
+pub fn asinh<A: AsRef<Tensor>>(x: A) -> Tensor
 {
     Tensor::builder()
-        .set_input(x)
-        .set_shape(x.shape())
+        .set_input(x.as_ref())
+        .set_shape(x.as_ref().shape())
         .build(math_ops::Asinh)
 }
 
 /// Elementwise hyperbolic arccos
-pub fn acosh(x: &Tensor) -> Tensor
+pub fn acosh<A: AsRef<Tensor>>(x: A) -> Tensor
 {
     Tensor::builder()
-        .set_input(x)
-        .set_shape(x.shape())
+        .set_input(x.as_ref())
+        .set_shape(x.as_ref().shape())
         .build(math_ops::Acosh)
 }
 
 /// Elementwise hyperbolic arctan
-pub fn atanh(x: &Tensor) -> Tensor
+pub fn atanh<A: AsRef<Tensor>>(x: A) -> Tensor
 {
     Tensor::builder()
-        .set_input(x)
-        .set_shape(x.shape())
+        .set_input(x.as_ref())
+        .set_shape(x.as_ref().shape())
         .build(math_ops::Atanh)
 }
 
-/// Gets i th output value of `x`
+/// Gets n th tensor in `x`.
 ///
-/// NOTE: `x` should be a result of a multi-outputs op;
+/// `x` must be a result of a multi-outputs op;
 /// otherwise index-out-of-bounds error may happen.
-pub fn select_ith_of(x: &Tensor, i: usize) -> Tensor
+pub fn nth_tensor<A: AsRef<Tensor>>(x: A, n: usize) -> Tensor
 {
     Tensor::builder()
-        .set_input(x)
-        .set_input_indices(vec![i])
+        .set_input(x.as_ref())
+        .set_input_indices(vec![n])
         .build(activation_ops::Identity)
 }
 
 /// Identity function without copy.
-pub fn identity(x: &Tensor) -> Tensor
+pub fn identity<A: AsRef<Tensor>>(x: A) -> Tensor
 {
     Tensor::builder()
-        .set_input(x)
-        .set_shape(x.shape())
+        .set_input(x.as_ref())
+        .set_shape(x.as_ref().shape())
         .build(activation_ops::Identity)
 }
 
 #[inline]
-fn infer_bin_op_shape<T: AsRef<Tensor>, U: AsRef<Tensor>>(shape_a: T, shape_b: U) -> Tensor {
+fn infer_bin_op_shape<T: AsRef<Tensor>, A: AsRef<Tensor>>(shape_a: T, shape_b: A) -> Tensor {
     Tensor::builder()
         .set_inputs(vec![shape_a.as_ref(), shape_b.as_ref()])
         .build(array_ops::InferBinOpShape)
 }
 
 #[inline]
-fn bin_op_helper<T: ::op::Op + 'static>(a: &Tensor, b: &Tensor, op: T) -> Tensor
+fn bin_op_helper<A: AsRef<Tensor>, B: AsRef<Tensor>,
+    T: ::op::Op + 'static>(a: A, b: B, op: T) -> Tensor
 {
-    let ref a_shape = a.shape();
-    let ref b_shape = b.shape();
+    let a_shape = a.as_ref().shape();
+    let b_shape = b.as_ref().shape();
     Tensor::builder()
-        .set_shape(infer_bin_op_shape(a_shape, b_shape))
-        .set_inputs(vec![a, b])
+        .set_shape(infer_bin_op_shape(&a_shape, &b_shape))
+        .set_inputs(vec![a.as_ref(), b.as_ref()])
         .build(op)
 }
 
@@ -493,7 +492,7 @@ fn bin_op_helper<T: ::op::Op + 'static>(a: &Tensor, b: &Tensor, op: T) -> Tensor
 /// let ref z: ag::Tensor = a + b;
 /// assert_eq!(z.eval(&[]), Ok(ndarray::arr1(&[2., 2.]).into_dyn()));
 /// ```
-pub fn add(a: &Tensor, b: &Tensor) -> Tensor
+pub fn add<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor
 {
     bin_op_helper(a, b, binary_ops::AddOp)
 }
@@ -512,7 +511,7 @@ pub fn add(a: &Tensor, b: &Tensor) -> Tensor
 /// let ref z: ag::Tensor = a - b;
 /// assert_eq!(z.eval(&[]), Ok(ndarray::arr1(&[0., 0.]).into_dyn()));
 /// ```
-pub fn sub(a: &Tensor, b: &Tensor) -> Tensor
+pub fn sub<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor
 {
     bin_op_helper(a, b, binary_ops::SubOp)
 }
@@ -531,7 +530,7 @@ pub fn sub(a: &Tensor, b: &Tensor) -> Tensor
 /// let ref z: ag::Tensor = a * b;
 /// assert_eq!(z.eval(&[]), Ok(ndarray::arr1(&[1., 1.]).into_dyn()));
 /// ```
-pub fn mul(a: &Tensor, b: &Tensor) -> Tensor
+pub fn mul<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor
 {
     bin_op_helper(a, b, binary_ops::MulOp)
 }
@@ -549,13 +548,15 @@ pub fn mul(a: &Tensor, b: &Tensor) -> Tensor
 /// let ref z: ag::Tensor = a / b;
 /// assert_eq!(z.eval(&[]), Ok(ndarray::arr1(&[1., 1.]).into_dyn()));
 /// ```
-pub fn div(a: &Tensor, b: &Tensor) -> Tensor
+pub fn div<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor
 {
     bin_op_helper(a, b, binary_ops::DivOp)
 }
 
 #[doc(hidden)]
 /// Should be limited to internal use.
+///
+/// This function takes `a`'s ownership.
 ///
 /// ```
 /// extern crate ndarray;
@@ -568,16 +569,18 @@ pub fn div(a: &Tensor, b: &Tensor) -> Tensor
 ///
 /// assert_eq!(c.eval(&[]), Ok(ndarray::arr1(&[0., 0.]).into_dyn()));
 /// ```
-pub fn mul_inplace(a: Tensor, b: &Tensor) -> Tensor
+pub fn mul_inplace<A: AsRef<Tensor>>(a: Tensor, b: A) -> Tensor
 {
     Tensor::builder()
-        .set_inputs(vec![&a, b])
+        .set_inputs(vec![&a, b.as_ref()])
         .set_shape(a.shape())
         .build(binary_ops::InplaceMulOp)
 }
 
 #[doc(hidden)]
 /// Should be limited to internal use.
+///
+/// This function takes `a`'s ownership.
 ///
 /// ```
 /// extern crate ndarray;
@@ -588,10 +591,10 @@ pub fn mul_inplace(a: Tensor, b: &Tensor) -> Tensor
 ///
 /// assert_eq!(c.eval(&[]), Ok(ndarray::arr1(&[0.5, 0.5]).into_dyn()));
 /// ```
-pub fn div_inplace(a: Tensor, b: &Tensor) -> Tensor
+pub fn div_inplace<A: AsRef<Tensor>>(a: Tensor, b: A) -> Tensor
 {
     Tensor::builder()
-        .set_inputs(vec![&a, b])
+        .set_inputs(vec![&a, b.as_ref()])
         .set_shape(a.shape())
         .build(binary_ops::InplaceDivOp)
 }
@@ -599,7 +602,7 @@ pub fn div_inplace(a: Tensor, b: &Tensor) -> Tensor
 /// Inplace addition
 ///
 /// Returns `a` after performing `a += b`.
-/// This function moves `a`.
+/// This function takes `a`'s ownership.
 ///
 /// # Panics
 ///
@@ -615,10 +618,10 @@ pub fn div_inplace(a: Tensor, b: &Tensor) -> Tensor
 ///
 /// assert_eq!(c.eval(&[]), Ok(ndarray::arr1(&[2., 2.]).into_dyn()));
 /// ```
-pub fn add_inplace(a: Tensor, b: &Tensor) -> Tensor
+pub fn add_inplace<A: AsRef<Tensor>>(a: Tensor, b: A) -> Tensor
 {
     Tensor::builder()
-        .set_inputs(vec![&a, b])
+        .set_inputs(vec![&a, b.as_ref()])
         .set_shape(a.shape())
         .build(binary_ops::InplaceAddOp)
 }
@@ -626,7 +629,7 @@ pub fn add_inplace(a: Tensor, b: &Tensor) -> Tensor
 /// Inplace subtraction
 ///
 /// Returns `a` after performing `a -= b`.
-/// This function moves `a`.
+/// This function takes `a`'s ownership.
 ///
 /// # Panics
 ///
@@ -642,47 +645,47 @@ pub fn add_inplace(a: Tensor, b: &Tensor) -> Tensor
 ///
 /// assert_eq!(c.eval(&[]), Ok(ndarray::arr2(&[[0., 0.], [0., 0.]]).into_dyn()));
 /// ```
-pub fn sub_inplace(a: Tensor, b: &Tensor) -> Tensor
+pub fn sub_inplace<A: AsRef<Tensor>>(a: Tensor, b: A) -> Tensor
 {
     Tensor::builder()
-        .set_inputs(vec![&a, b])
+        .set_inputs(vec![&a, b.as_ref()])
         .set_shape(a.shape())
         .build(binary_ops::InplaceSubOp)
 }
 
 /// Elementwise sqrt
-pub fn sqrt(x: &Tensor) -> Tensor
+pub fn sqrt<A: AsRef<Tensor>>(x: A) -> Tensor
 {
     Tensor::builder()
-        .set_input(x)
-        .set_shape(x.shape())
+        .set_input(x.as_ref())
+        .set_shape(x.as_ref().shape())
         .build(math_ops::Sqrt)
 }
 
 /// Elementwise pow
-pub fn pow(x: &Tensor, a: f32) -> Tensor
+pub fn pow<A: AsRef<Tensor>>(x: A, a: f32) -> Tensor
 {
     Tensor::builder()
-        .set_input(x)
-        .set_shape(x.shape())
+        .set_input(x.as_ref())
+        .set_shape(x.as_ref().shape())
         .build(math_ops::Pow { a })
 }
 
 /// Elementwise log
-pub fn log(x: &Tensor, a: f32) -> Tensor
+pub fn log<A: AsRef<Tensor>>(x: A, a: f32) -> Tensor
 {
     Tensor::builder()
-        .set_input(x)
-        .set_shape(x.shape())
+        .set_input(x.as_ref())
+        .set_shape(x.as_ref().shape())
         .build(math_ops::Log { a })
 }
 
 /// Elementwise exponential
-pub fn exp(x: &Tensor) -> Tensor
+pub fn exp<A: AsRef<Tensor>>(x: A) -> Tensor
 {
     Tensor::builder()
-        .set_input(x)
-        .set_shape(x.shape())
+        .set_input(x.as_ref())
+        .set_shape(x.as_ref().shape())
         .build(math_ops::Exp)
 }
 
@@ -697,10 +700,10 @@ pub fn exp(x: &Tensor) -> Tensor
 /// let ref c = ag::maximum(a, b);
 /// assert_eq!(c.eval(&[]), Ok(ndarray::arr1(&[3., 2., 3.]).into_dyn()));
 /// ```
-pub fn maximum(a: &Tensor, b: &Tensor) -> Tensor
+pub fn maximum<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor
 {
     Tensor::builder()
-        .set_inputs(vec![a, b])
+        .set_inputs(vec![a.as_ref(), b.as_ref()])
         .build(math_ops::Maximum)
 }
 
@@ -715,10 +718,10 @@ pub fn maximum(a: &Tensor, b: &Tensor) -> Tensor
 /// let ref c = ag::minimum(a, b);
 /// assert_eq!(c.eval(&[]), Ok(ndarray::arr1(&[1., 2., 1.]).into_dyn()));
 /// ```
-pub fn minimum(a: &Tensor, b: &Tensor) -> Tensor
+pub fn minimum<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor
 {
     Tensor::builder()
-        .set_inputs(vec![a, b])
+        .set_inputs(vec![a.as_ref(), b.as_ref()])
         .build(math_ops::Minimum)
 }
 
@@ -769,10 +772,10 @@ pub fn add_n(xs: &[&Tensor]) -> Tensor
 ///
 /// assert_eq!(c.eval(&[]), Ok(ndarray::arr1(&[0., 1., 0.]).into_dyn()));
 /// ```
-pub fn equal(a: &Tensor, b: &Tensor) -> Tensor
+pub fn equal<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor
 {
     Tensor::builder()
-        .set_inputs(vec![a, b])
+        .set_inputs(vec![a.as_ref(), b.as_ref()])
         .build(math_ops::Equal)
 }
 
@@ -793,10 +796,10 @@ pub fn equal(a: &Tensor, b: &Tensor) -> Tensor
 ///
 /// assert_eq!(c.eval(&[]), Ok(ndarray::arr1(&[1., 0., 1.]).into_dyn()));
 /// ```
-pub fn not_equal(a: &Tensor, b: &Tensor) -> Tensor
+pub fn not_equal<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor
 {
     Tensor::builder()
-        .set_inputs(vec![a, b])
+        .set_inputs(vec![a.as_ref(), b.as_ref()])
         .build(math_ops::NotEqual)
 }
 
@@ -813,10 +816,10 @@ pub fn not_equal(a: &Tensor, b: &Tensor) -> Tensor
 ///
 /// assert_eq!(y.eval(&[]), Ok(ndarray::arr1(&[1., 0.]).into_dyn()));
 /// ```
-pub fn argmax(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
+pub fn argmax<A: AsRef<Tensor>>(x: A, axis: isize, keep_dim: bool) -> Tensor
 {
     let op = reduction_ops::ArgMax { axis, keep_dim };
-    Tensor::builder().set_input(x).build(op)
+    Tensor::builder().set_input(x.as_ref()).build(op)
 }
 
 /// Expands specified dims.
@@ -831,11 +834,11 @@ pub fn argmax(x: &Tensor, axis: isize, keep_dim: bool) -> Tensor
 ///
 /// assert_eq!(b.eval(&[]).unwrap().shape(), &[1, 3, 1]);
 /// ```
-pub fn expand_dims<T: ArrayLike>(x: &Tensor, axes: &T) -> Tensor
+pub fn expand_dims<A: AsRef<Tensor>, T: ArrayLike>(x: A, axes: &T) -> Tensor
 {
     let op = array_ops::ExpandDims;
     Tensor::builder()
-        .set_inputs(vec![x, &axes.as_tensor()])
+        .set_inputs(vec![x.as_ref(), &axes.as_tensor()])
         .build(op)
 }
 
@@ -851,11 +854,11 @@ pub fn expand_dims<T: ArrayLike>(x: &Tensor, axes: &T) -> Tensor
 ///
 /// assert_eq!(b.eval(&[]).unwrap().shape(), &[3]);
 /// ```
-pub fn squeeze<T: ArrayLike>(x: &Tensor, axes: &T) -> Tensor
+pub fn squeeze<A: AsRef<Tensor>, T: ArrayLike>(x: A, axes: &T) -> Tensor
 {
     let op = array_ops::Squeeze;
     Tensor::builder()
-        .set_inputs(vec![x, &axes.as_tensor()])
+        .set_inputs(vec![x.as_ref(), &axes.as_tensor()])
         .build(op)
 }
 
@@ -876,10 +879,10 @@ pub fn squeeze<T: ArrayLike>(x: &Tensor, axes: &T) -> Tensor
 ///     Ok(ndarray::arr2(&[[2., 2.], [3., 3.], [2., 2.], [3., 3.]]).into_dyn())
 /// );
 /// ```
-pub fn tile(x: &Tensor, axis: isize, num: usize) -> Tensor
+pub fn tile<A: AsRef<Tensor>>(x: A, axis: isize, num: usize) -> Tensor
 {
     let op = array_ops::Tile { axis, num };
-    Tensor::builder().set_input(x).build(op)
+    Tensor::builder().set_input(x.as_ref()).build(op)
 }
 
 /// Limits all elements so as to be within `[min, max]`
@@ -893,10 +896,10 @@ pub fn tile(x: &Tensor, axis: isize, num: usize) -> Tensor
 ///
 /// assert_eq!(y.eval(&[]), Ok(ndarray::arr1(&[3., 4., 5.]).into_dyn()));
 /// ```
-pub fn clip(x: &Tensor, min: f32, max: f32) -> Tensor
+pub fn clip<A: AsRef<Tensor>>(x: A, min: f32, max: f32) -> Tensor
 {
     let op = array_ops::Clip { min, max };
-    Tensor::builder().set_input(x).build(op)
+    Tensor::builder().set_input(x.as_ref()).build(op)
 }
 
 /// Takes max along specified axes.
@@ -912,14 +915,14 @@ pub fn clip(x: &Tensor, min: f32, max: f32) -> Tensor
 ///
 /// assert_eq!(y.eval(&[]), Ok(ndarray::arr1(&[3., 4.]).into_dyn()));
 /// ```
-pub fn reduce_max<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tensor
+pub fn reduce_max<T: ArrayLike, A: AsRef<Tensor>>(x: A, axes: &T, keep_dims: bool) -> Tensor
 {
     let op = reduction_ops::ReduceMax {
         keep_dims,
         sparse_axes: false,
     };
     Tensor::builder()
-        .set_inputs(vec![x, &axes.as_tensor()])
+        .set_inputs(vec![x.as_ref(), &axes.as_tensor()])
         .build(op)
 }
 
@@ -936,14 +939,14 @@ pub fn reduce_max<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tensor
 ///
 /// assert_eq!(y.eval(&[]), Ok(ndarray::arr1(&[2., 1.]).into_dyn()));
 /// ```
-pub fn reduce_min<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tensor
+pub fn reduce_min<T: ArrayLike, A: AsRef<Tensor>>(x: A, axes: &T, keep_dims: bool) -> Tensor
 {
     let op = reduction_ops::ReduceMin {
         keep_dims,
         sparse_axes: false,
     };
     Tensor::builder()
-        .set_inputs(vec![x, &axes.as_tensor()])
+        .set_inputs(vec![x.as_ref(), &axes.as_tensor()])
         .build(op)
 }
 
@@ -960,14 +963,14 @@ pub fn reduce_min<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tensor
 ///
 /// assert_eq!(y.eval(&[]), Ok(ndarray::arr1(&[6., 4.]).into_dyn()));
 /// ```
-pub fn reduce_sum<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tensor
+pub fn reduce_sum<T: ArrayLike, A: AsRef<Tensor>>(x: A, axes: &T, keep_dims: bool) -> Tensor
 {
     let op = reduction_ops::ReduceSum {
         keep_dims,
         sparse_axes: false,
     };
     Tensor::builder()
-        .set_inputs(vec![x, &axes.as_tensor()])
+        .set_inputs(vec![x.as_ref(), &axes.as_tensor()])
         .build(op)
 }
 
@@ -984,23 +987,15 @@ pub fn reduce_sum<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tensor
 ///
 /// assert_eq!(y.eval(&[]), Ok(ndarray::arr1(&[3., 2.]).into_dyn()));
 /// ```
-pub fn reduce_mean<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tensor
+pub fn reduce_mean<T: ArrayLike, A: AsRef<Tensor>>(x: A, axes: &T, keep_dims: bool) -> Tensor
 {
     let op = reduction_ops::ReduceMean {
         keep_dims,
         sparse_axes: false,
     };
-    Tensor::builder().set_inputs(vec![x, &axes.as_tensor()]).build(op)
+    Tensor::builder().set_inputs(vec![x.as_ref(), &axes.as_tensor()]).build(op)
 }
 
-#[inline]
-fn rectify_negative_axes(axes: &Tensor, x_rank: &Tensor) -> Tensor
-{
-    let ref zero = zeros(&axes.shape());
-    let ge = greater_equal(axes, zero);
-    let lt = lesser(axes, zero);
-    add_inplace(mul_inplace(ge, axes), &mul_inplace(lt, &(axes + x_rank)))
-}
 
 /// Takes product along specified axes.
 ///
@@ -1015,14 +1010,14 @@ fn rectify_negative_axes(axes: &Tensor, x_rank: &Tensor) -> Tensor
 ///
 /// assert_eq!(y.eval(&[]), Ok(ndarray::arr1(&[8., 3.]).into_dyn()));
 /// ```
-pub fn reduce_prod<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tensor
+pub fn reduce_prod<T: ArrayLike, A: AsRef<Tensor>>(x: A, axes: &T, keep_dims: bool) -> Tensor
 {
     let op = reduction_ops::ReduceProd {
         keep_dims,
         sparse_axes: false,
     };
     Tensor::builder()
-        .set_inputs(vec![x, &axes.as_tensor()])
+        .set_inputs(vec![x.as_ref(), &axes.as_tensor()])
         .build(op)
 }
 
@@ -1039,10 +1034,10 @@ pub fn reduce_prod<T: ArrayLike>(x: &Tensor, axes: &T, keep_dims: bool) -> Tenso
 ///
 /// assert_eq!(y.eval(&[]), Ok(ag::ndarray_ext::zeros(&[3, 4])));
 /// ```
-pub fn reshape<T: ArrayLike>(x: &Tensor, shape: &T) -> Tensor
+pub fn reshape<T: ArrayLike, A: AsRef<Tensor>>(x: A, shape: &T) -> Tensor
 {
     Tensor::builder()
-        .set_inputs(vec![x, &shape.as_tensor()])
+        .set_inputs(vec![x.as_ref(), &shape.as_tensor()])
         .build(array_ops::Reshape)
 }
 
@@ -1055,11 +1050,11 @@ pub fn reshape<T: ArrayLike>(x: &Tensor, shape: &T) -> Tensor
 /// let ref z = ag::flatten(x);
 /// assert_eq!(z.eval(&[]).unwrap().shape(), &[12]);
 /// ```
-pub fn flatten(x: &Tensor) -> Tensor
+pub fn flatten<A: AsRef<Tensor>>(x: A) -> Tensor
 {
     Tensor::builder()
-        .set_inputs(vec![x, &scalar(-1.)])
-        .set_shape(x.shape())
+        .set_inputs(vec![x.as_ref(), &scalar(-1.)])
+        .set_shape(x.as_ref().shape())
         .build(array_ops::Reshape)
 }
 
@@ -1076,11 +1071,11 @@ pub fn flatten(x: &Tensor) -> Tensor
 ///     &[-1., 1., 0.]
 /// );
 /// ```
-pub fn sign(a: &Tensor) -> Tensor
+pub fn sign<A: AsRef<Tensor>>(a: A) -> Tensor
 {
     Tensor::builder()
-        .set_shape(a.shape())
-        .set_input(a)
+        .set_shape(a.as_ref().shape())
+        .set_input(a.as_ref())
         .build(math_ops::Sign)
 }
 
@@ -1097,11 +1092,11 @@ pub fn sign(a: &Tensor) -> Tensor
 ///     Ok(ndarray::arr1(&[0.2, 0., 0.2]).into_dyn())
 /// );
 /// ```
-pub fn abs(a: &Tensor) -> Tensor
+pub fn abs<A: AsRef<Tensor>>(a: A) -> Tensor
 {
     Tensor::builder()
-        .set_shape(a.shape())
-        .set_input(a)
+        .set_shape(a.as_ref().shape())
+        .set_input(a.as_ref())
         .build(math_ops::Abs)
 }
 
@@ -1118,11 +1113,11 @@ pub fn abs(a: &Tensor) -> Tensor
 ///     Ok(ndarray::arr1(&[-2., -2., -1.,  0.,  1.,  1.,  2.]).into_dyn())
 /// );
 /// ```
-pub fn floor(a: &Tensor) -> Tensor
+pub fn floor<A: AsRef<Tensor>>(a: A) -> Tensor
 {
     Tensor::builder()
-        .set_shape(a.shape())
-        .set_input(a)
+        .set_shape(a.as_ref().shape())
+        .set_input(a.as_ref())
         .build(math_ops::Floor)
 }
 
@@ -1139,11 +1134,11 @@ pub fn floor(a: &Tensor) -> Tensor
 ///     Ok(ndarray::arr1(&[-2., -3.]).into_dyn())
 /// );
 /// ```
-pub fn neg(a: &Tensor) -> Tensor
+pub fn neg<A: AsRef<Tensor>>(a: A) -> Tensor
 {
     Tensor::builder()
-        .set_shape(a.shape())
-        .set_input(a)
+        .set_shape(a.as_ref().shape())
+        .set_input(a.as_ref())
         .build(math_ops::NegOp)
 }
 
@@ -1160,11 +1155,11 @@ pub fn neg(a: &Tensor) -> Tensor
 ///     Ok(ndarray::arr1(&[4., 9.]).into_dyn())
 /// );
 /// ```
-pub fn square(a: &Tensor) -> Tensor
+pub fn square<A: AsRef<Tensor>>(a: A) -> Tensor
 {
     Tensor::builder()
-        .set_shape(a.shape())
-        .set_input(a)
+        .set_shape(a.as_ref().shape())
+        .set_input(a.as_ref())
         .build(math_ops::Square)
 }
 
@@ -1181,11 +1176,11 @@ pub fn square(a: &Tensor) -> Tensor
 ///     Ok(ndarray::arr1(&[0.5]).into_dyn())
 /// );
 /// ```
-pub fn reciprocal(x: &Tensor) -> Tensor
+pub fn reciprocal<A: AsRef<Tensor>>(x: A) -> Tensor
 {
     Tensor::builder()
-        .set_shape(x.shape())
-        .set_input(x)
+        .set_shape(x.as_ref().shape())
+        .set_input(x.as_ref())
         .build(math_ops::Reciprocal)
 }
 
@@ -1202,11 +1197,11 @@ pub fn reciprocal(x: &Tensor) -> Tensor
 ///     Ok(ndarray::arr1(&[-1., -1., -0.,  1.,  2.,  2.,  2.]).into_dyn())
 /// );
 /// ```
-pub fn ceil(a: &Tensor) -> Tensor
+pub fn ceil<A: AsRef<Tensor>>(a: A) -> Tensor
 {
     Tensor::builder()
-        .set_shape(a.shape())
-        .set_input(a)
+        .set_shape(a.as_ref().shape())
+        .set_input(a.as_ref())
         .build(math_ops::Ceil)
 }
 
@@ -1214,10 +1209,10 @@ pub fn ceil(a: &Tensor) -> Tensor
 ///
 /// # Panics
 /// When broadcast is impossible
-pub fn greater(a: &Tensor, b: &Tensor) -> Tensor
+pub fn greater<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor
 {
     Tensor::builder()
-        .set_inputs(vec![a, b])
+        .set_inputs(vec![a.as_ref(), b.as_ref()])
         .build(math_ops::Greater)
 }
 
@@ -1225,10 +1220,10 @@ pub fn greater(a: &Tensor, b: &Tensor) -> Tensor
 ///
 /// # Panics
 /// When broadcast is impossible
-pub fn greater_equal(a: &Tensor, b: &Tensor) -> Tensor
+pub fn greater_equal<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor
 {
     Tensor::builder()
-        .set_inputs(vec![a, b])
+        .set_inputs(vec![a.as_ref(), b.as_ref()])
         .build(math_ops::GreaterEqual)
 }
 
@@ -1236,10 +1231,10 @@ pub fn greater_equal(a: &Tensor, b: &Tensor) -> Tensor
 ///
 /// # Panics
 /// When broadcast is impossible
-pub fn lesser(a: &Tensor, b: &Tensor) -> Tensor
+pub fn lesser<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor
 {
     Tensor::builder()
-        .set_inputs(vec![a, b])
+        .set_inputs(vec![a.as_ref(), b.as_ref()])
         .build(math_ops::Lesser)
 }
 
@@ -1247,39 +1242,39 @@ pub fn lesser(a: &Tensor, b: &Tensor) -> Tensor
 ///
 /// # Panics
 /// When broadcast is impossible
-pub fn lesser_equal(a: &Tensor, b: &Tensor) -> Tensor
+pub fn lesser_equal<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor
 {
     Tensor::builder()
-        .set_inputs(vec![a, b])
+        .set_inputs(vec![a.as_ref(), b.as_ref()])
         .build(math_ops::LesserEqual)
 }
 
 /// Elementwise logistic sigmoid function.
-pub fn sigmoid(x: &Tensor) -> Tensor
+pub fn sigmoid<A: AsRef<Tensor>>(x: A) -> Tensor
 {
     Tensor::builder()
-        .set_shape(x.shape())
-        .set_input(x)
+        .set_shape(x.as_ref().shape())
+        .set_input(x.as_ref())
         .build(activation_ops::Sigmoid)
 }
 
 /// Elementwise exponential linear unit.
 ///
 /// See https://arxiv.org/abs/1511.07289
-pub fn elu(x: &Tensor, alpha: f32) -> Tensor
+pub fn elu<A: AsRef<Tensor>>(x: A, alpha: f32) -> Tensor
 {
     Tensor::builder()
-        .set_shape(x.shape())
-        .set_input(x)
+        .set_shape(x.as_ref().shape())
+        .set_input(x.as_ref())
         .build(activation_ops::ELU { alpha })
 }
 
 /// Elementwise rectified linear unit.
-pub fn relu(x: &Tensor) -> Tensor
+pub fn relu<A: AsRef<Tensor>>(x: A) -> Tensor
 {
     Tensor::builder()
-        .set_shape(x.shape())
-        .set_input(x)
+        .set_shape(x.as_ref().shape())
+        .set_input(x.as_ref())
         .build(activation_ops::ReLU)
 }
 
@@ -1288,26 +1283,26 @@ pub fn relu(x: &Tensor) -> Tensor
 /// In common, `alpha` is around 0.1 ~ 0.2.
 ///
 /// See http://web.stanford.edu/~awni/papers/relu_hybrid_icml2013_final.pdf
-pub fn leaky_relu(x: &Tensor, alpha: f32) -> Tensor
+pub fn leaky_relu<A: AsRef<Tensor>>(x: A, alpha: f32) -> Tensor
 {
-    maximum(x, &(alpha * x))
+    maximum(&x, alpha * x.as_ref())
 }
 
 /// Elementwise softplus.
-pub fn softplus(x: &Tensor) -> Tensor
+pub fn softplus<A: AsRef<Tensor>>(x: A) -> Tensor
 {
     Tensor::builder()
-        .set_shape(x.shape())
-        .set_input(x)
+        .set_shape(x.as_ref().shape())
+        .set_input(x.as_ref())
         .build(activation_ops::Softplus)
 }
 
 /// Computes `log(sum(exp(x)))` along specified axis.
 /// `axis` can be negative.
-pub fn reduce_logsumexp(x: &Tensor, axis: isize, keep_dims: bool) -> Tensor
+pub fn reduce_logsumexp<A: AsRef<Tensor>>(x: A, axis: isize, keep_dims: bool) -> Tensor
 {
     let op = math_ops::LogSumExp { axis, keep_dims };
-    Tensor::builder().set_input(x).build(op)
+    Tensor::builder().set_input(x.as_ref()).build(op)
 }
 
 /// Log softmax function.
@@ -1315,21 +1310,21 @@ pub fn reduce_logsumexp(x: &Tensor, axis: isize, keep_dims: bool) -> Tensor
 /// Computes `softmax(x)` along specified axis and
 /// takes logarithm of it.
 /// `axis` can be negative.
-pub fn log_softmax(x: &Tensor, axis: isize) -> Tensor
+pub fn log_softmax<A: AsRef<Tensor>>(x: A, axis: isize) -> Tensor
 {
     Tensor::builder()
-        .set_shape(x.shape())
-        .set_input(x)
+        .set_shape(x.as_ref().shape())
+        .set_input(x.as_ref())
         .build(xent_ops::LogSoftmax { axis })
 }
 
 /// Computes softmax along specified axis
 ///
 /// `axis` can be negative.
-pub fn softmax(x: &Tensor, axis: isize) -> Tensor
+pub fn softmax<A: AsRef<Tensor>>(x: A, axis: isize) -> Tensor
 {
     let op = activation_ops::Softmax { axis };
-    Tensor::builder().set_input(x).build(op)
+    Tensor::builder().set_input(x.as_ref()).build(op)
 }
 
 /// Computes `binary_cross_entropy(sigmoid(y), t)`.
@@ -1346,12 +1341,12 @@ pub fn softmax(x: &Tensor, axis: isize) -> Tensor
 ///
 /// # Returns
 /// Loss tensor with same shape as inputs's shapes
-pub fn sigmoid_cross_entropy(y: &Tensor, t: &Tensor) -> Tensor
+pub fn sigmoid_cross_entropy<A: AsRef<Tensor>, B: AsRef<Tensor>>(y: A, t: B) -> Tensor
 {
     let op = xent_ops::SigmoidCrossEntropy;
     Tensor::builder()
-        .set_shape(y.shape())
-        .set_inputs(vec![y, t])
+        .set_shape(y.as_ref().shape())
+        .set_inputs(vec![y.as_ref(), t.as_ref()])
         .build(op)
 }
 
@@ -1366,10 +1361,10 @@ pub fn sigmoid_cross_entropy(y: &Tensor, t: &Tensor) -> Tensor
 ///
 /// # Returns
 /// Loss tensor with shape (batch_size, 1)
-pub fn softmax_cross_entropy(y: &Tensor, t: &Tensor) -> Tensor
+pub fn softmax_cross_entropy<A: AsRef<Tensor>, B: AsRef<Tensor>>(y: A, t: B) -> Tensor
 {
     let op = xent_ops::SoftmaxCrossEntropy;
-    Tensor::builder().set_inputs(vec![y, t]).build(op)
+    Tensor::builder().set_inputs(vec![y.as_ref(), t.as_ref()]).build(op)
 }
 
 /// A variant of `softmax_cross_entropy`.
@@ -1383,10 +1378,10 @@ pub fn softmax_cross_entropy(y: &Tensor, t: &Tensor) -> Tensor
 ///
 /// # Returns
 /// Loss tensor with shape (batch_size, 1)
-pub fn sparse_softmax_cross_entropy(y: &Tensor, t: &Tensor) -> Tensor
+pub fn sparse_softmax_cross_entropy<A: AsRef<Tensor>, B: AsRef<Tensor>>(y: A, t: B) -> Tensor
 {
     let op = xent_ops::SparseSoftmaxCrossEntropy;
-    Tensor::builder().set_inputs(vec![y, t]).build(op)
+    Tensor::builder().set_inputs(vec![y.as_ref(), t.as_ref()]).build(op)
 }
 
 /// Matrix multiplication.
@@ -1402,13 +1397,13 @@ pub fn sparse_softmax_cross_entropy(y: &Tensor, t: &Tensor) -> Tensor
 ///
 /// assert_eq!(c.eval(&[]).unwrap().shape(), &[4, 3]);
 /// ```
-pub fn matmul(a: &Tensor, b: &Tensor) -> Tensor
+pub fn matmul<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor
 {
     let op = dot_ops::MatMul {
         transpose_a: false,
         transpose_b: false,
     };
-    Tensor::builder().set_inputs(vec![a, b]).build(op)
+    Tensor::builder().set_inputs(vec![a.as_ref(), b.as_ref()]).build(op)
 }
 
 /// Matrix multiplication with inputs's transposition.
@@ -1427,13 +1422,13 @@ pub fn matmul(a: &Tensor, b: &Tensor) -> Tensor
 ///
 /// assert_eq!(c.eval(&[]).unwrap().shape(), &[4, 3]);
 /// ```
-pub fn matmul_t(a: &Tensor, b: &Tensor, transpose_a: bool, transpose_b: bool) -> Tensor
+pub fn matmul_t<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B, transpose_a: bool, transpose_b: bool) -> Tensor
 {
     let op = dot_ops::MatMul {
         transpose_a,
         transpose_b,
     };
-    Tensor::builder().set_inputs(vec![a, b]).build(op)
+    Tensor::builder().set_inputs(vec![a.as_ref(), b.as_ref()]).build(op)
 }
 
 /// Computes tensor dot product (tensor contraction) along specified axes.
@@ -1460,13 +1455,25 @@ pub fn matmul_t(a: &Tensor, b: &Tensor, transpose_a: bool, transpose_b: bool) ->
 ///
 /// For detailed description,
 /// see https://docs.scipy.org/doc/numpy/reference/generated/numpy.tensordot.html.
-pub fn tensordot<T: ArrayLike>(a: &Tensor, b: &Tensor, a_axes: &T, b_axes: &T) -> Tensor
+pub fn tensordot<A, B, T>(a: A, b: B, a_axes: &T, b_axes: &T) -> Tensor
+where
+    T: ArrayLike,
+    A: AsRef<Tensor>,
+    B: AsRef<Tensor>,
 {
+    fn normalize_negative_axes(axes: &Tensor, x_rank: &Tensor) -> Tensor
+    {
+        let ref zero = zeros(&axes.shape());
+        let ge = greater_equal(axes, zero);
+        let lt = lesser(axes, zero);
+        add_inplace(mul_inplace(ge, axes), &mul_inplace(lt, &(axes + x_rank)))
+    }
+
     fn preprocess<T: ArrayLike>(x: &Tensor, axes: &T, flip: bool) -> (Tensor, Tensor)
     {
         let ref x_shape = x.shape();
         let ref x_rank = x.rank();
-        let ref axes = rectify_negative_axes(&axes.as_tensor(), x_rank);
+        let ref axes = normalize_negative_axes(&axes.as_tensor(), x_rank);
         let ref free = setdiff1d(&range(&scalar(0.), x_rank, &scalar(1.)), axes);
 
         let free_dims = gather(x_shape, free, 0);
@@ -1491,7 +1498,7 @@ pub fn tensordot<T: ArrayLike>(a: &Tensor, b: &Tensor, a_axes: &T, b_axes: &T) -
 
     // main procedure
     let ((a_reshaped, a_free_dims), (b_reshaped, b_free_dims)) =
-        (preprocess(a, a_axes, false), preprocess(b, b_axes, true));
+        (preprocess(a.as_ref(), a_axes, false), preprocess(b.as_ref(), b_axes, true));
     let ref mm = matmul(&a_reshaped, &b_reshaped);
     let final_shape = concat(&[&a_free_dims, &b_free_dims], 0);
     reshape(mm, &final_shape)
@@ -1512,13 +1519,13 @@ pub fn tensordot<T: ArrayLike>(a: &Tensor, b: &Tensor, a_axes: &T, b_axes: &T) -
 /// ```
 ///
 /// For detailed description, see https://www.tensorflow.org/api_docs/python/tf/matmul
-pub fn batch_matmul(a: &Tensor, b: &Tensor) -> Tensor
+pub fn batch_matmul<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor
 {
     let op = dot_ops::BatchMatMul {
         transpose_a: false,
         transpose_b: false,
     };
-    Tensor::builder().set_inputs(vec![a, b]).build(op)
+    Tensor::builder().set_inputs(vec![a.as_ref(), b.as_ref()]).build(op)
 }
 
 /// Takes diff between two tensors
@@ -1539,10 +1546,10 @@ pub fn batch_matmul(a: &Tensor, b: &Tensor) -> Tensor
 /// )
 /// ```
 ///
-pub fn setdiff1d(a: &Tensor, b: &Tensor) -> Tensor
+pub fn setdiff1d<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor
 {
     let op = array_ops::SetDiff1D;
-    Tensor::builder().set_inputs(vec![a, b]).build(op)
+    Tensor::builder().set_inputs(vec![a.as_ref(), b.as_ref()]).build(op)
 }
 
 /// Permutes dimensions.
@@ -1555,11 +1562,11 @@ pub fn setdiff1d(a: &Tensor, b: &Tensor) -> Tensor
 ///
 /// assert_eq!(b.eval(&[]).unwrap().shape(), &[5, 3, 4, 1, 2]);
 /// ```
-pub fn transpose<T: ArrayLike>(x: &Tensor, perm: &T) -> Tensor
+pub fn transpose<T: ArrayLike, A: AsRef<Tensor>>(x: A, perm: &T) -> Tensor
 {
     let op = math_ops::Transpose { zip: true };
     Tensor::builder()
-        .set_inputs(vec![x, &perm.as_tensor()])
+        .set_inputs(vec![x.as_ref(), &perm.as_tensor()])
         .build(op)
 }
 
@@ -1585,7 +1592,7 @@ pub fn transpose<T: ArrayLike>(x: &Tensor, perm: &T) -> Tensor
 /// assert_eq!(e1.as_ref().unwrap().shape(), &[3, 3, 5]);
 /// assert_eq!(e2.as_ref().unwrap().shape(), &[3, 2, 5]);
 /// ```
-pub fn split(x: &Tensor, sizes: &[usize], axis: isize) -> Vec<Tensor>
+pub fn split<A: AsRef<Tensor>>(x: A, sizes: &[usize], axis: isize) -> Vec<Tensor>
 {
     (0..sizes.len())
         .map(|i| {
@@ -1594,7 +1601,7 @@ pub fn split(x: &Tensor, sizes: &[usize], axis: isize) -> Vec<Tensor>
                 index: i,
                 axis,
             };
-            Tensor::builder().set_input(x).build(op)
+            Tensor::builder().set_input(x.as_ref()).build(op)
         })
         .collect::<Vec<_>>()
 }
@@ -1615,7 +1622,7 @@ pub fn split(x: &Tensor, sizes: &[usize], axis: isize) -> Vec<Tensor>
 ///
 /// assert_eq!(b.eval(&[]).unwrap().shape(), &[4, 2]);
 /// ```
-pub fn slice(x: &Tensor, starts: &[isize], ends: &[isize]) -> Tensor
+pub fn slice<A: AsRef<Tensor>>(x: A, starts: &[isize], ends: &[isize]) -> Tensor
 {
     // TODO: Make starts and ends ArrayLike
     assert_eq!(starts.len(), ends.len());
@@ -1628,7 +1635,7 @@ pub fn slice(x: &Tensor, starts: &[isize], ends: &[isize]) -> Tensor
     let op = array_ops::Slice {
         indices: indices.into_boxed_slice(),
     };
-    Tensor::builder().set_input(x).build(op)
+    Tensor::builder().set_input(x.as_ref()).build(op)
 }
 
 /// Concatenates input tensors along specified axis.
@@ -1671,11 +1678,11 @@ pub fn concat(tensors: &[&Tensor], axis: isize) -> Tensor
 ///
 /// assert_eq!(y.eval(&[]).unwrap().shape(), &[5, 4, 2, 3, 2])
 /// ```
-pub fn gather_common<T: ArrayLike>(param: &Tensor, indices: &T, axis: isize) -> Tensor
+pub fn gather_common<T: ArrayLike, A: AsRef<Tensor>>(param: A, indices: &T, axis: isize) -> Tensor
 {
     let op = array_ops::Gather { axis, should_normalize_negative_indices: true };
     Tensor::builder()
-        .set_inputs(vec![&indices.as_tensor(), param])
+        .set_inputs(vec![&indices.as_tensor(), param.as_ref()])
         .build(op)
 }
 
@@ -1697,11 +1704,11 @@ pub fn gather_common<T: ArrayLike>(param: &Tensor, indices: &T, axis: isize) -> 
 ///
 /// assert_eq!(y.eval(&[]).unwrap().shape(), &[5, 4, 2, 3, 2])
 /// ```
-pub fn gather<T: ArrayLike>(param: &Tensor, indices: &T, axis: isize) -> Tensor
+pub fn gather<T: ArrayLike, A: AsRef<Tensor>>(param: A, indices: &T, axis: isize) -> Tensor
 {
     let op = array_ops::Gather { axis, should_normalize_negative_indices: false };
     Tensor::builder()
-        .set_inputs(vec![&indices.as_tensor(), param])
+        .set_inputs(vec![&indices.as_tensor(), param.as_ref()])
         .build(op)
 }
 
@@ -1721,12 +1728,13 @@ pub fn gather<T: ArrayLike>(param: &Tensor, indices: &T, axis: isize) -> Tensor
 /// assert_eq!(e0.as_ref().unwrap().shape(), &[3, 4]);
 /// assert_eq!(e1.as_ref().unwrap().shape(), &[3, 4]);
 /// ```
-pub fn normalize<T: ArrayLike>(x: &Tensor, axes: &T) -> Tensor
+pub fn normalize<T: ArrayLike, A: AsRef<Tensor>>(x: A, axes: &T) -> Tensor
 {
+    let x = x.as_ref();
     let axes = axes.as_tensor();
     let ref mean = reduce_mean(x, &axes, true);
     let ref centered = x - mean;
-    let ref variance = reduce_mean(&square(&centered), &axes, true);
+    let ref variance = reduce_mean(square(centered), &axes, true);
     (x - mean) / sqrt(&(variance + 1e-5))
 }
 
@@ -1747,9 +1755,13 @@ pub fn normalize<T: ArrayLike>(x: &Tensor, axes: &T) -> Tensor
 ///
 /// assert_eq!(norm.eval(&[]).unwrap().shape(), &[3, 4]);
 /// ```
-pub fn batch_norm(x: &Tensor, scale: &Tensor, shift: &Tensor) -> Tensor
+pub fn batch_norm<A, B, C>(x: A, scale: B, shift: C) -> Tensor
+where
+    A: AsRef<Tensor>,
+    B: AsRef<Tensor>,
+    C: AsRef<Tensor>,
 {
-    normalize(x, &[0]) * scale + shift
+    normalize(x, &[0]) * scale.as_ref() + shift.as_ref()
 }
 
 /// Generates a zero-ranked tensor from a scalar value.

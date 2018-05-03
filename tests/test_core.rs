@@ -18,15 +18,15 @@ impl ag::op::Op for MultiOutputOp
 
     fn grad(&self, _: &ag::Tensor, _: &[&ag::Tensor], _: &ag::Tensor) -> Vec<Option<ag::Tensor>>
     {
-        vec![None]
+        vec![None; 2]
     }
 }
 
 #[test]
-fn test_select_ith()
+fn test_nth_tensor()
 {
     let ref a = ag::Tensor::builder().build(MultiOutputOp);
-    let ref b = ag::select_ith_of(a, 1);
+    let ref b = ag::nth_tensor(a, 1);
     let ref c = ag::exp(b);
     ag::eval(&[c], &[]);
 }
