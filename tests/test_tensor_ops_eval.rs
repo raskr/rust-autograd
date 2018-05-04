@@ -14,7 +14,7 @@ fn reduce_prod()
 fn argmax() {
     let ref x = ag::constant(ndarray::arr2(&[[3., 4.], [5., 6.]]));
     let ref y = ag::argmax(x, -1, false);
-    assert_eq!(y.eval(&[]), Ok(ndarray::arr1(&[1., 1.]).into_dyn()));
+    assert_eq!(y.eval(&[]), Some(ndarray::arr1(&[1., 1.]).into_dyn()));
 }
 
 #[test]

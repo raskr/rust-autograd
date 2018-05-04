@@ -249,8 +249,7 @@ impl Tensor
     /// Evaluates this tensor as a ndarray's array object.
     ///
     /// See [eval](../fn.eval.html).
-    pub fn eval<'a, 'b: 'a, 'c: 'a, T>(&self, feeds: T)
-        -> Result<ndarray::Array<f32, ndarray::IxDyn>, ::runtime::EvaluationError>
+    pub fn eval<'a, 'b: 'a, 'c: 'a, T>(&self, feeds: T) -> Option<NdArray>
     where
         T: IntoIterator<Item = &'a (&'b Tensor, &'c ndarray::Array<f32, ndarray::IxDyn>)>,
     {

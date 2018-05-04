@@ -8,14 +8,6 @@ use std::mem;
 use std::rc::Rc;
 use tensor::Tensor;
 
-#[derive(Clone, Debug, PartialEq)]
-pub enum EvaluationError {
-    ComputeFailed {
-        node_name: String,
-        msg: String
-    },
-    NoOutput
-}
 
 // Context in evaluation of `node`
 pub struct OpComputeContext<'a, 'b>
@@ -113,6 +105,13 @@ impl<'a> Tensor
 
 /// Evaluates given symbolic tensors.
 ///
+/// Each return value can be `None`.
+/// For example, evaluation of `gradient_descent_ops::*`
+/// would result in `None`.
+///
+/// NOTE: All the runtime errors are not reported by return values, but by "panic"
+/// for convenience.
+///
 /// ```
 /// extern crate ndarray;
 /// extern crate autograd as ag;
@@ -122,14 +121,14 @@ impl<'a> Tensor
 ///
 /// // eval two tensors at once.
 /// let evaluated = ag::eval(&[a, b], &[]);
-/// assert_eq!(evaluated[0], Ok(ndarray::arr1(&[0., 0.]).into_dyn()));
-/// assert_eq!(evaluated[1], Ok(ndarray::arr1(&[1., 1.]).into_dyn()));
+/// assert_eq!(evaluated[0], Some(ndarray::arr1(&[0., 0.]).into_dyn()));
+/// assert_eq!(evaluated[1], Some(ndarray::arr1(&[1., 1.]).into_dyn()));
 /// ```
 // FIXME: Annoying lifetime params
 pub fn eval<'a, 'b: 'a, 'c: 'a, T, U>(
     tensors: &[T],
     feeds: U,
-) -> Vec<Result<ndarray::Array<f32, ndarray::IxDyn>, EvaluationError>>
+) -> Vec<Option<NdArray>>
 where
     T: AsRef<Tensor>,
     U: IntoIterator<Item = &'a (&'b Tensor, &'c ndarray::Array<f32, ndarray::IxDyn>)>,
@@ -163,22 +162,22 @@ where
         .map(|ref creator| {
             if let Some(ref per) = creator.persistent_array {
                 // Rarely happens (case that a persistent array given by user is required)
-                Ok(per.get_array().clone())
+                Some(per.get_array().clone())
             } else if creator.is_placeholder {
                 // Rarely happens (case that a feed by user is required)
-                Ok(find_fed_resource(creator, &feeds).clone())
+                Some(find_fed_resource(creator, &feeds).clone())
             } else {
                 let res = match key2res.entry(creator.resource_lookup_key.get()) {
                     Entry::Occupied(mut ent) => {
                         if ent.get().pending_count == 1 { // move out the resource.
                             let mut got = ent.remove();
                             // Using first item of the compute result
-                            map_err(got.value.remove(0), creator)
+                            map_err(got.value.remove(0))
                         } else { // "clone" the resource.
                             let mut got = ent.get_mut();
                             got.pending_count -= 1;
                             // Using first item of the compute result
-                            map_err(got.value[0].clone(), creator)
+                            map_err(got.value[0].clone())
                         }
                     }
                     _ => unreachable!(),
@@ -192,8 +191,7 @@ where
 /// Runs given symbolic tensors.
 ///
 /// Runs, but returns nothing.
-/// Any errors in this running session cause panics automatically.
-/// To avoid this, use `ag::eval` or `Tensor::eval`.
+/// This is useful for executing in-place ops etc.
 ///
 /// ```
 /// extern crate ndarray;
@@ -212,26 +210,10 @@ where
     U: IntoIterator<Item = &'a (&'b Tensor, &'c NdArray)>,
 {
     // Just run the graph
-    let ret = eval_internal(
+    eval_internal(
         &tensors.iter().map(|t| t.as_ref()).collect(),
         &feeds.into_iter().collect(),
     );
-    // Panic as necessary
-    for r in ret {
-        panic_if_user_err(&r.value[0])
-    }
-}
-
-
-#[inline]
-fn panic_if_user_err(res: &Result<NdArray, op::ComputeError>)
-{
-    match res {
-        &Err(op::ComputeError::BadInput(_)) => {
-            res.as_ref().unwrap();
-        },
-        _ => {},
-    }
 }
 
 // Recursive function which seeks a node holding the x's resource.
@@ -246,20 +228,11 @@ fn find_resource_creator<'a, 'b>(storage: &ResourceStore, x: &'b Tensor) -> &'b 
     }
 }
 
-type EvalResult = Result<NdArray, EvaluationError>;
-
 #[inline]
-// Converts `ComputeError` to `EvaluationError`.
-fn map_err<'a>(res: Result<NdArray, ::op::ComputeError>,
-               node: &'a Tensor) -> EvalResult {
+fn map_err<'a>(res: Result<NdArray, ::op::ComputeError>) -> Option<NdArray> {
     match res {
-        Ok(arr) => Ok(arr),
-        Err(::op::ComputeError::BadInput(ref msg)) =>
-            Err(EvaluationError::ComputeFailed {
-                node_name: node.op.name().to_string(),
-                msg: msg.to_string() }
-            ),
-        Err(::op::ComputeError::NoOutput) => Err(EvaluationError::NoOutput),
+        Ok(arr) => Some(arr),
+        Err(::op::ComputeError::NoOutput) => None,
         _ => unreachable!()
     }
 }
@@ -380,7 +353,7 @@ fn test_eval()
 fn test_constant_eval()
 {
     let arr = ndarray::arr1(&[0., 0., 0.]);
-    assert_eq!(Ok(arr.clone().into_dyn()), ::variable(arr).eval(&[]));
+    assert_eq!(Some(arr.clone().into_dyn()), ::variable(arr).eval(&[]));
 }
 
 #[test]
@@ -389,7 +362,7 @@ fn test_placeholder_eval()
     let arr = ::ndarray_ext::ones(&[3, 2, 1]);
     let ref v = ::ops::placeholder(&[3, 2, 1]);
     let eval_result = eval(&[v], &[(v, &arr)]);
-    assert_eq!(eval_result[0], Ok(arr));
+    assert_eq!(eval_result[0], Some(arr));
 }
 
 #[test]

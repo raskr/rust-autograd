@@ -67,8 +67,7 @@ impl op::Op for PreprocessBinOpGrad {
                             mem::swap(&mut folded, &mut Some(::ndarray_ext::expand_dims(ret, i)));
                         }
                     } else {
-                        return vec![Err(::op::ComputeError::BadInput(
-                            format!("{}'s axis {} don't broadcast", ctx.grab_input_node(0), i)))];
+                        panic!("{}'s axis {} don't broadcast", ctx.grab_input_node(0), i);
                     }
                 }
                 // case of x_axis < gy_axis: unreachable
@@ -127,8 +126,7 @@ impl op::Op for PreprocessBinOpGradGrad {
             if let Some(ret) = gy.broadcast(target_shape) {
                 ret.to_owned()
             } else {
-                let msg = "Cant't broadcast.".to_string();
-                return vec![Err(::op::ComputeError::BadInput(msg))];
+                panic!("Cant't broadcast.");
             }
         };
 

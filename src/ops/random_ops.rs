@@ -13,7 +13,7 @@ pub struct StandardNormal<R>
 impl<R> StandardNormal<R> {
     pub fn new(arr_rng: ArrRng<R>) -> Self {
         Self {
-            arr_rng: arr_rng,
+            arr_rng,
         }
     }
 }
@@ -25,9 +25,7 @@ pub struct StandardUniform<R>
 
 impl<R> StandardUniform<R> {
     pub fn new(arr_rng: ArrRng<R>) -> Self {
-        Self {
-            arr_rng: arr_rng,
-        }
+        Self { arr_rng }
     }
 }
 
@@ -40,11 +38,7 @@ pub struct RandomUniform<R>
 
 impl<R> RandomUniform<R> {
     pub fn new(arr_rng: ArrRng<R>, min: f64, max: f64) -> Self {
-        Self {
-            arr_rng: arr_rng,
-            max: max,
-            min: min,
-        }
+        Self { arr_rng, max, min }
     }
 }
 
@@ -57,11 +51,7 @@ pub struct RandomNormal<R>
 
 impl<R> RandomNormal<R> {
     pub fn new(arr_rng: ArrRng<R>, mean: f64, stddev: f64) -> Self {
-        Self {
-            arr_rng: arr_rng,
-            mean: mean,
-            stddev: stddev,
-        }
+        Self { arr_rng, mean, stddev }
     }
 }
 
@@ -73,10 +63,7 @@ pub struct Bernoulli<R>
 
 impl<R> Bernoulli<R> {
     pub fn new(arr_rng: ArrRng<R>, p: f64) -> Self {
-        Self {
-            arr_rng: arr_rng,
-            p: p,
-        }
+        Self { arr_rng, p }
     }
 }
 
@@ -88,10 +75,7 @@ pub struct Exponential<R>
 
 impl<R> Exponential<R> {
     pub fn new(arr_rng: ArrRng<R>, lambda: f64) -> Self {
-        Self {
-            arr_rng: arr_rng,
-            lambda: lambda,
-        }
+        Self { arr_rng, lambda }
     }
 }
 
@@ -104,11 +88,7 @@ pub struct LogNormal<R>
 
 impl<R> LogNormal<R> {
     pub fn new(arr_rng: ArrRng<R>, mean: f64, stddev: f64) -> Self {
-        Self {
-            arr_rng: arr_rng,
-            mean: mean,
-            stddev: stddev,
-        }
+        Self { arr_rng, mean, stddev }
     }
 }
 
@@ -121,11 +101,7 @@ pub struct Gamma<R>
 
 impl<R> Gamma<R> {
     pub fn new(arr_rng: ArrRng<R>, shape_param: f64, scale: f64) -> Self {
-        Self {
-            arr_rng: arr_rng,
-            shape_param: shape_param,
-            scale: scale,
-        }
+        Self { arr_rng, shape_param, scale }
     }
 }
 
@@ -134,11 +110,6 @@ impl<R: Rng> op::Op for RandomNormal<R>
     fn name(&self) -> &str
     {
         "RandomNormal"
-    }
-
-    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
-        vec![None]
     }
 
     fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
@@ -153,6 +124,11 @@ impl<R: Rng> op::Op for RandomNormal<R>
             )),
         ]
     }
+
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
+        vec![None]
+    }
 }
 
 impl<R: Rng> op::Op for RandomUniform<R>
@@ -160,11 +136,6 @@ impl<R: Rng> op::Op for RandomUniform<R>
     fn name(&self) -> &str
     {
         "RandomUniform"
-    }
-
-    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
-        vec![None]
     }
 
     fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
@@ -179,6 +150,11 @@ impl<R: Rng> op::Op for RandomUniform<R>
             )),
         ]
     }
+
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
+        vec![None]
+    }
 }
 
 impl<R: Rng> op::Op for StandardNormal<R>
@@ -188,16 +164,16 @@ impl<R: Rng> op::Op for StandardNormal<R>
         "StandardNormal"
     }
 
-    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
-        vec![None]
-    }
-
     fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let xs = ctx.grab_inputs();
         let shape = ndarray_ext::arr_to_shape(xs[0]);
         vec![Ok(self.arr_rng.standard_normal(shape.as_slice()))]
+    }
+
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
+        vec![None]
     }
 }
 
@@ -208,16 +184,16 @@ impl<R: Rng> op::Op for StandardUniform<R>
         "StandardUniform"
     }
 
-    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
-        vec![None]
-    }
-
     fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let xs = ctx.grab_inputs();
         let shape = ndarray_ext::arr_to_shape(xs[0]);
         vec![Ok(self.arr_rng.standard_uniform(shape.as_slice()))]
+    }
+
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
+        vec![None]
     }
 }
 
@@ -228,16 +204,16 @@ impl<R: Rng> op::Op for Bernoulli<R>
         "Bernoulli"
     }
 
-    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
-        vec![None]
-    }
-
     fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let xs = ctx.grab_inputs();
         let shape = ndarray_ext::arr_to_shape(xs[0]);
         vec![Ok(self.arr_rng.bernoulli(shape.as_slice(), self.p))]
+    }
+
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
+        vec![None]
     }
 }
 
@@ -248,11 +224,6 @@ impl<R: Rng> op::Op for Exponential<R>
         "Exponential"
     }
 
-    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
-        vec![None]
-    }
-
     fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
     {
         let xs = ctx.grab_inputs();
@@ -261,6 +232,11 @@ impl<R: Rng> op::Op for Exponential<R>
             Ok(self.arr_rng.exponential(shape.as_slice(), self.lambda)),
         ]
     }
+
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
+        vec![None]
+    }
 }
 
 impl<R: Rng> op::Op for LogNormal<R>
@@ -268,11 +244,6 @@ impl<R: Rng> op::Op for LogNormal<R>
     fn name(&self) -> &str
     {
         "LogNormal"
-    }
-
-    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
-        vec![None]
     }
 
     fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
@@ -287,6 +258,11 @@ impl<R: Rng> op::Op for LogNormal<R>
             )),
         ]
     }
+
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
+        vec![None]
+    }
 }
 
 impl<R: Rng> op::Op for Gamma<R>
@@ -294,11 +270,6 @@ impl<R: Rng> op::Op for Gamma<R>
     fn name(&self) -> &str
     {
         "Gamma"
-    }
-
-    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
-        vec![None]
     }
 
     fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
@@ -312,5 +283,10 @@ impl<R: Rng> op::Op for Gamma<R>
                 self.scale,
             )),
         ]
+    }
+
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    {
+        vec![None]
     }
 }

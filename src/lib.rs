@@ -24,11 +24,11 @@
 //! let ref ggx = ag::grad(&[gx], &[x])[0];
 //!
 //! // evaluation of symbolic gradients
-//! println!("{:?}", gy.eval(&[]));   // => Ok(3.)
-//! println!("{:?}", ggx.eval(&[]));  // => Ok(4.)
+//! println!("{:?}", gy.eval(&[]));   // => Some(3.)
+//! println!("{:?}", ggx.eval(&[]));  // => Some(4.)
 //!
 //! // dz/dx requires to fill the placeholder `x`
-//! println!("{:?}", gx.eval(&[(x, &ndarray::arr0(2.).into_dyn())]));  // => Ok(8.)
+//! println!("{:?}", gx.eval(&[(x, &ndarray::arr0(2.).into_dyn())]));  // => Some(8.)
 //! # }
 //! ```
 //!

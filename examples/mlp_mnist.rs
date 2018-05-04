@@ -56,7 +56,7 @@ fn main()
                 let i = *i as isize;
                 let x_batch = x_train.slice(s![i..i + batch_size, ..]).to_owned();
                 let y_batch = y_train.slice(s![i..i + batch_size, ..]).to_owned();
-                ag::run(update_ops, &[(x, &x_batch), (y, &y_batch)]);
+                ag::eval(update_ops, &[(x, &x_batch), (y, &y_batch)]);
             }
         });
         println!("finish epoch {}", epoch);

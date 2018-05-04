@@ -228,9 +228,7 @@ impl op::Op for Reshape
         let ret = if let Ok(a) = ret.into_shape(ndarray::IxDyn(target.as_slice())) {
             Ok(a)
         } else {
-            Err(::op::ComputeError::BadInput(
-                "Shape incompatible".to_string(),
-            ))
+            panic!("Shape Incompatible");
         };
         vec![ret]
     }
@@ -301,9 +299,7 @@ impl op::Op for IndexOp
         let ret = if let Some(ret) = flat_x.get(i) {
             Ok(ndarray::arr0(*ret).into_dyn())
         } else {
-            Err(::op::ComputeError::BadInput(
-                "Index out of bounds".to_string(),
-            ))
+            panic!("Index out of bounds");
         };
         vec![ret]
     }
@@ -347,11 +343,7 @@ impl op::Op for IndexOpGrad
         {
             *a = gy[ndarray::IxDyn(&[])];
         } else {
-            return vec![
-                Err(::op::ComputeError::BadInput(
-                    "Index out of bounds".to_string(),
-                )),
-            ];
+            panic!("Index out of bounds");
         }
         vec![Ok(result)]
     }
@@ -584,9 +576,7 @@ impl op::Op for Concat
         let ret = if let Ok(y) = ndarray::stack(ndarray::Axis(axis), views.as_slice()) {
             Ok(y)
         } else {
-            Err(::op::ComputeError::BadInput(
-                "Can't concat arrays whose shapes are incompatible.".to_string(),
-            ))
+            panic!("Can't concat arrays whose shapes are incompatible.");
         };
         vec![ret]
     }
@@ -686,9 +676,7 @@ impl op::Op for Tile
         let ret = if let Ok(ret) = ndarray::stack(ndarray::Axis(axis), views.as_slice()) {
             Ok(ret)
         } else {
-            Err(::op::ComputeError::BadInput(
-                "Input shapes incompatible".to_string(),
-            ))
+            panic!("Shape Incompatible");
         };
         vec![ret]
     }

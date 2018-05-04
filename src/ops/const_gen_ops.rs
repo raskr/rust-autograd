@@ -117,11 +117,7 @@ impl op::Op for Range
 
         let true_shape = &[];
         if x0.shape() != true_shape || x1.shape() != true_shape || x2.shape() != true_shape {
-            return vec![
-                Err(::op::ComputeError::BadInput(
-                    "Inputs to `range` should be 0-ranked tensors".to_string(),
-                )),
-            ];
+            panic!("Inputs to `range` should be 0-ranked tensors");
         }
 
         let start = x0[ndarray::IxDyn(&[])];
@@ -129,11 +125,7 @@ impl op::Op for Range
         let step = x2[ndarray::IxDyn(&[])];
 
         if start > end {
-            return vec![
-                Err(::op::ComputeError::BadInput(
-                    "Start and end of `range` is wrong.".to_string(),
-                )),
-            ];
+            panic!("Start and end of `range` is wrong.");
         }
 
         vec![Ok(ndarray::Array1::range(start, end, step).into_dyn())]

@@ -13,8 +13,6 @@ pub enum ComputeError
     {
         to: usize
     },
-    /// Could'nt compute output array because of bad inputs.
-    BadInput(String),
     /// Computation finished correctly with no output
     NoOutput,
 }

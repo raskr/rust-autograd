@@ -59,7 +59,7 @@ let ((x_train, y_train), (x_test, y_test)) = dataset::load();
 // -- training loop --
 for epoch in 0..max_epoch {
     ...
-    ag::run(update_ops, &[(x, &x_batch), (y, &y_batch)]);
+    ag::eval(update_ops, &[(x, &x_batch), (y, &y_batch)]);
 }
 
 ```

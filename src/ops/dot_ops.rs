@@ -35,20 +35,8 @@ impl op::Op for MatMul
         let x1 = xs[1];
         let x0_shape = x0.shape();
         let x1_shape = x1.shape();
-        if x0_shape.len() != 2 {
-            return vec![
-                Err(::op::ComputeError::BadInput(
-                    "First input to the matmul should be Matrix".to_string(),
-                )),
-            ];
-        }
-        if x1_shape.len() != 2 {
-            return vec![
-                Err(::op::ComputeError::BadInput(
-                    "Second input to the matmul should be Matrix".to_string(),
-                )),
-            ];
-        }
+        assert_eq!(x0_shape.len(), 2, "First input to the matmul should be Matrix");
+        assert_eq!(x1_shape.len(), 2, "Second input to the matmul should be Matrix");
         let x0_view = x0.view();
         let x1_view = x1.view();
         // unwrap is always safe
@@ -103,12 +91,7 @@ impl op::Op for BatchMatMul
         let rank1 = x1.ndim();
 
         if rank0 != rank1 || shape0[..rank0 - 2] != shape1[..rank0 - 2] {
-            return vec![
-                Err(::op::ComputeError::BadInput(format!(
-                    "Input shape mismatch: {:?} vs {:?}",
-                    shape0, shape1
-                ))),
-            ];
+            panic!("Input shape mismatch: {:?} vs {:?}", shape0, shape1);
         }
 
         let row0 = shape0[rank0 - 2];

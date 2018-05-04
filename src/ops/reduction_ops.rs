@@ -425,11 +425,8 @@ impl op::Op for ReduceGradCommon
                 let mut gy_shape = gy.shape().to_vec();
                 axes.sort();
                 for &axis in axes.iter() {
-                    if axis > gy_shape.len() {
-                        return vec![Err(::op::ComputeError::BadInput(
-                            "Bad gradient. You may passed non-scalar value to ag::grad?".to_string()
-                        ))];
-                    }
+                    assert!(axis <= gy_shape.len(),
+                            "Bad gradient. You may passed non-scalar value to ag::grad?");
                     gy_shape.insert(axis, 1);
                 }
                 gy_view = gy_view.into_shape(gy_shape).unwrap()
@@ -439,9 +436,7 @@ impl op::Op for ReduceGradCommon
             if let Some(ret) = gy_view.broadcast(target_shape) {
                 ret.to_owned()
             } else {
-                return vec![Err(::op::ComputeError::BadInput(
-                    "Bad gradient. You may passed non-scalar value to ag::grad?".to_string()
-                ))];
+                panic!("Bad gradient. You may passed non-scalar value to ag::grad?")
             }
         };
 

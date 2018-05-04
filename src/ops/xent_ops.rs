@@ -52,13 +52,7 @@ impl op::Op for SigmoidCrossEntropy
         let x = xs[0];
         let t = xs[1];
 
-        if x.shape() != t.shape() {
-            return vec![
-                Err(::op::ComputeError::BadInput(
-                    "x.shape must match t.shape".to_string(),
-                )),
-            ];
-        }
+        assert_eq!(x.shape(), t.shape(), "x.shape must match t.shape");
 
         let e = f32::consts::E;
         let max_fn = f32::max;
@@ -98,33 +92,13 @@ impl op::Op for SparseSoftmaxCrossEntropy
 
         // validation
         {
-            if log_x.ndim() != 2 {
-                return vec![
-                    Err(::op::ComputeError::BadInput(format!(
-                        "Bad first argument's shape {:?}",
-                        log_x.shape()
-                    ))),
-                ];
-            }
-
+            assert_eq!(log_x.ndim(), 2, "Bad first argument's shape");
             let t_shape = t.shape();
             let t_rank = t_shape.len();
             if t_rank == 2 {
-                if t_shape[1] != 1 {
-                    return vec![
-                        Err(::op::ComputeError::BadInput(format!(
-                            "Bad second argument's shape {:?}",
-                            t_shape
-                        ))),
-                    ];
-                }
+                assert_eq!(t_shape[1], 1, "Bad second argument's shape");
             } else if t_rank != 1 {
-                return vec![
-                    Err(::op::ComputeError::BadInput(format!(
-                        "Bad second argument's shape {:?}",
-                        t_shape
-                    ))),
-                ];
+                panic!("Bad second argument's shape");
             }
         }
 
@@ -204,22 +178,8 @@ impl op::Op for SoftmaxCrossEntropy
         let log_x: NdArray = x - &ops::math_ops::logsumexp_forward(x, 1, true);
         // `t` must be one-hot
         let t = xs[1];
-
-        if log_x.ndim() != 2 {
-            return vec![
-                Err(::op::ComputeError::BadInput(
-                    "x must be 2-ranked tensor".to_string(),
-                )),
-            ];
-        }
-        if t.ndim() != 2 {
-            return vec![
-                Err(::op::ComputeError::BadInput(
-                    "t must be 2-ranked tensor".to_string(),
-                )),
-            ];
-        }
-
+        assert_eq!(log_x.ndim(), 2, "x must be 2-ranked tensor");
+        assert_eq!(t.ndim(), 2, "t must be 2-ranked tensor");
         // - t log x ( =(batch, num_classes))
         vec![Ok((t * &log_x).sum_axis(ndarray::Axis(1)) * -1.), Ok(log_x)]
     }
