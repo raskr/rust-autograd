@@ -9,6 +9,63 @@ use std::rc::Rc;
 use tensor::Tensor;
 
 
+/// Helper structure for **batched** evaluation.
+///
+/// ```
+/// extern crate autograd as ag;
+/// extern crate ndarray as nd;
+///
+/// let ref a = ag::placeholder(&[]);
+/// let ref x = a + a;
+/// let ref y = a * a;
+/// let ref z = a / a;
+///
+/// ag::Eval::new()
+///     .push(&y)
+///     .extend(&[y, z])
+///     .run(&[(a, &nd::arr0(2.).into_dyn())]);  // Do eval
+/// ```
+pub struct Eval<'a> {
+    buf: Vec<&'a Tensor>
+}
+
+impl<'t> Eval<'t> {
+
+    /// Instantiates a new evaluation session.
+    pub fn new() -> Self
+    {
+        Eval {
+            buf: Vec::new()
+        }
+    }
+
+    /// Appends a tensor to the back of evaluation targets.
+    pub fn push(&mut self, x: &'t Tensor) -> &mut Self
+    {
+        self.buf.push(x);
+        self
+    }
+
+    /// Extends the evaluation targets with `xs`.
+    pub fn extend<A>(&mut self, xs: &'t [A]) -> &mut Self
+    where
+        A: AsRef<Tensor>
+    {
+        self.buf.extend(xs.iter().map(|x| x.as_ref()));
+        self
+    }
+
+    /// Evaluates buffered tensors.
+    ///
+    /// `feeds` is a stream of `(placeholder tensor, its value)`
+    pub fn run<'tpl, 'tsr: 'tpl, 'arr: 'tpl, F>(&self, feed: F) -> Vec<Option<NdArray>>
+    where
+        F: IntoIterator<Item = &'tpl (&'tsr Tensor, &'arr ndarray::Array<f32, ndarray::IxDyn>)>
+    {
+        eval(&self.buf, feed)
+    }
+}
+
 // Context in evaluation of `node`
 pub struct OpComputeContext<'a, 'b>
 {

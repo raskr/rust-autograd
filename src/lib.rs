@@ -96,6 +96,4 @@ pub use ops::gradient_descent_ops;
 #[doc(hidden)]
 pub use ndarray_ext::NdArray;
 
-pub use runtime::eval;
-
-pub use runtime::run;
+pub use runtime::{eval, run, Eval};
