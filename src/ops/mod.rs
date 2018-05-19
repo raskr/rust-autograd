@@ -15,6 +15,7 @@ mod xent_ops;
 mod dot_ops;
 mod reduction_ops;
 mod const_gen_ops;
+mod conv_ops;
 pub mod gradient_descent_ops;
 
 impl Tensor
