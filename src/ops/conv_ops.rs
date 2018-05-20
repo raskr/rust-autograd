@@ -304,25 +304,30 @@ fn test_im2col()
     )
 }
 
-//#[test]
-//fn test_conv2d() {
-//    use ::op::Op;
-//
-//    let op = Conv2D {
-//        pad_h: 0,
-//        pad_w: 0,
-//        stride_w: 1,
-//        stride_h: 1,
-//        dilation_h: 1,
-//        dilation_w: 1,
-//    };
-//
-//    let x = ndarray::Array1::range(0., 1.*2.*3.*3., 1.)
-//        .into_shape((1, 2, 3, 3)).unwrap().into_dyn();
-//    let w = ::ndarray_ext::zeros(&[/*out_ch=*/1, /*in_ch=*/2, /*row=*/2, /*col=*/2]);
-//
-//    op.compute(::runtime::OpComputeContext {
-//        xs: vec![&x, &w],
-//        node: &::ops::zeros(&[0]) // dummy (not used)
-//    });
-//}
+#[test]
+fn test_conv2d() {
+    use ::op::Op;
+
+    let op = Conv2D {
+        pad_h: 0,
+        pad_w: 0,
+        stride_w: 1,
+        stride_h: 1,
+        dilation_h: 1,
+        dilation_w: 1,
+    };
+
+    let x = ndarray::Array1::range(0., 1.*2.*3.*3., 1.)
+        .into_shape((1, 2, 3, 3)).unwrap().into_dyn();
+    let w = ::ndarray_ext::zeros(&[/*out_ch=*/1, /*in_ch=*/2, /*row=*/2, /*col=*/2]);
+
+    let ret = op.compute(::runtime::OpComputeContext {
+        xs: vec![&x, &w],
+        node: &::ops::zeros(&[0]) // dummy (not used)
+    });
+    let x_shape = x.shape();
+    assert_eq!(
+        ret[0].as_ref().unwrap().shape(),
+        &[x_shape[0], 1, 2, 2]
+    );
+}

@@ -70,7 +70,7 @@ impl<'t> Eval<'t> {
 pub struct OpComputeContext<'a, 'b>
 {
     pub node: &'a Tensor, // Expose to its op for convenience
-    xs: Vec<&'b NdArray>,
+    pub xs: Vec<&'b NdArray>,
 }
 
 impl<'a, 'b> OpComputeContext<'a, 'b>
