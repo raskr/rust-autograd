@@ -10,6 +10,7 @@ use tensor::Tensor;
 #[link(name = "conv")]
 #[no_mangle]
 extern "C" {
+
     fn im2col_kernel(
         data_im: *const c_float,
         channels: c_int,
@@ -121,7 +122,7 @@ impl ::op::Op for Conv2D {
     {
         let xs = ctx.grab_inputs();
         let x: &NdArray = xs[0];
-        let ker = xs[1].view();
+        let w = xs[1].view();
 
         let (batch_size, xch, xh, xw) = {
             let x_shape = x.shape();
@@ -129,7 +130,7 @@ impl ::op::Op for Conv2D {
         };
 
         let (ych, kh, kw) = {
-            let kernel_shape = ker.shape();
+            let kernel_shape = w.shape();
             (kernel_shape[0] as i32, kernel_shape[2] as i32, kernel_shape[3] as i32)
         };
 
@@ -137,15 +138,8 @@ impl ::op::Op for Conv2D {
         let yw = get_col_w(self, xw, kw);
 
         let num_elements_in_batch = (xch * xh * xw) as usize;
-
-        type Mat = ndarray::Array2<f32>;
-        let w = {
-            let mut w = ker.into_shape(((ych * xch) as usize, (kh * kw) as usize)).unwrap();
-            w.swap_axes(0, 1);
-            w
-        };
-
-        let final_shape = ((yh * yw) as usize, (kh * kw * xch) as usize);
+        let w = w.into_shape((ych as usize, (xch * kh * kw) as usize)).unwrap();
+        let final_shape = ((xch * kh * kw) as usize, (yh * yw) as usize);
 
         // Stream of "im2col + matrix mul" is executed in parallel (with rayon thread pool).
         let dots: Vec<_> = (0..batch_size).into_par_iter().map(move |i| { // for each mini-batch
@@ -161,29 +155,31 @@ impl ::op::Op for Conv2D {
                 cols.as_ptr()
             );
 
-            let col: Mat = {
-                let mut col = Mat::from_shape_vec(final_shape, cols).unwrap();
-                col.swap_axes(0, 1);
-                col
-            };
+            // (kkc, wh)
+            type Mat = ndarray::Array2<f32>;
+            let col: Mat = Mat::from_shape_vec(final_shape, cols).unwrap();
 
             // Dot product and then expand the batch dim.
             let dot = {
-                let dot = col.dot(&w);
+                let dot = w.dot(&col);
                 let (a, b) = {
                     let shape = dot.shape();
                     (shape[0], shape[1])
                 };
                 dot.into_shape((1, a, b)).unwrap() // safe unwrap
             };
-
             dot
         }).collect();
 
-        // Stack results
+        // Stack results (batch, num_filters, out_h * out_w)
         let stack = ndarray::stack(ndarray::Axis(0),
                                    &dots.iter().map(|d| d.view()).collect::<Vec<_>>()).unwrap();
-        vec![Ok(stack.into_dyn())]
+
+        // Reshape it into (batch, yc, yh, yw)
+        let ret = stack.into_shape(ndarray::IxDyn(
+            &[batch_size, ych as usize, yh as usize, yw as usize])).unwrap();
+
+        vec![Ok(ret)]
     }
 
     fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
@@ -234,6 +230,7 @@ fn test_parallel_im2col()
             1.0, 2.0, 4.0, 5.0,
             3.0, 4.0, 6.0, 7.0,
             4.0, 5.0, 7.0, 8.0,
+
             9.0, 10.0, 12.0, 13.0,
             10.0, 11.0, 13.0, 14.0,
             12.0, 13.0, 15.0, 16.0,
