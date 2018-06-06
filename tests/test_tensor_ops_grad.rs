@@ -605,11 +605,11 @@ fn conv2d_filter_grad()
     let ref y = ag::conv2d(x, w, 0, 0, 1, 1, 1, 1);
     let ref g = ag::grad_with_default(&[y], &[w], &[&ag::ones(&y.shape())])[0];
     let ref gg = ag::grad_with_default(&[g], &[w], &[&ag::ones(&g.shape())]);
-    ag::test_helper::gradient_check(y, gg, &[w], &[], 1e-3, 1e-2);
+    ag::test_helper::gradient_check(g, gg, &[w], &[], 1e-3, 1e-2);
     // g.shape は w.shape と同じ。
     // で、g を w で微分すると、numeric については、g がまず評価される。つまり、FilterGrad がまず forward
     // される。ここはおｋらしい。
-    // 
+    //
 }
 
 #[test]

@@ -1996,7 +1996,7 @@ where A: AsRef<Tensor>,
       B: AsRef<Tensor>,
 {
     // let cols_buffer = &Tensor::builder().build(basic_source_ops::Variable);
-    let op = conv_ops::Conv2D {
+    let op = conv_ops::conv2d::Conv2D {
         pad_h, pad_w,
         stride_h, stride_w,
         dilation_h, dilation_w,
@@ -2017,7 +2017,7 @@ pub fn conv2d_transpose<A, B>(x: A, w: B,
     where A: AsRef<Tensor>,
           B: AsRef<Tensor>,
 {
-    let op = conv_ops::Conv2DTranspose {
+    let op = conv_ops::conv2d_transpose::Conv2DTranspose {
         pad_h, pad_w, stride_h, stride_w, dilation_h, dilation_w, cols: None
     };
     Tensor::builder()
