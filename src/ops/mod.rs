@@ -1985,3 +1985,42 @@ pub fn range<T: ArrayLike>(start: &T, end: &T, step: &T) -> Tensor
         ])
         .build(const_gen_ops::Range)
 }
+
+pub fn conv2d<A, B>(x: A, w: B,
+                    pad_h: usize, pad_w: usize,
+                    stride_h: usize,
+                    stride_w: usize,
+                    dilation_h: usize,
+                    dilation_w: usize) -> Tensor
+where A: AsRef<Tensor>,
+      B: AsRef<Tensor>,
+{
+    // let cols_buffer = &Tensor::builder().build(basic_source_ops::Variable);
+    let op = conv_ops::Conv2D {
+        pad_h, pad_w,
+        stride_h, stride_w,
+        dilation_h, dilation_w,
+        cols: None
+    };
+    Tensor::builder()
+        .set_inputs(vec![x.as_ref(), w.as_ref()])
+        .build(op)
+}
+
+
+pub fn conv2d_transpose<A, B>(x: A, w: B,
+                        pad_h: usize, pad_w: usize,
+                        stride_h: usize,
+                        stride_w: usize,
+                        dilation_h: usize,
+                        dilation_w: usize) -> Tensor
+    where A: AsRef<Tensor>,
+          B: AsRef<Tensor>,
+{
+    let op = conv_ops::Conv2DTranspose {
+        pad_h, pad_w, stride_h, stride_w, dilation_h, dilation_w, cols: None
+    };
+    Tensor::builder()
+        .set_inputs(vec![x.as_ref(), w.as_ref()])
+        .build(op)
+}
