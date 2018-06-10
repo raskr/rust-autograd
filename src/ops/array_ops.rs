@@ -295,7 +295,7 @@ impl op::Op for IndexOp
             self.index as usize
         };
         // unwrap is safe
-        let flat_x = x.view().into_shape((x.len())).unwrap();
+        let flat_x = x.view().into_shape(x.len()).unwrap();
         let ret = if let Some(ret) = flat_x.get(i) {
             Ok(ndarray::arr0(*ret).into_dyn())
         } else {
