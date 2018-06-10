@@ -1,5 +1,10 @@
 language: rust
 
+addons:
+  apt:
+    packages:
+      - gfortran
+
 rust:
   - "1.24.0"
   - stable
