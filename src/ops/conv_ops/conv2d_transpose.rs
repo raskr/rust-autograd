@@ -61,21 +61,20 @@ impl ::op::Op for Conv2DTranspose {
         };
         let w: &f32 = unsafe { &*w.as_ptr() };
 
-        // alloc buffers as necessary
+        // Alloc buffers as necessary
         let col = get_or_insert_cols!(self, batch_size, num_elements_in_batch_col);
+        // Col2im buffer must be initialized with zeros
         let gx = vec![0.; batch_size * num_elements_in_batch_gx];
 
         (0..batch_size).into_par_iter().for_each(|i| { // for each mini-batch
             let gy_region_head = &gy[i * num_elements_in_batch_gy];
             let col_region_head = &col[i * num_elements_in_batch_col];
             let gx_region_head = &gx[i * num_elements_in_batch_gx];
-
             sgemm(true, false, w, gy_region_head, col_region_head, m, n, k, 1., 0.);
-
-            exec_col2im(col_region_head, xch, xh, xw, kh, kw,
-                        self.pad_h, self.pad_w,
-                        self.stride_h, self.stride_w,
-                        self.dilation_h, self.dilation_w, gx_region_head);
+            col2im(col_region_head, xch, xh, xw, kh, kw,
+                   self.pad_h, self.pad_w,
+                   self.stride_h, self.stride_w,
+                   self.dilation_h, self.dilation_w, gx_region_head);
         });
 
         let gx = NdArray::from_shape_vec(ndarray::IxDyn(&[batch_size, xch, xh, xw]), gx);
@@ -87,7 +86,7 @@ impl ::op::Op for Conv2DTranspose {
         let x = xs[0];
         let w = xs[1];
 
-        let gx1 = Tensor::builder()
+        let gx = Tensor::builder()
             .set_inputs(vec![gy, w])
             .build(
                 super::conv2d::Conv2D {
@@ -101,8 +100,8 @@ impl ::op::Op for Conv2DTranspose {
                 }
             );
 
-        let gx2 = Tensor::builder()
-            .set_inputs(vec![gy, x, w])
+        let gw = Tensor::builder()
+            .set_inputs(vec![gy, x, &w])
             .build(
                 Conv2DTransposeFilterGrad {
                     pad_h: self.pad_h,
@@ -115,7 +114,7 @@ impl ::op::Op for Conv2DTranspose {
                 }
             );
 
-        vec![Some(gx1), Some(gx2)]
+        vec![Some(gx), Some(gw)]
     }
 }
 
@@ -131,23 +130,22 @@ impl ::op::Op for Conv2DTransposeFilterGrad {
         let xs = ctx.grab_inputs();
         let gy = xs[0];
         let x = xs[1];
-        let w = xs[2];
+        let k_shape = xs[2].shape();
 
         let x_shape = x.shape();
         let gy_shape = gy.shape();
-        let f_shape = w.shape();
 
         let batch_size = x_shape[0];
-        let (kh, kw) = (f_shape[2], f_shape[3]);
+        let (kh, kw) = (k_shape[2], k_shape[3]);
 
         let num_elements_in_batch_g = {
             gy_shape[1] *
-                gy_shape[2] *
-                gy_shape[3]
+            gy_shape[2] *
+            gy_shape[3]
         };
         let num_elements_in_batch_c = {
             get_yh!(self, gy_shape[2], kh) *
-                get_yw!(self, gy_shape[3], kw) * kh * kw * gy_shape[1]
+            get_yw!(self, gy_shape[3], kw) * kh * kw * gy_shape[1]
         };
         let num_elements_in_batch_x = x_shape[1] * x_shape[2] * x_shape[3];
 
@@ -165,15 +163,14 @@ impl ::op::Op for Conv2DTransposeFilterGrad {
         // Allocate buffer as necessary
         let cols = get_or_insert_cols!(self, batch_size, num_elements_in_batch_c);
 
-        let gw = alloc_uninitialized_buf(f_shape[0] * f_shape[1] * f_shape[2] * f_shape[3]);
+        let gw = alloc_uninitialized_buf(k_shape[0] * k_shape[1] * k_shape[2] * k_shape[3]);
         let gw_head = unsafe { &*gw.as_ptr() };
 
         for i in 0..batch_size {
             let x_region_head = &x[i * num_elements_in_batch_x];
             let c_region_head = &cols[i * num_elements_in_batch_c];
             let g_region_head = &gy[i * num_elements_in_batch_g];
-
-            exec_im2col(
+            im2col(
                 g_region_head,
                 gy_shape[1], gy_shape[2], gy_shape[3], kh, kw,
                 self.pad_h, self.pad_w,
@@ -181,23 +178,22 @@ impl ::op::Op for Conv2DTransposeFilterGrad {
                 self.dilation_h, self.dilation_w,
                 c_region_head
             );
-
             sgemm(false, true,
                   x_region_head,
                   c_region_head,
                   gw_head, m, n, k, 1., (i != 0) as i32 as f32);
         }
 
-        vec![Ok(NdArray::from_shape_vec(f_shape, gw).unwrap())]
+        vec![Ok(NdArray::from_shape_vec(k_shape, gw).unwrap())]
     }
 
-    fn grad(&self, gg: &Tensor, xs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gw: &Tensor, xs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         let gy = xs[0];
         let x = xs[1];
 
-        let g1 = Tensor::builder()
-            .set_inputs(vec![gy, gg])
+        let ggy = Tensor::builder()
+            .set_inputs(vec![x, gw])
             .build(
                 Conv2DTranspose {
                     pad_h: self.pad_h,
@@ -210,8 +206,8 @@ impl ::op::Op for Conv2DTransposeFilterGrad {
                 }
             );
 
-        let g2 = Tensor::builder()
-            .set_inputs(vec![x, gg])
+        let ggx = Tensor::builder()
+            .set_inputs(vec![gy, gw])
             .build(
                 super::conv2d::Conv2D {
                     pad_h: self.pad_h,
@@ -224,7 +220,7 @@ impl ::op::Op for Conv2DTransposeFilterGrad {
                 }
             );
 
-        vec![Some(g1), Some(g2), None]
+        vec![Some(ggy), Some(ggx), None]
     }
 }
 
@@ -276,19 +272,19 @@ fn test_parallel_col2im()
         unsafe {
             let cols_head = (&cols[i * num_elements_in_batch_col]) as *const f32;
             let im_head = (&im[i * num_elements_in_batch_im]) as *const f32;
-            col2im_kernel(cols_head,
-                          xch as i32,
-                          xh as i32,
-                          xw as i32,
-                          kh as i32,
-                          kw as i32,
-                          op.pad_h as i32,
-                          op.pad_w as i32,
-                          op.stride_h as i32,
-                          op.stride_w as i32,
-                          op.dilation_h as i32,
-                          op.dilation_w as i32,
-                          im_head);
+            col2im_cpu(cols_head,
+                       xch as i32,
+                       xh as i32,
+                       xw as i32,
+                       kh as i32,
+                       kw as i32,
+                       op.pad_h as i32,
+                       op.pad_w as i32,
+                       op.stride_h as i32,
+                       op.stride_w as i32,
+                       op.dilation_h as i32,
+                       op.dilation_w as i32,
+                       im_head);
         }
     });
 
