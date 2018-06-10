@@ -57,7 +57,7 @@ pub mod conv2d_transpose;
 #[no_mangle]
 extern "C" {
 
-    fn im2col_kernel(
+    fn im2col_cpu(
         data_im: *const c_float,
         channels: c_int,
         height: c_int,
@@ -73,7 +73,7 @@ extern "C" {
         data_col: *const c_float,
     );
 
-    fn col2im_kernel(
+    fn col2im_cpu(
         data_col: *const c_float,
         channels: c_int,
         height: c_int,
@@ -91,7 +91,7 @@ extern "C" {
 }
 
 #[inline]
-fn exec_im2col(
+fn im2col(
     data_im: &c_float,
     channels: usize,
     height: usize,
@@ -107,7 +107,7 @@ fn exec_im2col(
     data_col: &c_float,
 ) {
     unsafe {
-        im2col_kernel(
+        im2col_cpu(
             data_im as *const c_float,
             channels as i32,
             height as i32,
@@ -126,7 +126,7 @@ fn exec_im2col(
 }
 
 #[inline]
-fn exec_col2im(
+fn col2im(
     data_col: &f32,
     channels: usize,
     height: usize,
@@ -142,7 +142,7 @@ fn exec_col2im(
     data_im: &f32,
 ) {
     unsafe {
-        col2im_kernel(
+        col2im_cpu(
             data_col as *const c_float,
             channels as c_int,
             height as c_int,

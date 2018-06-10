@@ -1987,7 +1987,8 @@ pub fn range<T: ArrayLike>(start: &T, end: &T, step: &T) -> Tensor
 }
 
 pub fn conv2d<A, B>(x: A, w: B,
-                    pad_h: usize, pad_w: usize,
+                    pad_h: usize,
+                    pad_w: usize,
                     stride_h: usize,
                     stride_w: usize,
                     dilation_h: usize,
@@ -1995,21 +1996,22 @@ pub fn conv2d<A, B>(x: A, w: B,
 where A: AsRef<Tensor>,
       B: AsRef<Tensor>,
 {
-    // let cols_buffer = &Tensor::builder().build(basic_source_ops::Variable);
-    let op = conv_ops::conv2d::Conv2D {
-        pad_h, pad_w,
-        stride_h, stride_w,
-        dilation_h, dilation_w,
-        cols: None
-    };
     Tensor::builder()
         .set_inputs(vec![x.as_ref(), w.as_ref()])
-        .build(op)
+        .build(
+            conv_ops::conv2d::Conv2D {
+                pad_h, pad_w,
+                stride_h, stride_w,
+                dilation_h, dilation_w,
+                cols: None
+            }
+        )
 }
 
 
 pub fn conv2d_transpose<A, B>(x: A, w: B,
-                        pad_h: usize, pad_w: usize,
+                        pad_h: usize,
+                        pad_w: usize,
                         stride_h: usize,
                         stride_w: usize,
                         dilation_h: usize,
@@ -2017,10 +2019,13 @@ pub fn conv2d_transpose<A, B>(x: A, w: B,
     where A: AsRef<Tensor>,
           B: AsRef<Tensor>,
 {
-    let op = conv_ops::conv2d_transpose::Conv2DTranspose {
-        pad_h, pad_w, stride_h, stride_w, dilation_h, dilation_w, cols: None
-    };
     Tensor::builder()
         .set_inputs(vec![x.as_ref(), w.as_ref()])
-        .build(op)
+        .build(
+            conv_ops::conv2d_transpose::Conv2DTranspose {
+                pad_h, pad_w,
+                stride_h, stride_w,
+                dilation_h, dilation_w,
+                cols: None
+        })
 }

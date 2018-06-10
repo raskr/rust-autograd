@@ -28,7 +28,6 @@ pub struct Conv2DWithCols {
     pub stride_w: usize,
     pub dilation_h: usize,
     pub dilation_w: usize,
-    pub cols: Option<Vec<f32>>
 }
 
 impl ::op::Op for Conv2D {
@@ -51,8 +50,8 @@ impl ::op::Op for Conv2D {
             (x_shape[0], x_shape[1], x_shape[2], x_shape[3])
         };
         let (ych, kh, kw) = {
-            let f_shape = w.shape();
-            (f_shape[0], f_shape[2], f_shape[3])
+            let k_shape = w.shape();
+            (k_shape[0], k_shape[2], k_shape[3])
         };
         let yh = get_yh!(self, xh, kh);
         let yw = get_yw!(self, xw, kw);
@@ -77,11 +76,10 @@ impl ::op::Op for Conv2D {
 
         // Do task
         (0..batch_size).into_par_iter().for_each(|i| { // for each batch
-            // 1. im2col
             let x_region_head = &x[i * num_elements_in_batch_x];
             let c_region_head = &c[i * num_elements_in_batch_c];
-
-            exec_im2col(
+            let y_region_head = &y[i * num_elements_in_batch_y];
+            im2col(
                 x_region_head,
                 xch, xh, xw, kh, kw,
                 self.pad_h, self.pad_w,
@@ -89,10 +87,6 @@ impl ::op::Op for Conv2D {
                 self.dilation_h, self.dilation_w,
                 c_region_head
             );
-
-            // 2. sgemm (y <- wc)
-            let y_region_head = &y[i * num_elements_in_batch_y];
-
             sgemm(false, false, w, c_region_head, y_region_head, m, n, k, 1., 0.);
         });
 
@@ -109,6 +103,7 @@ impl ::op::Op for Conv2D {
     fn grad(&self, gy: &Tensor, xs: &[&Tensor], y: &Tensor) -> Vec<Option<Tensor>>
     {
         let w = xs[1];
+        let cols = &::ops::stop_gradient(::ops::nth_tensor(y, 1));
 
         let gx = Tensor::builder()
             .set_inputs(vec![gy, w])
@@ -124,9 +119,8 @@ impl ::op::Op for Conv2D {
                 }
             );
 
-        let cols = &::ops::nth_tensor(y, 1);
         let gw = Tensor::builder()
-            .set_inputs(vec![cols, gy, w])
+            .set_inputs(vec![cols, gy, &::ops::stop_gradient(w)])
             .build(
                 Conv2DFilterGrad {
                     pad_h: self.pad_h,
@@ -157,11 +151,10 @@ impl ::op::Op for Conv2DWithCols {
 
         // Extract size params
         let cols_shape = cols.shape();
-        let f_shape = w.shape();
+        let k_shape = w.shape();
         let (ych, xch, kh, kw) = {
-            (f_shape[0], f_shape[1], f_shape[2], f_shape[3])
+            (k_shape[0], k_shape[1], k_shape[2], k_shape[3])
         };
-        // bkkchw
         let yh = cols_shape[4];
         let yw = cols_shape[5];
         let batch_size = cols_shape[0];
@@ -170,10 +163,10 @@ impl ::op::Op for Conv2DWithCols {
         let num_elements_in_batch_y = ych * yh * yw;
         let num_elements_in_batch_c = {
             cols_shape[1] *
-                cols_shape[2] *
-                cols_shape[3] *
-                cols_shape[4] *
-                cols_shape[5]
+            cols_shape[2] *
+            cols_shape[3] *
+            cols_shape[4] *
+            cols_shape[5]
         };
         let m = ych;
         let n = yh * yw;
@@ -203,9 +196,9 @@ impl ::op::Op for Conv2DWithCols {
     fn grad(&self, gy: &Tensor, xs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         let cols = xs[0];
-        let w = xs[1]; // ggf
+        let w = xs[1];
 
-        let gx = Tensor::builder()
+        let g_col = Tensor::builder()
             .set_inputs(vec![gy, w])
             .build(
                 super::conv2d_transpose::Conv2DTranspose {
@@ -232,7 +225,7 @@ impl ::op::Op for Conv2DWithCols {
                 }
             );
 
-        vec![Some(gx), Some(gw)]
+        vec![Some(g_col), Some(gw)]
     }
 }
 
@@ -247,27 +240,26 @@ impl ::op::Op for Conv2DFilterGrad {
         let xs = ctx.grab_inputs();
         let cols = xs[0];  // must be columns
         let gy = xs[1];
-        let w = xs[2];
-
+        let k_shape = xs[2].shape();
         let cols_shape = cols.shape();
         let gy_shape = gy.shape();
-        let f_shape = w.shape();
 
         let num_elements_in_batch_g = {
             gy_shape[1] *
-                gy_shape[2] *
-                gy_shape[3]
+            gy_shape[2] *
+            gy_shape[3]
         };
 
         let num_elements_in_batch_c = {
             cols_shape[1] *
-                cols_shape[2] *
-                cols_shape[3] *
-                cols_shape[4] *
-                cols_shape[5]
+            cols_shape[2] *
+            cols_shape[3] *
+            cols_shape[4] *
+            cols_shape[5]
         };
 
-        let (xch, kh, kw) = (f_shape[1], f_shape[2], f_shape[3]);
+        let (xch, kh, kw) = (k_shape[1], k_shape[2], k_shape[3]);
+        // BUG: ych
         let (batch_size, ych, yh, yw) = (gy_shape[0], gy_shape[1], gy_shape[2], gy_shape[3]);
 
         let m = ych;
@@ -281,31 +273,25 @@ impl ::op::Op for Conv2DFilterGrad {
         let gy = unsafe {
             slice::from_raw_parts(gy.as_ptr(), gy.len())
         };
-        let gf = alloc_uninitialized_buf(ych * xch * kh * kw);
-        let gf_head = unsafe { &*gf.as_ptr() };
+        let gw = alloc_uninitialized_buf(ych * xch * kh * kw);
+        let gw_head = unsafe { &*gw.as_ptr() };
 
         for i in 0..batch_size {
             sgemm(false, true,
                   &gy[i * num_elements_in_batch_g],
                   &cols[i * num_elements_in_batch_c],
-                  gf_head, m, n, k, 1., (i != 0) as i32 as f32);
+                  gw_head, m, n, k, 1., (i != 0) as i32 as f32);
         }
-
-        println!("inputs of Conv2DFilterGrad: {:?}", ctx.node.inputs);
-        println!("f_shape: {:?}", f_shape);
-        println!("vec shape: {:?}", &[ych, xch, kh, kw]);
-
-        let gf = NdArray::from_shape_vec(f_shape, gf).unwrap();
-        vec![Ok(gf)]
+        vec![Ok(NdArray::from_shape_vec(k_shape, gw).unwrap())]
     }
 
-    fn grad(&self, ggf: &Tensor, xs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, ggw: &Tensor, xs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
     {
         let cols = xs[0];
         let gy = xs[1];
 
-        let g_cols = Tensor::builder()
-            .set_inputs(vec![gy, ggf])
+        let gx = Tensor::builder()
+            .set_inputs(vec![gy, ggw])
             .build(
                 super::conv2d_transpose::Conv2DTranspose {
                     pad_h: self.pad_h,
@@ -319,7 +305,7 @@ impl ::op::Op for Conv2DFilterGrad {
             );
 
         let ggy = Tensor::builder()
-            .set_inputs(vec![cols, ggf])
+            .set_inputs(vec![cols, ggw])
             .build(
                 Conv2DWithCols {
                     pad_h: self.pad_h,
@@ -328,11 +314,10 @@ impl ::op::Op for Conv2DFilterGrad {
                     stride_w: self.stride_w,
                     dilation_h: self.dilation_h,
                     dilation_w: self.dilation_w,
-                    cols: None,
                 }
             );
 
-        vec![Some(g_cols), Some(ggy), None]
+        vec![Some(gx), Some(ggy), None]
     }
 }
 
@@ -351,7 +336,6 @@ fn test_tensor_size_after_convolution()
 
     let (xh, xw) = (3, 3);
     let (kh, kw) = (2, 2);
-
     let yh = get_yh!(&op, xh, kh);
     let yw = get_yw!(&op, xw, kw);
     assert_eq!(yh, 2);
@@ -383,7 +367,7 @@ fn test_parallel_im2col()
     let c = alloc_uninitialized_buf(batch_size * num_elements_in_batch_c);
     // Call im2col on 2 chunks in parallel.
     (0..batch_size).into_par_iter().for_each(|i| { // for each mini-batch
-        exec_im2col(
+        im2col(
             &x[i * num_elements_in_batch_x],
             xch, xh, xw, kh, kw,
             op.pad_h, op.pad_w,
@@ -445,14 +429,14 @@ fn test_im2col()
     let cols = alloc_uninitialized_buf(1 * xch * kw * kh * yh * yw);
 
     unsafe {
-        im2col_kernel(x.as_ptr(),
-                      xch as i32,
-                      xh as i32, xw as i32,
-                      kh as i32, kw as i32,
-                      op.pad_h as i32, op.pad_w as i32,
-                      op.stride_h as i32, op.stride_w as i32,
-                      op.dilation_h as i32, op.dilation_w as i32,
-                      cols.as_ptr())
+        im2col_cpu(x.as_ptr(),
+                   xch as i32,
+                   xh as i32, xw as i32,
+                   kh as i32, kw as i32,
+                   op.pad_h as i32, op.pad_w as i32,
+                   op.stride_h as i32, op.stride_w as i32,
+                   op.dilation_h as i32, op.dilation_w as i32,
+                   cols.as_ptr())
     };
 
     assert_eq!(
