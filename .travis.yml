@@ -1,5 +1,7 @@
 language: rust
 
+env: TYPE=default RUST_BACKTRACE=1
+
 addons:
   apt:
     packages:
@@ -16,10 +18,10 @@ sudo: false
 cache: cargo
 
 install:
-  - cargo build
+  - cargo build -v
 
 script:
-  - cargo test
+  - cargo test -v
 
 compiler:
     - clang
