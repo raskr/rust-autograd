@@ -120,7 +120,7 @@ impl ::op::Op for Conv2D {
             );
 
         let gw = Tensor::builder()
-            .set_inputs(vec![cols, gy, w])
+            .set_inputs(vec![cols, gy, &::ops::stop_gradient(w)])
             .build(
                 Conv2DFilterGrad {
                     pad_h: self.pad_h,

@@ -101,7 +101,7 @@ impl ::op::Op for Conv2DTranspose {
             );
 
         let gw = Tensor::builder()
-            .set_inputs(vec![gy, x, &w])
+            .set_inputs(vec![gy, x, &::ops::stop_gradient(w)])
             .build(
                 Conv2DTransposeFilterGrad {
                     pad_h: self.pad_h,
