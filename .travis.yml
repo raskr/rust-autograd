@@ -1,12 +1,14 @@
 language: rust
 
+env: TYPE=default RUST_BACKTRACE=1
+
 addons:
   apt:
     packages:
       - gfortran
 
 rust:
-  - "1.24.0"
+  - "1.26.2"
   - stable
   - beta
   - nightly
@@ -16,10 +18,10 @@ sudo: false
 cache: cargo
 
 install:
-  - cargo build
+  - cargo build -v
 
 script:
-  - cargo test
+  - cargo test -v
 
 compiler:
     - clang
