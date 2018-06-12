@@ -33,6 +33,8 @@ pub struct TensorCore
     pub has_gradient: bool,
     /// Indices of arrays used in `compute`
     pub input_indices: Vec<usize>,
+    /// Inputs used when performing backprop.
+    pub inputs_on_backprop: Option<Vec<Tensor>>
 }
 
 pub enum PersistentArray
@@ -110,12 +112,13 @@ impl PersistentArray
 
 pub struct TensorBuilder
 {
-    shape:            Option<Tensor>,
-    inputs:           Vec<Tensor>,
-    has_gradient:     bool,
-    is_placeholder:   bool,
-    persistent_array: Option<PersistentArray>,
-    input_indices:    Option<Vec<usize>>,
+    shape:              Option<Tensor>,
+    inputs:             Vec<Tensor>,
+    has_gradient:       bool,
+    is_placeholder:     bool,
+    persistent_array:   Option<PersistentArray>,
+    input_indices:      Option<Vec<usize>>,
+    inputs_on_backprop: Option<Vec<Tensor>>,
 }
 
 impl TensorBuilder
@@ -183,6 +186,13 @@ impl TensorBuilder
         self
     }
 
+    #[inline]
+    pub fn set_backprop_inputs(mut self, a: Vec<Tensor>) -> TensorBuilder
+    {
+        self.inputs_on_backprop = Some(a);
+        self
+    }
+
     /// ```
     /// extern crate ndarray;
     /// extern crate autograd as ag;
@@ -227,6 +237,7 @@ impl TensorBuilder
             resource_lookup_key: Cell::new(!0),
             has_gradient: self.has_gradient,
             input_indices,
+            inputs_on_backprop: self.inputs_on_backprop,
         }))
     }
 }
@@ -237,12 +248,13 @@ impl Tensor
     pub fn builder() -> TensorBuilder
     {
         TensorBuilder {
-            shape:            None,
-            inputs:           Vec::new(),
-            has_gradient:     true,
-            persistent_array: None,
-            is_placeholder:   false,
-            input_indices:    None,
+            shape:              None,
+            inputs:             Vec::new(),
+            has_gradient:       true,
+            persistent_array:   None,
+            is_placeholder:     false,
+            input_indices:      None,
+            inputs_on_backprop: None
         }
     }
 

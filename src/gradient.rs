@@ -234,6 +234,11 @@ pub fn symbolic_gradients(
             gxs
         };
         // Register computed gradients
+        let xs_ = if let Some(ref a) = y.inner.inputs_on_backprop {
+            a
+        } else {
+            &y.inner.inputs
+        };
         for (gx, x) in gxs.into_iter().zip(xs_) {
             let x_info = &mut access_grad_info_of!(x, path);
             if x_info.has_gradient {

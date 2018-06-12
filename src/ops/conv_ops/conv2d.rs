@@ -103,7 +103,7 @@ impl ::op::Op for Conv2D {
     fn grad(&self, gy: &Tensor, xs: &[&Tensor], y: &Tensor) -> Vec<Option<Tensor>>
     {
         let w = xs[1];
-        let cols = &::ops::stop_gradient(::ops::nth_tensor(y, 1));
+        let cols = &::ops::stop_gradient(::ops::nth_tensor(y, 1, Some(y.inputs[0].clone())));
 
         let gx = Tensor::builder()
             .set_inputs(vec![gy, w])

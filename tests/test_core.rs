@@ -26,7 +26,7 @@ impl ag::op::Op for MultiOutputOp
 fn test_nth_tensor()
 {
     let ref a = ag::Tensor::builder().build(MultiOutputOp);
-    let ref b = ag::nth_tensor(a, 1);
+    let ref b = ag::nth_tensor(a, 1, None);
     let ref c = ag::exp(b);
     ag::eval(&[c], &[]);
 }
