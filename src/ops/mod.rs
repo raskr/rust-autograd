@@ -1989,7 +1989,18 @@ pub fn range<T: ArrayLike>(start: &T, end: &T, step: &T) -> Tensor
         .build(const_gen_ops::Range)
 }
 
-/// 2D convolution. (requires blas feature)
+/// 2D convolution.
+///
+/// * `x`: Tensor with shape `(batch, channel, h, w)`
+/// * `w`: Tensor with shape `(out_channel, channel, filter_h, filter_w)`
+///
+/// Returns a tensor with shape `(batch, out_channel, out_h, out_w)`
+///
+/// where
+///
+///   * `out_h` = `(h + 2 * pad_h - filter_h) / stride_h + 1`
+///   * `out_w` = `(w + 2 * pad_w - filter_w) / stride_w + 1`
+///
 pub fn conv2d<A, B>(x: A, w: B,
                     pad_h: usize,
                     pad_w: usize,
@@ -2010,14 +2021,25 @@ pub fn conv2d<A, B>(x: A, w: B,
         )
 }
 
-/// 2D convolution with dilation. (requires blas feature)
+/// 2D convolution with dilation.
+///
+/// * `x`: Tensor with shape `(batch, channel, h, w)`
+/// * `w`: Tensor with shape `(out_channel, in_channel, filter_h, filter_w)`
+///
+/// Returns a tensor with shape `(batch, out_channel, out_h, out_w)`
+///
+/// where
+///
+///   * `out_h` = `(h + 2 * pad_h - (dilate_h * (filter_h - 1) + 1)) / stride_h + 1`
+///   * `out_w` = `(w + 2 * pad_w - (dilate_w * (filter_w - 1) + 1)) / stride_w + 1`
+///
 pub fn dilated_conv2d<A, B>(x: A, w: B,
                             pad_h: usize,
                             pad_w: usize,
                             stride_h: usize,
                             stride_w: usize,
-                            dilation_h: usize,
-                            dilation_w: usize) -> Tensor
+                            dilate_h: usize,
+                            dilate_w: usize) -> Tensor
     where A: AsRef<Tensor>,
           B: AsRef<Tensor>,
 {
@@ -2027,14 +2049,25 @@ pub fn dilated_conv2d<A, B>(x: A, w: B,
             conv_ops::conv2d::Conv2D {
                 pad_h, pad_w,
                 stride_h, stride_w,
-                dilation_h, dilation_w,
+                dilation_h: dilate_h, dilation_w: dilate_w,
                 cols: None
             }
         )
 }
 
 
-/// 2D transposed convolution. (requires blas feature)
+/// 2D transposed convolution.
+///
+/// * `x`: Tensor with shape `(batch, in_channel, h, w)`
+/// * `w`: Tensor with shape `(in_channel, out_channel, filter_h, filter_w)`
+///
+/// Returns a tensor with shape `(batch, out_channel, out_h, out_w)`
+///
+/// where
+///
+///   * `out_h` = `stride_h * (h - 1) - pad_h + filter_h`
+///   * `out_w` = `stride_w * (w - 1) - pad_w + filter_w`
+///
 pub fn conv2d_transpose<A, B>(x: A, w: B,
                               pad_h: usize,
                               pad_w: usize,
@@ -2054,14 +2087,25 @@ pub fn conv2d_transpose<A, B>(x: A, w: B,
             })
 }
 
-/// 2D transposed convolution with dilation. (requires blas feature)
+/// 2D transposed convolution with dilation.
+///
+/// * `x`: Tensor with shape `(batch, in_channel, h, w)`
+/// * `w`: Tensor with shape `(in_channel, out_channel, filter_h, filter_w)`
+///
+/// Returns a tensor with shape `(batch, out_channel, out_h, out_w)`
+///
+/// where
+///
+///   * `out_h` = `stride_h * (h - 1) - pad_h + (dilate_h * (filter_h - 1) + 1)`
+///   * `out_w` = `stride_w * (w - 1) - pad_w + (dilate_w * (filter_w - 1) + 1)`
+///
 pub fn dilated_conv2d_transpose<A, B>(x: A, w: B,
                                       pad_h: usize,
                                       pad_w: usize,
                                       stride_h: usize,
                                       stride_w: usize,
-                                      dilation_h: usize,
-                                      dilation_w: usize) -> Tensor
+                                      dilate_h: usize,
+                                      dilate_w: usize) -> Tensor
     where A: AsRef<Tensor>,
           B: AsRef<Tensor>,
 {
@@ -2071,7 +2115,7 @@ pub fn dilated_conv2d_transpose<A, B>(x: A, w: B,
             conv_ops::conv2d_transpose::Conv2DTranspose {
                 pad_h, pad_w,
                 stride_h, stride_w,
-                dilation_h, dilation_w,
+                dilation_h: dilate_h, dilation_w: dilate_w,
                 cols: None
             })
 }
