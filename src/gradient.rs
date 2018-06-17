@@ -6,7 +6,6 @@ use std::mem;
 use std::rc::Rc;
 use tensor::Tensor;
 
-// module private
 struct GradInfo<'a>
 {
     node:           &'a Tensor, // information of this node
@@ -56,7 +55,11 @@ macro_rules! access_grad_info_of {
 #[inline]
 fn has_marked_child(parent: &Tensor, path: &Vec<GradInfo>) -> bool
 {
-    let mut it = parent.inputs.iter();
+    let mut it = if let Some(ref a) = parent.inputs_on_backprop {
+        a.iter()
+    } else {
+        parent.inputs.iter()
+    };
     while let Some(child) = it.next() {
         if access_grad_info_of!(child, path).has_gradient {
             return true;
@@ -66,7 +69,10 @@ fn has_marked_child(parent: &Tensor, path: &Vec<GradInfo>) -> bool
 }
 
 // Marks `has_gradient` if each node is on the gradient propagation path.
-// NOTE: Disconnected "parent nodes" are included but their children are not.
+//
+// Strategy:
+//   Visit all nodes with depth-first-search starting from `ys`, and record those in `path`.
+//   Mark all nodes between `ys` and `xs` as `has_gradient`.
 fn mark_gradient_path<'a>(ys: &[&'a Tensor], xs: &[&'a Tensor]) -> Vec<GradInfo<'a>>
 {
     // Randomly accessible by use of each node's lookup key.
@@ -83,14 +89,19 @@ fn mark_gradient_path<'a>(ys: &[&'a Tensor], xs: &[&'a Tensor]) -> Vec<GradInfo<
         } else {
             dfs_stack.push((node, true));
             // Push children as necessary
-            for child in &node.inputs {
+            let children = if let Some(ref a) = node.inputs_on_backprop {
+                a
+            } else {
+                &node.inputs
+            };
+            for child in children {
                 let visited = {
                     let k = child.resource_lookup_key.get();
                     k < path.len() && Rc::ptr_eq(child, path[k].node)
                 };
                 if !visited {
                     if child.is_source() || !child.has_gradient {
-                        // Add to result, but don't allow more recursive search
+                        // Add to result, but don't allow any more recursive search
                         child.resource_lookup_key.set(path.len());
                         path.push(GradInfo::new(child, xs.contains(&child), None));
                     } else {

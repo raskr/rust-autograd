@@ -102,8 +102,8 @@ impl ::op::Op for Conv2D {
 
     fn grad(&self, gy: &Tensor, xs: &[&Tensor], y: &Tensor) -> Vec<Option<Tensor>>
     {
+        let x = xs[0];
         let w = xs[1];
-        let cols = &::ops::stop_gradient(::ops::nth_tensor(y, 1, Some(y.inputs[0].clone())));
 
         let gx = Tensor::builder()
             .set_inputs(vec![gy, w])
@@ -119,8 +119,10 @@ impl ::op::Op for Conv2D {
                 }
             );
 
+        let cols = &::ops::nth_tensor(y, 1, None);
         let gw = Tensor::builder()
-            .set_inputs(vec![cols, gy, &::ops::stop_gradient(w)])
+            .set_inputs(vec![cols, gy, w])
+            .set_backprop_inputs(vec![x.clone(), gy.clone()])
             .build(
                 Conv2DFilterGrad {
                     pad_h: self.pad_h,
@@ -193,12 +195,12 @@ impl ::op::Op for Conv2DWithCols {
         vec![Ok(y)]
     }
 
-    fn grad(&self, gy: &Tensor, xs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, gy: &Tensor, xs: &[&Tensor], y: &Tensor) -> Vec<Option<Tensor>>
     {
         let cols = xs[0];
         let w = xs[1];
 
-        let g_col = Tensor::builder()
+        let gx = Tensor::builder()
             .set_inputs(vec![gy, w])
             .build(
                 super::conv2d_transpose::Conv2DTranspose {
@@ -214,6 +216,8 @@ impl ::op::Op for Conv2DWithCols {
 
         let gw = Tensor::builder()
             .set_inputs(vec![cols, gy, w])
+            .set_backprop_inputs(
+                vec![y.inputs_on_backprop.as_ref().unwrap()[0].clone(), gy.clone()])
             .build(
                 Conv2DFilterGrad {
                     pad_h: self.pad_h,
@@ -225,7 +229,7 @@ impl ::op::Op for Conv2DWithCols {
                 }
             );
 
-        vec![Some(g_col), Some(gw)]
+        vec![Some(gx), Some(gw)]
     }
 }
 
@@ -259,7 +263,6 @@ impl ::op::Op for Conv2DFilterGrad {
         };
 
         let (xch, kh, kw) = (k_shape[1], k_shape[2], k_shape[3]);
-        // BUG: ych
         let (batch_size, ych, yh, yw) = (gy_shape[0], gy_shape[1], gy_shape[2], gy_shape[3]);
 
         let m = ych;
@@ -285,11 +288,12 @@ impl ::op::Op for Conv2DFilterGrad {
         vec![Ok(NdArray::from_shape_vec(k_shape, gw).unwrap())]
     }
 
-    fn grad(&self, ggw: &Tensor, xs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
+    fn grad(&self, ggw: &Tensor, xs: &[&Tensor], y: &Tensor) -> Vec<Option<Tensor>>
     {
         let cols = xs[0];
-        let gy = xs[1];
+        let gy = xs[1]; // For example, gradient of output of Conv2D.
 
+        // grad grad
         let gx = Tensor::builder()
             .set_inputs(vec![gy, ggw])
             .build(
@@ -306,6 +310,8 @@ impl ::op::Op for Conv2DFilterGrad {
 
         let ggy = Tensor::builder()
             .set_inputs(vec![cols, ggw])
+            .set_backprop_inputs(
+                vec![y.inputs_on_backprop.as_ref().unwrap()[0].clone(), ggw.clone()])
             .build(
                 Conv2DWithCols {
                     pad_h: self.pad_h,

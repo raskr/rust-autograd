@@ -610,6 +610,17 @@ fn conv2d_filter_grad()
 }
 
 #[test]
+fn conv2d_grad_grad()
+{
+    let ref x = ag::variable(ag::ndarray_ext::standard_normal(&[2, 3, 5, 5]));
+    let ref w = ag::variable(ag::ndarray_ext::standard_normal(&[2, 3, 2, 2]));
+    let ref y = ag::conv2d(x, w, 0, 0, 1, 1, 1, 1);
+    let ref g = ag::grad_with_default(&[y], &[w], &[&ag::ones(&y.shape())])[0];
+    let ref gg = ag::grad_with_default(&[g], &[x], &[&ag::ones(&g.shape())]);
+    ag::test_helper::gradient_check(g, gg, &[x], &[], 1e-3, 1e-2);
+}
+
+#[test]
 #[should_panic]
 fn conv2d_x_grad()
 {
