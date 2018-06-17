@@ -3,6 +3,8 @@ extern crate libc;
 extern crate rayon;
 extern crate cblas_sys;
 extern crate openblas_src;
+#[cfg(not(feature="blas"))]
+extern crate matrixmultiply;
 #[allow(unused_imports)]
 use self::rayon::iter::*;
 use self::libc::{c_float, c_int};
@@ -170,34 +172,55 @@ fn alloc_uninitialized_buf(size: usize) -> Vec<f32>
     buf
 }
 
+
 #[inline]
 fn sgemm(trans_a: bool, trans_b: bool,
          a: &f32, b: &f32, c: &f32,
          m: usize, n: usize, k: usize, alpha: f32, beta: f32)
 {
-    let m = m as i32;
-    let n = n as i32;
-    let k = k as i32;
-    unsafe {
-        cblas_sys::cblas_sgemm(
-            cblas_sys::CBLAS_LAYOUT::CblasRowMajor,
-            if trans_a {
-                cblas_sys::CBLAS_TRANSPOSE::CblasTrans
-            } else {
-                cblas_sys::CBLAS_TRANSPOSE::CblasNoTrans
-            },
-            if trans_b {
-                cblas_sys::CBLAS_TRANSPOSE::CblasTrans
-            } else {
-                cblas_sys::CBLAS_TRANSPOSE::CblasNoTrans
-            },
-            m, n, k,
-            alpha,
-            a as *const f32, if trans_a { m } else { k },
-            b as *const f32, if trans_b { k } else { n },
-            beta,
-            mem::transmute::<&f32, *mut f32>(c), n,
-        );
+    #[cfg(feature="blas")] {
+        let m = m as i32;
+        let n = n as i32;
+        let k = k as i32;
+        unsafe {
+            cblas_sys::cblas_sgemm(
+                cblas_sys::CBLAS_LAYOUT::CblasRowMajor,
+                if trans_a {
+                    cblas_sys::CBLAS_TRANSPOSE::CblasTrans
+                } else {
+                    cblas_sys::CBLAS_TRANSPOSE::CblasNoTrans
+                },
+                if trans_b {
+                    cblas_sys::CBLAS_TRANSPOSE::CblasTrans
+                } else {
+                    cblas_sys::CBLAS_TRANSPOSE::CblasNoTrans
+                },
+                m, n, k,
+                alpha,
+                a as *const f32, if trans_a { m } else { k }, // lda
+                b as *const f32, if trans_b { k } else { n }, // ldb
+                beta,
+                mem::transmute::<&f32, *mut f32>(c), n, // ldc
+            );
+        }
+    }
+    #[cfg(not(feature="blas"))] {
+        let rsa = if trans_a { 1 } else { k };
+        let csa = if trans_a { m } else { 1 };
+        let rsb = if trans_b { 1 } else { n };
+        let csb = if trans_b { k } else { 1 };
+        let rsc = n;
+        let csc = 1;
+        unsafe {
+            let c: *mut f32 = mem::transmute(c);
+            matrixmultiply::sgemm(m, k, n,
+                                  alpha,
+                                  a as *const f32, rsa as isize, csa as isize,
+                                  b as *const f32, rsb as isize, csb as isize,
+                                  beta,
+                                  c as *mut f32, rsc as isize, csc as isize
+            )
+        }
     }
 }
 
