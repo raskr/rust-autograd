@@ -119,7 +119,7 @@ impl ::op::Op for Conv2D {
                 }
             );
 
-        let cols = &::ops::nth_tensor(y, 1, None);
+        let cols = &::ops::nth_tensor(y, 1);
         let gw = Tensor::builder()
             .set_inputs(vec![cols, gy, w])
             .set_backprop_inputs(vec![x.clone(), gy.clone()])

@@ -118,7 +118,7 @@ impl op::Op for SparseSoftmaxCrossEntropy
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
     {
         let t = inputs[1];
-        let ref log_x = ops::nth_tensor(output, 1, None);
+        let ref log_x = ops::nth_tensor(output, 1);
 
         let gx1 = Tensor::builder()
             .set_inputs(vec![log_x, t, gy])
@@ -186,7 +186,7 @@ impl op::Op for SoftmaxCrossEntropy
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
     {
-        let ref log_x = ops::nth_tensor(output, 1, None);
+        let ref log_x = ops::nth_tensor(output, 1);
         let ref x = ops::exp(log_x);
         let t = inputs[1];
 

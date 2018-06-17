@@ -445,19 +445,14 @@ pub fn atanh<A: AsRef<Tensor>>(x: A) -> Tensor
 ///
 /// `x` must be a result of a multi-outputs op;
 /// otherwise index-out-of-bounds error may happen.
-pub fn nth_tensor<A>(x: A, n: usize, backprop_input: Option<Tensor>) -> Tensor
+pub fn nth_tensor<A>(x: A, n: usize) -> Tensor
 where
     A: AsRef<Tensor>,
 {
-    let tmp = Tensor::builder()
+    Tensor::builder()
         .set_input(x.as_ref())
-        .set_input_indices(vec![n]);
-    if let Some(a) = backprop_input {
-        tmp.set_backprop_inputs(vec![a])
-            .build(activation_ops::Identity)
-    } else {
-        tmp.build(activation_ops::Identity)
-    }
+        .set_input_indices(vec![n])
+        .build(activation_ops::Identity)
 }
 
 /// Identity function without copy.
