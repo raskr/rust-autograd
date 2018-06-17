@@ -9,7 +9,6 @@ pub struct Conv2D {
     pub stride_w: usize,
     pub dilation_h: usize,
     pub dilation_w: usize,
-    pub cols: Option<Vec<f32>>
 }
 
 pub struct Conv2DFilterGrad {
@@ -70,7 +69,7 @@ impl ::op::Op for Conv2D {
         };
 
         // alloc buffers as necessary
-        let c = get_or_insert_cols!(self, batch_size, num_elements_in_batch_c);
+        let c = alloc_uninitialized_buf(batch_size * num_elements_in_batch_c);
         let y = alloc_uninitialized_buf(batch_size * num_elements_in_batch_y);
         let w: &f32 = unsafe { &*w.as_ptr() };
 
@@ -95,7 +94,7 @@ impl ::op::Op for Conv2D {
             ndarray::IxDyn(&[batch_size, ych, yh, yw]), y).unwrap();
 
         let cols = NdArray::from_shape_vec(
-            ndarray::IxDyn(&[batch_size, xch, kw, kh, yh, yw]), c.clone()).unwrap();
+            ndarray::IxDyn(&[batch_size, xch, kw, kh, yh, yw]), c).unwrap();
 
         vec![Ok(y), Ok(cols)]
     }
@@ -337,7 +336,6 @@ fn test_tensor_size_after_convolution()
         stride_h: 1,
         dilation_h: 1,
         dilation_w: 1,
-        cols: None,
     };
 
     let (xh, xw) = (3, 3);
@@ -358,7 +356,6 @@ fn test_parallel_im2col()
         stride_w: 1,
         dilation_h: 1,
         dilation_w: 1,
-        cols: None,
     };
 
     let batch_size = 2;
@@ -419,7 +416,6 @@ fn test_im2col()
         stride_w: 1,
         dilation_h: 1,
         dilation_w: 1,
-        cols: None,
     };
 
     let xch = 2;
@@ -472,7 +468,6 @@ fn test_conv2d()
         stride_h: 1,
         dilation_h: 1,
         dilation_w: 1,
-        cols: None,
     };
 
     let x = ndarray::Array1::range(0., 2.*2.*3.*3., 1.)

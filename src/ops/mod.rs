@@ -2016,7 +2016,6 @@ pub fn conv2d<A, B>(x: A, w: B,
                 pad_h, pad_w,
                 stride_h, stride_w,
                 dilation_h: 1, dilation_w: 1,
-                cols: None
             }
         )
 }
@@ -2050,7 +2049,6 @@ pub fn dilated_conv2d<A, B>(x: A, w: B,
                 pad_h, pad_w,
                 stride_h, stride_w,
                 dilation_h: dilate_h, dilation_w: dilate_w,
-                cols: None
             }
         )
 }

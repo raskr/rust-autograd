@@ -96,7 +96,6 @@ impl ::op::Op for Conv2DTranspose {
                     stride_w: self.stride_w,
                     dilation_h: self.dilation_h,
                     dilation_w: self.dilation_w,
-                    cols: None,
                 }
             );
 
@@ -216,7 +215,6 @@ impl ::op::Op for Conv2DTransposeFilterGrad {
                     stride_w: self.stride_w,
                     dilation_h: self.dilation_h,
                     dilation_w: self.dilation_w,
-                    cols: None,
                 }
             );
 
