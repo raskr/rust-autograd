@@ -1989,15 +1989,37 @@ pub fn range<T: ArrayLike>(start: &T, end: &T, step: &T) -> Tensor
         .build(const_gen_ops::Range)
 }
 
+/// 2D convolution. (requires blas feature)
 pub fn conv2d<A, B>(x: A, w: B,
                     pad_h: usize,
                     pad_w: usize,
                     stride_h: usize,
-                    stride_w: usize,
-                    dilation_h: usize,
-                    dilation_w: usize) -> Tensor
-where A: AsRef<Tensor>,
-      B: AsRef<Tensor>,
+                    stride_w: usize) -> Tensor
+    where A: AsRef<Tensor>,
+          B: AsRef<Tensor>,
+{
+    Tensor::builder()
+        .set_inputs(vec![x.as_ref(), w.as_ref()])
+        .build(
+            conv_ops::conv2d::Conv2D {
+                pad_h, pad_w,
+                stride_h, stride_w,
+                dilation_h: 1, dilation_w: 1,
+                cols: None
+            }
+        )
+}
+
+/// 2D convolution with dilation. (requires blas feature)
+pub fn dilated_conv2d<A, B>(x: A, w: B,
+                            pad_h: usize,
+                            pad_w: usize,
+                            stride_h: usize,
+                            stride_w: usize,
+                            dilation_h: usize,
+                            dilation_w: usize) -> Tensor
+    where A: AsRef<Tensor>,
+          B: AsRef<Tensor>,
 {
     Tensor::builder()
         .set_inputs(vec![x.as_ref(), w.as_ref()])
@@ -2012,13 +2034,34 @@ where A: AsRef<Tensor>,
 }
 
 
+/// 2D transposed convolution. (requires blas feature)
 pub fn conv2d_transpose<A, B>(x: A, w: B,
-                        pad_h: usize,
-                        pad_w: usize,
-                        stride_h: usize,
-                        stride_w: usize,
-                        dilation_h: usize,
-                        dilation_w: usize) -> Tensor
+                              pad_h: usize,
+                              pad_w: usize,
+                              stride_h: usize,
+                              stride_w: usize) -> Tensor
+    where A: AsRef<Tensor>,
+          B: AsRef<Tensor>,
+{
+    Tensor::builder()
+        .set_inputs(vec![x.as_ref(), w.as_ref()])
+        .build(
+            conv_ops::conv2d_transpose::Conv2DTranspose {
+                pad_h, pad_w,
+                stride_h, stride_w,
+                dilation_h: 1, dilation_w: 1,
+                cols: None
+            })
+}
+
+/// 2D transposed convolution with dilation. (requires blas feature)
+pub fn dilated_conv2d_transpose<A, B>(x: A, w: B,
+                                      pad_h: usize,
+                                      pad_w: usize,
+                                      stride_h: usize,
+                                      stride_w: usize,
+                                      dilation_h: usize,
+                                      dilation_w: usize) -> Tensor
     where A: AsRef<Tensor>,
           B: AsRef<Tensor>,
 {
@@ -2030,5 +2073,5 @@ pub fn conv2d_transpose<A, B>(x: A, w: B,
                 stride_h, stride_w,
                 dilation_h, dilation_w,
                 cols: None
-        })
+            })
 }
