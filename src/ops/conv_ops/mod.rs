@@ -1,7 +1,9 @@
 extern crate ndarray;
 extern crate libc;
 extern crate rayon;
+#[cfg(feature="blas")]
 extern crate cblas_sys;
+#[cfg(feature="blas")]
 extern crate openblas_src;
 #[cfg(not(feature="blas"))]
 extern crate matrixmultiply;
