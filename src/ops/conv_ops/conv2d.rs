@@ -46,10 +46,16 @@ impl ::op::Op for Conv2D {
         // Extract size params
         let (batch_size, xch, xh, xw) = {
             let x_shape = x.shape();
+            assert_eq!(x_shape.len(), 4, "ag::conv2d: Input must be 4D (got {:?})", x_shape);
             (x_shape[0], x_shape[1], x_shape[2], x_shape[3])
         };
         let (ych, kh, kw) = {
             let k_shape = w.shape();
+            assert_eq!(k_shape.len(), 4, "ag::conv2d: filter of must be 4D (got {:?})", k_shape);
+            assert_eq!(xch, k_shape[1],
+                       "ag::conv2d: Number of input's channel ({:?}) must match second filter dim ({:?})",
+                       xch, k_shape[1]
+            );
             (k_shape[0], k_shape[2], k_shape[3])
         };
         let yh = get_yh!(self, xh, kh);
@@ -73,7 +79,7 @@ impl ::op::Op for Conv2D {
         let y = alloc_uninitialized_buf(batch_size * num_elements_in_batch_y);
         let w: &f32 = unsafe { &*w.as_ptr() };
 
-        // Do task
+        // Execute stream of "im2col + sgemm" in parallel
         (0..batch_size).into_par_iter().for_each(|i| { // for each batch
             let x_region_head = &x[i * num_elements_in_batch_x];
             let c_region_head = &c[i * num_elements_in_batch_c];

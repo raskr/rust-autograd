@@ -47,6 +47,13 @@ impl ::op::Op for Conv2DTranspose {
         let xh = get_xh!(self, yh, kh);
         let xw = get_xw!(self, yw, kw);
 
+        assert_eq!(gy_shape.len(), 4, "ag::conv2d: Input must be 4D (got {:?})", gy_shape);
+        assert_eq!(f_shape.len(), 4, "ag::conv2d: Filter must be 4D (got {:?})", f_shape);
+        assert_eq!(ych, f_shape[0],
+                   "ag::conv2d: Number of input channel ({:?}) must match second filter dim ({:?})",
+                   ych, f_shape[0]
+        );
+
         let k = ych;
         let n = yh * yw;
         let m = kh * kw * xch;
