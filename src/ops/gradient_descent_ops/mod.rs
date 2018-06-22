@@ -1,6 +1,7 @@
 extern crate ndarray;
 
 pub mod adam;
+#[allow(dead_code)]
 pub mod sgd;
 
 pub use self::adam::Adam;
@@ -8,16 +9,6 @@ pub use self::sgd::SGD;
 
 use std::cmp::{Eq, Ordering, PartialEq};
 use tensor::Tensor;
-
-/// Trait for any gradient descent optimizer
-pub trait Optimizer<'a>
-{
-    fn compute_updates<T: AsRef<Tensor>>(
-        &mut self,
-        param: &[&'a Tensor],
-        grad: &[T],
-    ) -> Vec<Tensor>;
-}
 
 /// Key to access a state tensor.
 /// Stateful optimizers use this.

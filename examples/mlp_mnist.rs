@@ -2,16 +2,17 @@ extern crate autograd as ag;
 #[macro_use(s)]
 extern crate ndarray;
 
-use self::ag::gradient_descent_ops::Optimizer;
 use std::time::Instant;
 
 // This is a softmax regression with Adam optimizer for mnist.
 // 0.918 test accuracy after 3 epochs,
-// 0.26 sec/epoch on 2.7GHz Intel Core i5 (blas feature is disabled)
+// 0.28 sec/epoch on 2.7GHz Intel Core i5 (blas feature is disabled)
 //
 // First, run "./download_mnist.sh" beforehand if you don't have dataset and then run
-// "cargo run --example mlp_mnist --release" in `examples` dicectory.
-
+// "cargo run --example mlp_mnist --release" in `examples` directory.
+//
+// NOTE: This example is written in define-by-run style, so
+// the performance is spoiled little bit.
 macro_rules! eval_with_time {
   ($x:expr) => {
     {
@@ -24,24 +25,27 @@ macro_rules! eval_with_time {
   };
 }
 
+fn logits(x: &ag::Tensor, w: &ag::Tensor, b: &ag::Tensor) -> ag::Tensor
+{
+    ag::matmul(x, w) + b
+}
+
+fn inputs() -> (ag::Tensor, ag::Tensor)
+{
+    let x = ag::placeholder(&[-1, 28 * 28]);
+    let y = ag::placeholder(&[-1, 1]);
+    (x, y)
+}
+
 fn main()
 {
     let ((x_train, y_train), (x_test, y_test)) = dataset::load();
 
-    // -- graph def --
-    let ref x = ag::placeholder(&[-1, 28 * 28]);
-    let ref y = ag::placeholder(&[-1, 1]);
+    // -- variable tensors (target of optimization) --
     let ref w = ag::variable(ag::ndarray_ext::glorot_uniform(&[28 * 28, 10]));
     let ref b = ag::variable(ag::ndarray_ext::zeros(&[1, 10]));
-    let ref z = ag::matmul(x, w) + b;
-    let ref loss = ag::sparse_softmax_cross_entropy(z, y);
-    let ref mean_loss = ag::reduce_mean(loss, &[0, 1], false);
-    let ref params = [w, b];
-    let ref grads = ag::grad(&[mean_loss], params);
-    let ref predictions = ag::argmax(z, -1, true);
-    let ref accuracy = ag::reduce_mean(&ag::equal(predictions, y), &[0, 1], false);
-    let mut adam = ag::gradient_descent_ops::Adam::default();
-    let ref update_ops = adam.compute_updates(params, grads);
+    let params = &[w, b];
+    let ref params = ag::gradient_descent_ops::Adam::vars_with_states(params);
 
     // -- actual training --
     let max_epoch = 3;
@@ -53,19 +57,31 @@ fn main()
         eval_with_time!({
             let perm = ag::ndarray_ext::permutation(num_batches) * batch_size as usize;
             for i in perm.into_iter() {
+                let (x, y) = inputs();
+                let z = logits(&x, w, b);
+                let loss = ag::sparse_softmax_cross_entropy(z, &y);
+                let mean_loss = ag::reduce_mean(loss, &[0, 1], false);
+                let grads = &ag::grad(&[&mean_loss], &[w, b]);
+                let adam = ag::gradient_descent_ops::Adam::default();
+                let update_ops: &[ag::Tensor] = &adam.compute_updates(params, grads);
+
                 let i = *i as isize;
                 let x_batch = x_train.slice(s![i..i + batch_size, ..]).to_owned();
                 let y_batch = y_train.slice(s![i..i + batch_size, ..]).to_owned();
-                ag::eval(update_ops, &[(x, &x_batch), (y, &y_batch)]);
+                ag::eval(update_ops, &[(&x, &x_batch), (&y, &y_batch)]);
             }
         });
         println!("finish epoch {}", epoch);
     }
 
     // -- test --
+    let (x, y) = inputs();
+    let z = logits(&x, w, b);
+    let predictions = ag::argmax(z, -1, true);
+    let accuracy = ag::reduce_mean(&ag::equal(predictions, &y), &[0, 1], false);
     println!(
         "test accuracy: {:?}",
-        accuracy.eval(&[(x, &x_test), (y, &y_test)])
+        accuracy.eval(&[(&x, &x_test), (&y, &y_test)])
     );
 }
 

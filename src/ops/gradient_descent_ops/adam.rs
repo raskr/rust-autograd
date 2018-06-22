@@ -60,29 +60,92 @@ impl ::op::Op for AdamOp
     }
 }
 
+pub struct StatefulVariable<'a> {
+    pub var: &'a Tensor,
+    pub state: StatefulParams,
+}
+
 /// Adam optimizer
 ///
 /// This implementation is based on http://arxiv.org/abs/1412.6980v8
-pub struct Adam<'a>
+pub struct Adam
 {
     pub alpha:           f32,
     pub eps:             f32,
     pub b1:              f32,
     pub b2:              f32,
-    pub stateful_params: BTreeMap<super::StateKey<'a>, StatefulParams>,
 }
 
-impl<'a> Default for Adam<'a>
+impl Default for Adam
 {
-    fn default() -> Adam<'a>
+    fn default() -> Adam
     {
         Adam {
             alpha:           0.001,
             eps:             1e-08,
             b1:              0.9,
             b2:              0.999,
-            stateful_params: BTreeMap::new(),
         }
+    }
+}
+
+impl Adam {
+
+    /// Creates stateful variable tensors used for Adam optimizer.
+    pub fn vars_with_states<'a>(tensors: &[&'a Tensor]) -> Vec<StatefulVariable<'a>>
+    {
+        let mut var2state = BTreeMap::<super::StateKey<'a>, StatefulParams>::new();
+        tensors
+            .into_iter()
+            .map(|var| {
+                // let var = var.as_ref();
+                if let Some(ref var_arr) = var.persistent_array {
+                    match var2state.entry(super::StateKey(var)) {
+                        Entry::Vacant(ent) => {
+                            let inserted = ent.insert(StatefulParams {
+                                m: ::ops::variable(NdArray::zeros(var_arr.shape())),
+                                v: ::ops::variable(NdArray::zeros(var_arr.shape())),
+                                t: ::ops::variable(::ndarray_ext::from_scalar(1.)),
+                            });
+                            StatefulVariable { var, state: inserted.clone() }
+                        }
+                        Entry::Occupied(ent) => {
+                            StatefulVariable { var, state: ent.get().clone() }
+                        }
+                    }
+                } else {
+                    panic!("Can't optimize non-variable.")
+                }
+            })
+            .collect()
+    }
+
+    // Resolves states
+    pub fn compute_updates<T: AsRef<Tensor>>(
+        &self,
+        params: &[StatefulVariable],
+        grads: &[T],
+    ) -> Vec<Tensor>
+    {
+        params
+            .into_iter()
+            .zip(grads)
+            .map(|(param, grad)| {
+                let StatefulParams {ref m, ref v, ref t} = param.state;
+                Tensor::builder()
+                    .set_inputs(vec![param.var, grad.as_ref(), m, v, t])
+                    .build(
+                        AdamOp {
+                            static_params: StaticParams {
+                                alpha: self.alpha,
+                                eps:   self.eps,
+                                b1:    self.b1,
+                                b2:    self.b2,
+                            },
+                        }
+                    )
+            })
+            .collect()
     }
 }
 
@@ -95,65 +158,10 @@ pub struct StaticParams
     pub b2:    f32,
 }
 
+#[derive(Clone)]
 pub struct StatefulParams
 {
     pub m: Tensor,
     pub v: Tensor,
     pub t: Tensor, // shape: []
-}
-
-impl<'a> super::Optimizer<'a> for Adam<'a>
-{
-    fn compute_updates<T: AsRef<Tensor>>(
-        &mut self,
-        params: &[&'a Tensor],
-        grads: &[T],
-    ) -> Vec<Tensor>
-    {
-        params
-            .into_iter()
-            .zip(grads)
-            .map(|(param, grad)| {
-                let op = AdamOp {
-                    static_params: StaticParams {
-                        alpha: self.alpha,
-                        eps:   self.eps,
-                        b1:    self.b1,
-                        b2:    self.b2,
-                    },
-                };
-
-                if let Some(ref param_arr) = param.persistent_array {
-                    match self.stateful_params.entry(super::StateKey(param)) {
-                        Entry::Vacant(ent) => {
-                            let StatefulParams {
-                                ref m,
-                                ref v,
-                                ref t,
-                            } = *ent.insert(StatefulParams {
-                                m: ::ops::variable(NdArray::zeros(param_arr.shape())),
-                                v: ::ops::variable(NdArray::zeros(param_arr.shape())),
-                                t: ::ops::variable(::ndarray_ext::from_scalar(1.)),
-                            });
-                            Tensor::builder()
-                                .set_inputs(vec![param, grad.as_ref(), m, v, t])
-                                .build(op)
-                        }
-                        Entry::Occupied(ent) => {
-                            let StatefulParams {
-                                ref m,
-                                ref v,
-                                ref t,
-                            } = *ent.get();
-                            Tensor::builder()
-                                .set_inputs(vec![param, grad.as_ref(), m, v, t])
-                                .build(op)
-                        }
-                    }
-                } else {
-                    panic!("Can't optimize non-variable.")
-                }
-            })
-            .collect()
-    }
 }

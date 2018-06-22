@@ -34,10 +34,12 @@ println!("{:?}", ggx.eval(&[]));  // => Ok(4.)
 println!("{:?}", gx.eval(&[(x, &ag::ndarray::arr0(2.))]));  // => Ok(8.)
 ```
 
-Another example: multi layer perceptron for MNIST digits classification.
+Another example: softmax regression for MNIST digits classification with Adam.
 
 ```rust
-use self::ag::gradient_descent_ops::Optimizer;
+// This example is written in run-by-define style.
+// We get 0.918 test accuracy after 3 epochs,
+// 0.27 sec/epoch on 2.7GHz Intel Core i5 (blas feature is disabled)
 
 // -- graph def --
 let ref x = ag::placeholder(&[-1, 28*28]);
@@ -46,12 +48,13 @@ let ref w = ag::variable(ag::ndarray_ext::glorot_uniform(&[28*28, 10]));
 let ref b = ag::variable(ag::ndarray_ext::zeros(&[1, 10]));
 let ref z = ag::matmul(x, w) + b;
 let ref loss = ag::reduce_mean(&ag::sparse_softmax_cross_entropy(z, y), &[0, 1], false);
-let ref params = [w, b]
-let ref grads = ag::grad(loss, params);
+let ref params = [w, b];
+let ref grads = ag::grad(&[loss], params);
 let ref predictions = ag::argmax(z, -1, true);
 let ref accuracy = ag::reduce_mean(&ag::equal(predictions, y), &[0], false);
-let mut adam = ag::gradient_descent_ops::Adam::default();
-let ref update_ops = adam.compute_updates(params, grads);
+let ref adam = ag::gradient_descent_ops::Adam::default();
+let mut stateful_params = ag::gradient_descent_ops::Adam::vars_with_states(params);
+let ref update_ops = adam.compute_updates(stateful_params, grads);
 
 // -- dataset --
 let ((x_train, y_train), (x_test, y_test)) = dataset::load();

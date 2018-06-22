@@ -32,13 +32,11 @@
 //! # }
 //! ```
 //!
-//! Another example: multi layer perceptron for MNIST digits classification.
+//! Another example: softmax regression for MNIST digits classification.
 //!
 //! ```rust
 //! extern crate autograd as ag;
-//! use ag::gradient_descent_ops::Optimizer;
 //! # fn main() {
-//!
 //! // -- graph def --
 //! let ref x = ag::placeholder(&[-1, 28*28]);
 //! let ref y = ag::placeholder(&[-1]);
@@ -50,8 +48,9 @@
 //! let ref grads = ag::grad(&[loss], params);
 //! let ref predictions = ag::argmax(z, -1, true);
 //! let ref accuracy = ag::reduce_mean(&ag::equal(predictions, y), &[0], false);
-//! let mut adam = ag::gradient_descent_ops::Adam::default();
-//! let ref update_ops = adam.compute_updates(params, grads);
+//! let ref adam = ag::gradient_descent_ops::Adam::default();
+//! let mut stateful_params = ag::gradient_descent_ops::Adam::vars_with_states(params);
+//! let ref update_ops = adam.compute_updates(&stateful_params, grads);
 //!
 //! // -- dataset --
 //! // let ((x_train, y_train), (x_test, y_test)) = dataset::load();

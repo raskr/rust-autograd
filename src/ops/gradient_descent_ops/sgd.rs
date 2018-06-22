@@ -37,7 +37,7 @@ pub struct SGD
     pub lr: f32,
 }
 
-impl<'a> super::Optimizer<'a> for SGD
+impl<'a> SGD
 {
     fn compute_updates<T: AsRef<Tensor>>(
         &mut self,
@@ -49,10 +49,9 @@ impl<'a> super::Optimizer<'a> for SGD
             .into_iter()
             .zip(grads)
             .map(|(param, grad)| {
-                let op = SGDOp { lr: self.lr };
                 Tensor::builder()
                     .set_inputs(vec![param, grad.as_ref()])
-                    .build(op)
+                    .build(SGDOp { lr: self.lr })
             })
             .collect()
     }
