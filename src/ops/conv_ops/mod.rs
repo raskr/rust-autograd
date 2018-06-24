@@ -13,6 +13,7 @@ use self::libc::{c_float, c_int};
 use ndarray_ext::NdArray;
 use std::mem;
 use std::slice;
+use std::f32;
 use tensor::Tensor;
 
 macro_rules! get_xw {
@@ -56,6 +57,7 @@ macro_rules! get_or_insert_cols {
 
 pub mod conv2d;
 pub mod conv2d_transpose;
+pub mod max_pool;
 
 #[link(name = "conv")]
 #[no_mangle]
@@ -92,6 +94,113 @@ extern "C" {
         dilation_w: c_int,
         data_im: *const c_float,
     );
+
+    fn max_pool_cpu(
+        input: *const c_float,
+        pad: c_int,
+        h: c_int,
+        w: c_int,
+        out_h: c_int,
+        out_w: c_int,
+        c: c_int,
+        batch: c_int,
+        size: c_int,
+        stride: c_int,
+        output: *const c_float,
+        argmax: *const c_float,
+        float_min: c_float
+    );
+
+    fn max_pool_grad_cpu(
+        input: *const c_float,
+        h: c_int,
+        w: c_int,
+        c: c_int,
+        batch: c_int,
+        gx: *const c_float,
+        argmax: *const c_float,
+    );
+
+    fn max_pool_grad_grad_cpu(
+        ggx: *const c_float,
+        h: c_int,
+        w: c_int,
+        c: c_int,
+        batch: c_int,
+        ggy: *const c_float,
+        argmax: *const c_float,
+    );
+}
+
+#[inline]
+fn max_pool(
+    input: &c_float,
+    pad: usize,
+    h: usize,
+    w: usize,
+    out_h: usize,
+    out_w: usize,
+    c: usize,
+    batch: usize,
+    size: usize,
+    stride: usize,
+    output: &c_float,
+    argmax: &c_float,
+) {
+    unsafe {
+        max_pool_cpu(
+            input as *const _, pad as c_int,
+            h as c_int, w as c_int, out_h as c_int, out_w as c_int, c as c_int, batch as c_int,
+            size as c_int, stride as c_int,
+            output as *const _, argmax as *const _, f32::MIN
+        )
+    }
+}
+
+#[inline]
+fn max_pool_grad(
+    gy: &c_float,
+    h: usize,
+    w: usize,
+    c: usize,
+    batch: usize,
+    gx: &c_float,
+    argmax: &c_float,
+) {
+    unsafe {
+        max_pool_grad_cpu(
+            gy as *const _,
+            h as c_int,
+            w as c_int,
+            c as c_int,
+            batch as c_int,
+            gx as *const c_float,
+            argmax as *const c_float,
+        )
+    }
+}
+
+#[inline]
+fn max_pool_grad_grad(
+    ggx: &c_float,
+    h: usize,
+    w: usize,
+    c: usize,
+    batch: usize,
+    ggy: &c_float,
+    argmax: &c_float,
+) {
+    unsafe {
+        max_pool_grad_grad_cpu(
+            ggx as *const _,
+            h as c_int,
+            w as c_int,
+            c as c_int,
+            batch as c_int,
+            ggy as *const c_float,
+            argmax as *const c_float,
+        )
+    }
 }
 
 #[inline]
@@ -307,4 +416,26 @@ fn test_sgemm_acc()
         sgemm(false, false, &x[0], &y[0], &z[0], 2, 2, 2, 1., 1.)
     }
     assert_eq!([2.*num_iter, 3.*num_iter, 6.*num_iter, 11.*num_iter], z);
+}
+
+#[test]
+fn test_max_pool_cpu()
+{
+    let x = vec![
+        0., 1., 2.,
+        5., 4., 3.,
+        6., 7., 8.
+    ];
+    let output = alloc_uninitialized_buf(4);
+    let argmax = alloc_uninitialized_buf(4);
+    max_pool(&x[0], 0, // pad
+                     3, 3, // h, w
+                     2, 2, // out_h, out_w
+                     1, // c
+                     1, // batch
+                     2, // size
+                     1, // stride
+                     &output[0], &argmax[0]);
+    assert_eq!(output, vec![5., 4., 7., 8.]);
+    assert_eq!(argmax, vec![3., 4., 7., 8.]);
 }

@@ -72,3 +72,90 @@ void col2im_cpu(const float *data_col, const int channels,
         }
     }
 }
+
+// TODO: Handle the case where multiple maximum values appear in each window
+// by use of a binary mask. This also requires to fix max_pool_backward_cpu etc.
+void max_pool_cpu(
+        const float *input,
+        const int pad,
+        const int xh,
+        const int xw,
+        const int yh,
+        const int yw,
+        const int ch,
+        const int batch,
+        const int size,
+        const int stride,
+        float *output,
+        float *indexes,
+        const float float_min
+)
+{
+    for (int b = 0; b < batch; ++b) {
+        for (int c = 0; c < ch; ++c) {
+            const int c_base = xh * (c + b * ch);
+            for (int i = 0; i < yh; ++i) {
+                const int i_base = yw * (i + yh * (c + b * ch));
+                int h_start = i*stride - pad;
+                const int h_end = h_start + size > xh? xh : h_start + size;
+                h_start = h_start > 0? h_start : 0;
+                for (int j = 0; j < yw; ++j) {
+                    float max = float_min;
+                    int max_i = 0; // default
+                    int w_start = j*stride - pad;
+                    const int w_end = w_start + size > xw? xw : w_start + size;
+                    w_start = w_start > 0? w_start : 0;
+                    // in a window
+                    for (int h = h_start; h < h_end; ++h) {
+                        const int rows = xw * (h + c_base);
+                        for (int w = w_start; w < w_end; ++w) {
+                            const int index = w + rows;
+                            const float val = input[index];
+                            if (val > max) {
+                                max_i = index;
+                                max   = val;
+                            }
+                        }
+                    }
+                    int out_index = j + i_base;
+                    output[out_index] = max;
+                    indexes[out_index] = max_i;
+                }
+            }
+        }
+    }
+}
+
+// TODO: Parallelize (with rust's thread pool?)
+void max_pool_grad_cpu(
+        const float *gy,
+        const int yh,
+        const int yw,
+        const int c,
+        const int batch,
+        float *gx,
+        const float *argmax
+)
+{
+    const int until = yh * yw * c * batch;
+    for (int i = 0; i < until; ++i) {
+        gx[(int) *(argmax++)] += *(gy++);
+    }
+}
+
+
+void max_pool_grad_grad_cpu(
+        const float *ggx,
+        const int yh,
+        const int yw,
+        const int c,
+        const int batch,
+        float *ggy, // compute this
+        const float *argmax
+)
+{
+    const int until = yh * yw * c * batch;
+    for (int i = 0; i < until; ++i) {
+        *(ggy++) = ggx[(int) *(argmax++)];
+    }
+}

@@ -2117,3 +2117,27 @@ pub fn dilated_conv2d_transpose<A, B>(x: A, w: B,
                 cols: None
             })
 }
+
+/// 2D max pooling.
+///
+/// * `x`: Tensor with shape `(batch, channel, h, w)`
+///
+/// Returns a tensor with shape `(batch, channel, out_h, out_w)`
+///
+/// where
+///
+///   * `out_h` = `(h + 2 * pad - pool_size) / stride + 1`
+///   * `out_w` = `(w + 2 * pad - pool_size) / stride + 1`
+///
+pub fn max_pool2d<A: AsRef<Tensor>>(x: A, pool_size: usize, pad: usize, stride: usize) -> Tensor
+{
+    Tensor::builder()
+        .set_input(x.as_ref())
+        .build(
+            conv_ops::max_pool::MaxPool2D {
+                pad,
+                stride,
+                size: pool_size
+            }
+        )
+}
