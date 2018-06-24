@@ -1998,14 +1998,12 @@ pub fn range<T: ArrayLike>(start: &T, end: &T, step: &T) -> Tensor
 ///
 /// where
 ///
-///   * `out_h` = `(h + 2 * pad_h - filter_h) / stride_h + 1`
-///   * `out_w` = `(w + 2 * pad_w - filter_w) / stride_w + 1`
+///   * `out_h` = `(h + 2 * pad - filter_h) / stride + 1`
+///   * `out_w` = `(w + 2 * pad - filter_w) / stride + 1`
 ///
 pub fn conv2d<A, B>(x: A, w: B,
-                    pad_h: usize,
-                    pad_w: usize,
-                    stride_h: usize,
-                    stride_w: usize) -> Tensor
+                    pad: usize,
+                    stride: usize) -> Tensor
     where A: AsRef<Tensor>,
           B: AsRef<Tensor>,
 {
@@ -2013,9 +2011,9 @@ pub fn conv2d<A, B>(x: A, w: B,
         .set_inputs(vec![x.as_ref(), w.as_ref()])
         .build(
             conv_ops::conv2d::Conv2D {
-                pad_h, pad_w,
-                stride_h, stride_w,
-                dilation_h: 1, dilation_w: 1,
+                pad,
+                stride,
+                dilation: 1,
             }
         )
 }
@@ -2029,16 +2027,13 @@ pub fn conv2d<A, B>(x: A, w: B,
 ///
 /// where
 ///
-///   * `out_h` = `(h + 2 * pad_h - (dilate_h * (filter_h - 1) + 1)) / stride_h + 1`
-///   * `out_w` = `(w + 2 * pad_w - (dilate_w * (filter_w - 1) + 1)) / stride_w + 1`
+///   * `out_h` = `(h + 2 * pad - (dilate * (filter - 1) + 1)) / stride + 1`
+///   * `out_w` = `(w + 2 * pad - (dilate * (filter - 1) + 1)) / stride + 1`
 ///
 pub fn dilated_conv2d<A, B>(x: A, w: B,
-                            pad_h: usize,
-                            pad_w: usize,
-                            stride_h: usize,
-                            stride_w: usize,
-                            dilate_h: usize,
-                            dilate_w: usize) -> Tensor
+                            pad: usize,
+                            stride: usize,
+                            dilate: usize) -> Tensor
     where A: AsRef<Tensor>,
           B: AsRef<Tensor>,
 {
@@ -2046,9 +2041,9 @@ pub fn dilated_conv2d<A, B>(x: A, w: B,
         .set_inputs(vec![x.as_ref(), w.as_ref()])
         .build(
             conv_ops::conv2d::Conv2D {
-                pad_h, pad_w,
-                stride_h, stride_w,
-                dilation_h: dilate_h, dilation_w: dilate_w,
+                pad,
+                stride,
+                dilation: dilate,
             }
         )
 }
@@ -2063,14 +2058,12 @@ pub fn dilated_conv2d<A, B>(x: A, w: B,
 ///
 /// where
 ///
-///   * `out_h` = `stride_h * (h - 1) - pad_h + filter_h`
-///   * `out_w` = `stride_w * (w - 1) - pad_w + filter_w`
+///   * `out_h` = `stride * (h - 1) - pad + filter_h`
+///   * `out_w` = `stride * (w - 1) - pad + filter_w`
 ///
 pub fn conv2d_transpose<A, B>(x: A, w: B,
-                              pad_h: usize,
-                              pad_w: usize,
-                              stride_h: usize,
-                              stride_w: usize) -> Tensor
+                              pad: usize,
+                              stride: usize) -> Tensor
     where A: AsRef<Tensor>,
           B: AsRef<Tensor>,
 {
@@ -2078,9 +2071,9 @@ pub fn conv2d_transpose<A, B>(x: A, w: B,
         .set_inputs(vec![x.as_ref(), w.as_ref()])
         .build(
             conv_ops::conv2d_transpose::Conv2DTranspose {
-                pad_h, pad_w,
-                stride_h, stride_w,
-                dilation_h: 1, dilation_w: 1,
+                pad,
+                stride,
+                dilation: 1,
                 cols: None
             })
 }
@@ -2094,16 +2087,13 @@ pub fn conv2d_transpose<A, B>(x: A, w: B,
 ///
 /// where
 ///
-///   * `out_h` = `stride_h * (h - 1) - pad_h + (dilate_h * (filter_h - 1) + 1)`
-///   * `out_w` = `stride_w * (w - 1) - pad_w + (dilate_w * (filter_w - 1) + 1)`
+///   * `out_h` = `stride * (h - 1) - pad + (dilate * (filter_h - 1) + 1)`
+///   * `out_w` = `stride * (w - 1) - pad + (dilate * (filter_w - 1) + 1)`
 ///
 pub fn dilated_conv2d_transpose<A, B>(x: A, w: B,
-                                      pad_h: usize,
-                                      pad_w: usize,
-                                      stride_h: usize,
-                                      stride_w: usize,
-                                      dilate_h: usize,
-                                      dilate_w: usize) -> Tensor
+                                      pad: usize,
+                                      stride: usize,
+                                      dilate: usize) -> Tensor
     where A: AsRef<Tensor>,
           B: AsRef<Tensor>,
 {
@@ -2111,9 +2101,9 @@ pub fn dilated_conv2d_transpose<A, B>(x: A, w: B,
         .set_inputs(vec![x.as_ref(), w.as_ref()])
         .build(
             conv_ops::conv2d_transpose::Conv2DTranspose {
-                pad_h, pad_w,
-                stride_h, stride_w,
-                dilation_h: dilate_h, dilation_w: dilate_w,
+                pad,
+                stride,
+                dilation: dilate,
                 cols: None
             })
 }

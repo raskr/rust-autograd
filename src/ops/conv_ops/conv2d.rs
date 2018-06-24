@@ -3,30 +3,21 @@ use std::slice;
 use super::*;
 
 pub struct Conv2D {
-    pub pad_h: usize,
-    pub pad_w: usize,
-    pub stride_h: usize,
-    pub stride_w: usize,
-    pub dilation_h: usize,
-    pub dilation_w: usize,
+    pub pad: usize,
+    pub stride: usize,
+    pub dilation: usize,
 }
 
 pub struct Conv2DFilterGrad {
-    pub pad_h: usize,
-    pub pad_w: usize,
-    pub stride_h: usize,
-    pub stride_w: usize,
-    pub dilation_h: usize,
-    pub dilation_w: usize,
+    pub pad: usize,
+    pub stride: usize,
+    pub dilation: usize,
 }
 
 pub struct Conv2DWithCols {
-    pub pad_h: usize,
-    pub pad_w: usize,
-    pub stride_h: usize,
-    pub stride_w: usize,
-    pub dilation_h: usize,
-    pub dilation_w: usize,
+    pub pad: usize,
+    pub stride: usize,
+    pub dilation: usize,
 }
 
 impl ::op::Op for Conv2D {
@@ -87,9 +78,9 @@ impl ::op::Op for Conv2D {
             im2col(
                 x_region_head,
                 xch, xh, xw, kh, kw,
-                self.pad_h, self.pad_w,
-                self.stride_h, self.stride_w,
-                self.dilation_h, self.dilation_w,
+                self.pad, self.pad,
+                self.stride, self.stride,
+                self.dilation, self.dilation,
                 c_region_head
             );
             sgemm(false, false, w, c_region_head, y_region_head, m, n, k, 1., 0.);
@@ -114,12 +105,9 @@ impl ::op::Op for Conv2D {
             .set_inputs(vec![gy, w])
             .build(
                 super::conv2d_transpose::Conv2DTranspose {
-                    pad_h: self.pad_h,
-                    pad_w: self.pad_w,
-                    stride_h: self.stride_h,
-                    stride_w: self.stride_w,
-                    dilation_h: self.dilation_h,
-                    dilation_w: self.dilation_w,
+                    pad: self.pad,
+                    stride: self.stride,
+                    dilation: self.dilation,
                     cols: None,
                 }
             );
@@ -130,12 +118,9 @@ impl ::op::Op for Conv2D {
             .set_backprop_inputs(vec![x.clone(), gy.clone()])
             .build(
                 Conv2DFilterGrad {
-                    pad_h: self.pad_h,
-                    pad_w: self.pad_w,
-                    stride_h: self.stride_h,
-                    stride_w: self.stride_w,
-                    dilation_h: self.dilation_h,
-                    dilation_w: self.dilation_w,
+                    pad: self.pad,
+                    stride: self.stride,
+                    dilation: self.dilation,
                 }
             );
 
@@ -209,12 +194,9 @@ impl ::op::Op for Conv2DWithCols {
             .set_inputs(vec![gy, w])
             .build(
                 super::conv2d_transpose::Conv2DTranspose {
-                    pad_h: self.pad_h,
-                    pad_w: self.pad_w,
-                    stride_h: self.stride_h,
-                    stride_w: self.stride_w,
-                    dilation_h: self.dilation_h,
-                    dilation_w: self.dilation_w,
+                    pad: self.pad,
+                    stride: self.stride,
+                    dilation: self.dilation,
                     cols: None,
                 }
             );
@@ -225,12 +207,9 @@ impl ::op::Op for Conv2DWithCols {
                 vec![y.inputs_on_backprop.as_ref().unwrap()[0].clone(), gy.clone()])
             .build(
                 Conv2DFilterGrad {
-                    pad_h: self.pad_h,
-                    pad_w: self.pad_w,
-                    stride_h: self.stride_h,
-                    stride_w: self.stride_w,
-                    dilation_h: self.dilation_h,
-                    dilation_w: self.dilation_w,
+                    pad: self.pad,
+                    stride: self.stride,
+                    dilation: self.dilation,
                 }
             );
 
@@ -303,12 +282,9 @@ impl ::op::Op for Conv2DFilterGrad {
             .set_inputs(vec![gy, ggw])
             .build(
                 super::conv2d_transpose::Conv2DTranspose {
-                    pad_h: self.pad_h,
-                    pad_w: self.pad_w,
-                    stride_h: self.stride_h,
-                    stride_w: self.stride_w,
-                    dilation_h: self.dilation_h,
-                    dilation_w: self.dilation_w,
+                    pad: self.pad,
+                    stride: self.stride,
+                    dilation: self.dilation,
                     cols: None,
                 }
             );
@@ -319,12 +295,9 @@ impl ::op::Op for Conv2DFilterGrad {
                 vec![y.inputs_on_backprop.as_ref().unwrap()[0].clone(), ggw.clone()])
             .build(
                 Conv2DWithCols {
-                    pad_h: self.pad_h,
-                    pad_w: self.pad_w,
-                    stride_h: self.stride_h,
-                    stride_w: self.stride_w,
-                    dilation_h: self.dilation_h,
-                    dilation_w: self.dilation_w,
+                    pad: self.pad,
+                    stride: self.stride,
+                    dilation: self.dilation,
                 }
             );
 
@@ -336,12 +309,9 @@ impl ::op::Op for Conv2DFilterGrad {
 fn test_tensor_size_after_convolution()
 {
     let op = Conv2D {
-        pad_h: 0,
-        pad_w: 0,
-        stride_w: 1,
-        stride_h: 1,
-        dilation_h: 1,
-        dilation_w: 1,
+        pad: 0,
+        stride: 1,
+        dilation: 1,
     };
 
     let (xh, xw) = (3, 3);
@@ -356,12 +326,9 @@ fn test_tensor_size_after_convolution()
 fn test_parallel_im2col()
 {
     let op = Conv2D {
-        pad_h: 0,
-        pad_w: 0,
-        stride_h: 1,
-        stride_w: 1,
-        dilation_h: 1,
-        dilation_w: 1,
+        pad: 0,
+        stride: 1,
+        dilation: 1,
     };
 
     let batch_size = 2;
@@ -379,9 +346,9 @@ fn test_parallel_im2col()
         im2col(
             &x[i * num_elements_in_batch_x],
             xch, xh, xw, kh, kw,
-            op.pad_h, op.pad_w,
-            op.stride_h, op.stride_w,
-            op.dilation_h, op.dilation_w,
+            op.pad, op.pad,
+            op.stride, op.stride,
+            op.dilation, op.dilation,
             &c[i * num_elements_in_batch_c]
         );
     });
@@ -416,12 +383,9 @@ fn test_parallel_im2col()
 fn test_im2col()
 {
     let op = Conv2D {
-        pad_h: 0,
-        pad_w: 0,
-        stride_h: 1,
-        stride_w: 1,
-        dilation_h: 1,
-        dilation_w: 1,
+        pad: 0,
+        stride: 1,
+        dilation: 1,
     };
 
     let xch = 2;
@@ -441,9 +405,9 @@ fn test_im2col()
                    xch as i32,
                    xh as i32, xw as i32,
                    kh as i32, kw as i32,
-                   op.pad_h as i32, op.pad_w as i32,
-                   op.stride_h as i32, op.stride_w as i32,
-                   op.dilation_h as i32, op.dilation_w as i32,
+                   op.pad as i32, op.pad as i32,
+                   op.stride as i32, op.stride as i32,
+                   op.dilation as i32, op.dilation as i32,
                    cols.as_ptr())
     };
 
@@ -468,12 +432,9 @@ fn test_conv2d()
 {
     use ::op::Op;
     let op = Conv2D {
-        pad_h: 0,
-        pad_w: 0,
-        stride_w: 1,
-        stride_h: 1,
-        dilation_h: 1,
-        dilation_w: 1,
+        pad: 0,
+        stride: 1,
+        dilation: 1,
     };
 
     let x = ndarray::Array1::range(0., 2.*2.*3.*3., 1.)

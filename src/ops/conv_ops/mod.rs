@@ -18,25 +18,25 @@ use tensor::Tensor;
 
 macro_rules! get_xw {
     ($op:expr, $yw:expr, $kw:expr) => {
-        $op.stride_w * ($yw - 1) - $op.pad_w + ($op.dilation_w * ($kw - 1) + 1)
+        $op.stride * ($yw - 1) - $op.pad + ($op.dilation * ($kw - 1) + 1)
     };
 }
 
 macro_rules! get_xh {
     ($op:expr, $yh:expr, $kh:expr) => {
-        $op.stride_h * ($yh - 1) - $op.pad_h + ($op.dilation_h * ($kh - 1) + 1)
+        $op.stride * ($yh - 1) - $op.pad + ($op.dilation * ($kh - 1) + 1)
     };
 }
 
 macro_rules! get_yw {
     ($op:expr, $xw:expr, $kw:expr) => {
-        ($xw + 2 * $op.pad_w - ($op.dilation_w * ($kw - 1) + 1)) / $op.stride_w + 1
+        ($xw + 2 * $op.pad - ($op.dilation * ($kw - 1) + 1)) / $op.stride + 1
     };
 }
 
 macro_rules! get_yh {
     ($op:expr, $xh:expr, $kh:expr) => {
-        ($xh + 2 * $op.pad_h - ($op.dilation_h * ($kh - 1) + 1)) / $op.stride_h + 1
+        ($xh + 2 * $op.pad - ($op.dilation * ($kh - 1) + 1)) / $op.stride + 1
     };
 }
 
@@ -364,12 +364,9 @@ fn test_conv_filter_grad()
 {
     use ::op::Op;
     let op = conv2d::Conv2DFilterGrad {
-        pad_h: 0,
-        pad_w: 0,
-        stride_h: 1,
-        stride_w: 1,
-        dilation_h: 1,
-        dilation_w: 1,
+        pad: 0,
+        stride: 1,
+        dilation: 1,
     };
 
     let (kh, kw) = (2, 2);
