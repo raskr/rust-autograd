@@ -62,7 +62,6 @@ pub mod max_pool;
 #[link(name = "conv")]
 #[no_mangle]
 extern "C" {
-
     fn im2col_cpu(
         data_im: *const c_float,
         channels: c_int,
@@ -95,6 +94,23 @@ extern "C" {
         data_im: *const c_float,
     );
 
+    fn max_pool_cpu_unbatched(
+        input: *const c_float,
+        pad: c_int,
+        h: c_int,
+        w: c_int,
+        out_h: c_int,
+        out_w: c_int,
+        c: c_int,
+        b: c_int,
+        size: c_int,
+        stride: c_int,
+        output: *const c_float,
+        argmax: *const c_float,
+        float_min: c_float
+    );
+
+    #[allow(dead_code)]
     fn max_pool_cpu(
         input: *const c_float,
         pad: c_int,
@@ -132,7 +148,33 @@ extern "C" {
     );
 }
 
+#[inline(always)]
+fn max_pool_unbatched(
+    input: &c_float,
+    pad: usize,
+    h: usize,
+    w: usize,
+    out_h: usize,
+    out_w: usize,
+    c: usize,
+    b: usize,
+    size: usize,
+    stride: usize,
+    output: &c_float,
+    argmax: &c_float,
+) {
+    unsafe {
+        max_pool_cpu_unbatched(
+            input as *const _, pad as c_int,
+            h as c_int, w as c_int, out_h as c_int, out_w as c_int, c as c_int, b as c_int,
+            size as c_int, stride as c_int,
+            output as *const _, argmax as *const _, f32::MIN
+        )
+    }
+}
+
 #[inline]
+#[allow(dead_code)]
 fn max_pool(
     input: &c_float,
     pad: usize,
@@ -426,13 +468,13 @@ fn test_max_pool_cpu()
     let output = alloc_uninitialized_buf(4);
     let argmax = alloc_uninitialized_buf(4);
     max_pool(&x[0], 0, // pad
-                     3, 3, // h, w
-                     2, 2, // out_h, out_w
-                     1, // c
-                     1, // batch
-                     2, // size
-                     1, // stride
-                     &output[0], &argmax[0]);
+             3, 3, // h, w
+             2, 2, // out_h, out_w
+             1, // c
+             1, // batch
+             2, // size
+             1, // stride
+             &output[0], &argmax[0]);
     assert_eq!(output, vec![5., 4., 7., 8.]);
     assert_eq!(argmax, vec![3., 4., 7., 8.]);
 }

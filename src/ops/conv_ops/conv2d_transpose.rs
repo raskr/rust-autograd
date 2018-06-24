@@ -67,16 +67,33 @@ impl ::op::Op for Conv2DTranspose {
         // Col2im buffer must be initialized with zeros
         let gx = vec![0.; batch_size * num_elements_in_batch_gx];
 
-        (0..batch_size).into_par_iter().for_each(|i| { // for each mini-batch
-            let gy_region_head = &gy[i * num_elements_in_batch_gy];
-            let col_region_head = &col[i * num_elements_in_batch_col];
-            let gx_region_head = &gx[i * num_elements_in_batch_gx];
-            sgemm(true, false, w, gy_region_head, col_region_head, m, n, k, 1., 0.);
-            col2im(col_region_head, xch, xh, xw, kh, kw,
-                   self.pad, self.pad,
-                   self.stride, self.stride,
-                   self.dilation, self.dilation, gx_region_head);
-        });
+        #[cfg(feature="blas")] {
+            for i in 0..batch_size {
+                let gy_region_head = &gy[i * num_elements_in_batch_gy];
+                let col_region_head = &col[i * num_elements_in_batch_col];
+                sgemm(true, false, w, gy_region_head, col_region_head, m, n, k, 1., 0.);
+            }
+            (0..batch_size).into_par_iter().for_each(|i| { // for each mini-batch
+                let col_region_head = &col[i * num_elements_in_batch_col];
+                let gx_region_head = &gx[i * num_elements_in_batch_gx];
+                col2im(col_region_head, xch, xh, xw, kh, kw,
+                       self.pad, self.pad,
+                       self.stride, self.stride,
+                       self.dilation, self.dilation, gx_region_head);
+            });
+        }
+        #[cfg(not(feature="blas"))] {
+            (0..batch_size).into_par_iter().for_each(|i| { // for each mini-batch
+                let gy_region_head = &gy[i * num_elements_in_batch_gy];
+                let col_region_head = &col[i * num_elements_in_batch_col];
+                let gx_region_head = &gx[i * num_elements_in_batch_gx];
+                sgemm(true, false, w, gy_region_head, col_region_head, m, n, k, 1., 0.);
+                col2im(col_region_head, xch, xh, xw, kh, kw,
+                       self.pad, self.pad,
+                       self.stride, self.stride,
+                       self.dilation, self.dilation, gx_region_head);
+            });
+        }
 
         let gx = NdArray::from_shape_vec(ndarray::IxDyn(&[batch_size, xch, xh, xw]), gx);
         vec![Ok(gx.unwrap())]
@@ -160,8 +177,7 @@ impl ::op::Op for Conv2DTransposeFilterGrad {
         let gw = alloc_uninitialized_buf(k_shape[0] * k_shape[1] * k_shape[2] * k_shape[3]);
         let gw_head = unsafe { &*gw.as_ptr() };
 
-        for i in 0..batch_size {
-            let x_region_head = &x[i * num_elements_in_batch_x];
+        (0..batch_size).into_par_iter().for_each(|i| {
             let c_region_head = &cols[i * num_elements_in_batch_c];
             let g_region_head = &gy[i * num_elements_in_batch_g];
             im2col(
@@ -172,6 +188,11 @@ impl ::op::Op for Conv2DTransposeFilterGrad {
                 self.dilation, self.dilation,
                 c_region_head
             );
+        });
+
+        for i in 0..batch_size {
+            let x_region_head = &x[i * num_elements_in_batch_x];
+            let c_region_head = &cols[i * num_elements_in_batch_c];
             sgemm(false, true,
                   x_region_head,
                   c_region_head,

@@ -42,7 +42,7 @@ impl ::op::Op for Conv2D {
         };
         let (ych, kh, kw) = {
             let k_shape = w.shape();
-            assert_eq!(k_shape.len(), 4, "ag::conv2d: filter of must be 4D (got {:?})", k_shape);
+            assert_eq!(k_shape.len(), 4, "ag::conv2d: filter must be 4D (got {:?})", k_shape);
             assert_eq!(xch, k_shape[1],
                        "ag::conv2d: Number of input's channel ({:?}) must match second filter dim ({:?})",
                        xch, k_shape[1]
@@ -70,22 +70,37 @@ impl ::op::Op for Conv2D {
         let y = alloc_uninitialized_buf(batch_size * num_elements_in_batch_y);
         let w: &f32 = unsafe { &*w.as_ptr() };
 
-        // Execute stream of "im2col + sgemm" in parallel
-        (0..batch_size).into_par_iter().for_each(|i| { // for each batch
-            let x_region_head = &x[i * num_elements_in_batch_x];
-            let c_region_head = &c[i * num_elements_in_batch_c];
-            let y_region_head = &y[i * num_elements_in_batch_y];
-            im2col(
-                x_region_head,
-                xch, xh, xw, kh, kw,
-                self.pad, self.pad,
-                self.stride, self.stride,
-                self.dilation, self.dilation,
-                c_region_head
-            );
-            sgemm(false, false, w, c_region_head, y_region_head, m, n, k, 1., 0.);
-        });
-
+        #[cfg(feature="blas")] {
+            (0..batch_size).into_par_iter().for_each(|i| { // for each batch
+                let x_region_head = &x[i * num_elements_in_batch_x];
+                let c_region_head = &c[i * num_elements_in_batch_c];
+                im2col(x_region_head, xch, xh, xw, kh, kw,
+                       self.pad, self.pad,
+                       self.stride, self.stride,
+                       self.dilation, self.dilation,
+                       c_region_head
+                );
+            });
+            for i in 0..batch_size {
+                let c_region_head = &c[i * num_elements_in_batch_c];
+                let y_region_head = &y[i * num_elements_in_batch_y];
+                sgemm(false, false, w, c_region_head, y_region_head, m, n, k, 1., 0.);
+            }
+        }
+        #[cfg(not(feature="blas"))] {
+            (0..batch_size).into_par_iter().for_each(|i| { // for each batch
+                let x_region_head = &x[i * num_elements_in_batch_x];
+                let c_region_head = &c[i * num_elements_in_batch_c];
+                let y_region_head = &y[i * num_elements_in_batch_y];
+                im2col(x_region_head, xch, xh, xw, kh, kw,
+                       self.pad, self.pad,
+                       self.stride, self.stride,
+                       self.dilation, self.dilation,
+                       c_region_head
+                );
+                sgemm(false, false, w, c_region_head, y_region_head, m, n, k, 1., 0.);
+            });
+        }
         // Move vectors into NdArrays
         let y = NdArray::from_shape_vec(
             ndarray::IxDyn(&[batch_size, ych, yh, yw]), y).unwrap();
@@ -171,13 +186,20 @@ impl ::op::Op for Conv2DWithCols {
         let y = alloc_uninitialized_buf(batch_size * num_elements_in_batch_y);
         let w: &f32 = unsafe { &*w.as_ptr() };
 
-        // Do task
-        (0..batch_size).into_par_iter().for_each(|i| { // for each batch
-            let c_region_head = &c[i * num_elements_in_batch_c];
-            let y_region_head = &y[i * num_elements_in_batch_y];
-            sgemm(false, false, w, c_region_head, y_region_head, m, n, k, 1., 0.);
-        });
-
+        #[cfg(feature="blas")] {
+            for i in 0..batch_size { // for each batch
+                let c_region_head = &c[i * num_elements_in_batch_c];
+                let y_region_head = &y[i * num_elements_in_batch_y];
+                sgemm(false, false, w, c_region_head, y_region_head, m, n, k, 1., 0.);
+            }
+        }
+        #[cfg(not(feature="blas"))] {
+            (0..batch_size).into_par_iter().for_each(|i| { // for each batch
+                let c_region_head = &c[i * num_elements_in_batch_c];
+                let y_region_head = &y[i * num_elements_in_batch_y];
+                sgemm(false, false, w, c_region_head, y_region_head, m, n, k, 1., 0.);
+            });
+        }
         // Move vectors into NdArrays
         let y = NdArray::from_shape_vec(
             ndarray::IxDyn(&[batch_size, ych, yh, yw]), y).unwrap();

@@ -1,4 +1,7 @@
 extern crate ndarray;
+extern crate rayon;
+use self::rayon::iter::*;
+
 use ::tensor::Tensor;
 use super::*;
 
@@ -38,13 +41,16 @@ impl ::op::Op for MaxPool2D {
 
         let yh = (xh + 2 * self.pad - self.size) / self.stride + 1;
         let yw = (xw + 2 * self.pad - self.size) / self.stride + 1;
-        let output = alloc_uninitialized_buf(batch * c * yh * yw);
-        let indices = alloc_uninitialized_buf(batch * c * yh * yw);
-        max_pool(unsafe { &*x.as_ptr() }, self.pad, xh, xw, yh, yw, c, batch,
-                 self.size, self.stride,
-                 unsafe { &*output.as_ptr() },
-                 unsafe { &*indices.as_ptr() }
-        );
+        let all_len_y = batch * c * yh * yw;
+        let output = alloc_uninitialized_buf(all_len_y);
+        let indices = alloc_uninitialized_buf(all_len_y);
+        (0..batch).into_par_iter().for_each(|b| {
+            max_pool_unbatched(unsafe { &*x.as_ptr() }, self.pad, xh, xw, yh, yw, c, b,
+                               self.size, self.stride,
+                               unsafe { &*output.as_ptr() },
+                               unsafe { &*indices.as_ptr() }
+            );
+        });
         let output = NdArray::from_shape_vec(ndarray::IxDyn(&[batch, c, yh, yw]), output);
         let indices = NdArray::from_shape_vec(ndarray::IxDyn(&[batch, c, yh, yw]), indices);
         vec![Ok(output.unwrap()), Ok(indices.unwrap())]
