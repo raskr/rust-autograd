@@ -36,3 +36,7 @@ path = "examples/mlp_mnist.rs"
 [[example]]
 name = "lstm_lm"
 path = "examples/lstm_lm.rs"
+
+[[example]]
+name = "cnn_mnist"
+path = "examples/cnn_mnist.rs"
