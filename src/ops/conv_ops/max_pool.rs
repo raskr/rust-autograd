@@ -106,8 +106,8 @@ impl ::op::Op for MaxPool2DGrad {
         let yh = gy_shape[2];
         let yw = gy_shape[3];
 
-        let xh = self.stride * (yh - 1) - self.pad + ((self.size - 1) + 1);
-        let xw = self.stride * (yw - 1) - self.pad + ((self.size - 1) + 1);
+        let xh = self.stride * (yh - 1) - 2 * self.pad + self.size;
+        let xw = self.stride * (yw - 1) - 2 * self.pad + self.size;
         let gx = vec![0.; batch * c * xh * xw];
         max_pool_grad(unsafe { &*gy.as_ptr() }, yh, yw, c, batch,
                       unsafe { &*gx.as_ptr() },

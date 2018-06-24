@@ -18,13 +18,13 @@ use tensor::Tensor;
 
 macro_rules! get_xw {
     ($op:expr, $yw:expr, $kw:expr) => {
-        $op.stride * ($yw - 1) - $op.pad + ($op.dilation * ($kw - 1) + 1)
+        $op.stride * ($yw - 1) - 2 * $op.pad + ($op.dilation * ($kw - 1) + 1)
     };
 }
 
 macro_rules! get_xh {
     ($op:expr, $yh:expr, $kh:expr) => {
-        $op.stride * ($yh - 1) - $op.pad + ($op.dilation * ($kh - 1) + 1)
+        $op.stride * ($yh - 1) - 2 * $op.pad + ($op.dilation * ($kh - 1) + 1)
     };
 }
 
