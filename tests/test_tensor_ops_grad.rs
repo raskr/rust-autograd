@@ -588,7 +588,10 @@ fn conv2d() {
 
 #[test]
 fn max_pool2d() {
-    let ref x = ag::variable(ag::ndarray_ext::standard_normal(&[2, 2, 3, 3]));
+    let arr_x = ndarray::Array::from_iter(0..2 * 2 * 3 * 3)
+        .into_shape(ndarray::IxDyn(&[2, 2, 3, 3]))
+        .unwrap();
+    let ref x = ag::variable(arr_x.map(|a| *a as f32));
     let ref y = ag::max_pool2d(x, 2, 0, 1);
     let ref g = ag::grad_with_default(&[y], &[x], &[&ag::ones(&y.shape())]);
     ag::test_helper::gradient_check(y, g, &[x], &[], 1e-3, 1e-2);
@@ -596,9 +599,15 @@ fn max_pool2d() {
 
 #[test]
 fn max_pool2d_grad() {
-    let ref x = ag::variable(ag::ndarray_ext::standard_normal(&[2, 2, 3, 3]));
+    let arr_x = ndarray::Array::from_iter(0..2 * 2 * 3 * 3)
+        .into_shape(ndarray::IxDyn(&[2, 2, 3, 3]))
+        .unwrap();
+    let ref x = ag::variable(arr_x.map(|a| *a as f32));
     let ref y = ag::max_pool2d(x, 2, 0, 1);
-    let ref gy = ag::variable(ag::ndarray_ext::ones(&[2, 2, 2, 2]));
+    let arr_gx = ndarray::Array::from_iter(0..2 * 2 * 2 * 2)
+        .into_shape(ndarray::IxDyn(&[2, 2, 2, 2]))
+        .unwrap();
+    let ref gy = ag::variable(arr_gx.map(|a| *a as f32));
     let ref g = ag::grad_with_default(&[y], &[x], &[gy])[0];
     let ref gg = ag::grad_with_default(&[g], &[gy], &[&ag::ones(&g.shape())])[0];
     ag::test_helper::gradient_check(g, &[gg], &[gy], &[], 1e-3, 1e-2);
