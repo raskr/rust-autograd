@@ -2124,7 +2124,7 @@ pub fn max_pool2d<A: AsRef<Tensor>>(x: A, pool_size: usize, pad: usize, stride: 
     Tensor::builder()
         .set_input(x.as_ref())
         .build(
-            conv_ops::max_pool::MaxPool2D {
+            conv_ops::max_pool2d::MaxPool2D {
                 pad,
                 stride,
                 size: pool_size

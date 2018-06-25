@@ -57,7 +57,7 @@ macro_rules! get_or_insert_cols {
 
 pub mod conv2d;
 pub mod conv2d_transpose;
-pub mod max_pool;
+pub mod max_pool2d;
 
 #[link(name = "conv")]
 #[no_mangle]
