@@ -3,17 +3,17 @@ extern crate ndarray;
 
 struct LSTM
 {
-    pub vector_dim: usize,
-    pub hs:         Vec<ag::Tensor>,
-    pub cells:      Vec<ag::Tensor>,
-    pub wx:         ag::Tensor,
-    pub wh:         ag::Tensor,
-    pub b:          ag::Tensor,
+    vector_dim: usize,
+    hs:         Vec<ag::Tensor>,
+    cells:      Vec<ag::Tensor>,
+    wx:         ag::Tensor,
+    wh:         ag::Tensor,
+    b:          ag::Tensor,
 }
 
 impl LSTM
 {
-    pub fn new(vector_dim: usize) -> LSTM
+    fn new(vector_dim: usize) -> LSTM
     {
         LSTM {
             vector_dim,
@@ -33,20 +33,12 @@ impl LSTM
         }
     }
 
-    pub fn list_vars(&self) -> Vec<&ag::Tensor>
-    {
-        vec![&self.wx, &self.wh, &self.b]
-    }
-
-    #[inline]
-    /// Applies standard LSTM unit without peephole to input.
-    ///
-    /// # Arguments
-    /// * `x` - Tensor with shape (batch_size, embedding_dim)
+    /// Applies standard LSTM unit without peephole to `x`.
+    /// `x` must be a tensor with shape `(batch_size, embedding_dim)`
     ///
     /// # Returns
-    /// output tensor of this unit with shape (batch_size, state_size)
-    fn step(&mut self, x: &ag::Tensor) -> ag::Tensor
+    /// Output tensor of this unit with shape `(batch_size, state_size)`.
+    fn step(&mut self, x: &ag::Tensor) -> &ag::Tensor
     {
         let (cell, h) = {
             let ref last_output = self.hs.pop().unwrap_or_else(|| ag::zeros(&x.shape()));
@@ -65,55 +57,57 @@ impl LSTM
             (cell, h)
         };
         self.cells.push(cell);
-        self.hs.push(h.clone());
-        h
+        self.hs.push(h);
+        self.hs.last().as_ref().unwrap()
     }
 }
 
+// TODO: Use real-world data
+// TODO: Write in define-by-run style
 pub fn main()
 {
     let vec_dim = 4;
     let max_sent = 2;
     let vocab_size = 5;
 
-    // === graph def
     let ref sentences = ag::placeholder(&[-1, max_sent]);
     let ref mut rnn = LSTM::new(vec_dim);
 
-    let ref lookup_table = ag::variable(ag::ndarray_ext::random_normal(
+    let lookup_table = &ag::variable(ag::ndarray_ext::random_normal(
         &[vocab_size, vec_dim],
         0.,
         0.01,
     ));
-    let ref w_pred = ag::variable(ag::ndarray_ext::random_uniform(
+    let w_pred = &ag::variable(ag::ndarray_ext::random_uniform(
         &[vec_dim, vocab_size],
         0.,
         0.01,
     ));
+
     // Compute cross entropy losses for each LSTM step
-    let losses = (0..max_sent)
+    let losses: Vec<ag::Tensor> = (0..max_sent)
         .map(|i| {
-            let ref cur_id = ag::slice(sentences, &[0, i], &[-1, i + 1]);
-            let ref next_id = ag::slice(sentences, &[0, i + 1], &[-1, i + 2]);
-            let ref x = ag::gather(lookup_table, cur_id, 0);
-            let ref h = rnn.step(x);
-            let ref prediction = ag::matmul(h, w_pred);
+            let cur_id = ag::slice(sentences, &[0, i], &[-1, i + 1]);
+            let next_id = ag::slice(sentences, &[0, i + 1], &[-1, i + 2]);
+            let x = ag::gather(lookup_table, &cur_id, 0);
+            let h = rnn.step(&x);
+            let prediction = ag::matmul(h, w_pred);
             ag::sparse_softmax_cross_entropy(prediction, next_id)
         })
-        .collect::<Vec<_>>();
+        .collect();
 
-    // For simplicity, I use loss of the last output only.
-    let loss = losses.last().unwrap();
-    let mut vars = rnn.list_vars();
-    vars.extend_from_slice(&[lookup_table, w_pred]);
-    let ref g = ag::grad(&[loss], vars.as_slice());
-    // === graph def end
+    // Aggregate losses of generated words
+    let ref loss = ag::add_n(losses.iter().map(|a| a).collect::<Vec<_>>().as_slice());
+
+    // Compute gradients
+    let vars = &[&rnn.wh, &rnn.wx, &rnn.b, lookup_table, w_pred];
+    let grads = ag::grad(&[loss], vars);
 
     // test with toy data
     ag::test_helper::gradient_check(
         loss,
-        g.as_slice(),
-        vars.as_slice(),
+        &grads,
+        vars,
         &[
             (
                 sentences,
