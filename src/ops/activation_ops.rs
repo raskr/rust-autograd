@@ -6,13 +6,11 @@ use ops;
 use std::f32;
 use tensor::Tensor;
 
-pub struct ELU
-{
+pub struct ELU {
     pub alpha: f32,
 }
 
-pub struct ELUGrad
-{
+pub struct ELUGrad {
     pub alpha: f32,
 }
 
@@ -24,14 +22,12 @@ pub struct Sigmoid;
 
 pub struct Softplus;
 
-pub struct Softmax
-{
+pub struct Softmax {
     pub axis: isize,
 }
 
 #[inline]
-pub fn softmax_forward(x: &NdArray, axis: isize) -> NdArray
-{
+pub fn softmax_forward(x: &NdArray, axis: isize) -> NdArray {
     let axis = if axis < 0 {
         (x.ndim() as isize + axis) as usize
     } else {
@@ -57,41 +53,33 @@ pub fn softmax_forward(x: &NdArray, axis: isize) -> NdArray
     tmp
 }
 
-impl op::Op for Softmax
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for Softmax {
+    fn name(&self) -> &str {
         "Softmax"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         vec![Ok(softmax_forward(ctx.grab_inputs()[0], self.axis))]
     }
 
-    fn grad(&self, gy: &Tensor, _: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, gy: &Tensor, _: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
         let sum = ops::reduce_sum(&(output * gy), &[self.axis], true);
         vec![Some((gy - sum) * output)]
     }
 }
 
-impl op::Op for Softplus
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for Softplus {
+    fn name(&self) -> &str {
         "Softplus"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         let e = f32::consts::E;
         vec![Ok(xs[0].mapv(move |a| (a.exp() + 1.).log(e)))]
     }
 
-    fn grad(&self, gy: &Tensor, xs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, gy: &Tensor, xs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         let a = &ops::exp(xs[0]);
         let b = a + 1;
         let gx = gy * (a / b);
@@ -99,40 +87,32 @@ impl op::Op for Softplus
     }
 }
 
-impl op::Op for Sigmoid
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for Sigmoid {
+    fn name(&self) -> &str {
         "Sigmoid"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let x = ctx.grab_inputs()[0];
         vec![Ok(x.mapv(|a| ((a * 0.5).tanh() * 0.5) + 0.5))]
     }
 
-    fn grad(&self, gy: &Tensor, _: &[&Tensor], y: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, gy: &Tensor, _: &[&Tensor], y: &Tensor) -> Vec<Option<Tensor>> {
         vec![Some(gy * (y - ops::square(y)))]
     }
 }
 
-impl op::Op for ReLU
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for ReLU {
+    fn name(&self) -> &str {
         "ReLU"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let x = ctx.grab_inputs()[0];
         vec![Ok(x.map(|a| a.max(0.)))]
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         let bin = ops::greater(inputs[0], &ops::scalar(0.));
         // inplace is ok because second derivative of relu is 0.
         // (`mul_inplace` returns `None` as input gradient.)
@@ -140,35 +120,28 @@ impl op::Op for ReLU
     }
 }
 
-impl op::Op for Identity
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for Identity {
+    fn name(&self) -> &str {
         "Identity"
     }
 
-    fn compute(&self, _: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, _: ::runtime::OpComputeContext) -> op::ComputeResult {
         // do nothing
         vec![Err(::op::ComputeError::Delegate { to: 0 })]
     }
 
-    fn grad(&self, gy: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, gy: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         // use gy's array with rc increment.
         vec![Some(gy.clone())]
     }
 }
 
-impl op::Op for ELU
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for ELU {
+    fn name(&self) -> &str {
         "ELU"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let x = ctx.grab_inputs()[0];
         let ret = x.mapv(move |a| {
             if a > 0. {
@@ -180,8 +153,7 @@ impl op::Op for ELU
         vec![Ok(ret)]
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         let gx = Tensor::builder()
             .set_inputs(vec![inputs[0], gy])
             .set_shape(gy.shape())
@@ -190,15 +162,12 @@ impl op::Op for ELU
     }
 }
 
-impl op::Op for ELUGrad
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for ELUGrad {
+    fn name(&self) -> &str {
         "ELUGrad"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         let x = xs[0];
         let gy = xs[1];
@@ -212,8 +181,7 @@ impl op::Op for ELUGrad
         vec![Ok(a * gy)]
     }
 
-    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         vec![None, None]
     }
 }

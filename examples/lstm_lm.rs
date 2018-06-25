@@ -1,20 +1,17 @@
 extern crate autograd as ag;
 extern crate ndarray;
 
-struct LSTM
-{
+struct LSTM {
     vector_dim: usize,
-    hs:         Vec<ag::Tensor>,
-    cells:      Vec<ag::Tensor>,
-    wx:         ag::Tensor,
-    wh:         ag::Tensor,
-    b:          ag::Tensor,
+    hs: Vec<ag::Tensor>,
+    cells: Vec<ag::Tensor>,
+    wx: ag::Tensor,
+    wh: ag::Tensor,
+    b: ag::Tensor,
 }
 
-impl LSTM
-{
-    fn new(vector_dim: usize) -> LSTM
-    {
+impl LSTM {
+    fn new(vector_dim: usize) -> LSTM {
         LSTM {
             vector_dim,
             hs: vec![],
@@ -38,8 +35,7 @@ impl LSTM
     ///
     /// # Returns
     /// Output tensor of this unit with shape `(batch_size, state_size)`.
-    fn step(&mut self, x: &ag::Tensor) -> &ag::Tensor
-    {
+    fn step(&mut self, x: &ag::Tensor) -> &ag::Tensor {
         let (cell, h) = {
             let ref last_output = self.hs.pop().unwrap_or_else(|| ag::zeros(&x.shape()));
             let ref last_cell = self.cells.pop().unwrap_or_else(|| ag::zeros(&x.shape()));
@@ -64,8 +60,7 @@ impl LSTM
 
 // TODO: Use real-world data
 // TODO: Write in define-by-run style
-pub fn main()
-{
+pub fn main() {
     let vec_dim = 4;
     let max_sent = 2;
     let vocab_size = 5;
@@ -108,12 +103,10 @@ pub fn main()
         loss,
         &grads,
         vars,
-        &[
-            (
-                sentences,
-                &ndarray::arr2(&[[2., 3., 1.], [3., 0., 1.]]).into_dyn(),
-            ),
-        ],
+        &[(
+            sentences,
+            &ndarray::arr2(&[[2., 3., 1.], [3., 0., 1.]]).into_dyn(),
+        )],
         1e-3,
         1e-3,
     );

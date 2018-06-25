@@ -6,20 +6,17 @@ use std::mem;
 use std::rc::Rc;
 use tensor::Tensor;
 
-struct GradInfo<'a>
-{
-    node:           &'a Tensor, // information of this node
-    has_gradient:   bool,
-    grad_called:    bool,
+struct GradInfo<'a> {
+    node: &'a Tensor, // information of this node
+    has_gradient: bool,
+    grad_called: bool,
     computed_grads: Vec<Tensor>,
-    default_grad:   Option<&'a Tensor>,
+    default_grad: Option<&'a Tensor>,
 }
 
-impl<'a> GradInfo<'a>
-{
+impl<'a> GradInfo<'a> {
     #[inline]
-    fn new(t: &'a Tensor, has_gradient: bool, default_grad: Option<&'a Tensor>) -> GradInfo<'a>
-    {
+    fn new(t: &'a Tensor, has_gradient: bool, default_grad: Option<&'a Tensor>) -> GradInfo<'a> {
         GradInfo {
             node: t,
             has_gradient,
@@ -30,18 +27,14 @@ impl<'a> GradInfo<'a>
     }
 }
 
-impl<'a> fmt::Debug for GradInfo<'a>
-{
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result
-    {
+impl<'a> fmt::Debug for GradInfo<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.node.op.name())
     }
 }
 
-impl fmt::Debug for Tensor
-{
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result
-    {
+impl fmt::Debug for Tensor {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.op.name())
     }
 }
@@ -53,8 +46,7 @@ macro_rules! access_grad_info_of {
 }
 
 #[inline]
-fn has_marked_child(parent: &Tensor, path: &Vec<GradInfo>) -> bool
-{
+fn has_marked_child(parent: &Tensor, path: &Vec<GradInfo>) -> bool {
     let mut it = if let Some(ref a) = parent.inputs_on_backprop {
         a.iter()
     } else {
@@ -73,8 +65,7 @@ fn has_marked_child(parent: &Tensor, path: &Vec<GradInfo>) -> bool
 // Strategy:
 //   Visit all nodes with depth-first-search starting from `ys`, and record those in `path`.
 //   Mark all nodes between `ys` and `xs` as `has_gradient`.
-fn mark_gradient_path<'a>(ys: &[&'a Tensor], xs: &[&'a Tensor]) -> Vec<GradInfo<'a>>
-{
+fn mark_gradient_path<'a>(ys: &[&'a Tensor], xs: &[&'a Tensor]) -> Vec<GradInfo<'a>> {
     // Randomly accessible by use of each node's lookup key.
     let mut path: Vec<GradInfo<'a>> = Vec::new();
 
@@ -116,8 +107,7 @@ fn mark_gradient_path<'a>(ys: &[&'a Tensor], xs: &[&'a Tensor]) -> Vec<GradInfo<
 }
 
 #[test]
-fn test_gradient_path()
-{
+fn test_gradient_path() {
     // dummy graph
     // y = 3 * x1 * x1 + 5 * x2 + x3;
     let ref x1 = ::ops::placeholder(&[]);
@@ -193,8 +183,7 @@ pub fn symbolic_gradients(
     ys: &[&Tensor],
     xs: &[&Tensor],
     known_gys: &[Option<&Tensor>],
-) -> Vec<Tensor>
-{
+) -> Vec<Tensor> {
     assert_eq!(
         ys.len(),
         known_gys.len(),
@@ -286,53 +275,43 @@ pub fn symbolic_gradients(
         .collect::<Vec<Tensor>>()
 }
 
-struct TensorWrapper<'a>
-{
+struct TensorWrapper<'a> {
     inner: &'a Tensor,
 }
 
-impl<'a> Ord for TensorWrapper<'a>
-{
+impl<'a> Ord for TensorWrapper<'a> {
     // Compares the ranks in topological ordering
-    fn cmp(&self, other: &Self) -> Ordering
-    {
+    fn cmp(&self, other: &Self) -> Ordering {
         self.inner.top_rank.cmp(&other.inner.top_rank)
     }
 }
 
-impl<'a> PartialOrd for TensorWrapper<'a>
-{
+impl<'a> PartialOrd for TensorWrapper<'a> {
     #[inline]
     // Compares the ranks in topological ordering
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering>
-    {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.inner.top_rank.cmp(&other.inner.top_rank))
     }
 }
 
 impl<'a> Eq for TensorWrapper<'a> {}
 
-impl<'a> PartialEq for TensorWrapper<'a>
-{
+impl<'a> PartialEq for TensorWrapper<'a> {
     #[inline]
-    fn eq(&self, other: &TensorWrapper<'a>) -> bool
-    {
+    fn eq(&self, other: &TensorWrapper<'a>) -> bool {
         Rc::ptr_eq(&self.inner, &other.inner)
     }
 }
 
-impl Tensor
-{
+impl Tensor {
     #[inline]
-    fn wrapped(&self) -> TensorWrapper
-    {
+    fn wrapped(&self) -> TensorWrapper {
         TensorWrapper { inner: self }
     }
 }
 
 #[inline]
-fn accumulate_grads_if_needed(grads: &mut Vec<Tensor>)
-{
+fn accumulate_grads_if_needed(grads: &mut Vec<Tensor>) {
     if grads.len() > 1 {
         let mut acc = {
             let refs = grads.iter().map(|a| a).collect::<Vec<_>>();

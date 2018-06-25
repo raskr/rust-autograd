@@ -13,8 +13,7 @@ use std::rc::Rc;
 /// Symbolic multi-dimensional array.
 pub struct Tensor(pub Rc<TensorCore>);
 
-pub struct TensorCore
-{
+pub struct TensorCore {
     /// Operation of this node.
     pub op: Box<op::Op>,
     /// References to immediate predecessors.
@@ -34,11 +33,10 @@ pub struct TensorCore
     /// Indices of arrays used in `compute`
     pub input_indices: Vec<usize>,
     /// Inputs used when performing backprop.
-    pub inputs_on_backprop: Option<Vec<Tensor>>
+    pub inputs_on_backprop: Option<Vec<Tensor>>,
 }
 
-pub enum PersistentArray
-{
+pub enum PersistentArray {
     Variable(NdArray),
     Constant(NdArray),
 }
@@ -48,13 +46,10 @@ impl Tensor {
     /// that's a placeholder won't have a backing array, and will return
     /// `None`.
     pub fn get_array(&self) -> Option<&NdArray> {
-        self.0.persistent_array.as_ref()
-            .map(|p| {
-                match p {
-                    &PersistentArray::Variable(ref arr) => arr,
-                    &PersistentArray::Constant(ref arr) => arr,
-                }
-            })
+        self.0.persistent_array.as_ref().map(|p| match p {
+            &PersistentArray::Variable(ref arr) => arr,
+            &PersistentArray::Constant(ref arr) => arr,
+        })
     }
 
     /// Returns a mutable reference to the backing array, if one exists, the
@@ -66,21 +61,16 @@ impl Tensor {
     pub fn get_array_mut(&mut self) -> Option<&mut NdArray> {
         //inner.persistent_array.as_mut()
         Rc::get_mut(&mut self.0)
-            .and_then(|t| {
-                t.persistent_array.as_mut()
-            }).and_then(|p| {
-                match p {
-                    &mut PersistentArray::Variable(ref mut arr) => Some(arr),
-                    _ => None
-                }
+            .and_then(|t| t.persistent_array.as_mut())
+            .and_then(|p| match p {
+                &mut PersistentArray::Variable(ref mut arr) => Some(arr),
+                _ => None,
             })
     }
 }
 
-impl PersistentArray
-{
-    pub fn get_as_variable(&self) -> &NdArray
-    {
+impl PersistentArray {
+    pub fn get_as_variable(&self) -> &NdArray {
         match *self {
             PersistentArray::Variable(ref a) => a,
             PersistentArray::Constant(_) => panic!("Can't mutate constant tensor"),
@@ -88,21 +78,18 @@ impl PersistentArray
     }
 
     #[allow(mutable_transmutes)]
-    pub unsafe fn get_as_variable_mut(&self) -> &mut NdArray
-    {
+    pub unsafe fn get_as_variable_mut(&self) -> &mut NdArray {
         mem::transmute(self.get_as_variable())
     }
 
-    pub fn get_array(&self) -> &NdArray
-    {
+    pub fn get_array(&self) -> &NdArray {
         match *self {
             PersistentArray::Variable(ref a) => a,
             PersistentArray::Constant(ref a) => a,
         }
     }
 
-    pub fn shape(&self) -> &[usize]
-    {
+    pub fn shape(&self) -> &[usize] {
         match *self {
             PersistentArray::Variable(ref a) => a.shape(),
             PersistentArray::Constant(ref a) => a.shape(),
@@ -110,85 +97,73 @@ impl PersistentArray
     }
 }
 
-pub struct TensorBuilder
-{
-    shape:              Option<Tensor>,
-    inputs:             Vec<Tensor>,
-    has_gradient:       bool,
-    is_placeholder:     bool,
-    persistent_array:   Option<PersistentArray>,
-    input_indices:      Option<Vec<usize>>,
+pub struct TensorBuilder {
+    shape: Option<Tensor>,
+    inputs: Vec<Tensor>,
+    has_gradient: bool,
+    is_placeholder: bool,
+    persistent_array: Option<PersistentArray>,
+    input_indices: Option<Vec<usize>>,
     inputs_on_backprop: Option<Vec<Tensor>>,
 }
 
-impl TensorBuilder
-{
+impl TensorBuilder {
     #[inline]
-    pub fn set_shape(mut self, s: Tensor) -> TensorBuilder
-    {
+    pub fn set_shape(mut self, s: Tensor) -> TensorBuilder {
         self.shape = Some(s);
         self
     }
 
     #[inline]
-    pub fn set_has_gradient(mut self, a: bool) -> TensorBuilder
-    {
+    pub fn set_has_gradient(mut self, a: bool) -> TensorBuilder {
         self.has_gradient = a;
         self
     }
 
     #[inline]
-    pub fn set_inputs(mut self, a: Vec<&Tensor>) -> TensorBuilder
-    {
+    pub fn set_inputs(mut self, a: Vec<&Tensor>) -> TensorBuilder {
         self.inputs = a.iter().map(|b| (*b).clone()).collect::<Vec<Tensor>>();
         self
     }
 
     #[inline]
-    pub fn set_inputs_slice(mut self, a: &[&Tensor]) -> TensorBuilder
-    {
+    pub fn set_inputs_slice(mut self, a: &[&Tensor]) -> TensorBuilder {
         self.inputs = a.iter().map(|b| (*b).clone()).collect::<Vec<Tensor>>();
         self
     }
 
     #[inline]
-    pub fn set_input(mut self, a: &Tensor) -> TensorBuilder
-    {
+    pub fn set_input(mut self, a: &Tensor) -> TensorBuilder {
         self.inputs = vec![a.clone()];
         self
     }
 
     #[inline]
-    pub fn set_is_placeholder(mut self, a: bool) -> TensorBuilder
-    {
+    pub fn set_is_placeholder(mut self, a: bool) -> TensorBuilder {
         self.is_placeholder = a;
         self
     }
 
     #[inline]
-    pub fn set_constant_array(mut self, a: NdArray) -> TensorBuilder
-    {
+    pub fn set_constant_array(mut self, a: NdArray) -> TensorBuilder {
         self.persistent_array = Some(PersistentArray::Constant(a));
         self
     }
 
     #[inline]
-    pub fn set_variable_array(mut self, a: NdArray) -> TensorBuilder
-    {
+    pub fn set_variable_array(mut self, a: NdArray) -> TensorBuilder {
         self.persistent_array = Some(PersistentArray::Variable(a));
         self
     }
 
     #[inline]
-    pub fn set_input_indices(mut self, a: Vec<usize>) -> TensorBuilder
-    {
+    pub fn set_input_indices(mut self, a: Vec<usize>) -> TensorBuilder {
         self.input_indices = Some(a);
         self
     }
 
     #[inline]
-    pub fn set_backprop_inputs(mut self, a: Vec<Tensor>) -> TensorBuilder
-    {
+    pub fn set_backprop_inputs(mut self, a: Vec<Tensor>) -> TensorBuilder {
         self.inputs_on_backprop = Some(a);
         self
     }
@@ -207,8 +182,7 @@ impl TensorBuilder
     /// assert!(vars == [a, v, b, z])
     /// ```
     #[inline]
-    pub fn build<T: Op + 'static>(self, op: T) -> Tensor
-    {
+    pub fn build<T: Op + 'static>(self, op: T) -> Tensor {
         let rank = if self.inputs.len() == 0 {
             0
         } else {
@@ -242,19 +216,17 @@ impl TensorBuilder
     }
 }
 
-impl Tensor
-{
+impl Tensor {
     #[inline]
-    pub fn builder() -> TensorBuilder
-    {
+    pub fn builder() -> TensorBuilder {
         TensorBuilder {
-            shape:              None,
-            inputs:             Vec::new(),
-            has_gradient:       true,
-            persistent_array:   None,
-            is_placeholder:     false,
-            input_indices:      None,
-            inputs_on_backprop: None
+            shape: None,
+            inputs: Vec::new(),
+            has_gradient: true,
+            persistent_array: None,
+            is_placeholder: false,
+            input_indices: None,
+            inputs_on_backprop: None,
         }
     }
 
@@ -271,32 +243,28 @@ impl Tensor
     /// Returns the (symbolic) shape of this tensor.
     ///
     /// See [shape](../ops/fn.shape.html).
-    pub fn shape(&self) -> Tensor
-    {
+    pub fn shape(&self) -> Tensor {
         ::ops::shape(self)
     }
 
     /// Returns the (symbolic) rank of this tensor.
     ///
     /// See [rank](../ops/fn.rank.html).
-    pub fn rank(&self) -> Tensor
-    {
+    pub fn rank(&self) -> Tensor {
         ::ops::rank(self)
     }
 
     /// Returns the (symbolic) size of this tensor.
     ///
     /// See [size](../ops/fn.size.html).
-    pub fn size(&self) -> Tensor
-    {
+    pub fn size(&self) -> Tensor {
         ::ops::size(self)
     }
 
     #[doc(hidden)]
     #[inline]
     /// Returns true if this node has no incoming nodes.
-    pub fn is_source(&self) -> bool
-    {
+    pub fn is_source(&self) -> bool {
         self.inputs.is_empty()
     }
 }
@@ -304,54 +272,42 @@ impl Tensor
 // empty implementation
 impl Eq for Tensor {}
 
-impl PartialEq for Tensor
-{
-    fn eq(&self, other: &Tensor) -> bool
-    {
+impl PartialEq for Tensor {
+    fn eq(&self, other: &Tensor) -> bool {
         // compare addresses on the heap
         Rc::ptr_eq(&self.0, &other.0)
     }
 }
 
-impl AsRef<Tensor> for Tensor
-{
+impl AsRef<Tensor> for Tensor {
     #[inline(always)]
-    fn as_ref(&self) -> &Tensor
-    {
+    fn as_ref(&self) -> &Tensor {
         self
     }
 }
 
 // data is not cloned; only reference count is incremented.
-impl Clone for Tensor
-{
-    fn clone(&self) -> Tensor
-    {
+impl Clone for Tensor {
+    fn clone(&self) -> Tensor {
         Tensor(self.0.clone())
     }
 }
 
-impl Deref for Tensor
-{
+impl Deref for Tensor {
     type Target = Rc<TensorCore>;
-    fn deref(&self) -> &Self::Target
-    {
+    fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl DerefMut for Tensor
-{
-    fn deref_mut<'a>(&'a mut self) -> &'a mut Rc<TensorCore>
-    {
+impl DerefMut for Tensor {
+    fn deref_mut<'a>(&'a mut self) -> &'a mut Rc<TensorCore> {
         &mut self.0
     }
 }
 
-impl fmt::Display for Tensor
-{
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result
-    {
+impl fmt::Display for Tensor {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let input_names = self.0
             .inputs
             .iter()
@@ -367,15 +323,12 @@ impl fmt::Display for Tensor
 }
 
 /// Implementors can be converted to `Tensor`.
-pub trait ArrayLike
-{
+pub trait ArrayLike {
     fn as_tensor(&self) -> Tensor;
 }
 
-impl ArrayLike for Tensor
-{
-    fn as_tensor(&self) -> Tensor
-    {
+impl ArrayLike for Tensor {
+    fn as_tensor(&self) -> Tensor {
         self.clone()
     }
 }
@@ -383,12 +336,8 @@ impl ArrayLike for Tensor
 macro_rules! impl_array_like_for_array {
     ($scalar_type:ty, $num_elems:expr) => {
         impl ArrayLike for [$scalar_type; $num_elems] {
-            fn as_tensor(&self) -> Tensor
-            {
-                let vec = self
-                    .iter()
-                    .map(|&a| a as f32 )
-                    .collect::<Vec<f32>>();
+            fn as_tensor(&self) -> Tensor {
+                let vec = self.iter().map(|&a| a as f32).collect::<Vec<f32>>();
 
                 // unwrap is safe
                 let arr = NdArray::from_shape_vec(ndarray::IxDyn(&[self.len()]), vec).unwrap();

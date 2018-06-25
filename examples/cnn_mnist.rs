@@ -10,39 +10,36 @@ use std::time::Instant;
 // First, run "./download_mnist.sh" beforehand if you don't have dataset and then run
 // "cargo run --example cnn_mnist --release" in `examples` directory.
 macro_rules! eval_with_time {
-  ($x:expr) => {
-    {
-      let start = Instant::now();
-      let result = $x;
-      let end = start.elapsed();
-      println!("{}.{:03} sec", end.as_secs(), end.subsec_nanos() / 1_000_000);
-      result
-    }
-  };
+    ($x:expr) => {{
+        let start = Instant::now();
+        let result = $x;
+        let end = start.elapsed();
+        println!(
+            "{}.{:03} sec",
+            end.as_secs(),
+            end.subsec_nanos() / 1_000_000
+        );
+        result
+    }};
 }
 
-
-fn conv_pool(x: &ag::Tensor, w: &ag::Tensor, b: &ag::Tensor) -> ag::Tensor
-{
+fn conv_pool(x: &ag::Tensor, w: &ag::Tensor, b: &ag::Tensor) -> ag::Tensor {
     let y1 = ag::conv2d(x, w, 1, 1) + b;
     let y2 = ag::relu(y1);
     ag::max_pool2d(y2, 2, 0, 2)
 }
 
-fn logits(x: &ag::Tensor, w: &ag::Tensor, b: &ag::Tensor) -> ag::Tensor
-{
+fn logits(x: &ag::Tensor, w: &ag::Tensor, b: &ag::Tensor) -> ag::Tensor {
     ag::matmul(x, w) + b
 }
 
-fn inputs() -> (ag::Tensor, ag::Tensor)
-{
+fn inputs() -> (ag::Tensor, ag::Tensor) {
     let x = ag::placeholder(&[-1, 1, 28, 28]);
     let y = ag::placeholder(&[-1, 1]);
     (x, y)
 }
 
-fn main()
-{
+fn main() {
     let ((x_train, y_train), (x_test, y_test)) = dataset::load();
 
     let ref w1 = ag::variable(ag::ndarray_ext::random_normal(&[32, 1, 3, 3], 0., 0.1));
@@ -54,7 +51,7 @@ fn main()
     let params = &[w1, w2, w3, b1, b2, b3];
     let ref params_adam = ag::gradient_descent_ops::Adam::vars_with_states(params);
     let (x, y) = inputs();
-    let z1 = conv_pool(&x, w1, b1);  // map to 32 channel
+    let z1 = conv_pool(&x, w1, b1); // map to 32 channel
     let z2 = conv_pool(&z1, w2, b2); // map to 64 channel
     let z3 = ag::reshape(z2, &[-1, 64 * 7 * 7]); // flatten
     let logits = logits(&z3, w3, b3); // linear
@@ -92,8 +89,7 @@ fn main()
     );
 }
 
-pub mod dataset
-{
+pub mod dataset {
     extern crate ndarray;
     use std::fs::File;
     use std::io;
@@ -106,8 +102,7 @@ pub mod dataset
     /// load mnist dataset as "ndarray" objects.
     ///
     /// labels are sparse (vertical vector).
-    pub fn load() -> ((NdArray, NdArray), (NdArray, NdArray))
-    {
+    pub fn load() -> ((NdArray, NdArray), (NdArray, NdArray)) {
         // load dataset as `Vec`s
         let (train_x, num_image_train): (Vec<f32>, usize) =
             load_images("data/mnist/train-images-idx3-ubyte");
@@ -127,8 +122,7 @@ pub mod dataset
         ((x_train, y_train), (x_test, y_test))
     }
 
-    fn load_images<P: AsRef<Path>>(path: P) -> (Vec<f32>, usize)
-    {
+    fn load_images<P: AsRef<Path>>(path: P) -> (Vec<f32>, usize) {
         let ref mut buf_reader = io::BufReader::new(
             File::open(path).expect("Please run ./download_mnist.sh beforehand"),
         );
@@ -148,8 +142,7 @@ pub mod dataset
         (ret, num_image)
     }
 
-    fn load_labels<P: AsRef<Path>>(path: P) -> (Vec<f32>, usize)
-    {
+    fn load_labels<P: AsRef<Path>>(path: P) -> (Vec<f32>, usize) {
         let ref mut buf_reader = io::BufReader::new(File::open(path).unwrap());
         let magic = u32::from_be(read_u32(buf_reader));
         if magic != 2049 {
@@ -163,8 +156,7 @@ pub mod dataset
         (ret, num_label)
     }
 
-    fn read_u32<T: Read>(reader: &mut T) -> u32
-    {
+    fn read_u32<T: Read>(reader: &mut T) -> u32 {
         let mut buf: [u8; 4] = [0, 0, 0, 0];
         let _ = reader.read_exact(&mut buf);
         unsafe { mem::transmute(buf) }

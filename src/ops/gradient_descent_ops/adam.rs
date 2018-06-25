@@ -2,24 +2,20 @@ extern crate ndarray;
 
 use ndarray_ext::NdArray;
 use op;
-use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
+use std::collections::BTreeMap;
 use tensor::Tensor;
 
-struct AdamOp
-{
+struct AdamOp {
     static_params: StaticParams,
 }
 
-impl ::op::Op for AdamOp
-{
-    fn name(&self) -> &str
-    {
+impl ::op::Op for AdamOp {
+    fn name(&self) -> &str {
         "Adam"
     }
 
-    fn compute(&self, mut ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, mut ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let StaticParams { alpha, eps, b1, b2 } = self.static_params;
         let xs = unsafe { ctx.grab_assignable_inputs() };
 
@@ -54,8 +50,7 @@ impl ::op::Op for AdamOp
         vec![Err(::op::ComputeError::NoOutput)]
     }
 
-    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         vec![None]
     }
 }
@@ -68,32 +63,27 @@ pub struct StatefulVariable<'a> {
 /// Adam optimizer
 ///
 /// This implementation is based on http://arxiv.org/abs/1412.6980v8
-pub struct Adam
-{
-    pub alpha:           f32,
-    pub eps:             f32,
-    pub b1:              f32,
-    pub b2:              f32,
+pub struct Adam {
+    pub alpha: f32,
+    pub eps: f32,
+    pub b1: f32,
+    pub b2: f32,
 }
 
-impl Default for Adam
-{
-    fn default() -> Adam
-    {
+impl Default for Adam {
+    fn default() -> Adam {
         Adam {
-            alpha:           0.001,
-            eps:             1e-08,
-            b1:              0.9,
-            b2:              0.999,
+            alpha: 0.001,
+            eps: 1e-08,
+            b1: 0.9,
+            b2: 0.999,
         }
     }
 }
 
 impl Adam {
-
     /// Creates stateful variable tensors used for Adam optimizer.
-    pub fn vars_with_states<'a>(tensors: &[&'a Tensor]) -> Vec<StatefulVariable<'a>>
-    {
+    pub fn vars_with_states<'a>(tensors: &[&'a Tensor]) -> Vec<StatefulVariable<'a>> {
         let mut var2state = BTreeMap::<super::StateKey<'a>, StatefulParams>::new();
         tensors
             .into_iter()
@@ -107,11 +97,15 @@ impl Adam {
                                 v: ::ops::variable(NdArray::zeros(var_arr.shape())),
                                 t: ::ops::variable(::ndarray_ext::from_scalar(1.)),
                             });
-                            StatefulVariable { var, state: inserted.clone() }
+                            StatefulVariable {
+                                var,
+                                state: inserted.clone(),
+                            }
                         }
-                        Entry::Occupied(ent) => {
-                            StatefulVariable { var, state: ent.get().clone() }
-                        }
+                        Entry::Occupied(ent) => StatefulVariable {
+                            var,
+                            state: ent.get().clone(),
+                        },
                     }
                 } else {
                     panic!("Can't optimize non-variable.")
@@ -125,42 +119,41 @@ impl Adam {
         &self,
         params: &[StatefulVariable],
         grads: &[T],
-    ) -> Vec<Tensor>
-    {
+    ) -> Vec<Tensor> {
         params
             .into_iter()
             .zip(grads)
             .map(|(param, grad)| {
-                let StatefulParams {ref m, ref v, ref t} = param.state;
+                let StatefulParams {
+                    ref m,
+                    ref v,
+                    ref t,
+                } = param.state;
                 Tensor::builder()
                     .set_inputs(vec![param.var, grad.as_ref(), m, v, t])
-                    .build(
-                        AdamOp {
-                            static_params: StaticParams {
-                                alpha: self.alpha,
-                                eps:   self.eps,
-                                b1:    self.b1,
-                                b2:    self.b2,
-                            },
-                        }
-                    )
+                    .build(AdamOp {
+                        static_params: StaticParams {
+                            alpha: self.alpha,
+                            eps: self.eps,
+                            b1: self.b1,
+                            b2: self.b2,
+                        },
+                    })
             })
             .collect()
     }
 }
 
 #[derive(Copy, Clone)]
-pub struct StaticParams
-{
+pub struct StaticParams {
     pub alpha: f32,
-    pub eps:   f32,
-    pub b1:    f32,
-    pub b2:    f32,
+    pub eps: f32,
+    pub b1: f32,
+    pub b2: f32,
 }
 
 #[derive(Clone)]
-pub struct StatefulParams
-{
+pub struct StatefulParams {
     pub m: Tensor,
     pub v: Tensor,
     pub t: Tensor, // shape: []

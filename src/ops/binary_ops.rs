@@ -22,16 +22,14 @@ pub struct PreprocessBinOpGrad;
 pub struct PreprocessBinOpGradGrad;
 
 impl op::Op for PreprocessBinOpGrad {
-    fn name(&self) -> &str
-    {
+    fn name(&self) -> &str {
         "PreprocessBinOpGradGrad"
     }
 
     // Computes x's gradient.
     // Involves reduction as necessary.
     // Inputs: [gy, target_shape]
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         let gy = xs[0];
         let x_shape_ = ::ndarray_ext::vec_as_shape(xs[1]);
@@ -53,13 +51,15 @@ impl op::Op for PreprocessBinOpGrad {
             // Reduce each dim as necessary
             let mut folded: Option<NdArray> = None;
             for (i, (x_axis, gy_axis)) in x_shape.iter().zip(gy_shape).enumerate() {
-                if x_axis < gy_axis  {
+                if x_axis < gy_axis {
                     if *x_axis == 1 {
                         // `fold_axis` squashes the axis automatically.
                         let axis = ndarray::Axis(if x_is_scalar { 0 } else { i });
-                        let ret = folded.as_ref()
-                                        .unwrap_or(gy)
-                                        .fold_axis(axis.clone(), 0., |a, b| a.clone() + b.clone());
+                        let ret = folded.as_ref().unwrap_or(gy).fold_axis(
+                            axis.clone(),
+                            0.,
+                            |a, b| a.clone() + b.clone(),
+                        );
                         if x_is_scalar {
                             mem::swap(&mut folded, &mut Some(ret));
                         } else {
@@ -80,8 +80,7 @@ impl op::Op for PreprocessBinOpGrad {
     }
 
     // Do broadcast
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         let x_shape = inputs[1];
         let gx = Tensor::builder()
             .set_inputs(vec![gy, x_shape])
@@ -93,13 +92,11 @@ impl op::Op for PreprocessBinOpGrad {
 // Do broadcast.
 // Inputs: [gy, target_shape]
 impl op::Op for PreprocessBinOpGradGrad {
-    fn name(&self) -> &str
-    {
+    fn name(&self) -> &str {
         "BinOpGradGradCommon"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         let gy = xs[0];
         let target_shape_ = xs[1];
@@ -133,42 +130,36 @@ impl op::Op for PreprocessBinOpGradGrad {
         vec![Ok(ret)]
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
-        let gx = Tensor::builder().set_inputs(vec![inputs[0], gy]).build(PreprocessBinOpGrad);
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
+        let gx = Tensor::builder()
+            .set_inputs(vec![inputs[0], gy])
+            .build(PreprocessBinOpGrad);
         vec![Some(gx), None]
     }
 }
 
-impl op::Op for AddOp
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for AddOp {
+    fn name(&self) -> &str {
         "Add"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         add_forward(xs[0], xs[1])
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         let (gy1, gy2) = preprocess_gy(inputs[0], inputs[1], gy);
         vec![Some(gy1), Some(gy2)]
     }
 }
 
-impl op::Op for SubOp
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for SubOp {
+    fn name(&self) -> &str {
         "Sub"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         let x0 = xs[0];
         let x1 = xs[1];
@@ -183,28 +174,23 @@ impl op::Op for SubOp
         vec![ret]
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         let (gy1, gy2) = preprocess_gy(inputs[0], inputs[1], gy);
         vec![Some(gy1), Some(ops::neg(&gy2))]
     }
 }
 
-impl op::Op for MulOp
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for MulOp {
+    fn name(&self) -> &str {
         "Mul"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         mul_forward(xs[0], xs[1])
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         let x0 = inputs[0];
         let x1 = inputs[1];
         let (gy1, gy2) = preprocess_gy(x0, x1, gy);
@@ -212,15 +198,12 @@ impl op::Op for MulOp
     }
 }
 
-impl op::Op for DivOp
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for DivOp {
+    fn name(&self) -> &str {
         "Div"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         let x0 = xs[0];
         let x1 = xs[1];
@@ -235,8 +218,7 @@ impl op::Op for DivOp
         vec![ret]
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         let x0 = inputs[0];
         let x1 = inputs[1];
         let (gy1, gy2) = preprocess_gy(x0, x1, gy);
@@ -244,15 +226,12 @@ impl op::Op for DivOp
     }
 }
 
-impl op::Op for InplaceAddOp
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for InplaceAddOp {
+    fn name(&self) -> &str {
         "InplaceAdd"
     }
 
-    fn compute(&self, mut ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, mut ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = unsafe { ctx.grab_assignable_inputs() };
         // safe transmute probably
         let x1: &&NdArray = unsafe { mem::transmute(&mut xs[1]) };
@@ -260,22 +239,18 @@ impl op::Op for InplaceAddOp
         vec![Err(::op::ComputeError::Delegate { to: 0 })]
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         let (gy1, gy2) = preprocess_gy(inputs[0], inputs[1], gy);
         vec![Some(gy1), Some(gy2)]
     }
 }
 
-impl op::Op for InplaceSubOp
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for InplaceSubOp {
+    fn name(&self) -> &str {
         "InplaceSub"
     }
 
-    fn compute(&self, mut ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, mut ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = unsafe { ctx.grab_assignable_inputs() };
         // safe transmute probably
         let x1: &&NdArray = unsafe { mem::transmute(&mut xs[1]) };
@@ -283,22 +258,18 @@ impl op::Op for InplaceSubOp
         vec![Err(::op::ComputeError::Delegate { to: 0 })]
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         let (gy1, gy2) = preprocess_gy(inputs[0], inputs[1], gy);
         vec![Some(gy1), Some(ops::neg(&gy2))]
     }
 }
 
-impl op::Op for InplaceMulOp
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for InplaceMulOp {
+    fn name(&self) -> &str {
         "InplaceMul"
     }
 
-    fn compute(&self, mut ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, mut ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = unsafe { ctx.grab_assignable_inputs() };
         // safe transmute probably
         let x1: &&NdArray = unsafe { mem::transmute(&mut xs[1]) };
@@ -306,21 +277,17 @@ impl op::Op for InplaceMulOp
         vec![Err(::op::ComputeError::Delegate { to: 0 })]
     }
 
-    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         vec![None, None]
     }
 }
 
-impl op::Op for InplaceDivOp
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for InplaceDivOp {
+    fn name(&self) -> &str {
         "InplaceDiv"
     }
 
-    fn compute(&self, mut ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, mut ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = unsafe { ctx.grab_assignable_inputs() };
         // safe transmute probably
         let x1: &&NdArray = unsafe { mem::transmute(&mut xs[1]) };
@@ -328,8 +295,7 @@ impl op::Op for InplaceDivOp
         vec![Err(::op::ComputeError::Delegate { to: 0 })]
     }
 
-    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         vec![None, None]
     }
 }
@@ -353,18 +319,11 @@ fn preprocess_gy(x0: &Tensor, x1: &Tensor, gy: &Tensor) -> (Tensor, Tensor) {
 // -- std::ops::{Add, Sub, Mul, Div} implementations --
 
 macro_rules! impl_bin_op_between_tensor_and_scalar {
-    (
-        $trt:ident,
-        $func:ident,
-        $op:ident,
-        $scalar_type:ty
-    ) => {
-
+    ($trt:ident, $func:ident, $op:ident, $scalar_type:ty) => {
         // scalar op Tensor
         impl $trt<Tensor> for $scalar_type {
             type Output = Tensor;
-            fn $func(self, rhs: Tensor) -> Self::Output
-            {
+            fn $func(self, rhs: Tensor) -> Self::Output {
                 Tensor::builder()
                     .set_inputs(vec![&ops::scalar(self as f32), &rhs])
                     .set_shape(rhs.shape())
@@ -375,8 +334,7 @@ macro_rules! impl_bin_op_between_tensor_and_scalar {
         // scalar op &Tensor
         impl<'a> $trt<&'a Tensor> for $scalar_type {
             type Output = Tensor;
-            fn $func(self, rhs: &'a Tensor) -> Self::Output
-            {
+            fn $func(self, rhs: &'a Tensor) -> Self::Output {
                 Tensor::builder()
                     .set_inputs(vec![&ops::scalar(self as f32), &rhs])
                     .set_shape(rhs.shape())
@@ -387,8 +345,7 @@ macro_rules! impl_bin_op_between_tensor_and_scalar {
         // Tensor op scalar
         impl $trt<$scalar_type> for Tensor {
             type Output = Tensor;
-            fn $func(self, rhs: $scalar_type) -> Self::Output
-            {
+            fn $func(self, rhs: $scalar_type) -> Self::Output {
                 Tensor::builder()
                     .set_inputs(vec![&self, &ops::scalar(rhs as f32)])
                     .set_shape(self.shape())
@@ -399,28 +356,22 @@ macro_rules! impl_bin_op_between_tensor_and_scalar {
         // &Tensor op scalar
         impl<'a> $trt<$scalar_type> for &'a Tensor {
             type Output = Tensor;
-            fn $func(self, rhs: $scalar_type) -> Self::Output
-            {
+            fn $func(self, rhs: $scalar_type) -> Self::Output {
                 Tensor::builder()
                     .set_inputs(vec![&self, &ops::scalar(rhs as f32)])
                     .set_shape(self.shape())
                     .build($op)
             }
         }
-    }
+    };
 }
 
 macro_rules! impl_bin_op_between_tensors {
-    (
-        $trt:ident,
-        $func:ident,
-        $op:ident
-    ) => {
+    ($trt:ident, $func:ident, $op:ident) => {
         // Tensor op Tensor
         impl $trt for Tensor {
             type Output = Tensor;
-            fn $func(self, rhs: Tensor) -> Self::Output
-            {
+            fn $func(self, rhs: Tensor) -> Self::Output {
                 ops::$func(&self, &rhs)
             }
         }
@@ -428,8 +379,7 @@ macro_rules! impl_bin_op_between_tensors {
         // Tensor op &Tensor
         impl<'a> $trt<&'a Tensor> for Tensor {
             type Output = Tensor;
-            fn $func(self, rhs: &Tensor) -> Self::Output
-            {
+            fn $func(self, rhs: &Tensor) -> Self::Output {
                 ops::$func(&self, rhs)
             }
         }
@@ -437,8 +387,7 @@ macro_rules! impl_bin_op_between_tensors {
         // &Tensor op Tensor
         impl<'a> $trt<Tensor> for &'a Tensor {
             type Output = Tensor;
-            fn $func(self, rhs: Tensor) -> Self::Output
-            {
+            fn $func(self, rhs: Tensor) -> Self::Output {
                 ops::$func(&self, &rhs)
             }
         }
@@ -447,8 +396,7 @@ macro_rules! impl_bin_op_between_tensors {
         // lifetime of the two tensors are unrelated
         impl<'a, 'b> $trt<&'a Tensor> for &'b Tensor {
             type Output = Tensor;
-            fn $func(self, rhs: &Tensor) -> Self::Output
-            {
+            fn $func(self, rhs: &Tensor) -> Self::Output {
                 ops::$func(self, rhs)
             }
         }

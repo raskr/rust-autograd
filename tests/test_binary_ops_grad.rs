@@ -2,8 +2,7 @@ extern crate autograd as ag;
 extern crate ndarray;
 
 #[test]
-fn scalar_add()
-{
+fn scalar_add() {
     let ref x = ag::placeholder(&[]);
     let ref y = x + 2;
     let ref grad = ag::grad(&[y], &[x])[0];
@@ -11,8 +10,7 @@ fn scalar_add()
 }
 
 #[test]
-fn scalar_sub()
-{
+fn scalar_sub() {
     let ref x = ag::placeholder(&[]);
     let ref y = x - 2;
     let ref grad = ag::grad(&[y], &[x])[0];
@@ -20,8 +18,7 @@ fn scalar_sub()
 }
 
 #[test]
-fn scalar_mul()
-{
+fn scalar_mul() {
     let ref x = ag::placeholder(&[]);
     let ref y = 3 * x;
     let ref grad = ag::grad(&[y], &[x])[0];
@@ -29,8 +26,7 @@ fn scalar_mul()
 }
 
 #[test]
-fn scalar_div()
-{
+fn scalar_div() {
     let ref x = ag::placeholder(&[]);
     let ref y = x / 3;
     let ref grad = ag::grad(&[y], &[x])[0];
@@ -38,8 +34,7 @@ fn scalar_div()
 }
 
 #[test]
-fn expr1()
-{
+fn expr1() {
     let ref x = ag::placeholder(&[]);
     let ref y = 3 * x + 2;
     let ref grad = ag::grad(&[y], &[x])[0];
@@ -47,8 +42,7 @@ fn expr1()
 }
 
 #[test]
-fn expr2()
-{
+fn expr2() {
     let ref x = ag::placeholder(&[]);
     let ref y = 3 * x * x;
     let ref grad = ag::grad(&[y], &[x])[0];
@@ -59,8 +53,7 @@ fn expr2()
 }
 
 #[test]
-fn expr3()
-{
+fn expr3() {
     let ref x = ag::placeholder(&[]);
     let ref y = 3 * x * x + 2;
     let ref grad = ag::grad(&[y], &[x])[0];
@@ -71,8 +64,7 @@ fn expr3()
 }
 
 #[test]
-fn expr4()
-{
+fn expr4() {
     let ref x = ag::placeholder(&[]);
     let ref y = 3 * x * x + 2 * x + 1;
     let ref grad = ag::grad(&[y], &[x])[0];
@@ -83,8 +75,7 @@ fn expr4()
 }
 
 #[test]
-fn expr5()
-{
+fn expr5() {
     let ref x1 = ag::placeholder(&[]);
     let ref x2 = ag::placeholder(&[]);
     let ref y = 3 * x1 * x1 + 2 * x1 + x2 + 1;
@@ -98,8 +89,7 @@ fn expr5()
 #[test]
 // Test with intention that grad of `x2` should be computed
 // even if the value of `x1` is not given
-fn expr6()
-{
+fn expr6() {
     let ref x1 = ag::placeholder(&[]);
     let ref x2 = ag::variable(ndarray::arr0(0.));
     let ref y = 3 * x1 * x1 + 5 * x2;
@@ -108,8 +98,7 @@ fn expr6()
 }
 
 #[test]
-fn differentiate_twice()
-{
+fn differentiate_twice() {
     let ref x = ag::placeholder(&[]);
     let ref y = x * x;
     let ref g1 = ag::grad(&[y], &[x])[0];
@@ -118,8 +107,7 @@ fn differentiate_twice()
 }
 
 #[test]
-fn expr7()
-{
+fn expr7() {
     let ref x1 = ag::placeholder(&[]);
     let ref x2 = ag::placeholder(&[]);
     let ref y = 2 * x1 * x1 + 3 * x2;

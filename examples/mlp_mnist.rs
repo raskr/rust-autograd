@@ -14,31 +14,30 @@ use std::time::Instant;
 // NOTE: This example is written in define-by-run style, so
 // the performance is spoiled little bit.
 macro_rules! eval_with_time {
-  ($x:expr) => {
-    {
-      let start = Instant::now();
-      let result = $x;
-      let end = start.elapsed();
-      println!("{}.{:03} sec", end.as_secs(), end.subsec_nanos() / 1_000_000);
-      result
-    }
-  };
+    ($x:expr) => {{
+        let start = Instant::now();
+        let result = $x;
+        let end = start.elapsed();
+        println!(
+            "{}.{:03} sec",
+            end.as_secs(),
+            end.subsec_nanos() / 1_000_000
+        );
+        result
+    }};
 }
 
-fn logits(x: &ag::Tensor, w: &ag::Tensor, b: &ag::Tensor) -> ag::Tensor
-{
+fn logits(x: &ag::Tensor, w: &ag::Tensor, b: &ag::Tensor) -> ag::Tensor {
     ag::matmul(x, w) + b
 }
 
-fn inputs() -> (ag::Tensor, ag::Tensor)
-{
+fn inputs() -> (ag::Tensor, ag::Tensor) {
     let x = ag::placeholder(&[-1, 28 * 28]);
     let y = ag::placeholder(&[-1, 1]);
     (x, y)
 }
 
-fn main()
-{
+fn main() {
     let ((x_train, y_train), (x_test, y_test)) = dataset::load();
 
     // -- variable tensors (target of optimization) --
@@ -85,8 +84,7 @@ fn main()
     );
 }
 
-pub mod dataset
-{
+pub mod dataset {
     extern crate ndarray;
     use std::fs::File;
     use std::io;
@@ -99,8 +97,7 @@ pub mod dataset
     /// load mnist dataset as "ndarray" objects.
     ///
     /// labels are sparse (vertical vector).
-    pub fn load() -> ((NdArray, NdArray), (NdArray, NdArray))
-    {
+    pub fn load() -> ((NdArray, NdArray), (NdArray, NdArray)) {
         // load dataset as `Vec`s
         let (train_x, num_image_train): (Vec<f32>, usize) =
             load_images("data/mnist/train-images-idx3-ubyte");
@@ -120,8 +117,7 @@ pub mod dataset
         ((x_train, y_train), (x_test, y_test))
     }
 
-    fn load_images<P: AsRef<Path>>(path: P) -> (Vec<f32>, usize)
-    {
+    fn load_images<P: AsRef<Path>>(path: P) -> (Vec<f32>, usize) {
         let ref mut buf_reader = io::BufReader::new(
             File::open(path).expect("Please run ./download_mnist.sh beforehand"),
         );
@@ -141,8 +137,7 @@ pub mod dataset
         (ret, num_image)
     }
 
-    fn load_labels<P: AsRef<Path>>(path: P) -> (Vec<f32>, usize)
-    {
+    fn load_labels<P: AsRef<Path>>(path: P) -> (Vec<f32>, usize) {
         let ref mut buf_reader = io::BufReader::new(File::open(path).unwrap());
         let magic = u32::from_be(read_u32(buf_reader));
         if magic != 2049 {
@@ -156,8 +151,7 @@ pub mod dataset
         (ret, num_label)
     }
 
-    fn read_u32<T: Read>(reader: &mut T) -> u32
-    {
+    fn read_u32<T: Read>(reader: &mut T) -> u32 {
         let mut buf: [u8; 4] = [0, 0, 0, 0];
         let _ = reader.read_exact(&mut buf);
         unsafe { mem::transmute(buf) }

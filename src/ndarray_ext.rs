@@ -11,16 +11,14 @@ pub type NdArrayView<'a> = ndarray::ArrayView<'a, f32, ndarray::IxDyn>;
 pub use array_gen::*;
 
 #[inline]
-pub fn arr_to_shape(arr: &NdArray) -> Vec<usize>
-{
+pub fn arr_to_shape(arr: &NdArray) -> Vec<usize> {
     arr.iter().map(|&a| a as usize).collect::<Vec<_>>()
 }
 
 #[doc(hidden)]
 #[inline]
 // TODO: remove unwrap
-pub fn expand_dims_view<'a>(x: NdArrayView<'a>, axis: usize) -> NdArrayView<'a>
-{
+pub fn expand_dims_view<'a>(x: NdArrayView<'a>, axis: usize) -> NdArrayView<'a> {
     let mut shape = x.shape().to_vec();
     shape.insert(axis, 1);
     x.into_shape(shape).unwrap()
@@ -29,8 +27,7 @@ pub fn expand_dims_view<'a>(x: NdArrayView<'a>, axis: usize) -> NdArrayView<'a>
 #[doc(hidden)]
 #[inline]
 // TODO: remove unwrap
-pub fn expand_dims(x: NdArray, axis: usize) -> NdArray
-{
+pub fn expand_dims(x: NdArray, axis: usize) -> NdArray {
     let mut shape = x.shape().to_vec();
     shape.insert(axis, 1);
     x.into_shape(shape).unwrap()
@@ -38,8 +35,7 @@ pub fn expand_dims(x: NdArray, axis: usize) -> NdArray
 
 #[doc(hidden)]
 #[inline]
-pub fn roll_axis(arg: &mut NdArray, to: ndarray::Axis, from: ndarray::Axis)
-{
+pub fn roll_axis(arg: &mut NdArray, to: ndarray::Axis, from: ndarray::Axis) {
     let i = to.index();
     let mut j = from.index();
     if j > i {
@@ -92,8 +88,7 @@ pub fn sparse_to_dense(arr: &NdArray) -> Vec<usize> {
 #[doc(hidden)]
 #[inline]
 /// This works well only for small array
-pub fn vec_as_shape(x: &NdArray) -> Vec<usize>
-{
+pub fn vec_as_shape(x: &NdArray) -> Vec<usize> {
     let mut target = Vec::with_capacity(x.len());
     for &a in x.iter() {
         target.push(a as usize);
@@ -103,8 +98,7 @@ pub fn vec_as_shape(x: &NdArray) -> Vec<usize>
 
 #[doc(hidden)]
 #[inline]
-pub fn scalar_shape() -> NdArray
-{
+pub fn scalar_shape() -> NdArray {
     // safe unwrap
     NdArray::from_shape_vec(ndarray::IxDyn(&[0]), vec![]).unwrap()
 }
@@ -117,8 +111,7 @@ pub fn is_scalar_shape(shape: &[usize]) -> bool {
 
 #[doc(hidden)]
 #[inline]
-pub fn shape_of(x: &NdArray) -> NdArray
-{
+pub fn shape_of(x: &NdArray) -> NdArray {
     let shape = x.shape().iter().map(|&a| a as f32).collect::<Vec<f32>>();
     let rank = shape.len();
     // safe unwrap
@@ -127,8 +120,7 @@ pub fn shape_of(x: &NdArray) -> NdArray
 
 #[doc(hidden)]
 #[inline]
-pub fn into_mat(x: NdArray) -> ndarray::Array<f32, ndarray::Ix2>
-{
+pub fn into_mat(x: NdArray) -> ndarray::Array<f32, ndarray::Ix2> {
     let (a, b) = {
         let shape = x.shape();
         (shape[0], shape[1])
@@ -137,35 +129,30 @@ pub fn into_mat(x: NdArray) -> ndarray::Array<f32, ndarray::Ix2>
 }
 
 /// Generates ndarray which can be fed to `autograd::variable()` etc.
-pub mod array_gen
-{
+pub mod array_gen {
     use super::*;
 
     #[inline]
     /// Zeros.
-    pub fn zeros(shape: &[usize]) -> ndarray::Array<f32, ndarray::IxDyn>
-    {
+    pub fn zeros(shape: &[usize]) -> ndarray::Array<f32, ndarray::IxDyn> {
         NdArray::from_elem(shape, 0.)
     }
 
     #[inline]
     /// Ones.
-    pub fn ones(shape: &[usize]) -> ndarray::Array<f32, ndarray::IxDyn>
-    {
+    pub fn ones(shape: &[usize]) -> ndarray::Array<f32, ndarray::IxDyn> {
         NdArray::from_elem(shape, 1.)
     }
 
     #[inline]
     /// Create ndarray object from a scalar.
-    pub fn from_scalar(val: f32) -> ndarray::Array<f32, ndarray::IxDyn>
-    {
+    pub fn from_scalar(val: f32) -> ndarray::Array<f32, ndarray::IxDyn> {
         NdArray::from_elem(ndarray::IxDyn(&[]), val)
     }
 
     #[inline]
     /// Permutation.
-    pub fn permutation(size: usize) -> ndarray::Array1<usize>
-    {
+    pub fn permutation(size: usize) -> ndarray::Array1<usize> {
         ArrRng::default().permutation(size)
     }
 
@@ -175,8 +162,7 @@ pub mod array_gen
         shape: &[usize],
         mean: f64,
         stddev: f64,
-    ) -> ndarray::Array<f32, ndarray::IxDyn>
-    {
+    ) -> ndarray::Array<f32, ndarray::IxDyn> {
         ArrRng::default().random_normal(shape, mean, stddev)
     }
 
@@ -186,50 +172,43 @@ pub mod array_gen
         shape: &[usize],
         min: f64,
         max: f64,
-    ) -> ndarray::Array<f32, ndarray::IxDyn>
-    {
+    ) -> ndarray::Array<f32, ndarray::IxDyn> {
         ArrRng::default().random_uniform(shape, min, max)
     }
 
     #[inline]
     /// Samples from standard normal distribution
-    pub fn standard_normal(shape: &[usize]) -> ndarray::Array<f32, ndarray::IxDyn>
-    {
+    pub fn standard_normal(shape: &[usize]) -> ndarray::Array<f32, ndarray::IxDyn> {
         ArrRng::default().standard_normal(shape)
     }
 
     #[inline]
     /// Samples from standard uniform distribution
-    pub fn standard_uniform(shape: &[usize]) -> ndarray::Array<f32, ndarray::IxDyn>
-    {
+    pub fn standard_uniform(shape: &[usize]) -> ndarray::Array<f32, ndarray::IxDyn> {
         ArrRng::default().standard_uniform(shape)
     }
 
     #[inline]
     /// Glorot normal initialization. (a.k.a. Xavier normal initialization)
-    pub fn glorot_normal(shape: &[usize]) -> ndarray::Array<f32, ndarray::IxDyn>
-    {
+    pub fn glorot_normal(shape: &[usize]) -> ndarray::Array<f32, ndarray::IxDyn> {
         ArrRng::default().glorot_normal(shape)
     }
 
     #[inline]
     /// Glorot uniform initialization. (a.k.a. Xavier uniform initialization)
-    pub fn glorot_uniform(shape: &[usize]) -> ndarray::Array<f32, ndarray::IxDyn>
-    {
+    pub fn glorot_uniform(shape: &[usize]) -> ndarray::Array<f32, ndarray::IxDyn> {
         ArrRng::default().glorot_normal(shape)
     }
 
     /// Bernoulli distribution.
     #[inline]
-    pub fn bernoulli(shape: &[usize], p: f64) -> ndarray::Array<f32, ndarray::IxDyn>
-    {
+    pub fn bernoulli(shape: &[usize], p: f64) -> ndarray::Array<f32, ndarray::IxDyn> {
         ArrRng::default().bernoulli(shape, p)
     }
 
     /// Exponential distribution.
     #[inline]
-    pub fn exponential(shape: &[usize], lambda: f64) -> ndarray::Array<f32, ndarray::IxDyn>
-    {
+    pub fn exponential(shape: &[usize], lambda: f64) -> ndarray::Array<f32, ndarray::IxDyn> {
         ArrRng::default().exponential(shape, lambda)
     }
 
@@ -239,8 +218,7 @@ pub mod array_gen
         shape: &[usize],
         mean: f64,
         stddev: f64,
-    ) -> ndarray::Array<f32, ndarray::IxDyn>
-    {
+    ) -> ndarray::Array<f32, ndarray::IxDyn> {
         ArrRng::default().log_normal(shape, mean, stddev)
     }
 
@@ -250,41 +228,36 @@ pub mod array_gen
         shape: &[usize],
         shape_param: f64,
         scale: f64,
-    ) -> ndarray::Array<f32, ndarray::IxDyn>
-    {
+    ) -> ndarray::Array<f32, ndarray::IxDyn> {
         ArrRng::default().gamma(shape, shape_param, scale)
     }
 }
 
-use std::cell::RefCell;
-use rand::{self, Rng, XorShiftRng};
 use rand::distributions::IndependentSample;
+use rand::{self, Rng, XorShiftRng};
+use std::cell::RefCell;
 
 pub struct ArrRng<R = XorShiftRng> {
-    rng: RefCell<R>
+    rng: RefCell<R>,
 }
 
-impl Default for ArrRng<XorShiftRng>
-{
-    fn default() -> Self
-    {
+impl Default for ArrRng<XorShiftRng> {
+    fn default() -> Self {
         ArrRng {
-            rng: RefCell::new(rand::weak_rng())
+            rng: RefCell::new(rand::weak_rng()),
         }
     }
 }
 
 impl<R> ArrRng<R> {
-    pub fn new(rng: R) -> Self
-    {
+    pub fn new(rng: R) -> Self {
         ArrRng {
-            rng: RefCell::new(rng)
+            rng: RefCell::new(rng),
         }
     }
 }
 
-impl<R: Rng> ArrRng<R>
-{
+impl<R: Rng> ArrRng<R> {
     #[inline]
     fn gen_rnd_array<T>(&self, shape: &[usize], dist: T) -> NdArray
     where
@@ -306,8 +279,7 @@ impl<R: Rng> ArrRng<R>
 
     #[inline]
     /// Permutation.
-    pub fn permutation(&mut self, size: usize) -> ndarray::Array1<usize>
-    {
+    pub fn permutation(&mut self, size: usize) -> ndarray::Array1<usize> {
         let mut data: Vec<usize> = (0..size).collect();
         let slice = data.as_mut_slice();
 
@@ -323,8 +295,7 @@ impl<R: Rng> ArrRng<R>
         shape: &[usize],
         mean: f64,
         stddev: f64,
-    ) -> ndarray::Array<f32, ndarray::IxDyn>
-    {
+    ) -> ndarray::Array<f32, ndarray::IxDyn> {
         let normal = rand::distributions::Normal::new(mean, stddev);
         self.gen_rnd_array(shape, normal)
     }
@@ -336,32 +307,28 @@ impl<R: Rng> ArrRng<R>
         shape: &[usize],
         min: f64,
         max: f64,
-    ) -> ndarray::Array<f32, ndarray::IxDyn>
-    {
+    ) -> ndarray::Array<f32, ndarray::IxDyn> {
         let range = rand::distributions::Range::new(min, max);
         self.gen_rnd_array(shape, range)
     }
 
     #[inline]
     /// Samples from standard normal distribution
-    pub fn standard_normal(&self, shape: &[usize]) -> ndarray::Array<f32, ndarray::IxDyn>
-    {
+    pub fn standard_normal(&self, shape: &[usize]) -> ndarray::Array<f32, ndarray::IxDyn> {
         let normal = rand::distributions::Normal::new(0., 1.);
         self.gen_rnd_array(shape, normal)
     }
 
     #[inline]
     /// Samples from standard uniform distribution
-    pub fn standard_uniform(&self, shape: &[usize]) -> ndarray::Array<f32, ndarray::IxDyn>
-    {
+    pub fn standard_uniform(&self, shape: &[usize]) -> ndarray::Array<f32, ndarray::IxDyn> {
         let dist = rand::distributions::Range::new(0., 1.);
         self.gen_rnd_array(shape, dist)
     }
 
     #[inline]
     /// Glorot normal initialization. (a.k.a. Xavier normal initialization)
-    pub fn glorot_normal(&self, shape: &[usize]) -> ndarray::Array<f32, ndarray::IxDyn>
-    {
+    pub fn glorot_normal(&self, shape: &[usize]) -> ndarray::Array<f32, ndarray::IxDyn> {
         assert_eq!(shape.len(), 2);
         let s = 1. / (shape[0] as f64).sqrt();
         let normal = rand::distributions::Normal::new(0., s);
@@ -370,8 +337,7 @@ impl<R: Rng> ArrRng<R>
 
     #[inline]
     /// Glorot uniform initialization. (a.k.a. Xavier uniform initialization)
-    pub fn glorot_uniform(&self, shape: &[usize]) -> ndarray::Array<f32, ndarray::IxDyn>
-    {
+    pub fn glorot_uniform(&self, shape: &[usize]) -> ndarray::Array<f32, ndarray::IxDyn> {
         assert_eq!(shape.len(), 2);
         let s = (6. / shape[0] as f64).sqrt();
         let uniform = rand::distributions::Range::new(-s, s);
@@ -380,16 +346,14 @@ impl<R: Rng> ArrRng<R>
 
     /// Bernoulli distribution.
     #[inline]
-    pub fn bernoulli(&self, shape: &[usize], p: f64) -> ndarray::Array<f32, ndarray::IxDyn>
-    {
+    pub fn bernoulli(&self, shape: &[usize], p: f64) -> ndarray::Array<f32, ndarray::IxDyn> {
         let dist = rand::distributions::Range::new(0., 1.);
         self.gen_rand_array_f(shape, dist, |a| (a < p) as i64 as f64)
     }
 
     /// Exponential distribution.
     #[inline]
-    pub fn exponential(&self, shape: &[usize], lambda: f64) -> ndarray::Array<f32, ndarray::IxDyn>
-    {
+    pub fn exponential(&self, shape: &[usize], lambda: f64) -> ndarray::Array<f32, ndarray::IxDyn> {
         let dist = rand::distributions::Exp::new(lambda);
         self.gen_rnd_array(shape, dist)
     }
@@ -401,8 +365,7 @@ impl<R: Rng> ArrRng<R>
         shape: &[usize],
         mean: f64,
         stddev: f64,
-    ) -> ndarray::Array<f32, ndarray::IxDyn>
-    {
+    ) -> ndarray::Array<f32, ndarray::IxDyn> {
         let dist = rand::distributions::LogNormal::new(mean, stddev);
         self.gen_rnd_array(shape, dist)
     }
@@ -414,10 +377,8 @@ impl<R: Rng> ArrRng<R>
         shape: &[usize],
         shape_param: f64,
         scale: f64,
-    ) -> ndarray::Array<f32, ndarray::IxDyn>
-    {
+    ) -> ndarray::Array<f32, ndarray::IxDyn> {
         let dist = rand::distributions::Gamma::new(shape_param, scale);
         self.gen_rnd_array(shape, dist)
     }
-
 }

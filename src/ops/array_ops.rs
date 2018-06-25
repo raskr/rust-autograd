@@ -1,90 +1,77 @@
 extern crate ndarray;
 
-use Tensor;
 use ndarray_ext;
 use ndarray_ext::NdArray;
 use op;
 use ops;
 use std::collections::HashSet;
 use std::iter::FromIterator;
+use Tensor;
 
 pub struct ExpandDims;
 
 pub struct Squeeze;
 
-pub struct Slice
-{
+pub struct Slice {
     pub indices: Box<[ndarray::Si]>,
 }
 
-pub struct SliceGrad
-{
+pub struct SliceGrad {
     pub indices: Box<[ndarray::Si]>,
 }
 
-pub struct Split
-{
-    pub axis:  isize,
+pub struct Split {
+    pub axis: isize,
     pub sizes: Vec<usize>,
     pub index: usize,
 }
 
-pub struct SplitGrad
-{
-    pub axis:  isize,
+pub struct SplitGrad {
+    pub axis: isize,
     pub sizes: Vec<usize>,
     pub index: usize,
 }
 
-pub struct Tile
-{
+pub struct Tile {
     pub axis: isize,
-    pub num:  usize,
+    pub num: usize,
 }
 
-pub struct Concat
-{
+pub struct Concat {
     pub axis: isize,
 }
 
-pub struct ConcatGrad
-{
-    pub axis:  isize,
+pub struct ConcatGrad {
+    pub axis: isize,
     pub index: usize,
 }
 
-pub struct Clip
-{
+pub struct Clip {
     pub min: f32,
     pub max: f32,
 }
 
-pub struct ClipGrad
-{
+pub struct ClipGrad {
     pub min: f32,
     pub max: f32,
 }
 
 pub struct AddN;
 
-pub struct Gather
-{
+pub struct Gather {
     pub axis: isize,
-    pub should_normalize_negative_indices: bool
+    pub should_normalize_negative_indices: bool,
 }
 
-pub struct GatherGrad
-{
+pub struct GatherGrad {
     pub axis: isize,
 }
 
-pub struct IndexOp
-{
+pub struct IndexOp {
     pub index: isize,
 }
 
-pub struct IndexOpGrad
-{
+pub struct IndexOpGrad {
     pub index: isize,
 }
 
@@ -100,16 +87,12 @@ pub struct Reshape;
 
 pub struct InferBinOpShape;
 
-
-impl op::Op for InferBinOpShape
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for InferBinOpShape {
+    fn name(&self) -> &str {
         "InferBinOpShape"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         let a_shape_float = xs[0];
         let b_shape_float = xs[1];
@@ -122,10 +105,11 @@ impl op::Op for InferBinOpShape
             let a_rank = a_shape.len();
             let b_rank = b_shape.len();
             assert_eq!(a_rank, b_rank);
-            let max = a_shape.iter()
-                             .zip(b_shape)
-                             .map(|(a, b)| a.clone().max(b.clone()) as f32)
-                             .collect::<Vec<f32>>();
+            let max = a_shape
+                .iter()
+                .zip(b_shape)
+                .map(|(a, b)| a.clone().max(b.clone()) as f32)
+                .collect::<Vec<f32>>();
             Ok(NdArray::from_shape_vec(ndarray::IxDyn(&[a_rank]), max).unwrap())
         } else if !a_is_scalar {
             Err(::op::ComputeError::Delegate { to: 0 })
@@ -135,81 +119,65 @@ impl op::Op for InferBinOpShape
         vec![ret]
     }
 
-    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         vec![None, None]
     }
 }
 
-impl op::Op for Shape
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for Shape {
+    fn name(&self) -> &str {
         "Shape"
     }
 
-    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         vec![None]
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         let x = xs[0];
         vec![Ok(ndarray_ext::shape_of(x))]
     }
 }
 
-impl op::Op for Rank
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for Rank {
+    fn name(&self) -> &str {
         "Rank"
     }
 
-    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         vec![None]
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         let x: &NdArray = xs[0];
         vec![Ok(NdArray::from_elem(ndarray::IxDyn(&[]), x.ndim() as f32))]
     }
 }
 
-impl op::Op for Size
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for Size {
+    fn name(&self) -> &str {
         "Size"
     }
 
-    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         vec![None]
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         let x: &NdArray = xs[0];
         vec![Ok(NdArray::from_elem(ndarray::IxDyn(&[]), x.len() as f32))]
     }
 }
 
-impl op::Op for Reshape
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for Reshape {
+    fn name(&self) -> &str {
         "Reshape"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         let ret = xs[0].clone();
         let shape_arr: &NdArray = xs[1];
@@ -233,8 +201,7 @@ impl op::Op for Reshape
         vec![ret]
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         let gx = Tensor::builder()
             .set_inputs(vec![gy, &ops::shape(inputs[0])])
             .build(Reshape);
@@ -242,15 +209,12 @@ impl op::Op for Reshape
     }
 }
 
-impl op::Op for SetDiff1D
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for SetDiff1D {
+    fn name(&self) -> &str {
         "SetDiff1D"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         let x0: &NdArray = xs[0];
         let x1: &NdArray = xs[1];
@@ -272,21 +236,17 @@ impl op::Op for SetDiff1D
         vec![ret]
     }
 
-    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         vec![None, None]
     }
 }
 
-impl op::Op for IndexOp
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for IndexOp {
+    fn name(&self) -> &str {
         "IndexOp"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         let x: &NdArray = xs[0];
         let i = if self.index < 0 {
@@ -304,8 +264,7 @@ impl op::Op for IndexOp
         vec![ret]
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         let op = IndexOpGrad { index: self.index };
         let gx = Tensor::builder()
             .set_shape(inputs[0].shape())
@@ -315,15 +274,12 @@ impl op::Op for IndexOp
     }
 }
 
-impl op::Op for IndexOpGrad
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for IndexOpGrad {
+    fn name(&self) -> &str {
         "IndexOpGrad"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         let x = xs[0];
         let gy = xs[1];
@@ -348,21 +304,17 @@ impl op::Op for IndexOpGrad
         vec![Ok(result)]
     }
 
-    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         vec![None]
     }
 }
 
-impl op::Op for Gather
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for Gather {
+    fn name(&self) -> &str {
         "Gather"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         let param = xs[1];
         let indices = xs[0];
@@ -391,8 +343,7 @@ impl op::Op for Gather
         vec![Ok(selected.into_shape(output_shape.as_slice()).unwrap())]
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         let gx = Tensor::builder()
             .set_shape(inputs[0].shape())
             .set_inputs(vec![inputs[0], inputs[1], gy])
@@ -401,15 +352,12 @@ impl op::Op for Gather
     }
 }
 
-impl op::Op for GatherGrad
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for GatherGrad {
+    fn name(&self) -> &str {
         "GatherGrad"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         let indices: &NdArray = xs[0];
         let param: &NdArray = xs[1];
@@ -463,21 +411,17 @@ impl op::Op for GatherGrad
         vec![Ok(gx)]
     }
 
-    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         vec![None, None, None]
     }
 }
 
-impl op::Op for AddN
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for AddN {
+    fn name(&self) -> &str {
         "AddN"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         let ret = if 0 == xs.len() {
             unreachable!()
@@ -495,29 +439,24 @@ impl op::Op for AddN
         vec![ret]
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         (0..inputs.len())
             .map(|_| Some(gy.clone()))
             .collect::<Vec<Option<_>>>()
     }
 }
 
-impl op::Op for Clip
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for Clip {
+    fn name(&self) -> &str {
         "Clip"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         vec![Ok(xs[0].mapv(move |a| a.min(self.max).max(self.min)))]
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         let gx = Tensor::builder()
             .set_shape(gy.shape())
             .set_inputs(vec![inputs[0], gy])
@@ -529,14 +468,11 @@ impl op::Op for Clip
     }
 }
 
-impl op::Op for ClipGrad
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for ClipGrad {
+    fn name(&self) -> &str {
         "ClipGrad"
     }
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         let mut ret = xs[0].mapv(move |x| {
             // x > min && x < max
@@ -546,21 +482,17 @@ impl op::Op for ClipGrad
         vec![Ok(ret)]
     }
 
-    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         vec![None, None]
     }
 }
 
-impl op::Op for Concat
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for Concat {
+    fn name(&self) -> &str {
         "Concat"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let mut views = vec![];
         let xs = ctx.grab_inputs();
         for x in xs.iter() {
@@ -581,8 +513,7 @@ impl op::Op for Concat
         vec![ret]
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         // [x1, x2, x3, ..., gy]
         let mut merged_inputs: Vec<&Tensor> = inputs.to_vec();
         merged_inputs.insert(0, gy);
@@ -595,7 +526,7 @@ impl op::Op for Concat
                     .set_inputs_slice(merged_inputs)
                     .build(ConcatGrad {
                         index: i,
-                        axis:  self.axis,
+                        axis: self.axis,
                     });
                 Some(gx)
             })
@@ -604,15 +535,12 @@ impl op::Op for Concat
     }
 }
 
-impl op::Op for ConcatGrad
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for ConcatGrad {
+    fn name(&self) -> &str {
         "ConcatGrad"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         let gy = xs[0];
         let xs = xs[1..].to_vec();
@@ -645,21 +573,17 @@ impl op::Op for ConcatGrad
         vec![Ok(gy.slice(&*indices).to_owned())]
     }
 
-    fn grad(&self, _: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, _: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         (0..inputs.len()).map(|_| None).collect::<Vec<_>>()
     }
 }
 
-impl op::Op for Tile
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for Tile {
+    fn name(&self) -> &str {
         "Tile"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         let x: &NdArray = xs[0];
 
@@ -681,21 +605,17 @@ impl op::Op for Tile
         vec![ret]
     }
 
-    fn grad(&self, gy: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, gy: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         vec![Some(ops::reduce_sum(gy, &[self.axis], true))]
     }
 }
 
-impl op::Op for Split
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for Split {
+    fn name(&self) -> &str {
         "Split"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         let x = xs[0];
 
@@ -711,10 +631,9 @@ impl op::Op for Split
         vec![Ok(x.slice(indices.as_slice()).to_owned())]
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         let op = SplitGrad {
-            axis:  self.axis,
+            axis: self.axis,
             sizes: self.sizes.clone(),
             index: self.index,
         };
@@ -726,15 +645,12 @@ impl op::Op for Split
     }
 }
 
-impl op::Op for SplitGrad
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for SplitGrad {
+    fn name(&self) -> &str {
         "SplitGrad"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         let x = xs[0];
         let gy = xs[1];
@@ -755,8 +671,7 @@ impl op::Op for SplitGrad
         vec![Ok(gx)]
     }
 
-    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         vec![None]
     }
 }
@@ -767,8 +682,7 @@ fn make_indices_split(
     start_index: isize,
     end_index: isize,
     axis: usize,
-) -> Vec<ndarray::Si>
-{
+) -> Vec<ndarray::Si> {
     let ndim = x.ndim();
     assert!(ndim > axis, "Wrong split axis");
     (0..ndim)
@@ -783,15 +697,12 @@ fn make_indices_split(
         .collect::<Vec<ndarray::Si>>()
 }
 
-impl op::Op for Slice
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for Slice {
+    fn name(&self) -> &str {
         "Slice"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         let y: NdArray = xs[0].slice(&*self.indices).to_owned();
         // TODO: for now, if the size of last axis is 1, removing it.
@@ -804,8 +715,7 @@ impl op::Op for Slice
         vec![Ok(ret)]
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         let op = SliceGrad {
             indices: self.indices.clone(),
         };
@@ -817,15 +727,12 @@ impl op::Op for Slice
     }
 }
 
-impl op::Op for SliceGrad
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for SliceGrad {
+    fn name(&self) -> &str {
         "SliceGrad"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         let x = xs[0];
         let gy = xs[1];
@@ -836,21 +743,17 @@ impl op::Op for SliceGrad
         vec![Ok(gx)]
     }
 
-    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         // is this ok?
         vec![None, None]
     }
 }
-impl op::Op for Squeeze
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for Squeeze {
+    fn name(&self) -> &str {
         "Squeeze"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         let mut x = xs[0].view();
         let mut axes = xs[1].iter().map(|&a| a as isize).collect::<Vec<_>>();
@@ -871,21 +774,17 @@ impl op::Op for Squeeze
         vec![Ok(x.to_owned())]
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         vec![Some(ops::expand_dims(gy, inputs[1])), None]
     }
 }
 
-impl op::Op for ExpandDims
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for ExpandDims {
+    fn name(&self) -> &str {
         "ExpandDims"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         let ret = xs[0].clone();
         let mut axes = xs[1].iter().map(|&a| a as isize).collect::<Vec<_>>();
@@ -902,8 +801,7 @@ impl op::Op for ExpandDims
         vec![Ok(ret.into_shape(output_shape).unwrap())]
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         vec![Some(ops::squeeze(gy, inputs[1])), None]
     }
 }

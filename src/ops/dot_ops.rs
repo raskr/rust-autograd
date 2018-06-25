@@ -9,34 +9,37 @@ use tensor::Tensor;
 
 // `Tensordot` is implemented in `ops/mod.rs`.
 
-pub struct MatMul
-{
+pub struct MatMul {
     pub transpose_a: bool,
     pub transpose_b: bool,
 }
 
-pub struct BatchMatMul
-{
+pub struct BatchMatMul {
     pub transpose_a: bool,
     pub transpose_b: bool,
 }
 
-impl op::Op for MatMul
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for MatMul {
+    fn name(&self) -> &str {
         "MatMul"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         let x0 = xs[0];
         let x1 = xs[1];
         let x0_shape = x0.shape();
         let x1_shape = x1.shape();
-        assert_eq!(x0_shape.len(), 2, "First input to the matmul should be Matrix");
-        assert_eq!(x1_shape.len(), 2, "Second input to the matmul should be Matrix");
+        assert_eq!(
+            x0_shape.len(),
+            2,
+            "First input to the matmul should be Matrix"
+        );
+        assert_eq!(
+            x1_shape.len(),
+            2,
+            "Second input to the matmul should be Matrix"
+        );
         let x0_view = x0.view();
         let x1_view = x1.view();
         // unwrap is always safe
@@ -53,8 +56,7 @@ impl op::Op for MatMul
         vec![Ok(a.dot(&b).into_dyn())]
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         let opa = Tensor::builder()
             .set_inputs(vec![gy, inputs[1]])
             .build(MatMul {
@@ -73,15 +75,12 @@ impl op::Op for MatMul
     }
 }
 
-impl op::Op for BatchMatMul
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for BatchMatMul {
+    fn name(&self) -> &str {
         "BatchMatMul"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         let x0: &NdArray = xs[0];
         let x1: &NdArray = xs[1];
@@ -157,15 +156,12 @@ impl op::Op for BatchMatMul
         };
 
         // reshape to dst shape with safe unwrapping
-        vec![
-            Ok(stacked
-                .into_shape(ndarray::IxDyn(dst_shape.as_slice()))
-                .unwrap()),
-        ]
+        vec![Ok(stacked
+            .into_shape(ndarray::IxDyn(dst_shape.as_slice()))
+            .unwrap())]
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         let opa = Tensor::builder()
             .set_inputs(vec![gy, inputs[1]])
             .build(BatchMatMul {

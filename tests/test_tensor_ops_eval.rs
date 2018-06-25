@@ -2,8 +2,7 @@ extern crate autograd as ag;
 extern crate ndarray;
 
 #[test]
-fn reduce_prod()
-{
+fn reduce_prod() {
     let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[3, 2]));
     let ref z = ag::reduce_prod(v, &[0, 1], false); // keep_dims=false
     let empty_shape: &[usize] = &[];
@@ -25,16 +24,14 @@ fn argmax_with_multi_max_args() {
 }
 
 #[test]
-fn reduce_mean()
-{
+fn reduce_mean() {
     let ref v = ag::variable(ndarray::arr1(&[2., 3., 4.]));
     let ref z = ag::reduce_mean(v, &[0], false); // keep_dims=false
     assert_eq!(3., z.eval(&[]).unwrap()[ndarray::IxDyn(&[])]);
 }
 
 #[test]
-fn reduce_grad()
-{
+fn reduce_grad() {
     let ref v = ag::variable(ndarray::arr1(&[2., 3., 4.]));
     let ref z = ag::reduce_mean(v, &[0], false); // keep_dims=false
     let ref g = ag::grad(&[z], &[v])[0];

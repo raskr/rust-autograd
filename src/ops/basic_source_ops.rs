@@ -5,22 +5,19 @@ macro_rules! impl_op {
     ($name:ident) => {
         pub struct $name;
         impl ::op::Op for $name {
-            fn name(&self) -> &str
-            {
+            fn name(&self) -> &str {
                 stringify!($name)
             }
 
-            fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-            {
+            fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
                 unreachable!()
             }
 
-            fn compute(&self, _: ::runtime::OpComputeContext) -> op::ComputeResult
-            {
+            fn compute(&self, _: ::runtime::OpComputeContext) -> op::ComputeResult {
                 unreachable!()
             }
         }
-    }
+    };
 }
 
 impl_op!(Variable);

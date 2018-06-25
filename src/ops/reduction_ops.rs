@@ -10,45 +10,38 @@ use std::ops::Add;
 use std::ops::Mul;
 use tensor::Tensor;
 
-pub struct ReduceMin
-{
-    pub keep_dims:   bool,
+pub struct ReduceMin {
+    pub keep_dims: bool,
     pub sparse_axes: bool,
 }
 
-pub struct ReduceMax
-{
-    pub keep_dims:   bool,
+pub struct ReduceMax {
+    pub keep_dims: bool,
     pub sparse_axes: bool,
 }
 
-pub struct ReduceProd
-{
-    pub keep_dims:   bool,
+pub struct ReduceProd {
+    pub keep_dims: bool,
     pub sparse_axes: bool,
 }
 
-pub struct ReduceSum
-{
-    pub keep_dims:   bool,
+pub struct ReduceSum {
+    pub keep_dims: bool,
     pub sparse_axes: bool,
 }
 
-pub struct ReduceMean
-{
-    pub keep_dims:   bool,
+pub struct ReduceMean {
+    pub keep_dims: bool,
     pub sparse_axes: bool,
 }
 
-pub struct ArgMax
-{
-    pub axis:     isize,
+pub struct ArgMax {
+    pub axis: isize,
     pub keep_dim: bool,
 }
 
-pub struct ReduceGradCommon
-{
-    pub should_make_broadcast_dims:   bool,
+pub struct ReduceGradCommon {
+    pub should_make_broadcast_dims: bool,
     pub sparse_axes: bool,
 }
 
@@ -58,8 +51,7 @@ macro_rules! impl_reduce_forward {
             x: &NdArray,
             mut axes: Vec<usize>,
             keep_dims: bool,
-        ) -> Result<NdArray, ::op::ComputeError>
-        {
+        ) -> Result<NdArray, ::op::ComputeError> {
             let x_shape = x.shape();
 
             if ndarray_ext::is_scalar_shape(x_shape) {
@@ -110,26 +102,19 @@ fn preprocess_axes(x: &NdArray, axes: &NdArray, sparse_axes: bool) -> Vec<usize>
     }
 }
 
-
-impl op::Op for ReduceSum
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for ReduceSum {
+    fn name(&self) -> &str {
         "ReduceSum"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         let x = xs[0];
         let axes = preprocess_axes(x, xs[1], self.sparse_axes);
-        vec![
-            compute_reduce_sum(x, axes, self.keep_dims),
-        ]
+        vec![compute_reduce_sum(x, axes, self.keep_dims)]
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         let grad_op = ReduceGradCommon {
             should_make_broadcast_dims: !self.keep_dims,
             sparse_axes: self.sparse_axes,
@@ -141,15 +126,12 @@ impl op::Op for ReduceSum
     }
 }
 
-impl op::Op for ReduceMean
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for ReduceMean {
+    fn name(&self) -> &str {
         "ReduceMean"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         let x = xs[0];
         let axes = preprocess_axes(x, xs[1], self.sparse_axes);
@@ -176,53 +158,44 @@ impl op::Op for ReduceMean
         vec![ret]
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         let x = inputs[0];
         let axes = inputs[1];
 
         // Broadcast gy into x's shape
         let broadcast = Tensor::builder()
             .set_inputs(vec![gy, &inputs[0].shape(), inputs[1]])
-            .build(
-                ReduceGradCommon {
-                    should_make_broadcast_dims: !self.keep_dims,
-                    sparse_axes: self.sparse_axes,
-                }
-            );
+            .build(ReduceGradCommon {
+                should_make_broadcast_dims: !self.keep_dims,
+                sparse_axes: self.sparse_axes,
+            });
 
         // Divide
         let reduction_sizes = &ops::gather_common(&x.shape(), axes, 0);
-        let reduction_len = &ops::reduce_prod(reduction_sizes, &[0], false);  // 1: &[]
-        let reciprocal = ops::reciprocal(reduction_len);  // 1: &[]
+        let reduction_len = &ops::reduce_prod(reduction_sizes, &[0], false); // 1: &[]
+        let reciprocal = ops::reciprocal(reduction_len); // 1: &[]
         let gx = broadcast * reciprocal;
 
         vec![Some(gx), None]
     }
 }
 
-impl op::Op for ReduceProd
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for ReduceProd {
+    fn name(&self) -> &str {
         "ReduceProd"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         let x = xs[0];
         let axes = preprocess_axes(x, xs[1], self.sparse_axes);
         let ret = compute_reduce_prod(x, axes, self.keep_dims);
-        vec![
-            ret,
-        ]
+        vec![ret]
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
         let grad_op = ReduceGradCommon {
-            should_make_broadcast_dims:  !self.keep_dims,
+            should_make_broadcast_dims: !self.keep_dims,
             sparse_axes: self.sparse_axes,
         };
         let tmp = Tensor::builder()
@@ -233,48 +206,36 @@ impl op::Op for ReduceProd
     }
 }
 
-impl op::Op for ReduceMin
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for ReduceMin {
+    fn name(&self) -> &str {
         "ReduceMin"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         let x = xs[0];
         let axes = preprocess_axes(x, xs[1], self.sparse_axes);
-        vec![
-            compute_reduce_min(x, axes, self.keep_dims),
-        ]
+        vec![compute_reduce_min(x, axes, self.keep_dims)]
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
         min_max_grad(gy, inputs, output, self.keep_dims, self.sparse_axes)
     }
 }
 
-impl op::Op for ReduceMax
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for ReduceMax {
+    fn name(&self) -> &str {
         "ReduceMax"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         let x = xs[0];
         let axes = preprocess_axes(x, xs[1], self.sparse_axes);
-        vec![
-            compute_reduce_max(x, axes, self.keep_dims),
-        ]
+        vec![compute_reduce_max(x, axes, self.keep_dims)]
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
         min_max_grad(gy, inputs, output, self.keep_dims, self.sparse_axes)
     }
 }
@@ -285,8 +246,7 @@ fn min_max_grad(
     output: &Tensor,
     keep_dims: bool,
     sparse_axes: bool,
-) -> Vec<Option<Tensor>>
-{
+) -> Vec<Option<Tensor>> {
     let grad_op1 = ReduceGradCommon {
         should_make_broadcast_dims: !keep_dims,
         sparse_axes,
@@ -307,16 +267,13 @@ fn min_max_grad(
     vec![Some(ops::mul_inplace(eq, &gy)), None]
 }
 
-impl op::Op for ArgMax
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for ArgMax {
+    fn name(&self) -> &str {
         "ArgMax"
     }
 
     // cf. https://github.com/tensorflow/compiler/tf2xla/kernels/index_ops.cc
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         let x = xs[0];
         let axis = ndarray_ext::normalize_negative_axis(self.axis, x.ndim());
@@ -382,25 +339,21 @@ impl op::Op for ArgMax
         vec![Ok(result)]
     }
 
-    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         vec![None]
     }
 }
 
-impl op::Op for ReduceGradCommon
-{
-    fn name(&self) -> &str
-    {
+impl op::Op for ReduceGradCommon {
+    fn name(&self) -> &str {
         "ReduceGradCommon"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         //  broadcast `gy` into `target_shape`
         let gy = xs[0];
-        let target_shape = ndarray_ext::vec_as_shape(xs[1]);  // x's shape
+        let target_shape = ndarray_ext::vec_as_shape(xs[1]); // x's shape
 
         if gy.shape() == target_shape.as_slice() {
             return vec![Err(::op::ComputeError::Delegate { to: 0 })];
@@ -425,8 +378,10 @@ impl op::Op for ReduceGradCommon
                 let mut gy_shape = gy.shape().to_vec();
                 axes.sort();
                 for &axis in axes.iter() {
-                    assert!(axis <= gy_shape.len(),
-                            "Bad gradient. You may passed non-scalar value to ag::grad?");
+                    assert!(
+                        axis <= gy_shape.len(),
+                        "Bad gradient. You may passed non-scalar value to ag::grad?"
+                    );
                     gy_shape.insert(axis, 1);
                 }
                 gy_view = gy_view.into_shape(gy_shape).unwrap()
@@ -443,10 +398,9 @@ impl op::Op for ReduceGradCommon
         vec![Ok(ret)]
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         let sum = ops::reduction_ops::ReduceSum {
-            keep_dims:   self.should_make_broadcast_dims,
+            keep_dims: self.should_make_broadcast_dims,
             sparse_axes: self.sparse_axes,
         };
         let axes = inputs[2];

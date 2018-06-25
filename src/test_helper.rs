@@ -1,8 +1,8 @@
 extern crate ndarray;
 
+use ndarray_ext::NdArray;
 use std::cmp::Ordering;
 use std::collections::btree_set::BTreeSet;
-use ndarray_ext::NdArray;
 use tensor::Tensor;
 
 /// Checks the validity of `gradients` with finite difference trick.
@@ -80,7 +80,6 @@ where
     visit_once_internal(t, f, &mut BTreeSet::new())
 }
 
-
 fn visit_once_internal<'a, F>(t: &'a Tensor, f: &mut F, visited: &mut BTreeSet<&'a Tensor>)
 where
     F: FnMut(&'a Tensor) -> (),
@@ -98,26 +97,22 @@ where
     }
 }
 
-impl<'a> Ord for &'a Tensor
-{
+impl<'a> Ord for &'a Tensor {
     #[inline]
     /// Compares addresses of the two tensors.
     /// This can be used for ordering-based data structures (e.g. BinaryTree).
-    fn cmp(&self, other: &&'a Tensor) -> Ordering
-    {
+    fn cmp(&self, other: &&'a Tensor) -> Ordering {
         let a = (*self) as *const Tensor;
         let b = (*other) as *const Tensor;
         a.cmp(&b)
     }
 }
 
-impl<'a> PartialOrd for &'a Tensor
-{
+impl<'a> PartialOrd for &'a Tensor {
     #[inline]
     /// Compares addresses of the two tensors.
     /// This can be used for ordering-based data structures (e.g. BinaryTree).
-    fn partial_cmp(&self, other: &&'a Tensor) -> Option<Ordering>
-    {
+    fn partial_cmp(&self, other: &&'a Tensor) -> Option<Ordering> {
         Some(self.cmp(&other))
     }
 }
@@ -125,14 +120,16 @@ impl<'a> PartialOrd for &'a Tensor
 #[doc(hidden)]
 #[macro_export]
 macro_rules! eval_with_time {
-  ( $x:expr) => {
-    {
-      use std::time::{Duration, Instant};
-      let start = Instant::now();
-      let result = $x;
-      let end = start.elapsed();
-      println!("{}.{:03} sec", end.as_secs(), end.subsec_nanos() / 1_000_000);
-      result
-    }
-  };
+    ($x:expr) => {{
+        use std::time::{Duration, Instant};
+        let start = Instant::now();
+        let result = $x;
+        let end = start.elapsed();
+        println!(
+            "{}.{:03} sec",
+            end.as_secs(),
+            end.subsec_nanos() / 1_000_000
+        );
+        result
+    }};
 }

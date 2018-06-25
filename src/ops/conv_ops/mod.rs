@@ -1,19 +1,19 @@
-extern crate ndarray;
-extern crate libc;
-extern crate rayon;
-#[cfg(feature="blas")]
+#[cfg(feature = "blas")]
 extern crate cblas_sys;
-#[cfg(feature="blas")]
-extern crate openblas_src;
-#[cfg(not(feature="blas"))]
+extern crate libc;
+#[cfg(not(feature = "blas"))]
 extern crate matrixmultiply;
+extern crate ndarray;
+#[cfg(feature = "blas")]
+extern crate openblas_src;
+extern crate rayon;
+use self::libc::{c_float, c_int};
 #[allow(unused_imports)]
 use self::rayon::iter::*;
-use self::libc::{c_float, c_int};
 use ndarray_ext::NdArray;
+use std::f32;
 use std::mem;
 use std::slice;
-use std::f32;
 use tensor::Tensor;
 
 macro_rules! get_xw {
@@ -45,11 +45,9 @@ macro_rules! get_or_insert_cols {
     ($me:expr, $batch_size:expr, $num_elements_in_batch_c:expr) => {
         unsafe {
             let slf: &mut Self = mem::transmute($me);
-            let cols: &Vec<f32> = mem::transmute(
-                slf.cols.get_or_insert_with(||
-                    alloc_uninitialized_buf($batch_size * $num_elements_in_batch_c)
-                )
-            );
+            let cols: &Vec<f32> = mem::transmute(slf.cols.get_or_insert_with(|| {
+                alloc_uninitialized_buf($batch_size * $num_elements_in_batch_c)
+            }));
             cols
         }
     };
@@ -107,7 +105,7 @@ extern "C" {
         stride: c_int,
         output: *const c_float,
         argmax: *const c_float,
-        float_min: c_float
+        float_min: c_float,
     );
 
     #[allow(dead_code)]
@@ -124,7 +122,7 @@ extern "C" {
         stride: c_int,
         output: *const c_float,
         argmax: *const c_float,
-        float_min: c_float
+        float_min: c_float,
     );
 
     fn max_pool_grad_cpu(
@@ -165,10 +163,19 @@ fn max_pool_unbatched(
 ) {
     unsafe {
         max_pool_cpu_unbatched(
-            input as *const _, pad as c_int,
-            h as c_int, w as c_int, out_h as c_int, out_w as c_int, c as c_int, b as c_int,
-            size as c_int, stride as c_int,
-            output as *const _, argmax as *const _, f32::MIN
+            input as *const _,
+            pad as c_int,
+            h as c_int,
+            w as c_int,
+            out_h as c_int,
+            out_w as c_int,
+            c as c_int,
+            b as c_int,
+            size as c_int,
+            stride as c_int,
+            output as *const _,
+            argmax as *const _,
+            f32::MIN,
         )
     }
 }
@@ -191,10 +198,19 @@ fn max_pool(
 ) {
     unsafe {
         max_pool_cpu(
-            input as *const _, pad as c_int,
-            h as c_int, w as c_int, out_h as c_int, out_w as c_int, c as c_int, batch as c_int,
-            size as c_int, stride as c_int,
-            output as *const _, argmax as *const _, f32::MIN
+            input as *const _,
+            pad as c_int,
+            h as c_int,
+            w as c_int,
+            out_h as c_int,
+            out_w as c_int,
+            c as c_int,
+            batch as c_int,
+            size as c_int,
+            stride as c_int,
+            output as *const _,
+            argmax as *const _,
+            f32::MIN,
         )
     }
 }
@@ -316,8 +332,7 @@ fn col2im(
 }
 
 #[inline]
-fn alloc_uninitialized_buf(size: usize) -> Vec<f32>
-{
+fn alloc_uninitialized_buf(size: usize) -> Vec<f32> {
     let mut buf = Vec::with_capacity(size);
     unsafe {
         buf.set_len(size);
@@ -325,13 +340,21 @@ fn alloc_uninitialized_buf(size: usize) -> Vec<f32>
     buf
 }
 
-
 #[inline]
-fn sgemm(trans_a: bool, trans_b: bool,
-         a: &f32, b: &f32, c: &f32,
-         m: usize, n: usize, k: usize, alpha: f32, beta: f32)
-{
-    #[cfg(feature="blas")] {
+fn sgemm(
+    trans_a: bool,
+    trans_b: bool,
+    a: &f32,
+    b: &f32,
+    c: &f32,
+    m: usize,
+    n: usize,
+    k: usize,
+    alpha: f32,
+    beta: f32,
+) {
+    #[cfg(feature = "blas")]
+    {
         let m = m as i32;
         let n = n as i32;
         let k = k as i32;
@@ -348,16 +371,22 @@ fn sgemm(trans_a: bool, trans_b: bool,
                 } else {
                     cblas_sys::CBLAS_TRANSPOSE::CblasNoTrans
                 },
-                m, n, k,
+                m,
+                n,
+                k,
                 alpha,
-                a as *const f32, if trans_a { m } else { k }, // lda
-                b as *const f32, if trans_b { k } else { n }, // ldb
+                a as *const f32,
+                if trans_a { m } else { k }, // lda
+                b as *const f32,
+                if trans_b { k } else { n }, // ldb
                 beta,
-                mem::transmute::<&f32, *mut f32>(c), n, // ldc
+                mem::transmute::<&f32, *mut f32>(c),
+                n, // ldc
             );
         }
     }
-    #[cfg(not(feature="blas"))] {
+    #[cfg(not(feature = "blas"))]
+    {
         let rsa = if trans_a { 1 } else { k };
         let csa = if trans_a { m } else { 1 };
         let rsb = if trans_b { 1 } else { n };
@@ -366,12 +395,21 @@ fn sgemm(trans_a: bool, trans_b: bool,
         let csc = 1;
         unsafe {
             let c: *mut f32 = mem::transmute(c);
-            matrixmultiply::sgemm(m, k, n,
-                                  alpha,
-                                  a as *const f32, rsa as isize, csa as isize,
-                                  b as *const f32, rsb as isize, csb as isize,
-                                  beta,
-                                  c as *mut f32, rsc as isize, csc as isize
+            matrixmultiply::sgemm(
+                m,
+                k,
+                n,
+                alpha,
+                a as *const f32,
+                rsa as isize,
+                csa as isize,
+                b as *const f32,
+                rsb as isize,
+                csb as isize,
+                beta,
+                c as *mut f32,
+                rsc as isize,
+                csc as isize,
             )
         }
     }
@@ -402,9 +440,8 @@ fn test_gemm_trans_b() {
 }
 
 #[test]
-fn test_conv_filter_grad()
-{
-    use ::op::Op;
+fn test_conv_filter_grad() {
+    use op::Op;
     let op = conv2d::Conv2DFilterGrad {
         pad: 0,
         stride: 1,
@@ -422,16 +459,15 @@ fn test_conv_filter_grad()
 
     let ret = op.compute(::runtime::OpComputeContext {
         xs: vec![&x, &g, &w],
-        node: &::ops::zeros(&[0]) // dummy (not used)
+        node: &::ops::zeros(&[0]), // dummy (not used)
     });
 
-    assert_eq!(w.shape(), ret[0].as_ref().unwrap().shape());  // (2, 3, 2, 2)
+    assert_eq!(w.shape(), ret[0].as_ref().unwrap().shape()); // (2, 3, 2, 2)
     assert_eq!(ret[0].clone().unwrap().into_raw_vec(), vec![8.; 24]);
 }
 
 #[test]
-fn test_sequential_sgemm()
-{
+fn test_sequential_sgemm() {
     let x = [0., 1., 2., 3.];
     let y = [0., 1., 2., 3.];
     let z = [0.; 8];
@@ -443,8 +479,7 @@ fn test_sequential_sgemm()
 }
 
 #[test]
-fn test_sgemm_acc()
-{
+fn test_sgemm_acc() {
     let x = [0., 1., 2., 3.];
     let y = [0., 1., 2., 3.];
     let z = [0.; 4];
@@ -454,27 +489,31 @@ fn test_sgemm_acc()
     for _ in 0..num_iter as usize {
         sgemm(false, false, &x[0], &y[0], &z[0], 2, 2, 2, 1., 1.)
     }
-    assert_eq!([2.*num_iter, 3.*num_iter, 6.*num_iter, 11.*num_iter], z);
+    assert_eq!(
+        [2. * num_iter, 3. * num_iter, 6. * num_iter, 11. * num_iter],
+        z
+    );
 }
 
 #[test]
-fn test_max_pool_cpu()
-{
-    let x = vec![
-        0., 1., 2.,
-        5., 4., 3.,
-        6., 7., 8.
-    ];
+fn test_max_pool_cpu() {
+    let x = vec![0., 1., 2., 5., 4., 3., 6., 7., 8.];
     let output = alloc_uninitialized_buf(4);
     let argmax = alloc_uninitialized_buf(4);
-    max_pool(&x[0], 0, // pad
-             3, 3, // h, w
-             2, 2, // out_h, out_w
-             1, // c
-             1, // batch
-             2, // size
-             1, // stride
-             &output[0], &argmax[0]);
+    max_pool(
+        &x[0],
+        0, // pad
+        3,
+        3, // h, w
+        2,
+        2, // out_h, out_w
+        1, // c
+        1, // batch
+        2, // size
+        1, // stride
+        &output[0],
+        &argmax[0],
+    );
     assert_eq!(output, vec![5., 4., 7., 8.]);
     assert_eq!(argmax, vec![3., 4., 7., 8.]);
 }

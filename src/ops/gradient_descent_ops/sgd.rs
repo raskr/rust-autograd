@@ -2,20 +2,16 @@ use ndarray_ext::NdArray;
 use op;
 use tensor::Tensor;
 
-struct SGDOp
-{
+struct SGDOp {
     pub lr: f32,
 }
 
-impl ::op::Op for SGDOp
-{
-    fn name(&self) -> &str
-    {
+impl ::op::Op for SGDOp {
+    fn name(&self) -> &str {
         "SGD"
     }
 
-    fn compute(&self, mut ctx: ::runtime::OpComputeContext) -> op::ComputeResult
-    {
+    fn compute(&self, mut ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = unsafe { ctx.grab_assignable_inputs() };
         let updates = {
             let grad: &NdArray = xs[1];
@@ -25,26 +21,22 @@ impl ::op::Op for SGDOp
         vec![Err(::op::ComputeError::NoOutput)]
     }
 
-    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>>
-    {
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         vec![None]
     }
 }
 
 /// Vanilla SGD optimizer
-pub struct SGD
-{
+pub struct SGD {
     pub lr: f32,
 }
 
-impl<'a> SGD
-{
+impl<'a> SGD {
     fn compute_updates<T: AsRef<Tensor>>(
         &mut self,
         params: &[&'a Tensor],
         grads: &[T],
-    ) -> Vec<Tensor>
-    {
+    ) -> Vec<Tensor> {
         params
             .into_iter()
             .zip(grads)

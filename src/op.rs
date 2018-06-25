@@ -6,13 +6,9 @@ use tensor::Tensor;
 pub type ComputeResult = Vec<Result<NdArray, ComputeError>>;
 
 #[derive(Clone, Debug)]
-pub enum ComputeError
-{
+pub enum ComputeError {
     /// Computation finished correctly but delegates the result to its `to` th input.
-    Delegate
-    {
-        to: usize
-    },
+    Delegate { to: usize },
     /// Computation finished correctly with no output
     NoOutput,
 }
@@ -65,8 +61,7 @@ pub enum ComputeError
 ///         .build(Sigmoid)
 /// }
 /// ```
-pub trait Op
-{
+pub trait Op {
     /// Name of this op
     fn name(&self) -> &str;
 
