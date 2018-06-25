@@ -15,20 +15,16 @@
 //! let ref z = 2*x*x + 3*y + 1;
 //!
 //! // dz/dy
-//! let ref gy = ag::grad(&[z], &[y])[0];
+//! let gy = &ag::grad(&[z], &[y])[0];
+//! println!("{:?}", gy.eval(&[]));   // => Some(3.)
 //!
-//! // dz/dx
-//! let ref gx = ag::grad(&[z], &[x])[0];
+//! // dz/dx (requires to fill the placeholder `x`)
+//! let gx = &ag::grad(&[z], &[x])[0];
+//! println!("{:?}", gx.eval(&[(x, &ndarray::arr0(2.).into_dyn())]));  // => Some(8.)
 //!
 //! // ddz/dx (differentiates `z` again)
-//! let ref ggx = ag::grad(&[gx], &[x])[0];
-//!
-//! // evaluation of symbolic gradients
-//! println!("{:?}", gy.eval(&[]));   // => Some(3.)
+//! let ggx = &ag::grad(&[gx], &[x])[0];
 //! println!("{:?}", ggx.eval(&[]));  // => Some(4.)
-//!
-//! // dz/dx requires to fill the placeholder `x`
-//! println!("{:?}", gx.eval(&[(x, &ndarray::arr0(2.).into_dyn())]));  // => Some(8.)
 //! # }
 //! ```
 //!

@@ -6,6 +6,21 @@
 This library provides differentiable operations and tensors.
 The current backend is [rust-ndarray](https://github.com/bluss/rust-ndarray).
 
+## Features
+
+### Lazy, side-effect-free tensors in Rust
+Tensors themselves don't have the values basically.
+It realizes graphs that are eagerly executable at any timing.
+
+### Gradients using reverse-mode automatic differentiation
+It supports higher-order derivatives.
+Defining your own differentiable operations is not so difficult.
+
+### Runtime
+Graph execution engine is implemented in pure Rust,  
+so compilable to WebAssembly with little or no modifications.
+GPUs are not supported for now.
+
 ## Examples
 Here we are computing partial derivatives of `z = 2x^2 + 3y + 1`.
 
@@ -18,30 +33,24 @@ let ref y = ag::placeholder(&[]);
 let ref z = 2*x*x + 3*y + 1;
 
 // dz/dy
-let ref gy = ag::grad(&[z], &[y])[0];
+let gy = &ag::grad(&[z], &[y])[0];
+println!("{:?}", gy.eval(&[]));   // => Ok(3.)
 
-// dz/dx
-let ref gx = ag::grad(&[z], &[x])[0];
+// dz/dx (requires to fill the placeholder `x`)
+let gx = &ag::grad(&[z], &[x])[0];
+println!("{:?}", gx.eval(&[(x, &ag::ndarray::arr0(2.))]));  // => Ok(8.)
 
 // ddz/dx (differentiates `z` again)
-let ref ggx = ag::grad(&[gx], &[x])[0];
-
-// evaluation of symbolic gradients
-println!("{:?}", gy.eval(&[]));   // => Ok(3.)
+let ggx = &ag::grad(&[gx], &[x])[0];
 println!("{:?}", ggx.eval(&[]));  // => Ok(4.)
-
-// dz/dx requires to fill the placeholder `x`
-println!("{:?}", gx.eval(&[(x, &ag::ndarray::arr0(2.))]));  // => Ok(8.)
 ```
 
 Another example: softmax regression for MNIST digits classification with Adam.
 
 ```rust
-// This example is written in run-by-define style.
-// We get 0.918 test accuracy after 3 epochs,
+// This achieves 0.918 test accuracy after 3 epochs,
 // 0.27 sec/epoch on 2.7GHz Intel Core i5 (blas feature is disabled)
 
-// -- graph def --
 let ref x = ag::placeholder(&[-1, 28*28]);
 let ref y = ag::placeholder(&[-1]);
 let ref w = ag::variable(ag::ndarray_ext::glorot_uniform(&[28*28, 10]));
