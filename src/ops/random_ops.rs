@@ -1,5 +1,3 @@
-extern crate ndarray;
-
 use ndarray_ext::{self, ArrRng};
 use op;
 use rand::Rng;

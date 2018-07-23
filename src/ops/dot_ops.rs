@@ -1,7 +1,5 @@
-extern crate ndarray;
-extern crate rayon;
-
-use self::rayon::iter::*;
+use ndarray;
+use rayon::iter::*;
 use ndarray_ext;
 use ndarray_ext::NdArray;
 use op;

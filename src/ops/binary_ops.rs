@@ -1,8 +1,7 @@
 /// Implement +, -, *, / operators for Tensor
 /// +=, -=, *=, /= are provided as methods of ops::inplace_*.
 /// *=, /= don't propagate gradients.
-extern crate ndarray;
-
+use ndarray;
 use ndarray_ext::NdArray;
 use op;
 use ops;

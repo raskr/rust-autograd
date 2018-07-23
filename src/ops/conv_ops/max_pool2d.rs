@@ -1,6 +1,4 @@
-extern crate ndarray;
-extern crate rayon;
-use self::rayon::iter::*;
+use rayon::iter::*;
 
 use super::*;
 use tensor::Tensor;

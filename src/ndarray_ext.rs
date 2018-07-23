@@ -1,5 +1,4 @@
-/// small extension of rust-ndarray for convenience
-extern crate ndarray;
+use ndarray;
 
 /// type alias for convenience
 pub type NdArray = ndarray::Array<f32, ndarray::IxDyn>;
@@ -17,7 +16,6 @@ pub fn arr_to_shape(arr: &NdArray) -> Vec<usize> {
 
 #[doc(hidden)]
 #[inline]
-// TODO: remove unwrap
 pub fn expand_dims_view<'a>(x: NdArrayView<'a>, axis: usize) -> NdArrayView<'a> {
     let mut shape = x.shape().to_vec();
     shape.insert(axis, 1);
@@ -26,7 +24,6 @@ pub fn expand_dims_view<'a>(x: NdArrayView<'a>, axis: usize) -> NdArrayView<'a> 
 
 #[doc(hidden)]
 #[inline]
-// TODO: remove unwrap
 pub fn expand_dims(x: NdArray, axis: usize) -> NdArray {
     let mut shape = x.shape().to_vec();
     shape.insert(axis, 1);
@@ -87,7 +84,7 @@ pub fn sparse_to_dense(arr: &NdArray) -> Vec<usize> {
 
 #[doc(hidden)]
 #[inline]
-/// This works well only for small array
+/// This works well only for a small array
 pub fn vec_as_shape(x: &NdArray) -> Vec<usize> {
     let mut target = Vec::with_capacity(x.len());
     for &a in x.iter() {

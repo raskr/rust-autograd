@@ -1,5 +1,4 @@
-extern crate ndarray;
-
+use ndarray;
 use ndarray_ext::NdArray;
 use op;
 use op::Op;
@@ -14,25 +13,37 @@ use std::rc::Rc;
 pub struct Tensor(pub Rc<TensorCore>);
 
 pub struct TensorCore {
-    /// Operation of this node.
+
+    /// An operation to evaluate this tensor.
     pub op: Box<op::Op>,
+
     /// References to immediate predecessors.
     pub inputs: Vec<Tensor>,
+
     /// Rank number for topological ordering in a graph.
     pub top_rank: usize,
+
     /// Symbolic shape of this tensor.
     pub shape: Option<Tensor>,
-    /// Variable or constant array is placed here.
+
+    /// Backed "persistent" NdArray.
+    ///
+    /// This is `Some` if this tensor is made from `ag::variable` or `ag::constant`.
     pub persistent_array: Option<PersistentArray>,
-    /// Used to look up a resource of this tensor.
+
+    /// Used to look up a evaluation result of this tensor.
     pub resource_lookup_key: Cell<usize>,
+
     /// Immutable flag of tensor is placeholder or not.
     pub is_placeholder: bool,
-    /// `op` can have gradient?
-    pub has_gradient: bool,
+
+    /// `True` if this tensor can have gradient for any objectives.
+    pub can_have_gradient: bool,
+
     /// Indices of arrays used in `compute`
     pub input_indices: Vec<usize>,
-    /// Inputs used when performing backprop.
+
+    /// Inputs used for backprop.
     pub inputs_on_backprop: Option<Vec<Tensor>>,
 }
 
@@ -42,10 +53,10 @@ pub enum PersistentArray {
 }
 
 impl Tensor {
-    /// Returns a reference to the backing array, if one exists. A `Tensor`
-    /// that's a placeholder won't have a backing array, and will return
-    /// `None`.
     pub fn get_array(&self) -> Option<&NdArray> {
+    /// Returns a reference to the backing array.
+    ///
+    /// Returns `Some` if this tensor is made from `ag::variable` or `ag::constant`.
         self.0.persistent_array.as_ref().map(|p| match p {
             &PersistentArray::Variable(ref arr) => arr,
             &PersistentArray::Constant(ref arr) => arr,
@@ -209,7 +220,7 @@ impl TensorBuilder {
             persistent_array: self.persistent_array,
             is_placeholder: self.is_placeholder,
             resource_lookup_key: Cell::new(!0),
-            has_gradient: self.has_gradient,
+            can_have_gradient: self.has_gradient,
             input_indices,
             inputs_on_backprop: self.inputs_on_backprop,
         }))

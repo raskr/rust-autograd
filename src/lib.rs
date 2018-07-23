@@ -61,6 +61,7 @@
 #[macro_use(s)]
 extern crate ndarray;
 extern crate rand;
+extern crate rayon;
 
 #[macro_use]
 #[doc(hidden)]

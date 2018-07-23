@@ -1,5 +1,4 @@
-extern crate ndarray;
-
+use ndarray;
 use ndarray_ext::NdArray;
 use op;
 use ops;

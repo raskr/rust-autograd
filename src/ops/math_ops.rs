@@ -1,6 +1,5 @@
-extern crate ndarray;
-
-use self::ndarray::Zip;
+use ndarray;
+use ndarray::Zip;
 use ndarray_ext::NdArray;
 use op;
 use ops;

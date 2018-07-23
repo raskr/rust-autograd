@@ -1,5 +1,4 @@
-extern crate ndarray;
-
+use ndarray;
 use ndarray_ext::NdArray;
 use std::cmp::Ordering;
 use std::collections::btree_set::BTreeSet;
