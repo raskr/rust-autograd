@@ -23,5 +23,9 @@ install:
 script:
   - cargo test -v
 
+os:
+  - linux
+  - osx
+  
 compiler:
     - clang
