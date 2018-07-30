@@ -7,7 +7,9 @@ use std::mem;
 use std::rc::Rc;
 use tensor::Tensor;
 
-/// Helper structure for **batched** evaluation.
+/// Helper structure for batched evaluation.
+///
+/// Use this in case `ag::eval` doesn't help.
 ///
 /// ```
 /// extern crate autograd as ag;
@@ -33,7 +35,7 @@ impl<'t> Eval<'t> {
         Eval { buf: Vec::new() }
     }
 
-    /// Appends a tensor to the back of evaluation targets.
+    /// Appends a tensor to the back of the evaluation targets.
     pub fn push(&mut self, x: &'t Tensor) -> &mut Self {
         self.buf.push(x);
         self
@@ -48,7 +50,7 @@ impl<'t> Eval<'t> {
         self
     }
 
-    /// Evaluates buffered tensors.
+    /// Evaluates the buffered tensors.
     ///
     /// `feeds` is a stream of `(placeholder tensor, its value)`
     pub fn run<'tpl, 'tsr: 'tpl, 'arr: 'tpl, F>(&self, feed: F) -> Vec<Option<NdArray>>
@@ -61,11 +63,21 @@ impl<'t> Eval<'t> {
 
 // Context in evaluation of `node`
 pub struct OpComputeContext<'a, 'b> {
-    pub node: &'a Tensor, // Expose to its op for convenience
-    pub xs: Vec<&'b NdArray>,
+    node: &'a Tensor,
+    xs: Vec<&'b NdArray>,
 }
 
 impl<'a, 'b> OpComputeContext<'a, 'b> {
+    #[inline]
+    pub fn new(node: &'a Tensor, xs: Vec<&'b NdArray>) -> Self {
+        OpComputeContext { node, xs }
+    }
+
+    #[inline]
+    pub fn get_node(&self) -> &Tensor {
+        &self.node
+    }
+
     #[inline]
     pub fn grab_inputs(&self) -> &[&NdArray] {
         self.xs.as_slice()
@@ -82,7 +94,6 @@ impl<'a, 'b> OpComputeContext<'a, 'b> {
         &self.node.inputs[i]
     }
 
-    #[inline]
     // Internal of `grab_inputs`.
     // Grabs input arrays for `node`'s evaluation.
     // Returns "None" when failed to aggregate even one of input arrays.
@@ -97,15 +108,15 @@ impl<'a, 'b> OpComputeContext<'a, 'b> {
             feed_store: &FeedStore<'n>,
             value_index: usize,
         ) -> Option<&'n NdArray> {
-            if let Some(ref per) = x.persistent_array {
-                Some(per.get_array())
+            if let Some(per) = x.get_persistent_array() {
+                Some(per)
             } else if x.is_placeholder {
                 Some(feed_store[x.resource_lookup_key.get()])
             } else {
                 match store[x.resource_lookup_key.get()].value[value_index] {
                     Ok(ref a) => Some(a),
                     // hoping for x.inputs[i] to have the value
-                    Err(::op::ComputeError::Delegate { to: i }) => {
+                    Err(::op::ComputeException::Delegate { to: i }) => {
                         recurse(&x.inputs[i], store, feed_store, x.input_indices[i])
                     }
                     _ => None, // None for hopeless errors
@@ -148,8 +159,8 @@ impl<'a> Tensor {
 
 /// Evaluates given symbolic tensors.
 ///
-/// Each return value can be `None`.
-/// For example, evaluation of `gradient_descent_ops::*`
+/// Each return value can be `None`;
+/// for example, evaluation of `gradient_descent_ops::*`
 /// would result in `None`.
 ///
 /// NOTE: All the runtime errors are not reported by return values, but by "panic"
@@ -182,7 +193,7 @@ where
         .iter()
         .map(|x| {
             let x = x.as_ref();
-            let creator = if x.is_placeholder || x.persistent_array.is_some() {
+            let creator = if x.is_placeholder || x.has_persistent_array() {
                 x
             } else {
                 let creator = find_resource_creator(&output_storage, x);
@@ -200,9 +211,9 @@ where
     creators
         .iter()
         .map(|ref creator| {
-            if let Some(ref per) = creator.persistent_array {
+            if let Some(per) = creator.get_persistent_array() {
                 // Rarely happens (case that a persistent array given by user is required)
-                Some(per.get_array().clone())
+                Some(per.clone())
             } else if creator.is_placeholder {
                 // Rarely happens (case that a feed by user is required)
                 Some(find_fed_resource(creator, &feeds).clone())
@@ -230,48 +241,22 @@ where
         .collect()
 }
 
-/// Runs given symbolic tensors.
-///
-/// Runs, but returns nothing.
-/// This is useful for executing in-place ops etc.
-///
-/// ```
-/// extern crate ndarray;
-/// extern crate autograd as ag;
-///
-/// let a = ag::variable(ndarray::arr1(&[1., 1.]));
-/// let b = ag::ones(&[2]);
-/// let c = ag::sub_inplace(a, &b);
-///
-/// // runs inplace op.
-/// ag::run(&[&c], &[]);
-/// ```
-pub fn run<'a, 'b: 'a, 'c: 'a, T, U>(tensors: &[T], feeds: U)
-where
-    T: AsRef<Tensor>,
-    U: IntoIterator<Item = &'a (&'b Tensor, &'c NdArray)>,
-{
-    // Just run the graph
-    eval_internal(
-        &tensors.iter().map(|t| t.as_ref()).collect(),
-        &feeds.into_iter().collect(),
-    );
-}
-
 // Recursive function which seeks a node holding the x's resource.
 // Actual recursion "rarely" happens.
 fn find_resource_creator<'a, 'b>(storage: &ResourceStore, x: &'b Tensor) -> &'b Tensor {
     match storage[x.resource_lookup_key.get()].value[0] {
-        Err(::op::ComputeError::Delegate { to: i }) => find_resource_creator(storage, &x.inputs[i]),
+        Err(::op::ComputeException::Delegate { to: i }) => {
+            find_resource_creator(storage, &x.inputs[i])
+        }
         _ => x,
     }
 }
 
 #[inline]
-fn map_err<'a>(res: Result<NdArray, ::op::ComputeError>) -> Option<NdArray> {
+fn map_err<'a>(res: Result<NdArray, ::op::ComputeException>) -> Option<NdArray> {
     match res {
         Ok(arr) => Some(arr),
-        Err(::op::ComputeError::NoOutput) => None,
+        Err(::op::ComputeException::NoOutput) => None,
         _ => unreachable!(),
     }
 }
@@ -281,17 +266,16 @@ type FeedStore<'a> = Vec<&'a NdArray>;
 
 #[inline]
 fn find_fed_resource<'a>(node: &Tensor, feeds: &Vec<&(&Tensor, &'a NdArray)>) -> &'a NdArray {
-    // Linear search is suitable because number of feeds are so small in most cases
+    // Linear search is suitable because the number of feeds are so small in most cases.
     for feed in feeds {
         if Rc::ptr_eq(feed.0, node) {
             return feed.1;
         }
     }
-    // panic
-    panic!("Placeholder unfilled. See backtrace.");
+    panic!("Placeholder unfilled.");
 }
 
-// Actually evaluates nodes "targets".
+// Evaluates "targets".
 fn eval_internal<'a>(
     targets: &Vec<&'a Tensor>,
     feeds: &Vec<&(&'a Tensor, &NdArray)>,
@@ -300,7 +284,7 @@ fn eval_internal<'a>(
     let mut feed_store = Vec::new();
 
     // Obtain array resources while visiting nodes in topological order.
-    // Stack-based DFS is used to avoid stack overflow in explicit recursion.
+    // Stack-based depth-first-search is used to avoid stack overflow in explicit recursion.
     let mut dfs_stack: Vec<(&Tensor, bool)> = targets.iter().map(|&x| (x, false)).collect();
     while let Some((node, is_parent)) = dfs_stack.pop() {
         if is_parent {
@@ -310,13 +294,13 @@ fn eval_internal<'a>(
                 feed_store.push(find_fed_resource(node, &feeds));
             } else {
                 node.resource_lookup_key.set(res_store.len());
-                if node.persistent_array.is_none() {
+                if !node.has_persistent_array() {
                     let y = {
                         let ins = OpComputeContext::_grab_inputs(node, &res_store, &feed_store);
                         if let Some(xs) = ins {
                             node.op.compute(OpComputeContext { node, xs })
                         } else {
-                            vec![Err(::op::ComputeError::Delegate { to: 0 })]
+                            vec![Err(::op::ComputeException::Delegate { to: 0 })]
                         }
                     };
                     res_store.push(node.with_value(y));

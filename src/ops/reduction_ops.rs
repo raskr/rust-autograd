@@ -50,7 +50,7 @@ macro_rules! impl_reduce_forward {
             x: &NdArray,
             mut axes: Vec<usize>,
             keep_dims: bool,
-        ) -> Result<NdArray, ::op::ComputeError> {
+        ) -> Result<NdArray, ::op::ComputeException> {
             let x_shape = x.shape();
 
             if ndarray_ext::is_scalar_shape(x_shape) {
@@ -59,7 +59,7 @@ macro_rules! impl_reduce_forward {
             } else {
                 // reduction axes are empty => do nothing
                 if axes.is_empty() {
-                    return Err(::op::ComputeError::Delegate { to: 0 });
+                    return Err(::op::ComputeException::Delegate { to: 0 });
                 }
 
                 // -- main logic --
@@ -136,7 +136,7 @@ impl op::Op for ReduceMean {
         let axes = preprocess_axes(x, xs[1], self.sparse_axes);
         let x_shape = x.shape();
         if axes.is_empty() {
-            return vec![Err(::op::ComputeError::Delegate { to: 0 })];
+            return vec![Err(::op::ComputeException::Delegate { to: 0 })];
         }
 
         // Make reduction_len
@@ -171,9 +171,8 @@ impl op::Op for ReduceMean {
 
         // Divide
         let reduction_sizes = &ops::gather_common(&x.shape(), axes, 0);
-        let reduction_len = &ops::reduce_prod(reduction_sizes, &[0], false); // 1: &[]
-        let reciprocal = ops::reciprocal(reduction_len); // 1: &[]
-        let gx = broadcast * reciprocal;
+        let reduction_len = &ops::reduce_prod(reduction_sizes, &[0], false);
+        let gx = broadcast / reduction_len;
 
         vec![Some(gx), None]
     }
@@ -278,7 +277,7 @@ impl op::Op for ArgMax {
         let axis = ndarray_ext::normalize_negative_axis(self.axis, x.ndim());
         let x_shape = x.shape();
 
-        // 1. Make binary mask tensor (maximum is 1)
+        // 1. Make binary mask tensor (maximums are 1s)
         let mut mask = {
             let max_fn = f32::max;
             let maxed = x.fold_axis(ndarray::Axis(axis), f32::MIN, move |&a, &b| max_fn(a, b));
@@ -299,20 +298,18 @@ impl op::Op for ArgMax {
 
         // 2. Reshape the mask to 2-ranked. e.g. (2, 3, 4) -> (8, 3) (let `axis` be 1)
         let mask = {
-            // move axis to first, and remaining is put together in the 2nd axis
+            // move the `axis` to first, and put remaining together on the 2nd axis
             let reduction_len = x_shape[axis];
             ndarray_ext::roll_axis(&mut mask, ndarray::Axis(0), ndarray::Axis(axis));
             let shape2d = (reduction_len, mask.len() / reduction_len);
-            // unwrap is safe
             let mut mask = mask.into_shape(shape2d).unwrap();
             mask.swap_axes(0, 1);
             mask
         };
 
-        // 3. Make indices (vertical vector)
+        // 3. Make the indices (vertical vector)
         let indices = {
             let cols = mask.shape()[1];
-            // unwrap is safe
             ndarray::Array::range(0., cols as f32, 1.)
                 .into_shape((cols, 1))
                 .unwrap()
@@ -321,7 +318,7 @@ impl op::Op for ArgMax {
         // 4. Dot product between mask and index-tensor
         let mat = mask.dot(&indices);
 
-        // 5. reshape it
+        // 5. Reshape it
         let result = {
             let mut final_shape = x_shape.to_vec();
             if self.keep_dim {
@@ -355,7 +352,7 @@ impl op::Op for ReduceGradCommon {
         let target_shape = ndarray_ext::vec_as_shape(xs[1]); // x's shape
 
         if gy.shape() == target_shape.as_slice() {
-            return vec![Err(::op::ComputeError::Delegate { to: 0 })];
+            return vec![Err(::op::ComputeException::Delegate { to: 0 })];
         }
 
         let x_is_scalar = ndarray_ext::is_scalar_shape(gy.shape());
@@ -379,7 +376,7 @@ impl op::Op for ReduceGradCommon {
                 for &axis in axes.iter() {
                     assert!(
                         axis <= gy_shape.len(),
-                        "Bad gradient. You may passed non-scalar value to ag::grad?"
+                        "Bad gradient. You may passed a non-scalar value to `ag::grad`?"
                     );
                     gy_shape.insert(axis, 1);
                 }
@@ -390,7 +387,7 @@ impl op::Op for ReduceGradCommon {
             if let Some(ret) = gy_view.broadcast(target_shape) {
                 ret.to_owned()
             } else {
-                panic!("Bad gradient. You may passed non-scalar value to ag::grad?")
+                panic!("Bad gradient. You may passed a non-scalar value to `ag::grad`?")
             }
         };
 

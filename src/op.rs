@@ -3,10 +3,11 @@ extern crate ndarray;
 use ndarray_ext::NdArray;
 use tensor::Tensor;
 
-pub type ComputeResult = Vec<Result<NdArray, ComputeError>>;
+pub type ComputeResult = Vec<Result<NdArray, ComputeException>>;
 
 #[derive(Clone, Debug)]
-pub enum ComputeError {
+/// This is an `exception`, not an error.
+pub enum ComputeException {
     /// Computation finished correctly but delegates the result to its `to` th input.
     Delegate { to: usize },
     /// Computation finished correctly with no output
@@ -15,7 +16,10 @@ pub enum ComputeError {
 
 /// Operation trait. `Tensor` wraps trait-object of this.
 ///
-/// # Usage
+/// # Implementing differentiable operations
+///
+/// Many of well-known ops are pre-defined in `ag::ops`, but you can also
+/// implement custom ops by hand.
 ///
 /// ```
 /// extern crate ndarray;
@@ -23,9 +27,9 @@ pub enum ComputeError {
 ///
 /// type NdArray = ndarray::Array<f32, ndarray::IxDyn>;
 ///
+/// // Implements `Op` trait for `Sigmoid`.
 /// struct Sigmoid;
 ///
-/// // Implements `Operation` trait for `Sigmoid`
 /// impl ag::op::Op for Sigmoid {
 ///
 ///     fn name(&self) -> &str
@@ -33,8 +37,10 @@ pub enum ComputeError {
 ///         "Sigmoid"
 ///     }
 ///
+///     // In this method, any errors caused by bad user-inputs should results in "panic".
+///     // (`ag::op::ComputeException` represents an exception rather than an error.)
 ///     fn compute(&self, ctx: ag::runtime::OpComputeContext)
-///         -> Vec<Result<NdArray, ag::op::ComputeError>>
+///         -> Vec<Result<NdArray, ag::op::ComputeException>>
 ///     {
 ///         let xs = ctx.grab_inputs();
 ///         let x = xs[0];
@@ -65,7 +71,7 @@ pub trait Op {
     /// Name of this op
     fn name(&self) -> &str;
 
-    /// Actually runs this op.
+    /// Runs this op.
     fn compute(&self, ctx: ::runtime::OpComputeContext) -> ComputeResult;
 
     /// Returns symbolic gradients for input nodes by use of output gradient etc.

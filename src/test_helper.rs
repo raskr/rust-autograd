@@ -1,4 +1,3 @@
-use ndarray;
 use ndarray_ext::NdArray;
 use std::cmp::Ordering;
 use std::collections::btree_set::BTreeSet;
@@ -6,7 +5,7 @@ use tensor::Tensor;
 
 /// Checks the validity of `gradients` with finite difference trick.
 /// For this test only, `variables` must be "shared" variables.
-pub fn gradient_check<'a, 'b, T>(
+pub fn check_theoretical_grads<'a, 'b, T>(
     objective: &Tensor,
     gradients: &[T],
     variables: &[&Tensor],
@@ -21,12 +20,10 @@ pub fn gradient_check<'a, 'b, T>(
 
     // for each variable nodes
     for (var_node, th_grad) in variables.iter().zip(theoretical_grads) {
-        let v_arr = unsafe {
+        let mut v_arr = unsafe {
             var_node
-                .persistent_array
-                .as_ref()
-                .expect("This is not variable")
-                .get_as_variable_mut()
+                .get_persistent_array_mut()
+                .expect("This is not a variable")
         };
         let head_ptr: *mut f32 = v_arr.as_mut_ptr();
 
@@ -98,7 +95,7 @@ where
 
 impl<'a> Ord for &'a Tensor {
     #[inline]
-    /// Compares addresses of the two tensors.
+    /// Compares the addresses of the two tensors.
     /// This can be used for ordering-based data structures (e.g. BinaryTree).
     fn cmp(&self, other: &&'a Tensor) -> Ordering {
         let a = (*self) as *const Tensor;
@@ -109,7 +106,7 @@ impl<'a> Ord for &'a Tensor {
 
 impl<'a> PartialOrd for &'a Tensor {
     #[inline]
-    /// Compares addresses of the two tensors.
+    /// Compares the addresses of the two tensors.
     /// This can be used for ordering-based data structures (e.g. BinaryTree).
     fn partial_cmp(&self, other: &&'a Tensor) -> Option<Ordering> {
         Some(self.cmp(&other))

@@ -99,7 +99,7 @@ pub fn main() {
     let grads = ag::grad(&[loss], vars);
 
     // test with toy data
-    ag::test_helper::gradient_check(
+    ag::test_helper::check_theoretical_grads(
         loss,
         &grads,
         vars,

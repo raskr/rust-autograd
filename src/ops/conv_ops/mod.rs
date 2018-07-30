@@ -60,6 +60,7 @@ pub mod max_pool2d;
 #[link(name = "conv")]
 #[no_mangle]
 extern "C" {
+    #[inline]
     fn im2col_cpu(
         data_im: *const c_float,
         channels: c_int,
@@ -76,6 +77,7 @@ extern "C" {
         data_col: *const c_float,
     );
 
+    #[inline]
     fn col2im_cpu(
         data_col: *const c_float,
         channels: c_int,
@@ -92,6 +94,7 @@ extern "C" {
         data_im: *const c_float,
     );
 
+    #[inline]
     fn max_pool_cpu_unbatched(
         input: *const c_float,
         pad: c_int,
@@ -457,10 +460,10 @@ fn test_conv_filter_grad() {
     let g = ::ndarray_ext::ones(&[batch_size, ych, yh, yw]);
     let w = ::ndarray_ext::ones(&[ych, xch, kh, kw]);
 
-    let ret = op.compute(::runtime::OpComputeContext {
-        xs: vec![&x, &g, &w],
-        node: &::ops::zeros(&[0]), // dummy (not used)
-    });
+    let ret = op.compute(::runtime::OpComputeContext::new(
+        &::ops::zeros(&[0]), // dummy (not used)
+        vec![&x, &g, &w],
+    ));
 
     assert_eq!(w.shape(), ret[0].as_ref().unwrap().shape()); // (2, 3, 2, 2)
     assert_eq!(ret[0].clone().unwrap().into_raw_vec(), vec![8.; 24]);

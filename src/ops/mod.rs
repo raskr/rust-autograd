@@ -19,7 +19,7 @@ mod reduction_ops;
 mod xent_ops;
 
 impl Tensor {
-    /// Gets a symbolic element from this tensor with shape `[]`.
+    /// Looks up a symbolic element from this tensor.
     ///
     /// Index `i` can be negative.
     ///
@@ -46,16 +46,15 @@ impl Tensor {
 ///
 /// # Arguments
 /// * `ys` - Targets of differentiation.
-/// * `xs` - tensors with which differentiate `ys`.
-/// So the length must be same as `ys`'s.
+/// * `xs` - Tensors with which differentiate `ys`; so its length must be same as `ys`'s.
 ///
-/// NOTE: Each objective **must** be a scalar (0-ranked tensor); otherwise it causes **undefined**
+/// NOTE: Each of `ys` **must** be a scalar (0-ranked tensor); otherwise it causes **undefined**
 /// behavior.
-/// For multi dimensional objectives, do `reduce_sum`ing all dimensionality or
+/// For multi dimensional objectives, do `reduce_sum`/`reduce_mean` for all dimensionality or
 /// use [grad_with_default](fn.grad_with_default.html).
 ///
 /// # Returns
-/// Symbolic gradient tensors corresponding to `xs` in the same order as `xs`
+/// Symbolic gradient tensors corresponding to `xs` in the same order as `xs`'s.
 ///
 ///
 /// # Example
@@ -100,7 +99,7 @@ pub fn grad(ys: &[&Tensor], xs: &[&Tensor]) -> Vec<Tensor> {
 /// you must pass the "Some" value. In most cases, it is initialized with 1s.
 ///
 /// # Returns
-/// Symbolic gradient tensors corresponding to `xs` in the same order as `xs`
+/// Symbolic gradient tensors corresponding to `xs` in the same order as `xs`'s.
 ///
 /// For detailed, see [grad](fn.grad.html).
 pub fn grad_with_default(ys: &[&Tensor], xs: &[&Tensor], output_grads: &[&Tensor]) -> Vec<Tensor> {
@@ -123,7 +122,7 @@ pub fn grad_with_default(ys: &[&Tensor], xs: &[&Tensor], output_grads: &[&Tensor
 /// * `y_size` - (flattened) size of `y`
 ///
 /// # Returns
-/// Jacobians for each variable. Each one is matrix of shape `(y_size, x size)`.
+/// Jacobians for each variable. Each one is a matrix of shape `(y_size, x size)`.
 ///
 /// ```
 /// extern crate autograd as ag;
@@ -178,21 +177,20 @@ pub fn _hessian_vector_product(ys: &[&Tensor], xs: &[&Tensor], vectors: &[&Tenso
 
 /// Stops gradient propagation.
 ///
-/// Guarantees that the gradient is not propagated to the tensor behind this
+/// Guarantees that the gradient is not propagated to the tensors behind this
 /// during gradient computation.
 pub fn stop_gradient<A: AsRef<Tensor>>(x: A) -> Tensor {
     Tensor::builder()
         .set_input(x.as_ref())
-        .set_has_gradient(false)
+        .set_differentiable(false)
         .build(gradient_ops::StopGradient)
 }
 
-/// Creates a shared variable tensor from rust-ndarray's array object.
+/// Creates a shared variable tensor from an array object.
 ///
-/// The shared variable behaves like any other tensors, except that
-/// it can be optimized with gradient descent methods
-/// implemented in `autograd::gradient_descent`.
-/// For the usages, see https://github.com/perrier1034/rust-autograd/tree/master/examples
+/// A shared variable can be mutated with in-place ops or gradient descent methods
+/// implemented in `autograd::gradient_descent_ops`.
+/// For the usages, see https://github.com/perrier1034/rust-autograd/tree/master/examples.
 ///
 /// ```
 /// extern crate ndarray;
@@ -279,7 +277,7 @@ pub fn shape<A: AsRef<Tensor>>(x: A) -> Tensor {
     } else {
         Tensor::builder()
             .set_input(x.as_ref())
-            .set_has_gradient(false)
+            .set_differentiable(false)
             .build(array_ops::Shape)
     }
 }
@@ -298,7 +296,7 @@ pub fn shape<A: AsRef<Tensor>>(x: A) -> Tensor {
 pub fn size<A: AsRef<Tensor>>(x: A) -> Tensor {
     Tensor::builder()
         .set_input(x.as_ref())
-        .set_has_gradient(false)
+        .set_differentiable(false)
         .build(array_ops::Size)
 }
 
@@ -316,7 +314,7 @@ pub fn size<A: AsRef<Tensor>>(x: A) -> Tensor {
 pub fn rank<A: AsRef<Tensor>>(x: A) -> Tensor {
     Tensor::builder()
         .set_input(x.as_ref())
-        .set_has_gradient(false)
+        .set_differentiable(false)
         .build(array_ops::Rank)
 }
 
@@ -530,10 +528,13 @@ pub fn div<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor {
     bin_op_helper(a, b, binary_ops::DivOp)
 }
 
-#[doc(hidden)]
-/// Should be limited to internal use.
-///
+/// Inplace multiplication.
 /// This function takes `a`'s ownership.
+/// Note that this **doesn't** support gradient propagation.
+///
+/// # Panics
+///
+/// In case of `a` is a `constant`.
 ///
 /// ```
 /// extern crate ndarray;
@@ -553,10 +554,14 @@ pub fn mul_inplace<A: AsRef<Tensor>>(a: Tensor, b: A) -> Tensor {
         .build(binary_ops::InplaceMulOp)
 }
 
-#[doc(hidden)]
-/// Should be limited to internal use.
+/// Inplace division.
 ///
 /// This function takes `a`'s ownership.
+/// Note that this **doesn't** support gradient propagation.
+///
+/// # Panics
+///
+/// In case of `a` is a `constant`.
 ///
 /// ```
 /// extern crate ndarray;
@@ -581,7 +586,7 @@ pub fn div_inplace<A: AsRef<Tensor>>(a: Tensor, b: A) -> Tensor {
 ///
 /// # Panics
 ///
-/// When `a` is a `constant`.
+/// In case of `a` is a `constant`.
 ///
 /// ```
 /// extern crate ndarray;
@@ -607,7 +612,7 @@ pub fn add_inplace<A: AsRef<Tensor>>(a: Tensor, b: A) -> Tensor {
 ///
 /// # Panics
 ///
-/// When `a` is a `constant`.
+/// In case of `a` is a `constant`.
 ///
 /// ```
 /// extern crate ndarray;
@@ -692,7 +697,7 @@ pub fn minimum<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor {
         .build(math_ops::Minimum)
 }
 
-/// Adds all input tensors.
+/// Adds all input tensors, element-wise.
 ///
 /// All the input tensors must have same shapes.
 ///
@@ -723,7 +728,7 @@ pub fn add_n(xs: &[&Tensor]) -> Tensor {
 
 /// Compares two tensors and returns a binary tensor.
 ///
-/// if `a[i] == b[i]` then `return_value[i]` will be 1 else 0
+/// if `a[i] == b[i]` then `return-value[i]` will be 1 else 0
 ///
 /// # Panics
 /// When broadcast is impossible
@@ -746,7 +751,7 @@ pub fn equal<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor {
 
 /// Compares two tensors and returns a binary tensor.
 ///
-/// if `a[i] != b[i]` then `return_value[i]` will be 1 else 0
+/// if `a[i] != b[i]` then `return-value[i]` will be 1 else 0
 ///
 /// # Panics
 /// When broadcast is impossible
@@ -798,10 +803,9 @@ pub fn argmax<A: AsRef<Tensor>>(x: A, axis: isize, keep_dim: bool) -> Tensor {
 /// assert_eq!(b.eval(&[]).unwrap().shape(), &[1, 3, 1]);
 /// ```
 pub fn expand_dims<A: AsRef<Tensor>, T: ArrayLike>(x: A, axes: &T) -> Tensor {
-    let op = array_ops::ExpandDims;
     Tensor::builder()
         .set_inputs(vec![x.as_ref(), &axes.as_tensor()])
-        .build(op)
+        .build(array_ops::ExpandDims)
 }
 
 /// Squeezes specified dims.
@@ -845,7 +849,7 @@ pub fn tile<A: AsRef<Tensor>>(x: A, axis: isize, num: usize) -> Tensor {
     Tensor::builder().set_input(x.as_ref()).build(op)
 }
 
-/// Limits all elements so as to be within `[min, max]`
+/// Limits all elements of `x` so as to be within `[min, max]`
 ///
 /// ```
 /// extern crate ndarray;
@@ -995,7 +999,7 @@ pub fn reshape<T: ArrayLike, A: AsRef<Tensor>>(x: A, shape: &T) -> Tensor {
         .build(array_ops::Reshape)
 }
 
-/// Flattens input tensor into 1-ranked (vector)
+/// Flattens input tensor into 1-ranked (vector).
 ///
 /// ```
 /// extern crate autograd as ag;
@@ -1071,7 +1075,7 @@ pub fn floor<A: AsRef<Tensor>>(a: A) -> Tensor {
         .build(math_ops::Floor)
 }
 
-/// Performs the - operation.
+/// Performs the `-` operation.
 ///
 /// ```
 /// extern crate ndarray;
@@ -1091,7 +1095,7 @@ pub fn neg<A: AsRef<Tensor>>(a: A) -> Tensor {
         .build(math_ops::NegOp)
 }
 
-/// Returns square of the input.
+/// Takes square of the input.
 ///
 /// ```
 /// extern crate ndarray;
@@ -1235,9 +1239,13 @@ pub fn softplus<A: AsRef<Tensor>>(x: A) -> Tensor {
 }
 
 /// Computes `log(sum(exp(x)))` along specified axis.
+///
 /// `axis` can be negative.
-pub fn reduce_logsumexp<A: AsRef<Tensor>>(x: A, axis: isize, keep_dims: bool) -> Tensor {
-    let op = math_ops::LogSumExp { axis, keep_dims };
+pub fn reduce_logsumexp<A: AsRef<Tensor>>(x: A, axis: isize, keep_dim: bool) -> Tensor {
+    let op = math_ops::LogSumExp {
+        axis,
+        keep_dims: keep_dim,
+    };
     Tensor::builder().set_input(x.as_ref()).build(op)
 }
 
@@ -1268,7 +1276,7 @@ pub fn softmax<A: AsRef<Tensor>>(x: A, axis: isize) -> Tensor {
 ///
 /// # Arguments
 /// * `y` - Tensor with arbitrary shape
-/// * `t` - Tensor with arbitrary shape
+/// * `t` - Ground-truth Tensor with same shape as `y`'s
 ///
 /// # Panics
 /// When y.shape != t.shape.
@@ -1373,7 +1381,7 @@ pub fn matmul_t<A: AsRef<Tensor>, B: AsRef<Tensor>>(
         .build(op)
 }
 
-/// Computes tensor dot product (tensor contraction) along specified axes.
+/// Computes tensor-dot-product (tensor contraction) along specified axes.
 ///
 /// # Arguments
 /// * `a` - Input tensor
@@ -1471,9 +1479,9 @@ pub fn batch_matmul<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor {
         .build(op)
 }
 
-/// Takes diff between two tensors
+/// Takes diff between two tensors.
 ///
-/// Returns the sorted, unique values in a that are not in b.
+/// Returns the sorted, unique values in `a` that are not in `b`.
 ///
 /// ```
 /// extern crate ndarray;
@@ -1498,6 +1506,8 @@ pub fn setdiff1d<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor {
 
 /// Permutes dimensions.
 ///
+/// It's like TensorFlow or NumPy's.
+///
 /// ```
 /// extern crate autograd as ag;
 ///
@@ -1518,7 +1528,7 @@ pub fn transpose<T: ArrayLike, A: AsRef<Tensor>>(x: A, perm: &T) -> Tensor {
 /// Splits `x` into `sizes.len()` parts along `axis`.
 ///
 /// The size of dimension of each part is `sizes[i]` on `axis`, but
-/// `x.shape[i]` on other axis.
+/// `x.shape[i]` on other axis (similar to TensorFlow's `split`).
 ///
 /// ```
 /// extern crate autograd as ag;
@@ -1548,7 +1558,7 @@ pub fn split<A: AsRef<Tensor>>(x: A, sizes: &[usize], axis: isize) -> Vec<Tensor
         .collect::<Vec<_>>()
 }
 
-/// Slices input tensor with indices.
+/// Slices the input tensor.
 ///
 /// # Arguments
 /// * `x` - Tensor with arbitrary shape.
@@ -1656,7 +1666,7 @@ pub fn gather<T: ArrayLike, A: AsRef<Tensor>>(param: A, indices: &T, axis: isize
         .build(op)
 }
 
-/// Normalizes input tensor with its mean and variance along specified axis.
+/// Normalizes the input tensor with its mean and variance along specified axis.
 ///
 /// ```
 /// extern crate ndarray;
@@ -1861,7 +1871,7 @@ pub fn log_normal_rng<T: ArrayLike, R: Rng + 'static>(
         .build(random_ops::LogNormal::new(arr_rng, mean, stddev))
 }
 
-/// Converts `ndarray::Array` to `ag::Tensor`.
+/// Converts an `ndarray::Array` to a `ag::Tensor`.
 ///
 /// ```
 /// extern crate ndarray;
@@ -1887,7 +1897,7 @@ where
         .build(const_gen_ops::ConvertToTensor { arr })
 }
 
-/// Returns zeros with given shape
+/// Returns zeros with given shape.
 ///
 /// ```
 /// extern crate ndarray;
@@ -1902,7 +1912,7 @@ pub fn zeros<T: ArrayLike>(shape: &T) -> Tensor {
         .build(const_gen_ops::Zeros)
 }
 
-/// Returns ones with given shape
+/// Returns ones with given shape.
 ///
 /// ```
 /// extern crate ndarray;
@@ -1917,9 +1927,7 @@ pub fn ones<T: ArrayLike>(shape: &T) -> Tensor {
         .build(const_gen_ops::Ones)
 }
 
-/// Returns a range
-///
-/// Unlike `range`, inputs are symbolic tensors.
+/// Returns a range.
 ///
 /// ```
 /// extern crate ndarray;

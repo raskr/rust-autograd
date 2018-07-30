@@ -1,8 +1,8 @@
 use ndarray;
-use rayon::iter::*;
 use ndarray_ext;
 use ndarray_ext::NdArray;
 use op;
+use rayon::iter::*;
 use tensor::Tensor;
 
 // `Tensordot` is implemented in `ops/mod.rs`.
@@ -28,16 +28,8 @@ impl op::Op for MatMul {
         let x1 = xs[1];
         let x0_shape = x0.shape();
         let x1_shape = x1.shape();
-        assert_eq!(
-            x0_shape.len(),
-            2,
-            "First input to the matmul should be Matrix"
-        );
-        assert_eq!(
-            x1_shape.len(),
-            2,
-            "Second input to the matmul should be Matrix"
-        );
+        assert_eq!(x0_shape.len(), 2, "First input to matmul should be Matrix");
+        assert_eq!(x1_shape.len(), 2, "Second input to matmul should be Matrix");
         let x0_view = x0.view();
         let x1_view = x1.view();
         // unwrap is always safe
@@ -78,6 +70,7 @@ impl op::Op for BatchMatMul {
         "BatchMatMul"
     }
 
+    // TODO: Remove unnecessary mem copy
     fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         let x0: &NdArray = xs[0];
@@ -88,7 +81,7 @@ impl op::Op for BatchMatMul {
         let rank1 = x1.ndim();
 
         if rank0 != rank1 || shape0[..rank0 - 2] != shape1[..rank0 - 2] {
-            panic!("Input shape mismatch: {:?} vs {:?}", shape0, shape1);
+            panic!("Input shapes mismatch: {:?} vs {:?}", shape0, shape1);
         }
 
         let row0 = shape0[rank0 - 2];
@@ -119,7 +112,7 @@ impl op::Op for BatchMatMul {
             b
         };
 
-        // parallel dot
+        // parallel mm
         let dot = (0..x0_flattened.shape()[0] as isize)
             .into_par_iter()
             .map(|i| {

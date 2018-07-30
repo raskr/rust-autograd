@@ -105,11 +105,7 @@ impl op::Op for Range {
         let start = x0[ndarray::IxDyn(&[])];
         let end = x1[ndarray::IxDyn(&[])];
         let step = x2[ndarray::IxDyn(&[])];
-
-        if start > end {
-            panic!("Start and end of `range` is wrong.");
-        }
-
+        assert!(start < end, "`start` and `end` overlap.");
         vec![Ok(ndarray::Array1::range(start, end, step).into_dyn())]
     }
 

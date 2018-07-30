@@ -1,7 +1,6 @@
 use ndarray;
 use ndarray_ext::NdArray;
 use op;
-use op::Op;
 use ops;
 use std::cell::Cell;
 use std::fmt;
@@ -13,109 +12,101 @@ use std::rc::Rc;
 pub struct Tensor(pub Rc<TensorCore>);
 
 pub struct TensorCore {
-
     /// An operation to evaluate this tensor.
     pub op: Box<op::Op>,
 
     /// References to immediate predecessors.
     pub inputs: Vec<Tensor>,
 
-    /// Rank number for topological ordering in a graph.
+    /// The rank number for topological ordering in a graph.
     pub top_rank: usize,
 
-    /// Symbolic shape of this tensor.
+    /// "Symbolic" shape of this tensor.
     pub shape: Option<Tensor>,
 
-    /// Backed "persistent" NdArray.
+    /// An optional "persistent" NdArray.
     ///
     /// This is `Some` if this tensor is made from `ag::variable` or `ag::constant`.
-    pub persistent_array: Option<PersistentArray>,
+    persistent_array: Option<PersistentArray>,
 
     /// Used to look up a evaluation result of this tensor.
     pub resource_lookup_key: Cell<usize>,
 
-    /// Immutable flag of tensor is placeholder or not.
+    /// This tensor is placeholder or not.
     pub is_placeholder: bool,
 
-    /// `True` if this tensor can have gradient for any objectives.
-    pub can_have_gradient: bool,
+    /// This is `True` if this tensor can have gradient for any objectives.
+    pub is_differentiable: bool,
 
-    /// Indices of arrays used in `compute`
+    /// Input indices of arrays used in `compute`
     pub input_indices: Vec<usize>,
 
-    /// Inputs used for backprop.
+    /// Input nodes used when backprop.
+    ///
+    /// This is same as `inputs` in most cases.
     pub inputs_on_backprop: Option<Vec<Tensor>>,
 }
 
-pub enum PersistentArray {
+enum PersistentArray {
     Variable(NdArray),
     Constant(NdArray),
 }
 
 impl Tensor {
-    pub fn get_array(&self) -> Option<&NdArray> {
-    /// Returns a reference to the backing array.
+    /// Returns a reference to the persistent array.
     ///
     /// Returns `Some` if this tensor is made from `ag::variable` or `ag::constant`.
-        self.0.persistent_array.as_ref().map(|p| match p {
-            &PersistentArray::Variable(ref arr) => arr,
-            &PersistentArray::Constant(ref arr) => arr,
-        })
-    }
-
-    /// Returns a mutable reference to the backing array, if one exists, the
-    /// `Tensor` has not been copied, and is permissible to mutate. A placeholder
-    /// `Tensor` has no backing array, and will return `None`. If the `Tensor` is
-    /// a constant, this will also return `None`, as mutating a constant is not
-    /// permitted. If any copies have been made, accessing a `&mut` of the
-    /// inner `Rc<TensorCore>` that houses the backing array will be impossible.
-    pub fn get_array_mut(&mut self) -> Option<&mut NdArray> {
-        //inner.persistent_array.as_mut()
-        Rc::get_mut(&mut self.0)
-            .and_then(|t| t.persistent_array.as_mut())
-            .and_then(|p| match p {
-                &mut PersistentArray::Variable(ref mut arr) => Some(arr),
-                _ => None,
-            })
-    }
-}
-
-impl PersistentArray {
-    pub fn get_as_variable(&self) -> &NdArray {
-        match *self {
-            PersistentArray::Variable(ref a) => a,
-            PersistentArray::Constant(_) => panic!("Can't mutate constant tensor"),
+    pub fn get_persistent_array(&self) -> Option<&NdArray> {
+        match self.persistent_array {
+            Some(ref a) => match a {
+                PersistentArray::Variable(ref arr) => Some(arr),
+                PersistentArray::Constant(ref arr) => Some(arr),
+            },
+            None => None,
         }
     }
 
-    #[allow(mutable_transmutes)]
-    pub unsafe fn get_as_variable_mut(&self) -> &mut NdArray {
-        mem::transmute(self.get_as_variable())
+    /// Returns a mutable reference to the persistent array.
+    ///
+    /// Returns `Some` if this tensor is made from `ag::variable`.
+    pub unsafe fn get_persistent_array_mut(&self) -> Option<&mut NdArray> {
+        mem::transmute(
+            self.persistent_array
+                .as_ref()
+                .and_then(|inner| match inner {
+                    PersistentArray::Variable(arr) => Some(arr),
+                    PersistentArray::Constant(_) => None,
+                }),
+        )
     }
 
-    pub fn get_array(&self) -> &NdArray {
-        match *self {
-            PersistentArray::Variable(ref a) => a,
-            PersistentArray::Constant(ref a) => a,
-        }
-    }
-
-    pub fn shape(&self) -> &[usize] {
-        match *self {
-            PersistentArray::Variable(ref a) => a.shape(),
-            PersistentArray::Constant(ref a) => a.shape(),
-        }
+    /// Returns `True` if this tensor is made from `ag::variable` or `ag::constant`.
+    #[inline]
+    pub fn has_persistent_array(&self) -> bool {
+        self.persistent_array.is_some()
     }
 }
 
 pub struct TensorBuilder {
     shape: Option<Tensor>,
     inputs: Vec<Tensor>,
-    has_gradient: bool,
+    can_have_gradient: bool,
     is_placeholder: bool,
     persistent_array: Option<PersistentArray>,
     input_indices: Option<Vec<usize>>,
     inputs_on_backprop: Option<Vec<Tensor>>,
+}
+
+#[test]
+fn test_build() {
+    let ref a = ::zeros(&[4, 2]);
+    let ref v = ::zeros(&[2, 3]);
+    let ref b = ::zeros(&[4, 3]);
+    let ref z = ::matmul(a, v) + b;
+    let mut vars = [a, v, b, z];
+    // `sort_by_key` don't reverse the order of `a` and `v`
+    vars.sort_by_key(|a| a.top_rank);
+    assert_eq!(vars, [a, v, b, z])
 }
 
 impl TensorBuilder {
@@ -126,8 +117,8 @@ impl TensorBuilder {
     }
 
     #[inline]
-    pub fn set_has_gradient(mut self, a: bool) -> TensorBuilder {
-        self.has_gradient = a;
+    pub fn set_differentiable(mut self, a: bool) -> TensorBuilder {
+        self.can_have_gradient = a;
         self
     }
 
@@ -179,21 +170,8 @@ impl TensorBuilder {
         self
     }
 
-    /// ```
-    /// extern crate ndarray;
-    /// extern crate autograd as ag;
-    ///
-    /// let ref a = ag::zeros(&[4, 2]);
-    /// let ref v = ag::zeros(&[2, 3]);
-    /// let ref b = ag::zeros(&[4, 3]);
-    /// let ref z = ag::matmul(a, v) + b;
-    /// let mut vars = [a, v, b, z];
-    /// // `sort_by_key` don't reverse the order of `a` and `v`
-    /// vars.sort_by_key(|a| a.top_rank);
-    /// assert!(vars == [a, v, b, z])
-    /// ```
     #[inline]
-    pub fn build<T: Op + 'static>(self, op: T) -> Tensor {
+    pub fn build<T: op::Op + 'static>(self, op: T) -> Tensor {
         let rank = if self.inputs.len() == 0 {
             0
         } else {
@@ -220,7 +198,7 @@ impl TensorBuilder {
             persistent_array: self.persistent_array,
             is_placeholder: self.is_placeholder,
             resource_lookup_key: Cell::new(!0),
-            can_have_gradient: self.has_gradient,
+            is_differentiable: self.can_have_gradient,
             input_indices,
             inputs_on_backprop: self.inputs_on_backprop,
         }))
@@ -233,7 +211,7 @@ impl Tensor {
         TensorBuilder {
             shape: None,
             inputs: Vec::new(),
-            has_gradient: true,
+            can_have_gradient: true,
             persistent_array: None,
             is_placeholder: false,
             input_indices: None,
@@ -241,7 +219,7 @@ impl Tensor {
         }
     }
 
-    /// Evaluates this tensor as a ndarray's array object.
+    /// Evaluates this tensor as an ndarray's array object.
     ///
     /// See [eval](../fn.eval.html).
     pub fn eval<'a, 'b: 'a, 'c: 'a, T>(&self, feeds: T) -> Option<NdArray>
@@ -254,6 +232,7 @@ impl Tensor {
     /// Returns the (symbolic) shape of this tensor.
     ///
     /// See [shape](../ops/fn.shape.html).
+    #[inline]
     pub fn shape(&self) -> Tensor {
         ::ops::shape(self)
     }

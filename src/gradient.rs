@@ -62,14 +62,14 @@ fn has_marked_child(parent: &Tensor, path: &Vec<GradInfo>) -> bool {
 
 // Marks `has_gradient` if each node is on the gradient propagation path.
 //
-// Strategy:
-//   Visit all nodes with depth-first-search starting from `ys`, and record those in `path`.
-//   Mark all nodes between `ys` and `xs` as `has_gradient`.
+// Strategy
+//   1. Record all nodes that are reachable from `ys` into `path`.
+//   2. Mark the path between `ys` and `xs` as `has_gradient`.
 fn mark_gradient_path<'a>(ys: &[&'a Tensor], xs: &[&'a Tensor]) -> Vec<GradInfo<'a>> {
     // Randomly accessible by use of each node's lookup key.
     let mut path: Vec<GradInfo<'a>> = Vec::new();
 
-    // Builds GradInfo while performing DFS.
+    // Builds GradInfo while performing depth-first-search.
     // `has_gradient` properties are filled at the same time.
     let mut dfs_stack: Vec<(&Tensor, bool)> = ys.iter().map(|&y| (y, false)).collect();
     while let Some((node, should_visit)) = dfs_stack.pop() {
@@ -91,7 +91,7 @@ fn mark_gradient_path<'a>(ys: &[&'a Tensor], xs: &[&'a Tensor]) -> Vec<GradInfo<
                     k < path.len() && Rc::ptr_eq(child, path[k].node)
                 };
                 if !visited {
-                    if child.is_source() || !child.has_gradient {
+                    if child.is_source() || !child.is_differentiable {
                         // Add to result, but don't allow any more recursive search
                         child.resource_lookup_key.set(path.len());
                         path.push(GradInfo::new(child, xs.contains(&child), None));
@@ -170,14 +170,14 @@ fn test_gradient_path() {
     }
 }
 
-/// Returns symbolic gradient tensors.
+/// Returns symbolic gradient tensors of `xs`.
 ///
 /// This computes partial derivatives of `ys` with `xs` and returns the
-/// gradients. This is achieved by building the subgraph between `ys` and
+/// gradients. This is achieved by building a subgraph between `ys` and
 /// `xs` in reverse order from user's graph definition.
 /// `known_gys` are already known gradients of `ys`'s outputs.
 ///
-/// NOTE: Nodes that do not have gradient won't be included in the subgraph to avoid
+/// NOTE: Nodes that do not have gradients won't be included in the subgraph to avoid
 /// unnecessary computation.
 pub fn symbolic_gradients(
     ys: &[&Tensor],
@@ -209,7 +209,7 @@ pub fn symbolic_gradients(
         .collect::<BinaryHeap<TensorWrapper>>();
 
     // Backprop.
-    // cf. https://github.com/chainer/chainer/blob/master/chainer/variable.py
+    // c.f. https://github.com/chainer/chainer/blob/master/chainer/variable.py
     while let Some(y) = heap.pop() {
         let xs_ = y.inner.inputs.iter().map(|a| a).collect::<Vec<&Tensor>>();
         let gxs = {

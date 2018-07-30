@@ -22,7 +22,7 @@ pub struct PreprocessBinOpGradGrad;
 
 impl op::Op for PreprocessBinOpGrad {
     fn name(&self) -> &str {
-        "PreprocessBinOpGradGrad"
+        "PreprocessBinOpGrad"
     }
 
     // Computes x's gradient.
@@ -37,7 +37,7 @@ impl op::Op for PreprocessBinOpGrad {
 
         let ret = if x_shape == gy_shape {
             // The case where forward path didn't cause broadcast.
-            Err(::op::ComputeError::Delegate { to: 0 })
+            Err(::op::ComputeException::Delegate { to: 0 })
         } else {
             // Broadcast occurred. We need reduction of `gy`.
             // First, handle the case where x is scalar.
@@ -88,11 +88,11 @@ impl op::Op for PreprocessBinOpGrad {
     }
 }
 
-// Do broadcast.
+// Do broadcast if necessary.
 // Inputs: [gy, target_shape]
 impl op::Op for PreprocessBinOpGradGrad {
     fn name(&self) -> &str {
-        "BinOpGradGradCommon"
+        "PreprocessBinOpGradGrad"
     }
 
     fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
@@ -103,7 +103,7 @@ impl op::Op for PreprocessBinOpGradGrad {
         let target_shape = target_shape_.as_slice();
 
         if gy.shape() == target_shape {
-            return vec![Err(::op::ComputeError::Delegate { to: 0 })];
+            return vec![Err(::op::ComputeException::Delegate { to: 0 })];
         }
 
         let gy_is_scalar = ::ndarray_ext::is_scalar_shape(gy.shape());
@@ -207,10 +207,17 @@ impl op::Op for DivOp {
         let x0 = xs[0];
         let x1 = xs[1];
         let shape0: &[usize] = x0.shape();
-        let ret = if shape0 == &[] {
-            // a is scalar
+        let shape1: &[usize] = x1.shape();
+        let is_scalar0 = shape0 == &[] || shape0 == &[0];
+        let is_scalar1 = shape1 == &[] || shape1 == &[1];
+        let ret = if is_scalar0 {
+            // a is a scalar
             let x0_elem = x0[ndarray::IxDyn(&[])];
             Ok(x1.map(move |a| x0_elem / a))
+        } else if is_scalar1 {
+            // b is a scalar
+            let x1_elem = x1[ndarray::IxDyn(&[])];
+            Ok(x0 * (1. / x1_elem))
         } else {
             Ok(x0 / x1)
         };
@@ -235,7 +242,7 @@ impl op::Op for InplaceAddOp {
         // safe transmute probably
         let x1: &&NdArray = unsafe { mem::transmute(&mut xs[1]) };
         xs[0].zip_mut_with(x1, |a, &b| *a += b);
-        vec![Err(::op::ComputeError::Delegate { to: 0 })]
+        vec![Err(::op::ComputeException::Delegate { to: 0 })]
     }
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
@@ -254,7 +261,7 @@ impl op::Op for InplaceSubOp {
         // safe transmute probably
         let x1: &&NdArray = unsafe { mem::transmute(&mut xs[1]) };
         xs[0].zip_mut_with(x1, |a, &b| *a -= b);
-        vec![Err(::op::ComputeError::Delegate { to: 0 })]
+        vec![Err(::op::ComputeException::Delegate { to: 0 })]
     }
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
@@ -273,7 +280,7 @@ impl op::Op for InplaceMulOp {
         // safe transmute probably
         let x1: &&NdArray = unsafe { mem::transmute(&mut xs[1]) };
         xs[0].zip_mut_with(x1, |a, &b| *a *= b);
-        vec![Err(::op::ComputeError::Delegate { to: 0 })]
+        vec![Err(::op::ComputeException::Delegate { to: 0 })]
     }
 
     fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
@@ -291,7 +298,7 @@ impl op::Op for InplaceDivOp {
         // safe transmute probably
         let x1: &&NdArray = unsafe { mem::transmute(&mut xs[1]) };
         xs[0].zip_mut_with(x1, |a, &b| *a /= b);
-        vec![Err(::op::ComputeError::Delegate { to: 0 })]
+        vec![Err(::op::ComputeException::Delegate { to: 0 })]
     }
 
     fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
@@ -299,7 +306,6 @@ impl op::Op for InplaceDivOp {
     }
 }
 
-#[inline]
 // Reduce gy if broadcast occurred in the forward path.
 fn preprocess_gy(x0: &Tensor, x1: &Tensor, gy: &Tensor) -> (Tensor, Tensor) {
     let shape0 = x0.shape();

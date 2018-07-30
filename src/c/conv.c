@@ -120,8 +120,8 @@ void max_pool_cpu_unbatched(
     }
 }
 
-// TODO: Handle the case where multiple maximum values appear in each window
-// by use of a binary mask. This also requires to fix max_pool_backward_cpu etc.
+// TODO: Use binary mask to handle the case where multiple maximum values appear in each window.
+// This also requires to fix max_pool_backward_cpu etc.
 void max_pool_cpu(
         const float *input,
         const int pad,

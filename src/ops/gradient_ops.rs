@@ -9,7 +9,7 @@ impl op::Op for StopGradient {
     }
 
     fn compute(&self, _: ::runtime::OpComputeContext) -> op::ComputeResult {
-        vec![Err(::op::ComputeError::Delegate { to: 0 })]
+        vec![Err(::op::ComputeException::Delegate { to: 0 })]
     }
 
     fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {

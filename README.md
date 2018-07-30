@@ -3,22 +3,24 @@
 [![Build Status](https://travis-ci.org/raskr/rust-autograd.svg?branch=master)](https://travis-ci.org/raskr/rust-autograd)
 [![](http://meritbadge.herokuapp.com/autograd)](https://crates.io/crates/autograd)
 
-This library provides differentiable operations and tensors.
-The current backend is [rust-ndarray](https://github.com/bluss/rust-ndarray).
+A library which provides differentiable operations and tensors.
 
 ## Features
 
-### Lazy, side-effect-free tensors in Rust
-Tensors themselves don't have the values basically.
-It realizes graphs that are eagerly executable at any timing.
+* **Lazy, side-effect-free tensors.**
+`autograd::Tensor` itself doesn't have its value basically.
+It realizes graphs that are eagerly executable at any timing, 
+that is, it supports both *run-by-define* and *define-by-run* naturally
+in the context of neural networks.
 
-### Gradients using reverse-mode automatic differentiation
-It supports higher-order derivatives.
-Defining your own differentiable operations is not so difficult.
+* **Reverse-mode automatic differentiation.**
+There are a lot of [built-in operations](https://docs.rs/autograd/0.8.0/autograd/ops/index.html)
+that support *higher-order* derivatives, and
+you can [define your own ops](https://docs.rs/autograd/0.8.0/autograd/op/trait.Op.html) with ndarrays easily.
 
-### Runtime
+* **Runtime using ndarray.**
 Graph execution engine is implemented in pure Rust,  
-so compilable to WebAssembly with little or no modifications.
+so it's compilable to WebAssembly with few or no modifications.
 GPUs are not supported for now.
 
 ## Examples

@@ -18,7 +18,7 @@ impl ::op::Op for SGDOp {
             grad * self.lr
         };
         xs[0].zip_mut_with(&updates, |a, &b| *a -= b);
-        vec![Err(::op::ComputeError::NoOutput)]
+        vec![Err(::op::ComputeException::NoOutput)]
     }
 
     fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {

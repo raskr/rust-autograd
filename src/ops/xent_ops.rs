@@ -108,7 +108,7 @@ impl op::Op for SparseSoftmaxCrossEntropy {
             .set_inputs(vec![log_x, t, gy])
             .build(SparseSoftmaxCrossEntropyGrad);
 
-        // gx2 won't be used
+        // gx2 won't be used in most cases.
         let gx2 = {
             let ref x = ops::exp(log_x);
             let sum = ops::reduce_sum(&(x * log_x), &[1], true);
@@ -173,7 +173,7 @@ impl op::Op for SoftmaxCrossEntropy {
         // = -t + x
         let gx1 = (x - t) * gy;
 
-        // gx2 won't be used
+        // gx2 won't be used in most cases
         let gx2 = {
             let sum = ops::reduce_sum(&(x * log_x), &[-1], true);
             gy * (sum - log_x) * output

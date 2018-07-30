@@ -47,7 +47,7 @@ impl ::op::Op for AdamOp {
         // Update t and param
         xs[4][ndarray::IxDyn(&[])] += 1.;
         xs[0].scaled_add(-alpha, &m_hat);
-        vec![Err(::op::ComputeError::NoOutput)]
+        vec![Err(::op::ComputeException::NoOutput)]
     }
 
     fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
@@ -62,7 +62,7 @@ pub struct StatefulVariable<'a> {
 
 /// Adam optimizer
 ///
-/// This implementation is based on http://arxiv.org/abs/1412.6980v8
+/// The implementation is based on http://arxiv.org/abs/1412.6980v8
 pub struct Adam {
     pub alpha: f32,
     pub eps: f32,
@@ -89,7 +89,7 @@ impl Adam {
             .into_iter()
             .map(|var| {
                 // let var = var.as_ref();
-                if let Some(ref var_arr) = var.persistent_array {
+                if let Some(var_arr) = var.get_persistent_array() {
                     match var2state.entry(super::StateKey(var)) {
                         Entry::Vacant(ent) => {
                             let inserted = ent.insert(StatefulParams {

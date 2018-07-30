@@ -72,7 +72,7 @@ impl ::op::Op for Conv2D {
         // Prepare pointers to buffers
         let x = unsafe { slice::from_raw_parts(x.as_ptr(), batch_size * xch * xh * xw) };
 
-        // alloc buffers as necessary
+        // Allocate buffers as necessary
         let c = alloc_uninitialized_buf(batch_size * num_elements_in_batch_c);
         let y = alloc_uninitialized_buf(batch_size * num_elements_in_batch_y);
         let w: &f32 = unsafe { &*w.as_ptr() };
@@ -510,10 +510,10 @@ fn test_conv2d() {
         /*col=*/ 2,
     ]);
 
-    let y = op.compute(::runtime::OpComputeContext {
-        xs: vec![&x, &w],
-        node: &::ops::zeros(&[0]), // dummy (not used)
-    });
+    let y = op.compute(::runtime::OpComputeContext::new(
+        &::ops::zeros(&[0]), // dummy (not used)
+        vec![&x, &w],
+    ));
 
     assert_eq!(
         y[0].as_ref().unwrap().as_slice().unwrap(),

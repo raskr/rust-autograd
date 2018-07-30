@@ -525,15 +525,15 @@ impl op::Op for Atanh {
         "Atanh"
     }
 
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
+        let x = ctx.grab_inputs()[0];
+        vec![Ok(x.map(|a| a.atanh()))]
+    }
+
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         let x = inputs[0];
         let y = ops::reciprocal(&(1 - ops::square(x)));
         vec![Some(y * gy)]
-    }
-
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
-        let x = ctx.grab_inputs()[0];
-        vec![Ok(x.map(|a| a.atanh()))]
     }
 }
 
@@ -542,15 +542,15 @@ impl op::Op for Acosh {
         "Acosh"
     }
 
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
+        let x = ctx.grab_inputs()[0];
+        vec![Ok(x.map(|a| a.acosh()))]
+    }
+
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         let x = inputs[0];
         let y = -1 / ops::sqrt(&(ops::square(x) - 1));
         vec![Some(y * gy)]
-    }
-
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
-        let x = ctx.grab_inputs()[0];
-        vec![Ok(x.map(|a| a.acosh()))]
     }
 }
 
@@ -559,15 +559,15 @@ impl op::Op for Asinh {
         "Asinh"
     }
 
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
+        let x = ctx.grab_inputs()[0];
+        vec![Ok(x.map(|a| a.asinh()))]
+    }
+
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         let x = inputs[0];
         let y = 1 / ops::sqrt(&(x * x + 1));
         vec![Some(y * gy)]
-    }
-
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
-        let x = ctx.grab_inputs()[0];
-        vec![Ok(x.map(|a| a.asinh()))]
     }
 }
 
@@ -591,13 +591,13 @@ impl op::Op for Cosh {
         "Cosh"
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
-        vec![Some(ops::sinh(inputs[0]) * gy)]
-    }
-
     fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let x = ctx.grab_inputs()[0];
         vec![Ok(x.map(|a| a.cosh()))]
+    }
+
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
+        vec![Some(ops::sinh(inputs[0]) * gy)]
     }
 }
 
@@ -606,13 +606,13 @@ impl op::Op for Sinh {
         "Sinh"
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
-        vec![Some(ops::cosh(inputs[0]) * gy)]
-    }
-
     fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let x = ctx.grab_inputs()[0];
         vec![Ok(x.map(|a| a.sinh()))]
+    }
+
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
+        vec![Some(ops::cosh(inputs[0]) * gy)]
     }
 }
 
@@ -621,15 +621,15 @@ impl op::Op for Atan {
         "Atan"
     }
 
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
+        let x = ctx.grab_inputs()[0];
+        vec![Ok(x.map(|a| a.atan()))]
+    }
+
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         let x = inputs[0];
         let y = ops::reciprocal(&(1 + ops::square(x)));
         vec![Some(y * gy)]
-    }
-
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
-        let x = ctx.grab_inputs()[0];
-        vec![Ok(x.map(|a| a.atan()))]
     }
 }
 
@@ -638,15 +638,15 @@ impl op::Op for Acos {
         "Acos"
     }
 
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
+        let x = ctx.grab_inputs()[0];
+        vec![Ok(x.map(|a| a.acos()))]
+    }
+
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         let x = inputs[0];
         let y = -1 / ops::sqrt(&(1 - ops::square(x)));
         vec![Some(y * gy)]
-    }
-
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
-        let x = ctx.grab_inputs()[0];
-        vec![Ok(x.map(|a| a.acos()))]
     }
 }
 
@@ -655,15 +655,15 @@ impl op::Op for Asin {
         "Asin"
     }
 
+    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
+        let x = ctx.grab_inputs()[0];
+        vec![Ok(x.map(|a| a.asin()))]
+    }
+
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         let x = inputs[0];
         let y = 1 / ops::sqrt(&(1 - x * x));
         vec![Some(y * gy)]
-    }
-
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
-        let x = ctx.grab_inputs()[0];
-        vec![Ok(x.map(|a| a.asin()))]
     }
 }
 
@@ -672,13 +672,13 @@ impl op::Op for Sin {
         "Sin"
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
-        vec![Some(ops::cos(inputs[0]) * gy)]
-    }
-
     fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let x = ctx.grab_inputs()[0];
         vec![Ok(x.map(|a| a.sin()))]
+    }
+
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
+        vec![Some(ops::cos(inputs[0]) * gy)]
     }
 }
 
@@ -687,13 +687,13 @@ impl op::Op for Cos {
         "Cos"
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
-        vec![Some(ops::neg(&(ops::sin(inputs[0]) * gy)))]
-    }
-
     fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let x = ctx.grab_inputs()[0];
         vec![Ok(x.map(|a| a.cos()))]
+    }
+
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
+        vec![Some(ops::neg(&(ops::sin(inputs[0]) * gy)))]
     }
 }
 
@@ -702,13 +702,13 @@ impl op::Op for Tan {
         "Tan"
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
-        let ref cos = ops::cos(inputs[0]);
-        vec![Some(gy / (ops::square(cos)))]
-    }
-
     fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let x = ctx.grab_inputs()[0];
         vec![Ok(x.map(|a| a.tan()))]
+    }
+
+    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
+        let ref cos = ops::cos(inputs[0]);
+        vec![Some(gy / (ops::square(cos)))]
     }
 }

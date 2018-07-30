@@ -53,7 +53,7 @@ impl ::op::Op for Conv2DTranspose {
         );
         assert_eq!(
             ych, f_shape[0],
-            "ag::conv2d: Number of input channel ({:?}) must match second filter dim ({:?})",
+            "ag::conv2d: Number of input channels ({:?}) must match second filter dim ({:?})",
             ych, f_shape[0]
         );
 
@@ -69,7 +69,7 @@ impl ::op::Op for Conv2DTranspose {
         let gy = unsafe { slice::from_raw_parts(gy.as_ptr(), gy.len()) };
         let w: &f32 = unsafe { &*w.as_ptr() };
 
-        // Alloc buffers as necessary
+        // Allocate a buffer as necessary
         let col = get_or_insert_cols!(self, batch_size, num_elements_in_batch_col);
         // Col2im buffer must be initialized with zeros
         let gx = vec![0.; batch_size * num_elements_in_batch_gx];
@@ -210,9 +210,8 @@ impl ::op::Op for Conv2DTransposeFilterGrad {
         let x = unsafe { slice::from_raw_parts(x.as_ptr(), x.len()) };
         let gy = unsafe { slice::from_raw_parts(gy.as_ptr(), gy.len()) };
 
-        // Allocate buffer as necessary
+        // Allocate buffers as necessary
         let cols = get_or_insert_cols!(self, batch_size, num_elements_in_batch_c);
-
         let gw = alloc_uninitialized_buf(k_shape[0] * k_shape[1] * k_shape[2] * k_shape[3]);
         let gw_head = unsafe { &*gw.as_ptr() };
 
@@ -366,10 +365,10 @@ fn test_deconv() {
     let w = ::ndarray_ext::ones(&[ych, xch, kh, kw]);
     let g = ::ndarray_ext::ones(&[batch_size, ych, yh, yw]);
 
-    let ret = op.compute(::runtime::OpComputeContext {
-        xs: vec![&g, &w],
-        node: &::ops::zeros(&[0]), // dummy (not used)
-    });
+    let ret = op.compute(::runtime::OpComputeContext::new(
+        &::ops::zeros(&[0]), // dummy (not used)
+        vec![&g, &w],
+    ));
 
     let x = ::ndarray_ext::ones(&[batch_size, xch, xh, xw]);
     assert_eq!(x.shape(), ret[0].as_ref().unwrap().shape());

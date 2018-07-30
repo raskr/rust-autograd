@@ -113,8 +113,8 @@ impl op::Op for ReLU {
 
     fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
         let bin = ops::greater(inputs[0], &ops::scalar(0.));
-        // inplace is ok because second derivative of relu is 0.
-        // (`mul_inplace` returns `None` as input gradient.)
+        // inplace is ok because the second derivative of relu is 0.
+        // (`mul_inplace` returns `None` as an input gradient.)
         vec![Some(ops::mul_inplace(bin, gy))]
     }
 }
@@ -126,7 +126,7 @@ impl op::Op for Identity {
 
     fn compute(&self, _: ::runtime::OpComputeContext) -> op::ComputeResult {
         // do nothing
-        vec![Err(::op::ComputeError::Delegate { to: 0 })]
+        vec![Err(::op::ComputeException::Delegate { to: 0 })]
     }
 
     fn grad(&self, gy: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {

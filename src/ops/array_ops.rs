@@ -111,9 +111,9 @@ impl op::Op for InferBinOpShape {
                 .collect::<Vec<f32>>();
             Ok(NdArray::from_shape_vec(ndarray::IxDyn(&[a_rank]), max).unwrap())
         } else if !a_is_scalar {
-            Err(::op::ComputeError::Delegate { to: 0 })
+            Err(::op::ComputeException::Delegate { to: 0 })
         } else {
-            Err(::op::ComputeError::Delegate { to: 1 })
+            Err(::op::ComputeException::Delegate { to: 1 })
         };
         vec![ret]
     }
@@ -128,14 +128,14 @@ impl op::Op for Shape {
         "Shape"
     }
 
-    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
-        vec![None]
-    }
-
     fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         let x = xs[0];
         vec![Ok(ndarray_ext::shape_of(x))]
+    }
+
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
+        vec![None]
     }
 }
 
@@ -144,14 +144,14 @@ impl op::Op for Rank {
         "Rank"
     }
 
-    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
-        vec![None]
-    }
-
     fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         let x: &NdArray = xs[0];
         vec![Ok(NdArray::from_elem(ndarray::IxDyn(&[]), x.ndim() as f32))]
+    }
+
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
+        vec![None]
     }
 }
 
@@ -160,14 +160,14 @@ impl op::Op for Size {
         "Size"
     }
 
-    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
-        vec![None]
-    }
-
     fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
         let xs = ctx.grab_inputs();
         let x: &NdArray = xs[0];
         vec![Ok(NdArray::from_elem(ndarray::IxDyn(&[]), x.len() as f32))]
+    }
+
+    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
+        vec![None]
     }
 }
 
@@ -425,7 +425,7 @@ impl op::Op for AddN {
         let ret = if 0 == xs.len() {
             unreachable!()
         } else if 1 == xs.len() {
-            Err(::op::ComputeError::Delegate { to: 0 })
+            Err(::op::ComputeException::Delegate { to: 0 })
         } else if 2 == xs.len() {
             Ok(xs[0] + xs[1])
         } else {
@@ -765,7 +765,7 @@ impl op::Op for Squeeze {
                 i as usize
             };
             let axis = axis - adjust;
-            assert_eq!(1, x.shape()[axis], "Can't squeeze the dim whose size != 1");
+            assert_eq!(1, x.shape()[axis], "Can't squeeze a dim whose size != 1");
             // axis making ok
             x = x.remove_axis(ndarray::Axis(axis));
             adjust += 1;

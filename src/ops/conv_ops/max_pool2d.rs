@@ -84,10 +84,10 @@ fn test_max_pool2d() {
         size: 2,
     };
     let x = vec![0., 1., 2., 5., 4., 3., 6., 7., 8.];
-    let y = op.compute(::runtime::OpComputeContext {
-        node: &::zeros(&[0]),
-        xs: vec![&NdArray::from_shape_vec(ndarray::IxDyn(&[1, 1, 3, 3]), x).unwrap()],
-    });
+    let y = op.compute(::runtime::OpComputeContext::new(
+        &::zeros(&[0]),
+        vec![&NdArray::from_shape_vec(ndarray::IxDyn(&[1, 1, 3, 3]), x).unwrap()],
+    ));
     assert_eq!(
         vec![5., 4., 7., 8.],
         y[0].as_ref().unwrap().as_slice().unwrap()
