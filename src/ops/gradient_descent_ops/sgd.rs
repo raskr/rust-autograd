@@ -32,7 +32,7 @@ pub struct SGD {
 }
 
 impl<'a> SGD {
-    fn compute_updates<T: AsRef<Tensor>>(
+    pub fn compute_updates<T: AsRef<Tensor>>(
         &mut self,
         params: &[&'a Tensor],
         grads: &[T],
