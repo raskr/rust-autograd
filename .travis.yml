@@ -8,7 +8,7 @@ addons:
       - gfortran
 
 rust:
-  - "1.26.2"
+  - "1.27.2"
   - stable
   - beta
   - nightly
@@ -23,5 +23,9 @@ install:
 script:
   - cargo test -v
 
+os:
+  - linux
+  - osx
+  
 compiler:
     - clang
