@@ -1,5 +1,6 @@
 #[cfg(feature = "blas")]
 extern crate cblas_sys;
+extern crate intel_mkl_src;
 extern crate libc;
 #[cfg(not(feature = "blas"))]
 extern crate matrixmultiply;
@@ -40,27 +41,164 @@ macro_rules! get_yh {
     };
 }
 
-// Returns: &Vec<f32>
-macro_rules! get_or_insert_cols {
-    ($me:expr, $batch_size:expr, $num_elements_in_batch_c:expr) => {
-        unsafe {
-            let slf: &mut Self = mem::transmute($me);
-            let cols: &Vec<f32> = mem::transmute(slf.cols.get_or_insert_with(|| {
-                alloc_uninitialized_buf($batch_size * $num_elements_in_batch_c)
-            }));
-            cols
-        }
-    };
-}
-
 pub mod conv2d;
 pub mod conv2d_transpose;
 pub mod max_pool2d;
 
+type MklInt = i64;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+enum CblasTranspose {
+    CblasNoTrans = 111,
+    CblasTrans = 112,
+    // CblasConjTrans = 113,
+}
+
+type CblasLayout = usize;
+
+extern "C" {
+    // Batched sgemm from intel MKL
+    fn cblas_sgemm_batch(
+        layout: CblasLayout,
+        transa_array: *const CblasTranspose, // batch of CblasTranspose
+        transb_array: *const CblasTranspose, // batch of CblasTranspose
+        m_array: *const MklInt,              // batch of m
+        n_array: *const MklInt,              // batch of n
+        k_array: *const MklInt,              // batch of k
+        alpha_array: *const libc::c_float,   // batch of alpha
+        a_array: *const *const libc::c_float, // a
+        lda_array: *const MklInt,            // batch of lda
+        b_array: *const *const libc::c_float, // b
+        ldb_array: *const MklInt,            // batch of ldb
+        beta_array: *const libc::c_float,    // batch of beta
+        c_array: *mut *mut libc::c_float,    // c
+        ldc_array: *const MklInt,            // batch of odc
+        group_count: MklInt,                 // batch size
+        group_size: *const MklInt,
+    ); // num of matrices in each batch
+}
+
+#[inline]
+fn cblas_sgemm_batch_wrapper(
+    trans_a: bool,
+    trans_b: bool,
+    m: usize,
+    n: usize,
+    k: usize,
+    alpha: &[f32],
+    a_array: Vec<&f32>,
+    b_array: Vec<&f32>,
+    beta: &[f32],
+    c_array: Vec<&f32>,
+    group_count: usize,
+    size_per_group: usize,
+) {
+    let size_per_group = size_per_group as usize;
+    let lda = if trans_a { m } else { k } as MklInt;
+    let ldb = if trans_b { k } else { n } as MklInt;
+    let ldc = n as MklInt;
+    let trans_a = if trans_a {
+        CblasTranspose::CblasTrans
+    } else {
+        CblasTranspose::CblasNoTrans
+    };
+    let trans_b = if trans_b {
+        CblasTranspose::CblasTrans
+    } else {
+        CblasTranspose::CblasNoTrans
+    };
+    unsafe {
+        const CBLAS_ROW_MAGER: usize = 101;
+        cblas_sgemm_batch(
+            CBLAS_ROW_MAGER,
+            vec![trans_a; group_count].as_slice().as_ptr(),
+            vec![trans_b; group_count].as_slice().as_ptr(),
+            vec![m as MklInt; group_count].as_slice().as_ptr(),
+            vec![n as MklInt; group_count].as_slice().as_ptr(),
+            vec![k as MklInt; group_count].as_slice().as_ptr(),
+            alpha.as_ptr(),
+            mem::transmute(a_array.as_slice().as_ptr()), // safe
+            vec![lda as MklInt; group_count].as_slice().as_ptr(),
+            mem::transmute(b_array.as_slice().as_ptr()), // safe
+            vec![ldb as MklInt; group_count].as_slice().as_ptr(),
+            beta.as_ptr(),
+            mem::transmute(c_array.as_slice().as_ptr()), // ???
+            vec![ldc as MklInt; group_count].as_slice().as_ptr(),
+            group_count as MklInt,
+            vec![size_per_group as MklInt; group_count]
+                .as_slice()
+                .as_ptr(),
+        );
+    }
+}
+
+#[test]
+fn test_sgemm_batch_trans_a() {
+    let batch = 2;
+    let w = vec![0., 1., 2., 3., 4., 5.]; // (2, 3)
+    let x = vec![0., 1., 2., 3., 4., 5., 6., 7.]; // (2, 2, 2)
+    let z = alloc_uninitialized_buf(12); // (2, 2, 2)
+    let m = 3; // row of op(a)
+    let n = 2; // col of op(b)
+    let k = 2; // col of op(a)
+    cblas_sgemm_batch_wrapper(
+        true,
+        false,
+        m,
+        n,
+        k,
+        &[1.],              // alpha
+        vec![&w[0], &w[0]], // a
+        get_region_heads(batch, &x),
+        &[0.], // beta
+        get_region_heads(batch, &z),
+        1,
+        batch,
+    );
+    assert_eq!(
+        z,
+        vec![6., 9., 8., 13., 10., 17., 18., 21., 28., 33., 38., 45.]
+    );
+}
+
+#[test]
+fn test_sgemm_batch() {
+    let batch = 2;
+    let x = vec![0., 1., 2., 3.]; // (2, 2)
+    let y = vec![0., 1., 2., 3., 4., 5., 6., 7.]; // (2, 2, 2)
+    let z = alloc_uninitialized_buf(8); // (2, 2, 2)
+
+    cblas_sgemm_batch_wrapper(
+        false,
+        false,
+        2,                  // m
+        2,                  // n
+        2,                  // k
+        &[1.],              // alpha
+        vec![&x[0], &x[0]], // a
+        get_region_heads(batch, &y),
+        &[0.], // beta
+        get_region_heads(batch, &z),
+        1,
+        batch,
+    );
+    assert_eq!(z, vec![2., 3., 6., 11., 6., 7., 26., 31.]);
+}
+
+#[inline]
+fn get_region_heads<'a>(size: usize, slice: &'a [f32]) -> Vec<&'a f32> {
+    let size_per_batch = slice.len() / size;
+    let mut ret = Vec::with_capacity(size_per_batch);
+    for i in 0..size {
+        ret.push(&slice[i * size_per_batch]);
+    }
+    ret
+}
+
 #[link(name = "conv")]
 #[no_mangle]
 extern "C" {
-    #[inline]
     fn im2col_cpu(
         data_im: *const c_float,
         channels: c_int,
@@ -77,7 +215,6 @@ extern "C" {
         data_col: *const c_float,
     );
 
-    #[inline]
     fn col2im_cpu(
         data_col: *const c_float,
         channels: c_int,
@@ -94,7 +231,6 @@ extern "C" {
         data_im: *const c_float,
     );
 
-    #[inline]
     fn max_pool_cpu_unbatched(
         input: *const c_float,
         pad: c_int,
@@ -356,65 +492,30 @@ fn sgemm(
     alpha: f32,
     beta: f32,
 ) {
-    #[cfg(feature = "blas")]
-    {
-        let m = m as i32;
-        let n = n as i32;
-        let k = k as i32;
-        unsafe {
-            cblas_sys::cblas_sgemm(
-                cblas_sys::CBLAS_LAYOUT::CblasRowMajor,
-                if trans_a {
-                    cblas_sys::CBLAS_TRANSPOSE::CblasTrans
-                } else {
-                    cblas_sys::CBLAS_TRANSPOSE::CblasNoTrans
-                },
-                if trans_b {
-                    cblas_sys::CBLAS_TRANSPOSE::CblasTrans
-                } else {
-                    cblas_sys::CBLAS_TRANSPOSE::CblasNoTrans
-                },
-                m,
-                n,
-                k,
-                alpha,
-                a as *const f32,
-                if trans_a { m } else { k }, // lda
-                b as *const f32,
-                if trans_b { k } else { n }, // ldb
-                beta,
-                mem::transmute::<&f32, *mut f32>(c),
-                n, // ldc
-            );
-        }
-    }
-    #[cfg(not(feature = "blas"))]
-    {
-        let rsa = if trans_a { 1 } else { k };
-        let csa = if trans_a { m } else { 1 };
-        let rsb = if trans_b { 1 } else { n };
-        let csb = if trans_b { k } else { 1 };
-        let rsc = n;
-        let csc = 1;
-        unsafe {
-            let c: *mut f32 = mem::transmute(c);
-            matrixmultiply::sgemm(
-                m,
-                k,
-                n,
-                alpha,
-                a as *const f32,
-                rsa as isize,
-                csa as isize,
-                b as *const f32,
-                rsb as isize,
-                csb as isize,
-                beta,
-                c as *mut f32,
-                rsc as isize,
-                csc as isize,
-            )
-        }
+    let rsa = if trans_a { 1 } else { k };
+    let csa = if trans_a { m } else { 1 };
+    let rsb = if trans_b { 1 } else { n };
+    let csb = if trans_b { k } else { 1 };
+    let rsc = n;
+    let csc = 1;
+    unsafe {
+        let c: *mut f32 = mem::transmute(c);
+        matrixmultiply::sgemm(
+            m,
+            k,
+            n,
+            alpha,
+            a as *const f32,
+            rsa as isize,
+            csa as isize,
+            b as *const f32,
+            rsb as isize,
+            csb as isize,
+            beta,
+            c as *mut f32,
+            rsc as isize,
+            csc as isize,
+        )
     }
 }
 

@@ -13,17 +13,18 @@ documentation = "https://docs.rs/autograd/"
 [dependencies]
 rand = "0.3.15"
 ndarray = { version = "0.10.11" }
-cblas-sys = { version = "0.1.4", optional = false, default-features = true }
-blas-src = { version = "0.2.0", default-features = true, features = ["openblas"] }
-#openblas-src = { version = "0.6.0", default-features = true, features = ["cblas", "system"] }
 glob = "0.2"
 rayon = "1.0"
 libc = "0.2"
-openblas-src = "0.6.0"
-matrixmultiply = { version = "0.1.14" }
+matrixmultiply = "0.1.14"
+intel-mkl-src = { version="0.2.5", optional = true, default-features = true }
 
 [build-dependencies]
 cc = "1.0"
+
+[features]
+mkl = ["intel-mkl-src"]
+default = ["mkl"]
 
 [lib]
 name = "autograd"

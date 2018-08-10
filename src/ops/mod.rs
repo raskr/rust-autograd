@@ -2025,7 +2025,6 @@ where
             pad,
             stride,
             dilation: 1,
-            cols: None,
         })
 }
 
@@ -2058,7 +2057,6 @@ where
             pad,
             stride,
             dilation: dilate,
-            cols: None,
         })
 }
 

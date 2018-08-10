@@ -5,7 +5,7 @@ extern crate ndarray;
 use std::time::Instant;
 
 // This is a toy convolutional network for MNIST.
-// Got 0.983 test accuracy in 500 sec on 2.7GHz Intel Core i5 (blas feature is disabled)
+// Got 0.983 test accuracy in 400 sec on 2.7GHz Intel Core i5 (blas feature is disabled)
 //
 // First, run "./download_mnist.sh" beforehand if you don't have dataset and then run
 // "cargo run --example cnn_mnist --release" in `examples` directory.

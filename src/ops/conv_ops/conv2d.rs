@@ -25,7 +25,6 @@ impl ::op::Op for Conv2D {
         "Conv2D"
     }
 
-    #[allow(mutable_transmutes)]
     fn compute(&self, ctx: ::runtime::OpComputeContext) -> ::op::ComputeResult {
         // Grab inputs
         let xs = ctx.grab_inputs();
@@ -61,23 +60,22 @@ impl ::op::Op for Conv2D {
         let yh = get_yh!(self, xh, kh);
         let yw = get_yw!(self, xw, kw);
 
-        // Parameters for sgemm
         let num_elements_in_batch_x = xch * xh * xw;
         let num_elements_in_batch_y = ych * yh * yw;
         let num_elements_in_batch_c = xch * kw * kh * yh * yw;
+
+        // Parameters for sgemm
         let m = ych;
         let n = yh * yw;
         let k = xch * kh * kw;
 
         // Prepare pointers to buffers
         let x = unsafe { slice::from_raw_parts(x.as_ptr(), batch_size * xch * xh * xw) };
-
-        // Allocate buffers as necessary
         let c = alloc_uninitialized_buf(batch_size * num_elements_in_batch_c);
         let y = alloc_uninitialized_buf(batch_size * num_elements_in_batch_y);
         let w: &f32 = unsafe { &*w.as_ptr() };
 
-        #[cfg(feature = "blas")]
+        #[cfg(feature = "mkl")]
         {
             (0..batch_size).into_par_iter().for_each(|i| {
                 // for each batch
@@ -99,25 +97,24 @@ impl ::op::Op for Conv2D {
                     c_region_head,
                 );
             });
-            for i in 0..batch_size {
-                let c_region_head = &c[i * num_elements_in_batch_c];
-                let y_region_head = &y[i * num_elements_in_batch_y];
-                sgemm(
-                    false,
-                    false,
-                    w,
-                    c_region_head,
-                    y_region_head,
-                    m,
-                    n,
-                    k,
-                    1.,
-                    0.,
-                );
-            }
+            cblas_sgemm_batch_wrapper(
+                false,
+                false,
+                m,
+                n,
+                k,
+                &[1.],
+                vec![w; batch_size],
+                get_region_heads(batch_size, c.as_slice()),
+                &[0.],
+                get_region_heads(batch_size, y.as_slice()),
+                1,
+                batch_size,
+            );
         }
-        #[cfg(not(feature = "blas"))]
+        #[cfg(not(feature = "mkl"))]
         {
+            // fallback: parallel im2col + sgemm using rayon
             (0..batch_size).into_par_iter().for_each(|i| {
                 // for each batch
                 let x_region_head = &x[i * num_elements_in_batch_x];
@@ -170,7 +167,6 @@ impl ::op::Op for Conv2D {
                 pad: self.pad,
                 stride: self.stride,
                 dilation: self.dilation,
-                cols: None,
             },
         );
 
@@ -209,8 +205,6 @@ impl ::op::Op for Conv2DWithCols {
 
         // Parameters for sgemm
         let num_elements_in_batch_y = ych * yh * yw;
-        let num_elements_in_batch_c =
-            { cols_shape[1] * cols_shape[2] * cols_shape[3] * cols_shape[4] * cols_shape[5] };
         let m = ych;
         let n = yh * yw;
         let k = xch * kh * kw;
@@ -220,28 +214,28 @@ impl ::op::Op for Conv2DWithCols {
         let y = alloc_uninitialized_buf(batch_size * num_elements_in_batch_y);
         let w: &f32 = unsafe { &*w.as_ptr() };
 
-        #[cfg(feature = "blas")]
+        #[cfg(feature = "mkl")]
         {
-            for i in 0..batch_size {
-                // for each batch
-                let c_region_head = &c[i * num_elements_in_batch_c];
-                let y_region_head = &y[i * num_elements_in_batch_y];
-                sgemm(
-                    false,
-                    false,
-                    w,
-                    c_region_head,
-                    y_region_head,
-                    m,
-                    n,
-                    k,
-                    1.,
-                    0.,
-                );
-            }
+            cblas_sgemm_batch_wrapper(
+                false,
+                false,
+                m,
+                n,
+                k,
+                &[1.],
+                vec![w; batch_size],
+                get_region_heads(batch_size, c),
+                &[0.],
+                get_region_heads(batch_size, y.as_slice()),
+                1,
+                batch_size,
+            );
         }
-        #[cfg(not(feature = "blas"))]
+        #[cfg(not(feature = "mkl"))]
         {
+            let num_elements_in_batch_c =
+                { cols_shape[1] * cols_shape[2] * cols_shape[3] * cols_shape[4] * cols_shape[5] };
+            // fallback: parallel sgemm using rayon
             (0..batch_size).into_par_iter().for_each(|i| {
                 // for each batch
                 let c_region_head = &c[i * num_elements_in_batch_c];
@@ -275,7 +269,6 @@ impl ::op::Op for Conv2DWithCols {
                 pad: self.pad,
                 stride: self.stride,
                 dilation: self.dilation,
-                cols: None,
             },
         );
 
@@ -337,7 +330,7 @@ impl ::op::Op for Conv2DFilterGrad {
                 n,
                 k,
                 1.,
-                (i != 0) as i32 as f32,
+                (i != 0) as i32 as f32, // beta: if i==0 then 0 else 1
             );
         }
         vec![Ok(NdArray::from_shape_vec(k_shape, gw).unwrap())]
@@ -353,7 +346,6 @@ impl ::op::Op for Conv2DFilterGrad {
                 pad: self.pad,
                 stride: self.stride,
                 dilation: self.dilation,
-                cols: None,
             },
         );
 

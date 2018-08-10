@@ -4,14 +4,12 @@ pub struct Conv2DTranspose {
     pub pad: usize,
     pub stride: usize,
     pub dilation: usize,
-    pub cols: Option<Vec<f32>>,
 }
 
 pub struct Conv2DTransposeFilterGrad {
     pub pad: usize,
     pub stride: usize,
     pub dilation: usize,
-    pub cols: Option<Vec<f32>>,
 }
 
 impl ::op::Op for Conv2DTranspose {
@@ -19,7 +17,6 @@ impl ::op::Op for Conv2DTranspose {
         "Conv2DTranspose"
     }
 
-    #[allow(mutable_transmutes)]
     fn compute(&self, ctx: ::runtime::OpComputeContext) -> ::op::ComputeResult {
         let xs = ctx.grab_inputs();
 
@@ -57,41 +54,37 @@ impl ::op::Op for Conv2DTranspose {
             ych, f_shape[0]
         );
 
+        // sgemm params
         let k = ych;
         let n = yh * yw;
         let m = kh * kw * xch;
 
-        let num_elements_in_batch_gy = ych * yh * yw;
         let num_elements_in_batch_gx = xch * xh * xw;
         let num_elements_in_batch_col = xch * kh * kw * yh * yw;
 
-        // Targets of gemm
         let gy = unsafe { slice::from_raw_parts(gy.as_ptr(), gy.len()) };
         let w: &f32 = unsafe { &*w.as_ptr() };
-
-        // Allocate a buffer as necessary
-        let col = get_or_insert_cols!(self, batch_size, num_elements_in_batch_col);
+        let col = alloc_uninitialized_buf(batch_size * num_elements_in_batch_col);
         // Col2im buffer must be initialized with zeros
         let gx = vec![0.; batch_size * num_elements_in_batch_gx];
 
-        #[cfg(feature = "blas")]
+        #[cfg(feature = "mkl")]
         {
-            for i in 0..batch_size {
-                let gy_region_head = &gy[i * num_elements_in_batch_gy];
-                let col_region_head = &col[i * num_elements_in_batch_col];
-                sgemm(
-                    true,
-                    false,
-                    w,
-                    gy_region_head,
-                    col_region_head,
-                    m,
-                    n,
-                    k,
-                    1.,
-                    0.,
-                );
-            }
+            cblas_sgemm_batch_wrapper(
+                true,
+                false,
+                m,
+                n,
+                k,
+                &[1.],
+                vec![w; batch_size],
+                get_region_heads(batch_size, gy),
+                &[0.],
+                get_region_heads(batch_size, col.as_slice()),
+                1,
+                batch_size,
+            );
+
             (0..batch_size).into_par_iter().for_each(|i| {
                 // for each mini-batch
                 let col_region_head = &col[i * num_elements_in_batch_col];
@@ -113,8 +106,10 @@ impl ::op::Op for Conv2DTranspose {
                 );
             });
         }
-        #[cfg(not(feature = "blas"))]
+        #[cfg(not(feature = "mkl"))]
         {
+            let num_elements_in_batch_gy = ych * yh * yw;
+            // fallback: parallel sgemm + col2im using rayon
             (0..batch_size).into_par_iter().for_each(|i| {
                 // for each mini-batch
                 let gy_region_head = &gy[i * num_elements_in_batch_gy];
@@ -172,7 +167,6 @@ impl ::op::Op for Conv2DTranspose {
                 pad: self.pad,
                 stride: self.stride,
                 dilation: self.dilation,
-                cols: None,
             });
 
         vec![Some(gx), Some(gw)]
@@ -184,7 +178,6 @@ impl ::op::Op for Conv2DTransposeFilterGrad {
         "Conv2DTransposeFilterGrad"
     }
 
-    #[allow(mutable_transmutes)]
     fn compute(&self, ctx: ::runtime::OpComputeContext) -> ::op::ComputeResult {
         let xs = ctx.grab_inputs();
         let gy = xs[0];
@@ -203,15 +196,14 @@ impl ::op::Op for Conv2DTransposeFilterGrad {
         };
         let num_elements_in_batch_x = x_shape[1] * x_shape[2] * x_shape[3];
 
+        // sgemm params
         let m = x_shape[1];
         let n = kh * kw * gy_shape[1];
         let k = get_yh!(self, gy_shape[2], kh) * get_yw!(self, gy_shape[3], kw);
 
         let x = unsafe { slice::from_raw_parts(x.as_ptr(), x.len()) };
         let gy = unsafe { slice::from_raw_parts(gy.as_ptr(), gy.len()) };
-
-        // Allocate buffers as necessary
-        let cols = get_or_insert_cols!(self, batch_size, num_elements_in_batch_c);
+        let cols = alloc_uninitialized_buf(batch_size * num_elements_in_batch_c);
         let gw = alloc_uninitialized_buf(k_shape[0] * k_shape[1] * k_shape[2] * k_shape[3]);
         let gw_head = unsafe { &*gw.as_ptr() };
 
@@ -265,7 +257,6 @@ impl ::op::Op for Conv2DTransposeFilterGrad {
                 pad: self.pad,
                 stride: self.stride,
                 dilation: self.dilation,
-                cols: None,
             });
 
         let ggx = Tensor::builder()
@@ -286,7 +277,6 @@ fn test_tensor_size_after_convolution_t() {
         pad: 0,
         stride: 1,
         dilation: 1,
-        cols: None,
     };
     let (yh, yw) = (2, 2);
     let (kh, kw) = (2, 2);
@@ -303,7 +293,6 @@ fn test_parallel_col2im() {
         pad: 0,
         stride: 1,
         dilation: 1,
-        cols: None,
     };
     let xch = 3;
     let (yh, yw) = (2, 2);
@@ -354,7 +343,6 @@ fn test_deconv() {
         pad: 0,
         stride: 1,
         dilation: 1,
-        cols: None,
     };
     let (kh, kw) = (2, 2);
     let (xch, ych) = (3, 2);
