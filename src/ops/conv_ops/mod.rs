@@ -1,12 +1,9 @@
-#[cfg(feature = "blas")]
-extern crate cblas_sys;
+#[cfg(feature = "mkl")]
 extern crate intel_mkl_src;
 extern crate libc;
-#[cfg(not(feature = "blas"))]
+#[cfg(not(feature = "mkl"))]
 extern crate matrixmultiply;
 extern crate ndarray;
-#[cfg(feature = "blas")]
-extern crate openblas_src;
 extern crate rayon;
 use self::libc::{c_float, c_int};
 #[allow(unused_imports)]
