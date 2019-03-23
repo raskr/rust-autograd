@@ -284,7 +284,7 @@ where
 /// ```
 /// extern crate autograd as ag;
 ///
-/// let ref x = ag::zeros::<f32, [usize; 2]>(&[2, 3]);
+/// let ref x: ag::Tensor<f32> = ag::zeros(&[2, 3]);
 /// let ref s = ag::shape(x);
 ///
 /// assert_eq!(&[2., 3.], s.eval(&[]).unwrap().as_slice().unwrap());
@@ -306,7 +306,7 @@ pub fn shape<T: Float, A: AsRef<Tensor<T>>>(x: A) -> Tensor<T> {
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::zeros::<f32, [usize; 2]>(&[4, 3]);
+/// let ref a: ag::Tensor<f32> = ag::zeros(&[4, 3]);
 /// let ref b = ag::size(a);
 ///
 /// assert_eq!(12., b.eval(&[]).unwrap()[ndarray::IxDyn(&[])]);
@@ -324,7 +324,7 @@ pub fn size<T: Float, A: AsRef<Tensor<T>>>(x: A) -> Tensor<T> {
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref x = ag::zeros::<f32, [usize; 3]>(&[2, 3, 4]);
+/// let ref x: ag::Tensor<f32> = ag::zeros(&[2, 3, 4]);
 /// let ref r = ag::rank(x);
 ///
 /// assert_eq!(3., r.eval(&[]).unwrap()[ndarray::IxDyn(&[])]);
@@ -488,8 +488,8 @@ fn bin_op_helper<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>, O: ::op::Op
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::ones::<f32, [usize; 1]>(&[2]);
-/// let ref b = ag::ones::<f32, [usize; 1]>(&[2]);
+/// let ref a = ag::ones(&[2]);
+/// let ref b = ag::ones(&[2]);
 /// let ref z: ag::Tensor<f32> = a + b;
 /// assert_eq!(z.eval(&[]), Some(ndarray::arr1(&[2., 2.]).into_dyn()));
 /// ```
@@ -505,8 +505,8 @@ pub fn add<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>>(a: A, b: B) -> Te
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::ones::<f32, [usize; 1]>(&[2]);
-/// let ref b = ag::ones::<f32, [usize; 1]>(&[2]);
+/// let ref a = ag::ones(&[2]);
+/// let ref b = ag::ones(&[2]);
 ///
 /// let ref z: ag::Tensor<f32> = a - b;
 /// assert_eq!(z.eval(&[]), Some(ndarray::arr1(&[0., 0.]).into_dyn()));
@@ -524,8 +524,8 @@ pub fn sub<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>>(a: A, b: B) -> Te
 /// extern crate autograd as ag;
 ///
 ///
-/// let ref a = ag::ones::<f32, [usize; 1]>(&[2]);
-/// let ref b = ag::ones::<f32, [usize; 1]>(&[2]);
+/// let ref a = ag::ones(&[2]);
+/// let ref b = ag::ones(&[2]);
 /// let ref z: ag::Tensor<f32> = a * b;
 /// assert_eq!(z.eval(&[]), Some(ndarray::arr1(&[1., 1.]).into_dyn()));
 /// ```
@@ -541,8 +541,8 @@ pub fn mul<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>>(a: A, b: B) -> Te
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::ones::<f32, [usize; 1]>(&[2]);
-/// let ref b = ag::ones::<f32, [usize; 1]>(&[2]);
+/// let ref a = ag::ones(&[2]);
+/// let ref b = ag::ones(&[2]);
 /// let ref z: ag::Tensor<f32> = a / b;
 /// assert_eq!(z.eval(&[]), Some(ndarray::arr1(&[1., 1.]).into_dyn()));
 /// ```
@@ -563,8 +563,8 @@ pub fn div<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>>(a: A, b: B) -> Te
 /// extern crate autograd as ag;
 ///
 ///
-/// let a = ag::ones::<f32, [usize; 1]>(&[2]);
-/// let ref b = ag::zeros::<f32, [usize; 1]>(&[2]);
+/// let a = ag::ones(&[2]);
+/// let ref b: ag::Tensor<f32> = ag::zeros(&[2]);
 /// let ref c = ag::mul_inplace(a, b);
 ///
 /// assert_eq!(c.eval(&[]), Some(ndarray::arr1(&[0., 0.]).into_dyn()));
@@ -589,7 +589,7 @@ pub fn mul_inplace<T: Float, A: AsRef<Tensor<T>>>(a: Tensor<T>, b: A) -> Tensor<
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let a = ag::ones::<f32, [usize; 1]>(&[2]);
+/// let a = ag::ones(&[2]);
 /// let ref c = ag::div_inplace(a, &ag::scalar(2.));
 ///
 /// assert_eq!(c.eval(&[]), Some(ndarray::arr1(&[0.5, 0.5]).into_dyn()));
@@ -614,8 +614,8 @@ pub fn div_inplace<T: Float, A: AsRef<Tensor<T>>>(a: Tensor<T>, b: A) -> Tensor<
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let a = ag::ones::<f32, [usize; 1]>(&[2]);
-/// let ref b = ag::ones::<f32, [usize; 1]>(&[2]);
+/// let a = ag::ones(&[2]);
+/// let ref b = ag::ones(&[2]);
 /// let ref c = ag::add_inplace(a, b);
 ///
 /// assert_eq!(c.eval(&[]), Some(ndarray::arr1(&[2., 2.]).into_dyn()));
@@ -640,8 +640,8 @@ pub fn add_inplace<T: Float, A: AsRef<Tensor<T>>>(a: Tensor<T>, b: A) -> Tensor<
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let a = ag::ones::<f32, [usize; 2]>(&[2, 2]);
-/// let ref b = ag::ones::<f32, [usize; 2]>(&[2, 2]);
+/// let a = ag::ones(&[2, 2]);
+/// let ref b = ag::ones(&[2, 2]);
 /// let ref c = ag::sub_inplace(a, b);
 ///
 /// assert_eq!(c.eval(&[]), Some(ndarray::arr2(&[[0., 0.], [0., 0.]]).into_dyn()));
@@ -727,9 +727,9 @@ pub fn minimum<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>>(a: A, b: B) -
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::ones::<f32, [usize; 2]>(&[2, 2]);
-/// let ref b = ag::ones::<f32, [usize; 2]>(&[2, 2]);
-/// let ref c = ag::ones::<f32, [usize; 2]>(&[2, 2]);
+/// let ref a = ag::ones(&[2, 2]);
+/// let ref b = ag::ones(&[2, 2]);
+/// let ref c = ag::ones(&[2, 2]);
 /// let ref d = ag::add_n(&[a, b, c]);
 ///
 /// assert_eq!(d.eval(&[]).as_ref().unwrap().shape(), &[2, 2]);
@@ -819,7 +819,7 @@ pub fn argmax<T: Float, A: AsRef<Tensor<T>>>(x: A, axis: isize, keep_dim: bool) 
 /// ```
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::zeros::<f32, [usize; 1]>(&[3]);
+/// let ref a: ag::Tensor<f32> = ag::zeros(&[3]);
 /// let ref b = ag::expand_dims(a, &[0, 2]);
 ///
 /// assert_eq!(b.eval(&[]).unwrap().shape(), &[1, 3, 1]);
@@ -837,7 +837,7 @@ pub fn expand_dims<T: Float, A: AsRef<Tensor<T>>, AL: ArrayLike<T>>(x: A, axes: 
 /// ```
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::zeros::<f32, [usize; 3]>(&[1, 3, 1]);
+/// let ref a: ag::Tensor<f32> = ag::zeros(&[1, 3, 1]);
 /// let ref b = ag::squeeze(a, &[0, 2]);
 ///
 /// assert_eq!(b.eval(&[]).unwrap().shape(), &[3]);
@@ -1030,7 +1030,7 @@ pub fn reduce_prod<AL: ArrayLike<T>, T: Float, A: AsRef<Tensor<T>>>(
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref x = ag::zeros::<f32, [usize; 3]>(&[3, 2, 2]);
+/// let ref x: ag::Tensor<f32> = ag::zeros(&[3, 2, 2]);
 /// let ref y = ag::reshape(&x, &[3, -1]);
 ///
 /// assert_eq!(y.eval(&[]), Some(ag::ndarray_ext::zeros::<f32>(&[3, 4])));
@@ -1046,7 +1046,7 @@ pub fn reshape<AL: ArrayLike<T>, T: Float, A: AsRef<Tensor<T>>>(x: A, shape: &AL
 /// ```
 /// extern crate autograd as ag;
 ///
-/// let ref x = ag::zeros::<f32, [usize; 3]>(&[3, 2, 2]);
+/// let ref x: ag::Tensor<f32> = ag::zeros(&[3, 2, 2]);
 /// let ref z = ag::flatten(x);
 /// assert_eq!(z.eval(&[]).unwrap().shape(), &[12]);
 /// ```
@@ -1389,8 +1389,8 @@ pub fn sparse_softmax_cross_entropy<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tens
 /// ```
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::zeros::<f32, [usize; 2]>(&[4, 2]);
-/// let ref b = ag::zeros::<f32, [usize; 2]>(&[2, 3]);
+/// let ref a: ag::Tensor<f32> = ag::zeros(&[4, 2]);
+/// let ref b: ag::Tensor<f32> = ag::zeros(&[2, 3]);
 /// let ref c = ag::matmul(a, b);
 ///
 /// assert_eq!(c.eval(&[]).unwrap().shape(), &[4, 3]);
@@ -1415,8 +1415,8 @@ pub fn matmul<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>>(a: A, b: B) ->
 /// ```
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::zeros::<f32, [usize; 2]>(&[2, 4]);
-/// let ref b = ag::zeros::<f32, [usize; 2]>(&[2, 3]);
+/// let ref a: ag::Tensor<f32> = ag::zeros(&[2, 4]);
+/// let ref b: ag::Tensor<f32> = ag::zeros(&[2, 3]);
 /// let ref c = ag::matmul_t(a, b, true, false);
 ///
 /// assert_eq!(c.eval(&[]).unwrap().shape(), &[4, 3]);
@@ -1452,8 +1452,8 @@ pub fn matmul_t<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>>(
 /// extern crate autograd as ag;
 ///
 ///
-/// let ref a = ag::zeros::<f32, [usize; 3]>(&[3, 4, 5]);
-/// let ref b = ag::zeros::<f32, [usize; 3]>(&[4, 3, 2]);
+/// let ref a: ag::Tensor<f32> = ag::zeros(&[3, 4, 5]);
+/// let ref b: ag::Tensor<f32> = ag::zeros(&[4, 3, 2]);
 /// let ref c = ag::tensordot(a, b, &[1, 0], &[0, 1]);
 /// assert_eq!(c.eval(&[]).unwrap().shape(), &[5, 2]);
 /// ```
@@ -1482,7 +1482,7 @@ where
         let ref x_shape = x.shape();
         let ref x_rank = x.rank();
         let ref axes = normalize_negative_axes(&axes.as_tensor(), x_rank);
-        let ref free = setdiff1d(&range(&scalar(T::zero()), x_rank, &scalar(T::one())), axes);
+        let ref free = setdiff1d(&_range(&scalar(T::zero()), x_rank, &scalar(T::one())), axes);
 
         let free_dims = gather(x_shape, free, 0);
         let ref axes_dims = gather(x_shape, axes, 0);
@@ -1521,8 +1521,8 @@ where
 /// ```
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::zeros::<f32, [usize; 4]>(&[2, 3, 4, 2]);
-/// let ref b = ag::zeros::<f32, [usize; 4]>(&[2, 3, 2, 3]);
+/// let ref a: ag::Tensor<f32> = ag::zeros(&[2, 3, 4, 2]);
+/// let ref b: ag::Tensor<f32> = ag::zeros(&[2, 3, 2, 3]);
 /// let ref c = ag::batch_matmul(a, b);
 ///
 /// assert_eq!(c.eval(&[]).unwrap().shape(), &[2, 3, 4, 3]);
@@ -1571,7 +1571,7 @@ pub fn setdiff1d<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>>(a: A, b: B)
 /// ```
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::zeros::<f32, [usize; 5]>(&[1, 2, 3, 4, 5]);
+/// let ref a: ag::Tensor<f32> = ag::zeros(&[1, 2, 3, 4, 5]);
 /// let ref b = ag::transpose(a, &[4, 2, 3, 0, 1]);
 ///
 /// assert_eq!(b.eval(&[]).unwrap().shape(), &[5, 3, 4, 1, 2]);
@@ -1593,7 +1593,7 @@ pub fn transpose<AL: ArrayLike<T>, T: Float, A: AsRef<Tensor<T>>>(x: A, perm: &A
 /// ```
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::zeros::<f32, [usize; 3]>(&[3, 7, 5]);
+/// let ref a: ag::Tensor<f32> = ag::zeros(&[3, 7, 5]);
 /// let ref b = ag::split(a, &[2, 3, 2], 1);
 ///
 /// let evaluated = ag::eval(&[&b[0], &b[1], &b[2]], &[]);
@@ -1629,7 +1629,7 @@ pub fn split<T: Float, A: AsRef<Tensor<T>>>(x: A, sizes: &[usize], axis: isize) 
 /// ```
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::zeros::<f32, [usize; 2]>(&[4, 4]);
+/// let ref a: ag::Tensor<f32> = ag::zeros(&[4, 4]);
 /// let ref b = ag::slice(a, &[0, 0], &[-1, 2]); // numpy equivalent is a[:, 0:2]
 ///
 /// assert_eq!(b.eval(&[]).unwrap().shape(), &[4, 2]);
@@ -1656,9 +1656,9 @@ pub fn slice<T: Float, A: AsRef<Tensor<T>>>(x: A, starts: &[isize], ends: &[isiz
 /// ```
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::zeros::<f32, [usize; 2]>(&[3, 2]);
-/// let ref b = ag::zeros::<f32, [usize; 2]>(&[3, 2]);
-/// let ref c = ag::zeros::<f32, [usize; 2]>(&[3, 2]);
+/// let ref a: ag::Tensor<f32> = ag::zeros(&[3, 2]);
+/// let ref b: ag::Tensor<f32> = ag::zeros(&[3, 2]);
+/// let ref c: ag::Tensor<f32> = ag::zeros(&[3, 2]);
 /// let ref d = ag::concat(&[a, b, c], 0);
 ///
 /// assert_eq!(d.eval(&[]).unwrap().shape(), &[9, 2]);
@@ -1741,7 +1741,7 @@ where
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref x = ag::standard_normal::<f32, [usize; 2]>(&[3, 4]);
+/// let ref x: ag::Tensor<f32> = ag::standard_normal(&[3, 4]);
 /// let ref y1 = ag::normalize(x, &[0]);
 /// let ref y2 = ag::normalize(x, &[0]);
 ///
@@ -1771,7 +1771,7 @@ pub fn normalize<AL: ArrayLike<T>, T: Float, A: AsRef<Tensor<T>>>(x: A, axes: &A
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref x = ag::standard_normal::<f32, [usize; 2]>(&[3, 4]);
+/// let ref x = ag::standard_normal(&[3, 4]);
 /// let ref scale = ag::variable(ag::ndarray_ext::ones::<f32>(&[1, 4]));
 /// let ref shift = ag::variable(ag::ndarray_ext::zeros::<f32>(&[1, 4]));
 /// let ref norm = ag::batch_norm(x, scale, shift);
@@ -1987,7 +1987,7 @@ where
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let a = ag::zeros::<f32, [usize; 2]>(&[4, 2]);
+/// let a: ag::Tensor<f32> = ag::zeros(&[4, 2]);
 /// assert_eq!(a.eval(&[]), Some(ndarray::Array2::<f32>::zeros((4, 2)).into_dyn()));
 /// ```
 pub fn zeros<T: Float, AL: ArrayLike<T>>(shape: &AL) -> Tensor<T> {
@@ -2002,7 +2002,7 @@ pub fn zeros<T: Float, AL: ArrayLike<T>>(shape: &AL) -> Tensor<T> {
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let a = ag::ones::<f32, [usize; 2]>(&[4, 2]);
+/// let a = ag::ones(&[4, 2]);
 /// assert_eq!(a.eval(&[]), Some(ndarray::Array2::<f32>::from_elem((4, 2), 1.).into_dyn()));
 /// ```
 pub fn ones<T: Float, AL: ArrayLike<T>>(shape: &AL) -> Tensor<T> {
@@ -2017,14 +2017,24 @@ pub fn ones<T: Float, AL: ArrayLike<T>>(shape: &AL) -> Tensor<T> {
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref start = ag::scalar(0.);
-/// let ref end = ag::scalar(5.);
-/// let ref step = ag::scalar(1.);
+/// let start = 0.;
+/// let end = 5.;
+/// let step = 1.;
 /// let ref z = ag::range(start, end, step);
 ///
 /// assert_eq!(z.eval(&[]), Some(ndarray::Array1::range(0., 5., 1.).into_dyn()));
 /// ```
-pub fn range<T: Float, AL: ArrayLike<T>>(start: &AL, end: &AL, step: &AL) -> Tensor<T> {
+pub fn range<T: Float>(start: T, end: T, step: T) -> Tensor<T> {
+    Tensor::builder()
+        .set_inputs(vec![
+            &scalar(start),
+            &scalar(end),
+            &scalar(step)
+        ])
+        .build(const_gen_ops::Range)
+}
+
+pub fn _range<T: Float, AL: ArrayLike<T>>(start: &AL, end: &AL, step: &AL) -> Tensor<T> {
     Tensor::builder()
         .set_inputs(vec![
             &start.as_tensor(),
@@ -2032,6 +2042,14 @@ pub fn range<T: Float, AL: ArrayLike<T>>(start: &AL, end: &AL, step: &AL) -> Ten
             &step.as_tensor(),
         ])
         .build(const_gen_ops::Range)
+}
+
+// internal helper
+fn slice_as_tensor<T: Float>(slice: &[T]) -> Tensor<T> {
+    let vec = slice.to_vec();
+    // unwrap is safe
+    let arr = NdArray::from_shape_vec(ndarray::IxDyn(&[vec.len()]), vec).unwrap();
+    convert_to_tensor(arr)
 }
 
 /// 2D convolution.

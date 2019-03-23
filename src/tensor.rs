@@ -103,9 +103,9 @@ pub struct TensorBuilder<T: Float> {
 
 #[test]
 fn test_build() {
-    let ref a = ::zeros::<f32, [usize; 2]>(&[4, 2]);
-    let ref v = ::zeros::<f32, [usize; 2]>(&[2, 3]);
-    let ref b = ::zeros::<f32, [usize; 2]>(&[4, 3]);
+    let ref a: Tensor<f32> = ::zeros(&[4, 2]);
+    let ref v: Tensor<f32> = ::zeros(&[2, 3]);
+    let ref b: Tensor<f32> = ::zeros(&[4, 3]);
     let ref z = ::matmul(a, v) + b;
     let mut vars = [a, v, b, z];
     // `sort_by_key` don't reverse the order of `a` and `v`
