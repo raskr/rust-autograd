@@ -21,14 +21,14 @@ pub struct MaxPool2DGradGrad {
     size: usize,
 }
 
-impl ::op::Op for MaxPool2D {
+impl ::op::Op<f32> for MaxPool2D {
     fn name(&self) -> &str {
         "MaxPool"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> ::op::ComputeResult {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<f32>) -> ::op::ComputeResult<f32> {
         let xs = ctx.grab_inputs();
-        let x: &NdArray = xs[0];
+        let x: &NdArray<f32> = xs[0];
         let x_shape = x.shape();
         let batch = x_shape[0];
         let c = x_shape[1];
@@ -61,7 +61,12 @@ impl ::op::Op for MaxPool2D {
         vec![Ok(output.unwrap()), Ok(indices.unwrap())]
     }
 
-    fn grad(&self, gy: &Tensor, _: &[&Tensor], y: &Tensor) -> Vec<Option<Tensor>> {
+    fn grad(
+        &self,
+        gy: &Tensor<f32>,
+        _: &[&Tensor<f32>],
+        y: &Tensor<f32>,
+    ) -> Vec<Option<Tensor<f32>>> {
         let indices = ::ops::nth_tensor(y, 1);
         let gx = Tensor::builder()
             .set_inputs(vec![&gy, &indices])
@@ -98,12 +103,12 @@ fn test_max_pool2d() {
     );
 }
 
-impl ::op::Op for MaxPool2DGrad {
+impl ::op::Op<f32> for MaxPool2DGrad {
     fn name(&self) -> &str {
         "MaxPoolGrad"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> ::op::ComputeResult {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<f32>) -> ::op::ComputeResult<f32> {
         let xs = ctx.grab_inputs();
         let gy = xs[0];
         let argmax = xs[1];
@@ -129,7 +134,12 @@ impl ::op::Op for MaxPool2DGrad {
         vec![Ok(gx.unwrap())]
     }
 
-    fn grad(&self, ggx: &Tensor, xs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
+    fn grad(
+        &self,
+        ggx: &Tensor<f32>,
+        xs: &[&Tensor<f32>],
+        _: &Tensor<f32>,
+    ) -> Vec<Option<Tensor<f32>>> {
         let argmax = xs[1];
         let ggy = Tensor::builder()
             .set_inputs(vec![ggx, argmax])
@@ -142,12 +152,12 @@ impl ::op::Op for MaxPool2DGrad {
     }
 }
 
-impl ::op::Op for MaxPool2DGradGrad {
+impl ::op::Op<f32> for MaxPool2DGradGrad {
     fn name(&self) -> &str {
         "MaxPoolGradGrad"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> ::op::ComputeResult {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<f32>) -> ::op::ComputeResult<f32> {
         let xs = ctx.grab_inputs();
         let ggx = xs[0];
         let x_shape = ggx.shape();
@@ -172,7 +182,12 @@ impl ::op::Op for MaxPool2DGradGrad {
         vec![Ok(ggy)]
     }
 
-    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
+    fn grad(
+        &self,
+        _: &Tensor<f32>,
+        _: &[&Tensor<f32>],
+        _: &Tensor<f32>,
+    ) -> Vec<Option<Tensor<f32>>> {
         vec![None, None]
     }
 }

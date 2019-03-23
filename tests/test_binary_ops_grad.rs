@@ -4,7 +4,7 @@ extern crate ndarray;
 #[test]
 fn scalar_add() {
     let ref x = ag::placeholder(&[]);
-    let ref y = x + 2;
+    let ref y = x + 2.;
     let ref grad = ag::grad(&[y], &[x])[0];
     assert_eq!(1., grad.eval(&[]).unwrap()[ndarray::IxDyn(&[])]);
 }
@@ -12,7 +12,7 @@ fn scalar_add() {
 #[test]
 fn scalar_sub() {
     let ref x = ag::placeholder(&[]);
-    let ref y = x - 2;
+    let ref y = x - 2.;
     let ref grad = ag::grad(&[y], &[x])[0];
     assert_eq!(1., grad.eval(&[]).unwrap()[ndarray::IxDyn(&[])]);
 }
@@ -20,7 +20,7 @@ fn scalar_sub() {
 #[test]
 fn scalar_mul() {
     let ref x = ag::placeholder(&[]);
-    let ref y = 3 * x;
+    let ref y = 3. * x;
     let ref grad = ag::grad(&[y], &[x])[0];
     assert_eq!(3., grad.eval(&[]).unwrap()[ndarray::IxDyn(&[])]);
 }
@@ -28,7 +28,7 @@ fn scalar_mul() {
 #[test]
 fn scalar_div() {
     let ref x = ag::placeholder(&[]);
-    let ref y = x / 3;
+    let ref y = x / 3.;
     let ref grad = ag::grad(&[y], &[x])[0];
     assert_eq!(1. / 3., grad.eval(&[]).unwrap()[ndarray::IxDyn(&[])]);
 }
@@ -36,7 +36,7 @@ fn scalar_div() {
 #[test]
 fn expr1() {
     let ref x = ag::placeholder(&[]);
-    let ref y = 3 * x + 2;
+    let ref y = 3. * x + 2.;
     let ref grad = ag::grad(&[y], &[x])[0];
     assert_eq!(3., grad.eval(&[]).unwrap()[ndarray::IxDyn(&[])]);
 }
@@ -44,7 +44,7 @@ fn expr1() {
 #[test]
 fn expr2() {
     let ref x = ag::placeholder(&[]);
-    let ref y = 3 * x * x;
+    let ref y = 3. * x * x;
     let ref grad = ag::grad(&[y], &[x])[0];
     assert_eq!(
         18.,
@@ -55,7 +55,7 @@ fn expr2() {
 #[test]
 fn expr3() {
     let ref x = ag::placeholder(&[]);
-    let ref y = 3 * x * x + 2;
+    let ref y = 3. * x * x + 2.;
     let ref grad = ag::grad(&[y], &[x])[0];
     assert_eq!(
         18.,
@@ -66,7 +66,7 @@ fn expr3() {
 #[test]
 fn expr4() {
     let ref x = ag::placeholder(&[]);
-    let ref y = 3 * x * x + 2 * x + 1;
+    let ref y = 3. * x * x + 2. * x + 1.;
     let ref grad = ag::grad(&[y], &[x])[0];
     assert_eq!(
         20.,
@@ -78,7 +78,7 @@ fn expr4() {
 fn expr5() {
     let ref x1 = ag::placeholder(&[]);
     let ref x2 = ag::placeholder(&[]);
-    let ref y = 3 * x1 * x1 + 2 * x1 + x2 + 1;
+    let ref y = 3. * x1 * x1 + 2. * x1 + x2 + 1.;
     let ref grad = ag::grad(&[y], &[x1])[0];
     assert_eq!(
         20.,
@@ -92,7 +92,7 @@ fn expr5() {
 fn expr6() {
     let ref x1 = ag::placeholder(&[]);
     let ref x2 = ag::variable(ndarray::arr0(0.));
-    let ref y = 3 * x1 * x1 + 5 * x2;
+    let ref y = 3. * x1 * x1 + 5. * x2;
     let ref grad = ag::grad(&[y], &[x2])[0];
     assert_eq!(5., grad.eval(&[]).unwrap()[ndarray::IxDyn(&[])]);
 }
@@ -110,7 +110,7 @@ fn differentiate_twice() {
 fn expr7() {
     let ref x1 = ag::placeholder(&[]);
     let ref x2 = ag::placeholder(&[]);
-    let ref y = 2 * x1 * x1 + 3 * x2;
+    let ref y = 2. * x1 * x1 + 3. * x2;
     let ref g1 = ag::grad(&[y], &[x1])[0];
     let ref g2 = ag::grad(&[y], &[x2])[0];
     let ref gg1 = ag::grad(&[g1], &[x1])[0];

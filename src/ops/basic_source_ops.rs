@@ -1,19 +1,25 @@
 use op;
 use tensor::Tensor;
+use Float;
 
 macro_rules! impl_op {
     ($name:ident) => {
         pub struct $name;
-        impl ::op::Op for $name {
+        impl<T: Float> ::op::Op<T> for $name {
             fn name(&self) -> &str {
                 stringify!($name)
             }
 
-            fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
+            fn grad(
+                &self,
+                _: &Tensor<T>,
+                _: &[&Tensor<T>],
+                _: &Tensor<T>,
+            ) -> Vec<Option<Tensor<T>>> {
                 unreachable!()
             }
 
-            fn compute(&self, _: ::runtime::OpComputeContext) -> op::ComputeResult {
+            fn compute(&self, _: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
                 unreachable!()
             }
         }

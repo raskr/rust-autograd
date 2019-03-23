@@ -4,6 +4,7 @@ use ndarray_ext::NdArray;
 use op;
 use rayon::iter::*;
 use tensor::Tensor;
+use Float;
 
 // `Tensordot` is implemented in `ops/mod.rs`.
 
@@ -17,12 +18,12 @@ pub struct BatchMatMul {
     pub transpose_b: bool,
 }
 
-impl op::Op for MatMul {
+impl<T: Float> op::Op<T> for MatMul {
     fn name(&self) -> &str {
         "MatMul"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
         let x0 = xs[0];
         let x1 = xs[1];
@@ -46,7 +47,7 @@ impl op::Op for MatMul {
         vec![Ok(a.dot(&b).into_dyn())]
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
+    fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
         let opa = Tensor::builder()
             .set_inputs(vec![gy, inputs[1]])
             .build(MatMul {
@@ -65,16 +66,16 @@ impl op::Op for MatMul {
     }
 }
 
-impl op::Op for BatchMatMul {
+impl<T: Float> op::Op<T> for BatchMatMul {
     fn name(&self) -> &str {
         "BatchMatMul"
     }
 
     // TODO: Remove unnecessary mem copy
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let x0: &NdArray = xs[0];
-        let x1: &NdArray = xs[1];
+        let x0: &NdArray<T> = xs[0];
+        let x1: &NdArray<T> = xs[1];
         let shape0 = x0.shape();
         let shape1 = x1.shape();
         let rank0 = x0.ndim();
@@ -93,7 +94,8 @@ impl op::Op for BatchMatMul {
         // squashes dims (remains last two dims)
         // unwrap is always safe
         let x0_flattened = {
-            let mut a = x0.view()
+            let mut a = x0
+                .view()
                 .into_shape((x0.len() / row0 / col0, row0, col0))
                 .unwrap();
             if self.transpose_a {
@@ -103,7 +105,8 @@ impl op::Op for BatchMatMul {
         };
 
         let x1_flattened = {
-            let mut b = x1.view()
+            let mut b = x1
+                .view()
                 .into_shape((x1.len() / row1 / col1, row1, col1))
                 .unwrap();
             if self.transpose_b {
@@ -152,7 +155,7 @@ impl op::Op for BatchMatMul {
             .unwrap())]
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
+    fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
         let opa = Tensor::builder()
             .set_inputs(vec![gy, inputs[1]])
             .build(BatchMatMul {

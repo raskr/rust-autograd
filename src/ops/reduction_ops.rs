@@ -5,9 +5,8 @@ use op;
 use ops;
 use std::f32;
 use std::mem;
-use std::ops::Add;
-use std::ops::Mul;
 use tensor::Tensor;
+use Float;
 
 pub struct ReduceMin {
     pub keep_dims: bool,
@@ -45,12 +44,12 @@ pub struct ReduceGradCommon {
 }
 
 macro_rules! impl_reduce_forward {
-    ($forward_name:ident, $reduce_fn_name:ident, $reduce_default:expr) => {
-        fn $forward_name(
-            x: &NdArray,
+    ($forward_name:ident, $reduce_fn_name:ident, $reduce_default:ident) => {
+        fn $forward_name<T: Float>(
+            x: &NdArray<T>,
             mut axes: Vec<usize>,
             keep_dims: bool,
-        ) -> Result<NdArray, ::op::ComputeException> {
+        ) -> Result<NdArray<T>, ::op::ComputeException> {
             let x_shape = x.shape();
 
             if ndarray_ext::is_scalar_shape(x_shape) {
@@ -63,14 +62,14 @@ macro_rules! impl_reduce_forward {
                 }
 
                 // -- main logic --
-                let mut folded: Option<NdArray> = None;
+                let mut folded: Option<NdArray<T>> = None;
                 axes.sort();
 
                 for axis in axes.into_iter().rev() {
-                    let func = f32::$reduce_fn_name;
+                    let func = T::$reduce_fn_name;
                     let ret = folded.as_ref().unwrap_or(x).fold_axis(
                         ndarray::Axis(axis),
-                        $reduce_default,
+                        T::$reduce_default(),
                         move |&a, &b| func(a, b),
                     );
 
@@ -87,13 +86,13 @@ macro_rules! impl_reduce_forward {
     };
 }
 
-impl_reduce_forward!(compute_reduce_sum, add, 0.);
-impl_reduce_forward!(compute_reduce_min, min, f32::MAX);
-impl_reduce_forward!(compute_reduce_max, max, f32::MIN);
-impl_reduce_forward!(compute_reduce_prod, mul, 1.);
+impl_reduce_forward!(compute_reduce_sum, add, zero);
+impl_reduce_forward!(compute_reduce_min, min, max_value);
+impl_reduce_forward!(compute_reduce_max, max, min_value);
+impl_reduce_forward!(compute_reduce_prod, mul, one);
 
 #[inline]
-fn preprocess_axes(x: &NdArray, axes: &NdArray, sparse_axes: bool) -> Vec<usize> {
+fn preprocess_axes<T: Float>(x: &NdArray<T>, axes: &NdArray<T>, sparse_axes: bool) -> Vec<usize> {
     if sparse_axes {
         ndarray_ext::sparse_to_dense(axes)
     } else {
@@ -101,19 +100,19 @@ fn preprocess_axes(x: &NdArray, axes: &NdArray, sparse_axes: bool) -> Vec<usize>
     }
 }
 
-impl op::Op for ReduceSum {
+impl<T: Float> op::Op<T> for ReduceSum {
     fn name(&self) -> &str {
         "ReduceSum"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
         let x = xs[0];
         let axes = preprocess_axes(x, xs[1], self.sparse_axes);
         vec![compute_reduce_sum(x, axes, self.keep_dims)]
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
+    fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
         let grad_op = ReduceGradCommon {
             should_make_broadcast_dims: !self.keep_dims,
             sparse_axes: self.sparse_axes,
@@ -125,12 +124,12 @@ impl op::Op for ReduceSum {
     }
 }
 
-impl op::Op for ReduceMean {
+impl<T: Float> op::Op<T> for ReduceMean {
     fn name(&self) -> &str {
         "ReduceMean"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
         let x = xs[0];
         let axes = preprocess_axes(x, xs[1], self.sparse_axes);
@@ -144,20 +143,21 @@ impl op::Op for ReduceMean {
         for &axis in axes.iter() {
             reduction_len *= x_shape[axis as usize] as f32;
         }
+        let reduction_len_inv = T::one() / T::from(reduction_len).unwrap();
 
         // Do summation
-        let sum: Result<NdArray, _> = compute_reduce_sum(x, axes, self.keep_dims);
+        let sum: Result<NdArray<T>, _> = compute_reduce_sum(x, axes, self.keep_dims);
 
         // Do division
         let ret = sum.map(|mut ok| {
-            ok *= 1. / reduction_len;
+            ok.mapv_inplace(move |elem| elem * reduction_len_inv);
             ok
         });
 
         vec![ret]
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
+    fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
         let x = inputs[0];
         let axes = inputs[1];
 
@@ -178,12 +178,12 @@ impl op::Op for ReduceMean {
     }
 }
 
-impl op::Op for ReduceProd {
+impl<T: Float> op::Op<T> for ReduceProd {
     fn name(&self) -> &str {
         "ReduceProd"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
         let x = xs[0];
         let axes = preprocess_axes(x, xs[1], self.sparse_axes);
@@ -191,7 +191,12 @@ impl op::Op for ReduceProd {
         vec![ret]
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
+    fn grad(
+        &self,
+        gy: &Tensor<T>,
+        inputs: &[&Tensor<T>],
+        output: &Tensor<T>,
+    ) -> Vec<Option<Tensor<T>>> {
         let grad_op = ReduceGradCommon {
             should_make_broadcast_dims: !self.keep_dims,
             sparse_axes: self.sparse_axes,
@@ -204,47 +209,57 @@ impl op::Op for ReduceProd {
     }
 }
 
-impl op::Op for ReduceMin {
+impl<T: Float> op::Op<T> for ReduceMin {
     fn name(&self) -> &str {
         "ReduceMin"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
         let x = xs[0];
         let axes = preprocess_axes(x, xs[1], self.sparse_axes);
         vec![compute_reduce_min(x, axes, self.keep_dims)]
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
+    fn grad(
+        &self,
+        gy: &Tensor<T>,
+        inputs: &[&Tensor<T>],
+        output: &Tensor<T>,
+    ) -> Vec<Option<Tensor<T>>> {
         min_max_grad(gy, inputs, output, self.keep_dims, self.sparse_axes)
     }
 }
 
-impl op::Op for ReduceMax {
+impl<T: Float> op::Op<T> for ReduceMax {
     fn name(&self) -> &str {
         "ReduceMax"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
         let x = xs[0];
         let axes = preprocess_axes(x, xs[1], self.sparse_axes);
         vec![compute_reduce_max(x, axes, self.keep_dims)]
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
+    fn grad(
+        &self,
+        gy: &Tensor<T>,
+        inputs: &[&Tensor<T>],
+        output: &Tensor<T>,
+    ) -> Vec<Option<Tensor<T>>> {
         min_max_grad(gy, inputs, output, self.keep_dims, self.sparse_axes)
     }
 }
 
-fn min_max_grad(
-    gy: &Tensor,
-    inputs: &[&Tensor],
-    output: &Tensor,
+fn min_max_grad<T: Float>(
+    gy: &Tensor<T>,
+    inputs: &[&Tensor<T>],
+    output: &Tensor<T>,
     keep_dims: bool,
     sparse_axes: bool,
-) -> Vec<Option<Tensor>> {
+) -> Vec<Option<Tensor<T>>> {
     let grad_op1 = ReduceGradCommon {
         should_make_broadcast_dims: !keep_dims,
         sparse_axes,
@@ -265,13 +280,13 @@ fn min_max_grad(
     vec![Some(ops::mul_inplace(eq, &gy)), None]
 }
 
-impl op::Op for ArgMax {
+impl<T: Float> op::Op<T> for ArgMax {
     fn name(&self) -> &str {
         "ArgMax"
     }
 
     // cf. https://github.com/tensorflow/compiler/tf2xla/kernels/index_ops.cc
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
         let x = xs[0];
         let axis = ndarray_ext::normalize_negative_axis(self.axis, x.ndim());
@@ -279,8 +294,9 @@ impl op::Op for ArgMax {
 
         // 1. Make binary mask tensor (maximums are 1s)
         let mut mask = {
-            let max_fn = f32::max;
-            let maxed = x.fold_axis(ndarray::Axis(axis), f32::MIN, move |&a, &b| max_fn(a, b));
+            let max_fn = T::max;
+            let min_val = T::min_value();
+            let maxed = x.fold_axis(ndarray::Axis(axis), min_val, move |&a, &b| max_fn(a, b));
             let mut mask = x.clone();
             let mut found = ndarray::Array::<bool, ndarray::IxDyn>::from_elem(maxed.shape(), false);
             for mut sub in mask.axis_iter_mut(ndarray::Axis(axis)) {
@@ -290,7 +306,7 @@ impl op::Op for ArgMax {
                     .apply(|r, f, m| {
                         let z = r == m && !*f;
                         *f = z;
-                        *r = (z as i32) as f32;
+                        *r = T::from(z as i32).unwrap();
                     });
             }
             mask
@@ -310,7 +326,7 @@ impl op::Op for ArgMax {
         // 3. Make the indices (vertical vector)
         let indices = {
             let cols = mask.shape()[1];
-            ndarray::Array::range(0., cols as f32, 1.)
+            ndarray::Array::range(T::zero(), T::from(cols).unwrap(), T::one())
                 .into_shape((cols, 1))
                 .unwrap()
         };
@@ -335,17 +351,17 @@ impl op::Op for ArgMax {
         vec![Ok(result)]
     }
 
-    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
+    fn grad(&self, _: &Tensor<T>, _: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
         vec![None]
     }
 }
 
-impl op::Op for ReduceGradCommon {
+impl<T: Float> op::Op<T> for ReduceGradCommon {
     fn name(&self) -> &str {
         "ReduceGradCommon"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
         //  broadcast `gy` into `target_shape`
         let gy = xs[0];
@@ -394,7 +410,7 @@ impl op::Op for ReduceGradCommon {
         vec![Ok(ret)]
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
+    fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
         let sum = ops::reduction_ops::ReduceSum {
             keep_dims: self.should_make_broadcast_dims,
             sparse_axes: self.sparse_axes,

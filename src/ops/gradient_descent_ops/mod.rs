@@ -9,34 +9,35 @@ pub use self::sgd::SGD;
 
 use std::cmp::{Eq, Ordering, PartialEq};
 use tensor::Tensor;
+use Float;
 
 /// Key to access a state tensor.
 /// Stateful optimizers use this.
-pub struct StateKey<'a>(pub &'a Tensor);
+pub struct StateKey<'a, T: Float + 'a>(pub &'a Tensor<T>);
 
-impl<'a> Eq for StateKey<'a> {}
+impl<'a, T: Float> Eq for StateKey<'a, T> {}
 
-impl<'a> PartialEq for StateKey<'a> {
+impl<'a, T: Float> PartialEq for StateKey<'a, T> {
     #[inline]
     /// Compares addresses of the two tensors.
     /// This can be used for ordering-based data structures (e.g. BinaryTree).
-    fn eq(&self, other: &StateKey<'a>) -> bool {
+    fn eq(&self, other: &StateKey<'a, T>) -> bool {
         (self.0 as *const _) == (other.0 as *const _)
     }
 }
 
-impl<'a> Ord for StateKey<'a> {
+impl<'a, T: Float> Ord for StateKey<'a, T> {
     #[inline]
     /// Compares addresses of the two tensors.
     /// This can be used for ordering-based data structures (e.g. BinaryTree).
     fn cmp(&self, other: &Self) -> Ordering {
-        let a = self.0 as *const Tensor;
-        let b = other.0 as *const Tensor;
+        let a = self.0 as *const Tensor<T>;
+        let b = other.0 as *const Tensor<T>;
         a.cmp(&b)
     }
 }
 
-impl<'a> PartialOrd for StateKey<'a> {
+impl<'a, T: Float> PartialOrd for StateKey<'a, T> {
     #[inline]
     /// Compares addresses of the two tensors.
     /// This can be used for ordering-based data structures (e.g. BinaryTree).

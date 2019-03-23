@@ -3,11 +3,12 @@ extern crate ndarray;
 use ndarray_ext::{ArrRng, NdArray};
 use rand::Rng;
 use tensor::{ArrayLike, Tensor};
+use Float;
 
 mod activation_ops;
 mod array_ops;
 mod basic_source_ops;
-mod binary_ops;
+pub mod binary_ops;
 mod const_gen_ops;
 mod conv_ops;
 mod dot_ops;
@@ -18,7 +19,7 @@ mod random_ops;
 mod reduction_ops;
 mod xent_ops;
 
-impl Tensor {
+impl<T: Float> Tensor<T> {
     /// Looks up a symbolic element from this tensor.
     ///
     /// Index `i` can be negative.
@@ -32,7 +33,7 @@ impl Tensor {
     ///
     /// assert_eq!(b.eval(&[]).unwrap()[ndarray::IxDyn(&[])], 4.);
     /// ```
-    pub fn get(&self, i: isize) -> Tensor {
+    pub fn get(&self, i: isize) -> Tensor<T> {
         let op = array_ops::IndexOp { index: i };
         Tensor::builder().set_input(self).build(op)
     }
@@ -64,9 +65,9 @@ impl Tensor {
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref x = ag::placeholder(&[]);
-/// let ref y = ag::placeholder(&[]);
-/// let ref z = 2*x*x + 3*y + 1;
+/// let ref x = ag::placeholder::<f64>(&[]);
+/// let ref y = ag::placeholder::<f64>(&[]);
+/// let ref z = 2.*x*x + 3.*y + 1.;
 ///
 /// // dz/dy
 /// let ref gy = ag::grad(&[z], &[y])[0];
@@ -84,7 +85,7 @@ impl Tensor {
 /// assert_eq!(8., gx.eval(&[(x, &ndarray::arr0(2.).into_dyn())]).unwrap()[ndarray::IxDyn(&[])]);
 ///
 /// ```
-pub fn grad(ys: &[&Tensor], xs: &[&Tensor]) -> Vec<Tensor> {
+pub fn grad<T: Float>(ys: &[&Tensor<T>], xs: &[&Tensor<T>]) -> Vec<Tensor<T>> {
     ::gradient::symbolic_gradients(ys, xs, &vec![None; ys.len()])
 }
 
@@ -102,7 +103,11 @@ pub fn grad(ys: &[&Tensor], xs: &[&Tensor]) -> Vec<Tensor> {
 /// Symbolic gradient tensors corresponding to `xs` in the same order as `xs`'s.
 ///
 /// For detailed, see [grad](fn.grad.html).
-pub fn grad_with_default(ys: &[&Tensor], xs: &[&Tensor], output_grads: &[&Tensor]) -> Vec<Tensor> {
+pub fn grad_with_default<T: Float>(
+    ys: &[&Tensor<T>],
+    xs: &[&Tensor<T>],
+    output_grads: &[&Tensor<T>],
+) -> Vec<Tensor<T>> {
     ::gradient::symbolic_gradients(
         ys,
         xs,
@@ -127,15 +132,19 @@ pub fn grad_with_default(ys: &[&Tensor], xs: &[&Tensor], output_grads: &[&Tensor
 /// ```
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::variable(ag::ndarray_ext::standard_normal(&[4, 2]));
-/// let ref b = ag::variable(ag::ndarray_ext::standard_normal(&[2, 3]));
+/// let ref a = ag::variable(ag::ndarray_ext::standard_normal::<f32>(&[4, 2]));
+/// let ref b = ag::variable(ag::ndarray_ext::standard_normal::<f32>(&[2, 3]));
 /// let ref c = ag::matmul(a, b);
 /// let ref j = ag::jacobians(c, &[a, b], 4*3);
 ///
 /// assert_eq!(j[0].eval(&[]).unwrap().shape(), &[4*3, 4*2]);
 /// assert_eq!(j[1].eval(&[]).unwrap().shape(), &[4*3, 2*3]);
 /// ```
-pub fn jacobians(y: &Tensor, xs: &[&Tensor], objective_len: usize) -> Vec<Tensor> {
+pub fn jacobians<T: Float>(
+    y: &Tensor<T>,
+    xs: &[&Tensor<T>],
+    objective_len: usize,
+) -> Vec<Tensor<T>> {
     // TODO: remove map
     let vec_vec = (0..objective_len as isize)
         .map(|i| {
@@ -160,7 +169,11 @@ pub fn jacobians(y: &Tensor, xs: &[&Tensor], objective_len: usize) -> Vec<Tensor
 /// (Experimental) Computes hessian vector product
 ///
 /// `ys` must be scalars.
-pub fn _hessian_vector_product(ys: &[&Tensor], xs: &[&Tensor], vectors: &[&Tensor]) -> Vec<Tensor> {
+pub fn _hessian_vector_product<T: Float>(
+    ys: &[&Tensor<T>],
+    xs: &[&Tensor<T>],
+    vectors: &[&Tensor<T>],
+) -> Vec<Tensor<T>> {
     let grads =
         ::gradient::symbolic_gradients(ys, xs, &xs.iter().map(|_| None).collect::<Vec<_>>());
 
@@ -179,7 +192,7 @@ pub fn _hessian_vector_product(ys: &[&Tensor], xs: &[&Tensor], vectors: &[&Tenso
 ///
 /// Guarantees that the gradient is not propagated to the tensors behind this
 /// during gradient computation.
-pub fn stop_gradient<A: AsRef<Tensor>>(x: A) -> Tensor {
+pub fn stop_gradient<A: AsRef<Tensor<T>>, T: Float>(x: A) -> Tensor<T> {
     Tensor::builder()
         .set_input(x.as_ref())
         .set_differentiable(false)
@@ -196,13 +209,13 @@ pub fn stop_gradient<A: AsRef<Tensor>>(x: A) -> Tensor {
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref x: ag::Tensor = ag::variable(ndarray::arr1(&[2.]));
-/// let ref y: ag::Tensor = 3 * x;
+/// let ref x: ag::Tensor<f64> = ag::variable(ndarray::arr1(&[2.]));
+/// let ref y: ag::Tensor<f64> = 3. * x;
 ///
 /// assert_eq!(6., y.eval(&[]).unwrap()[0]);
 /// ```
 #[inline]
-pub fn variable<T: ndarray::Dimension>(arr: ndarray::Array<f32, T>) -> Tensor {
+pub fn variable<T: Float, D: ndarray::Dimension>(arr: ndarray::Array<T, D>) -> Tensor<T> {
     let arr = arr.into_dyn();
     Tensor::builder()
         .set_shape(convert_to_tensor(::ndarray_ext::shape_of(&arr)))
@@ -223,15 +236,19 @@ pub fn variable<T: ndarray::Dimension>(arr: ndarray::Array<f32, T>) -> Tensor {
 /// assert_eq!(x.eval(&[(&x, &arr.clone())]), Some(arr));
 /// ```
 #[inline]
-pub fn placeholder(shape_: &[isize]) -> Tensor {
+pub fn placeholder<T: Float>(shape_: &[isize]) -> Tensor<T> {
     let b = Tensor::builder().set_is_placeholder(true);
     let rank = shape_.len();
     let b = if rank == 0 || -1 != shape_[0] {
         b.set_shape(convert_to_tensor(
             NdArray::from_shape_vec(
                 ndarray::IxDyn(&[rank]),
-                shape_.iter().map(|&x| x as f32).collect::<Vec<_>>(),
-            ).unwrap(),
+                shape_
+                    .iter()
+                    .map(|&x| T::from(x).unwrap())
+                    .collect::<Vec<_>>(),
+            )
+            .unwrap(),
         ))
     } else {
         b
@@ -250,9 +267,10 @@ pub fn placeholder(shape_: &[isize]) -> Tensor {
 /// assert_eq!(con.eval(&[]), Some(arr.into_dyn()))
 /// ```
 #[inline]
-pub fn constant<T>(arr: ndarray::Array<f32, T>) -> Tensor
+pub fn constant<D, T>(arr: ndarray::Array<T, D>) -> Tensor<T>
 where
-    T: ndarray::Dimension,
+    D: ndarray::Dimension,
+    T: Float,
 {
     let arr = arr.into_dyn();
     Tensor::builder()
@@ -266,12 +284,12 @@ where
 /// ```
 /// extern crate autograd as ag;
 ///
-/// let ref x = ag::zeros(&[2, 3]);
+/// let ref x = ag::zeros::<f32, [usize; 2]>(&[2, 3]);
 /// let ref s = ag::shape(x);
 ///
 /// assert_eq!(&[2., 3.], s.eval(&[]).unwrap().as_slice().unwrap());
 /// ```
-pub fn shape<A: AsRef<Tensor>>(x: A) -> Tensor {
+pub fn shape<T: Float, A: AsRef<Tensor<T>>>(x: A) -> Tensor<T> {
     if let Some(ref inner) = x.as_ref().shape {
         inner.clone()
     } else {
@@ -288,12 +306,12 @@ pub fn shape<A: AsRef<Tensor>>(x: A) -> Tensor {
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::zeros(&[4, 3]);
+/// let ref a = ag::zeros::<f32, [usize; 2]>(&[4, 3]);
 /// let ref b = ag::size(a);
 ///
 /// assert_eq!(12., b.eval(&[]).unwrap()[ndarray::IxDyn(&[])]);
 /// ```
-pub fn size<A: AsRef<Tensor>>(x: A) -> Tensor {
+pub fn size<T: Float, A: AsRef<Tensor<T>>>(x: A) -> Tensor<T> {
     Tensor::builder()
         .set_input(x.as_ref())
         .set_differentiable(false)
@@ -306,12 +324,12 @@ pub fn size<A: AsRef<Tensor>>(x: A) -> Tensor {
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref x = ag::zeros(&[2, 3, 4]);
+/// let ref x = ag::zeros::<f32, [usize; 3]>(&[2, 3, 4]);
 /// let ref r = ag::rank(x);
 ///
 /// assert_eq!(3., r.eval(&[]).unwrap()[ndarray::IxDyn(&[])]);
 /// ```
-pub fn rank<A: AsRef<Tensor>>(x: A) -> Tensor {
+pub fn rank<T: Float, A: AsRef<Tensor<T>>>(x: A) -> Tensor<T> {
     Tensor::builder()
         .set_input(x.as_ref())
         .set_differentiable(false)
@@ -319,7 +337,7 @@ pub fn rank<A: AsRef<Tensor>>(x: A) -> Tensor {
 }
 
 /// Elementwise sine
-pub fn sin<A: AsRef<Tensor>>(x: A) -> Tensor {
+pub fn sin<T: Float, A: AsRef<Tensor<T>>>(x: A) -> Tensor<T> {
     Tensor::builder()
         .set_input(x.as_ref())
         .set_shape(x.as_ref().shape())
@@ -327,7 +345,7 @@ pub fn sin<A: AsRef<Tensor>>(x: A) -> Tensor {
 }
 
 /// Elementwise cosine
-pub fn cos<A: AsRef<Tensor>>(x: A) -> Tensor {
+pub fn cos<T: Float, A: AsRef<Tensor<T>>>(x: A) -> Tensor<T> {
     Tensor::builder()
         .set_input(x.as_ref())
         .set_shape(x.as_ref().shape())
@@ -335,7 +353,7 @@ pub fn cos<A: AsRef<Tensor>>(x: A) -> Tensor {
 }
 
 /// Elementwise tangent
-pub fn tan<A: AsRef<Tensor>>(x: A) -> Tensor {
+pub fn tan<T: Float, A: AsRef<Tensor<T>>>(x: A) -> Tensor<T> {
     Tensor::builder()
         .set_input(x.as_ref())
         .set_shape(x.as_ref().shape())
@@ -343,7 +361,7 @@ pub fn tan<A: AsRef<Tensor>>(x: A) -> Tensor {
 }
 
 /// Elementwise arcsin
-pub fn asin<A: AsRef<Tensor>>(x: A) -> Tensor {
+pub fn asin<T: Float, A: AsRef<Tensor<T>>>(x: A) -> Tensor<T> {
     Tensor::builder()
         .set_input(x.as_ref())
         .set_shape(x.as_ref().shape())
@@ -351,7 +369,7 @@ pub fn asin<A: AsRef<Tensor>>(x: A) -> Tensor {
 }
 
 /// Elementwise arccos
-pub fn acos<A: AsRef<Tensor>>(x: A) -> Tensor {
+pub fn acos<T: Float, A: AsRef<Tensor<T>>>(x: A) -> Tensor<T> {
     Tensor::builder()
         .set_input(x.as_ref())
         .set_shape(x.as_ref().shape())
@@ -359,7 +377,7 @@ pub fn acos<A: AsRef<Tensor>>(x: A) -> Tensor {
 }
 
 /// Elementwise arctan
-pub fn atan<A: AsRef<Tensor>>(x: A) -> Tensor {
+pub fn atan<T: Float, A: AsRef<Tensor<T>>>(x: A) -> Tensor<T> {
     Tensor::builder()
         .set_input(x.as_ref())
         .set_shape(x.as_ref().shape())
@@ -367,7 +385,7 @@ pub fn atan<A: AsRef<Tensor>>(x: A) -> Tensor {
 }
 
 /// Elementwise hyperbolic sine
-pub fn sinh<A: AsRef<Tensor>>(x: A) -> Tensor {
+pub fn sinh<T: Float, A: AsRef<Tensor<T>>>(x: A) -> Tensor<T> {
     Tensor::builder()
         .set_input(x.as_ref())
         .set_shape(x.as_ref().shape())
@@ -375,7 +393,7 @@ pub fn sinh<A: AsRef<Tensor>>(x: A) -> Tensor {
 }
 
 /// Elementwise hyperbolic cosine
-pub fn cosh<A: AsRef<Tensor>>(x: A) -> Tensor {
+pub fn cosh<T: Float, A: AsRef<Tensor<T>>>(x: A) -> Tensor<T> {
     Tensor::builder()
         .set_input(x.as_ref())
         .set_shape(x.as_ref().shape())
@@ -383,7 +401,7 @@ pub fn cosh<A: AsRef<Tensor>>(x: A) -> Tensor {
 }
 
 /// Elementwise hyperbolic tangent
-pub fn tanh<A: AsRef<Tensor>>(x: A) -> Tensor {
+pub fn tanh<T: Float, A: AsRef<Tensor<T>>>(x: A) -> Tensor<T> {
     Tensor::builder()
         .set_input(x.as_ref())
         .set_shape(x.as_ref().shape())
@@ -391,7 +409,7 @@ pub fn tanh<A: AsRef<Tensor>>(x: A) -> Tensor {
 }
 
 /// Elementwise hyperbolic arcsin
-pub fn asinh<A: AsRef<Tensor>>(x: A) -> Tensor {
+pub fn asinh<T: Float, A: AsRef<Tensor<T>>>(x: A) -> Tensor<T> {
     Tensor::builder()
         .set_input(x.as_ref())
         .set_shape(x.as_ref().shape())
@@ -399,7 +417,7 @@ pub fn asinh<A: AsRef<Tensor>>(x: A) -> Tensor {
 }
 
 /// Elementwise hyperbolic arccos
-pub fn acosh<A: AsRef<Tensor>>(x: A) -> Tensor {
+pub fn acosh<T: Float, A: AsRef<Tensor<T>>>(x: A) -> Tensor<T> {
     Tensor::builder()
         .set_input(x.as_ref())
         .set_shape(x.as_ref().shape())
@@ -407,7 +425,7 @@ pub fn acosh<A: AsRef<Tensor>>(x: A) -> Tensor {
 }
 
 /// Elementwise hyperbolic arctan
-pub fn atanh<A: AsRef<Tensor>>(x: A) -> Tensor {
+pub fn atanh<T: Float, A: AsRef<Tensor<T>>>(x: A) -> Tensor<T> {
     Tensor::builder()
         .set_input(x.as_ref())
         .set_shape(x.as_ref().shape())
@@ -419,9 +437,10 @@ pub fn atanh<A: AsRef<Tensor>>(x: A) -> Tensor {
 ///
 /// `x` must be a result of a multi-outputs op;
 /// otherwise index-out-of-bounds error may happen.
-pub fn nth_tensor<A>(x: A, n: usize) -> Tensor
+pub fn nth_tensor<A, T>(x: A, n: usize) -> Tensor<T>
 where
-    A: AsRef<Tensor>,
+    T: Float,
+    A: AsRef<Tensor<T>>,
 {
     Tensor::builder()
         .set_input(x.as_ref())
@@ -430,7 +449,7 @@ where
 }
 
 /// Identity function without copy.
-pub fn identity<A: AsRef<Tensor>>(x: A) -> Tensor {
+pub fn identity<T: Float, A: AsRef<Tensor<T>>>(x: A) -> Tensor<T> {
     Tensor::builder()
         .set_input(x.as_ref())
         .set_shape(x.as_ref().shape())
@@ -438,18 +457,21 @@ pub fn identity<A: AsRef<Tensor>>(x: A) -> Tensor {
 }
 
 #[inline]
-fn infer_bin_op_shape<T: AsRef<Tensor>, A: AsRef<Tensor>>(shape_a: T, shape_b: A) -> Tensor {
+fn infer_bin_op_shape<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>>(
+    shape_a: A,
+    shape_b: B,
+) -> Tensor<T> {
     Tensor::builder()
         .set_inputs(vec![shape_a.as_ref(), shape_b.as_ref()])
         .build(array_ops::InferBinOpShape)
 }
 
 #[inline]
-fn bin_op_helper<A: AsRef<Tensor>, B: AsRef<Tensor>, T: ::op::Op + 'static>(
+fn bin_op_helper<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>, O: ::op::Op<T> + 'static>(
     a: A,
     b: B,
-    op: T,
-) -> Tensor {
+    op: O,
+) -> Tensor<T> {
     let a_shape = a.as_ref().shape();
     let b_shape = b.as_ref().shape();
     Tensor::builder()
@@ -466,12 +488,12 @@ fn bin_op_helper<A: AsRef<Tensor>, B: AsRef<Tensor>, T: ::op::Op + 'static>(
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::ones(&[2]);
-/// let ref b = ag::ones(&[2]);
-/// let ref z: ag::Tensor = a + b;
+/// let ref a = ag::ones::<f32, [usize; 1]>(&[2]);
+/// let ref b = ag::ones::<f32, [usize; 1]>(&[2]);
+/// let ref z: ag::Tensor<f32> = a + b;
 /// assert_eq!(z.eval(&[]), Some(ndarray::arr1(&[2., 2.]).into_dyn()));
 /// ```
-pub fn add<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor {
+pub fn add<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>>(a: A, b: B) -> Tensor<T> {
     bin_op_helper(a, b, binary_ops::AddOp)
 }
 
@@ -483,13 +505,13 @@ pub fn add<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor {
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::ones(&[2]);
-/// let ref b = ag::ones(&[2]);
+/// let ref a = ag::ones::<f32, [usize; 1]>(&[2]);
+/// let ref b = ag::ones::<f32, [usize; 1]>(&[2]);
 ///
-/// let ref z: ag::Tensor = a - b;
+/// let ref z: ag::Tensor<f32> = a - b;
 /// assert_eq!(z.eval(&[]), Some(ndarray::arr1(&[0., 0.]).into_dyn()));
 /// ```
-pub fn sub<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor {
+pub fn sub<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>>(a: A, b: B) -> Tensor<T> {
     bin_op_helper(a, b, binary_ops::SubOp)
 }
 
@@ -502,12 +524,12 @@ pub fn sub<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor {
 /// extern crate autograd as ag;
 ///
 ///
-/// let ref a = ag::ones(&[2]);
-/// let ref b = ag::ones(&[2]);
-/// let ref z: ag::Tensor = a * b;
+/// let ref a = ag::ones::<f32, [usize; 1]>(&[2]);
+/// let ref b = ag::ones::<f32, [usize; 1]>(&[2]);
+/// let ref z: ag::Tensor<f32> = a * b;
 /// assert_eq!(z.eval(&[]), Some(ndarray::arr1(&[1., 1.]).into_dyn()));
 /// ```
-pub fn mul<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor {
+pub fn mul<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>>(a: A, b: B) -> Tensor<T> {
     bin_op_helper(a, b, binary_ops::MulOp)
 }
 
@@ -519,12 +541,12 @@ pub fn mul<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor {
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::ones(&[2]);
-/// let ref b = ag::ones(&[2]);
-/// let ref z: ag::Tensor = a / b;
+/// let ref a = ag::ones::<f32, [usize; 1]>(&[2]);
+/// let ref b = ag::ones::<f32, [usize; 1]>(&[2]);
+/// let ref z: ag::Tensor<f32> = a / b;
 /// assert_eq!(z.eval(&[]), Some(ndarray::arr1(&[1., 1.]).into_dyn()));
 /// ```
-pub fn div<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor {
+pub fn div<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>>(a: A, b: B) -> Tensor<T> {
     bin_op_helper(a, b, binary_ops::DivOp)
 }
 
@@ -541,13 +563,13 @@ pub fn div<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor {
 /// extern crate autograd as ag;
 ///
 ///
-/// let a = ag::ones(&[2]);
-/// let ref b = ag::zeros(&[2]);
+/// let a = ag::ones::<f32, [usize; 1]>(&[2]);
+/// let ref b = ag::zeros::<f32, [usize; 1]>(&[2]);
 /// let ref c = ag::mul_inplace(a, b);
 ///
 /// assert_eq!(c.eval(&[]), Some(ndarray::arr1(&[0., 0.]).into_dyn()));
 /// ```
-pub fn mul_inplace<A: AsRef<Tensor>>(a: Tensor, b: A) -> Tensor {
+pub fn mul_inplace<T: Float, A: AsRef<Tensor<T>>>(a: Tensor<T>, b: A) -> Tensor<T> {
     Tensor::builder()
         .set_inputs(vec![&a, b.as_ref()])
         .set_shape(a.shape())
@@ -567,12 +589,12 @@ pub fn mul_inplace<A: AsRef<Tensor>>(a: Tensor, b: A) -> Tensor {
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let a = ag::ones(&[2]);
+/// let a = ag::ones::<f32, [usize; 1]>(&[2]);
 /// let ref c = ag::div_inplace(a, &ag::scalar(2.));
 ///
 /// assert_eq!(c.eval(&[]), Some(ndarray::arr1(&[0.5, 0.5]).into_dyn()));
 /// ```
-pub fn div_inplace<A: AsRef<Tensor>>(a: Tensor, b: A) -> Tensor {
+pub fn div_inplace<T: Float, A: AsRef<Tensor<T>>>(a: Tensor<T>, b: A) -> Tensor<T> {
     Tensor::builder()
         .set_inputs(vec![&a, b.as_ref()])
         .set_shape(a.shape())
@@ -592,13 +614,13 @@ pub fn div_inplace<A: AsRef<Tensor>>(a: Tensor, b: A) -> Tensor {
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let a = ag::ones(&[2]);
-/// let ref b = ag::ones(&[2]);
+/// let a = ag::ones::<f32, [usize; 1]>(&[2]);
+/// let ref b = ag::ones::<f32, [usize; 1]>(&[2]);
 /// let ref c = ag::add_inplace(a, b);
 ///
 /// assert_eq!(c.eval(&[]), Some(ndarray::arr1(&[2., 2.]).into_dyn()));
 /// ```
-pub fn add_inplace<A: AsRef<Tensor>>(a: Tensor, b: A) -> Tensor {
+pub fn add_inplace<T: Float, A: AsRef<Tensor<T>>>(a: Tensor<T>, b: A) -> Tensor<T> {
     Tensor::builder()
         .set_inputs(vec![&a, b.as_ref()])
         .set_shape(a.shape())
@@ -618,13 +640,13 @@ pub fn add_inplace<A: AsRef<Tensor>>(a: Tensor, b: A) -> Tensor {
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let a = ag::ones(&[2, 2]);
-/// let ref b = ag::ones(&[2, 2]);
+/// let a = ag::ones::<f32, [usize; 2]>(&[2, 2]);
+/// let ref b = ag::ones::<f32, [usize; 2]>(&[2, 2]);
 /// let ref c = ag::sub_inplace(a, b);
 ///
 /// assert_eq!(c.eval(&[]), Some(ndarray::arr2(&[[0., 0.], [0., 0.]]).into_dyn()));
 /// ```
-pub fn sub_inplace<A: AsRef<Tensor>>(a: Tensor, b: A) -> Tensor {
+pub fn sub_inplace<T: Float, A: AsRef<Tensor<T>>>(a: Tensor<T>, b: A) -> Tensor<T> {
     Tensor::builder()
         .set_inputs(vec![&a, b.as_ref()])
         .set_shape(a.shape())
@@ -632,7 +654,7 @@ pub fn sub_inplace<A: AsRef<Tensor>>(a: Tensor, b: A) -> Tensor {
 }
 
 /// Elementwise sqrt
-pub fn sqrt<A: AsRef<Tensor>>(x: A) -> Tensor {
+pub fn sqrt<T: Float, A: AsRef<Tensor<T>>>(x: A) -> Tensor<T> {
     Tensor::builder()
         .set_input(x.as_ref())
         .set_shape(x.as_ref().shape())
@@ -640,7 +662,7 @@ pub fn sqrt<A: AsRef<Tensor>>(x: A) -> Tensor {
 }
 
 /// Elementwise pow
-pub fn pow<A: AsRef<Tensor>>(x: A, a: f32) -> Tensor {
+pub fn pow<T: Float, A: AsRef<Tensor<T>>>(x: A, a: T) -> Tensor<T> {
     Tensor::builder()
         .set_input(x.as_ref())
         .set_shape(x.as_ref().shape())
@@ -648,7 +670,7 @@ pub fn pow<A: AsRef<Tensor>>(x: A, a: f32) -> Tensor {
 }
 
 /// Elementwise log
-pub fn log<A: AsRef<Tensor>>(x: A, a: f32) -> Tensor {
+pub fn log<T: Float, A: AsRef<Tensor<T>>>(x: A, a: T) -> Tensor<T> {
     Tensor::builder()
         .set_input(x.as_ref())
         .set_shape(x.as_ref().shape())
@@ -656,7 +678,7 @@ pub fn log<A: AsRef<Tensor>>(x: A, a: f32) -> Tensor {
 }
 
 /// Elementwise exponential
-pub fn exp<A: AsRef<Tensor>>(x: A) -> Tensor {
+pub fn exp<T: Float, A: AsRef<Tensor<T>>>(x: A) -> Tensor<T> {
     Tensor::builder()
         .set_input(x.as_ref())
         .set_shape(x.as_ref().shape())
@@ -674,7 +696,7 @@ pub fn exp<A: AsRef<Tensor>>(x: A) -> Tensor {
 /// let ref c = ag::maximum(a, b);
 /// assert_eq!(c.eval(&[]), Some(ndarray::arr1(&[3., 2., 3.]).into_dyn()));
 /// ```
-pub fn maximum<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor {
+pub fn maximum<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>>(a: A, b: B) -> Tensor<T> {
     Tensor::builder()
         .set_inputs(vec![a.as_ref(), b.as_ref()])
         .build(math_ops::Maximum)
@@ -691,7 +713,7 @@ pub fn maximum<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor {
 /// let ref c = ag::minimum(a, b);
 /// assert_eq!(c.eval(&[]), Some(ndarray::arr1(&[1., 2., 1.]).into_dyn()));
 /// ```
-pub fn minimum<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor {
+pub fn minimum<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>>(a: A, b: B) -> Tensor<T> {
     Tensor::builder()
         .set_inputs(vec![a.as_ref(), b.as_ref()])
         .build(math_ops::Minimum)
@@ -705,15 +727,15 @@ pub fn minimum<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor {
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::ones(&[2, 2]);
-/// let ref b = ag::ones(&[2, 2]);
-/// let ref c = ag::ones(&[2, 2]);
+/// let ref a = ag::ones::<f32, [usize; 2]>(&[2, 2]);
+/// let ref b = ag::ones::<f32, [usize; 2]>(&[2, 2]);
+/// let ref c = ag::ones::<f32, [usize; 2]>(&[2, 2]);
 /// let ref d = ag::add_n(&[a, b, c]);
 ///
 /// assert_eq!(d.eval(&[]).as_ref().unwrap().shape(), &[2, 2]);
 /// assert_eq!(d.eval(&[]), Some(ndarray::arr2(&[[3., 3.], [3., 3.]]).into_dyn()));
 /// ```
-pub fn add_n(xs: &[&Tensor]) -> Tensor {
+pub fn add_n<T: Float>(xs: &[&Tensor<T>]) -> Tensor<T> {
     let len = xs.len();
     assert_ne!(len, 0);
     if len == 1 {
@@ -743,7 +765,7 @@ pub fn add_n(xs: &[&Tensor]) -> Tensor {
 ///
 /// assert_eq!(c.eval(&[]), Some(ndarray::arr1(&[0., 1., 0.]).into_dyn()));
 /// ```
-pub fn equal<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor {
+pub fn equal<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>>(a: A, b: B) -> Tensor<T> {
     Tensor::builder()
         .set_inputs(vec![a.as_ref(), b.as_ref()])
         .build(math_ops::Equal)
@@ -766,7 +788,7 @@ pub fn equal<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor {
 ///
 /// assert_eq!(c.eval(&[]), Some(ndarray::arr1(&[1., 0., 1.]).into_dyn()));
 /// ```
-pub fn not_equal<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor {
+pub fn not_equal<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>>(a: A, b: B) -> Tensor<T> {
     Tensor::builder()
         .set_inputs(vec![a.as_ref(), b.as_ref()])
         .build(math_ops::NotEqual)
@@ -785,7 +807,7 @@ pub fn not_equal<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor {
 ///
 /// assert_eq!(y.eval(&[]), Some(ndarray::arr1(&[1., 0.]).into_dyn()));
 /// ```
-pub fn argmax<A: AsRef<Tensor>>(x: A, axis: isize, keep_dim: bool) -> Tensor {
+pub fn argmax<T: Float, A: AsRef<Tensor<T>>>(x: A, axis: isize, keep_dim: bool) -> Tensor<T> {
     let op = reduction_ops::ArgMax { axis, keep_dim };
     Tensor::builder().set_input(x.as_ref()).build(op)
 }
@@ -797,12 +819,12 @@ pub fn argmax<A: AsRef<Tensor>>(x: A, axis: isize, keep_dim: bool) -> Tensor {
 /// ```
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::zeros(&[3]);
+/// let ref a = ag::zeros::<f32, [usize; 1]>(&[3]);
 /// let ref b = ag::expand_dims(a, &[0, 2]);
 ///
 /// assert_eq!(b.eval(&[]).unwrap().shape(), &[1, 3, 1]);
 /// ```
-pub fn expand_dims<A: AsRef<Tensor>, T: ArrayLike>(x: A, axes: &T) -> Tensor {
+pub fn expand_dims<T: Float, A: AsRef<Tensor<T>>, AL: ArrayLike<T>>(x: A, axes: &AL) -> Tensor<T> {
     Tensor::builder()
         .set_inputs(vec![x.as_ref(), &axes.as_tensor()])
         .build(array_ops::ExpandDims)
@@ -815,12 +837,12 @@ pub fn expand_dims<A: AsRef<Tensor>, T: ArrayLike>(x: A, axes: &T) -> Tensor {
 /// ```
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::zeros(&[1, 3, 1]);
+/// let ref a = ag::zeros::<f32, [usize; 3]>(&[1, 3, 1]);
 /// let ref b = ag::squeeze(a, &[0, 2]);
 ///
 /// assert_eq!(b.eval(&[]).unwrap().shape(), &[3]);
 /// ```
-pub fn squeeze<A: AsRef<Tensor>, T: ArrayLike>(x: A, axes: &T) -> Tensor {
+pub fn squeeze<T: Float, A: AsRef<Tensor<T>>, AL: ArrayLike<T>>(x: A, axes: &AL) -> Tensor<T> {
     let op = array_ops::Squeeze;
     Tensor::builder()
         .set_inputs(vec![x.as_ref(), &axes.as_tensor()])
@@ -844,7 +866,7 @@ pub fn squeeze<A: AsRef<Tensor>, T: ArrayLike>(x: A, axes: &T) -> Tensor {
 ///     Some(ndarray::arr2(&[[2., 2.], [3., 3.], [2., 2.], [3., 3.]]).into_dyn())
 /// );
 /// ```
-pub fn tile<A: AsRef<Tensor>>(x: A, axis: isize, num: usize) -> Tensor {
+pub fn tile<T: Float, A: AsRef<Tensor<T>>>(x: A, axis: isize, num: usize) -> Tensor<T> {
     let op = array_ops::Tile { axis, num };
     Tensor::builder().set_input(x.as_ref()).build(op)
 }
@@ -860,7 +882,7 @@ pub fn tile<A: AsRef<Tensor>>(x: A, axis: isize, num: usize) -> Tensor {
 ///
 /// assert_eq!(y.eval(&[]), Some(ndarray::arr1(&[3., 4., 5.]).into_dyn()));
 /// ```
-pub fn clip<A: AsRef<Tensor>>(x: A, min: f32, max: f32) -> Tensor {
+pub fn clip<T: Float, A: AsRef<Tensor<T>>>(x: A, min: T, max: T) -> Tensor<T> {
     let op = array_ops::Clip { min, max };
     Tensor::builder().set_input(x.as_ref()).build(op)
 }
@@ -878,7 +900,11 @@ pub fn clip<A: AsRef<Tensor>>(x: A, min: f32, max: f32) -> Tensor {
 ///
 /// assert_eq!(y.eval(&[]), Some(ndarray::arr1(&[3., 4.]).into_dyn()));
 /// ```
-pub fn reduce_max<T: ArrayLike, A: AsRef<Tensor>>(x: A, axes: &T, keep_dims: bool) -> Tensor {
+pub fn reduce_max<AL: ArrayLike<T>, T: Float, A: AsRef<Tensor<T>>>(
+    x: A,
+    axes: &AL,
+    keep_dims: bool,
+) -> Tensor<T> {
     let op = reduction_ops::ReduceMax {
         keep_dims,
         sparse_axes: false,
@@ -901,7 +927,11 @@ pub fn reduce_max<T: ArrayLike, A: AsRef<Tensor>>(x: A, axes: &T, keep_dims: boo
 ///
 /// assert_eq!(y.eval(&[]), Some(ndarray::arr1(&[2., 1.]).into_dyn()));
 /// ```
-pub fn reduce_min<T: ArrayLike, A: AsRef<Tensor>>(x: A, axes: &T, keep_dims: bool) -> Tensor {
+pub fn reduce_min<AL: ArrayLike<T>, T: Float, A: AsRef<Tensor<T>>>(
+    x: A,
+    axes: &AL,
+    keep_dims: bool,
+) -> Tensor<T> {
     let op = reduction_ops::ReduceMin {
         keep_dims,
         sparse_axes: false,
@@ -924,7 +954,11 @@ pub fn reduce_min<T: ArrayLike, A: AsRef<Tensor>>(x: A, axes: &T, keep_dims: boo
 ///
 /// assert_eq!(y.eval(&[]), Some(ndarray::arr1(&[6., 4.]).into_dyn()));
 /// ```
-pub fn reduce_sum<T: ArrayLike, A: AsRef<Tensor>>(x: A, axes: &T, keep_dims: bool) -> Tensor {
+pub fn reduce_sum<AL: ArrayLike<T>, T: Float, A: AsRef<Tensor<T>>>(
+    x: A,
+    axes: &AL,
+    keep_dims: bool,
+) -> Tensor<T> {
     let op = reduction_ops::ReduceSum {
         keep_dims,
         sparse_axes: false,
@@ -947,7 +981,11 @@ pub fn reduce_sum<T: ArrayLike, A: AsRef<Tensor>>(x: A, axes: &T, keep_dims: boo
 ///
 /// assert_eq!(y.eval(&[]), Some(ndarray::arr1(&[3., 2.]).into_dyn()));
 /// ```
-pub fn reduce_mean<T: ArrayLike, A: AsRef<Tensor>>(x: A, axes: &T, keep_dims: bool) -> Tensor {
+pub fn reduce_mean<AL: ArrayLike<T>, T: Float, A: AsRef<Tensor<T>>>(
+    x: A,
+    axes: &AL,
+    keep_dims: bool,
+) -> Tensor<T> {
     let op = reduction_ops::ReduceMean {
         keep_dims,
         sparse_axes: false,
@@ -970,7 +1008,11 @@ pub fn reduce_mean<T: ArrayLike, A: AsRef<Tensor>>(x: A, axes: &T, keep_dims: bo
 ///
 /// assert_eq!(y.eval(&[]), Some(ndarray::arr1(&[8., 3.]).into_dyn()));
 /// ```
-pub fn reduce_prod<T: ArrayLike, A: AsRef<Tensor>>(x: A, axes: &T, keep_dims: bool) -> Tensor {
+pub fn reduce_prod<AL: ArrayLike<T>, T: Float, A: AsRef<Tensor<T>>>(
+    x: A,
+    axes: &AL,
+    keep_dims: bool,
+) -> Tensor<T> {
     let op = reduction_ops::ReduceProd {
         keep_dims,
         sparse_axes: false,
@@ -988,12 +1030,12 @@ pub fn reduce_prod<T: ArrayLike, A: AsRef<Tensor>>(x: A, axes: &T, keep_dims: bo
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref x = ag::zeros(&[3, 2, 2]);
+/// let ref x = ag::zeros::<f32, [usize; 3]>(&[3, 2, 2]);
 /// let ref y = ag::reshape(&x, &[3, -1]);
 ///
-/// assert_eq!(y.eval(&[]), Some(ag::ndarray_ext::zeros(&[3, 4])));
+/// assert_eq!(y.eval(&[]), Some(ag::ndarray_ext::zeros::<f32>(&[3, 4])));
 /// ```
-pub fn reshape<T: ArrayLike, A: AsRef<Tensor>>(x: A, shape: &T) -> Tensor {
+pub fn reshape<AL: ArrayLike<T>, T: Float, A: AsRef<Tensor<T>>>(x: A, shape: &AL) -> Tensor<T> {
     Tensor::builder()
         .set_inputs(vec![x.as_ref(), &shape.as_tensor()])
         .build(array_ops::Reshape)
@@ -1004,13 +1046,13 @@ pub fn reshape<T: ArrayLike, A: AsRef<Tensor>>(x: A, shape: &T) -> Tensor {
 /// ```
 /// extern crate autograd as ag;
 ///
-/// let ref x = ag::zeros(&[3, 2, 2]);
+/// let ref x = ag::zeros::<f32, [usize; 3]>(&[3, 2, 2]);
 /// let ref z = ag::flatten(x);
 /// assert_eq!(z.eval(&[]).unwrap().shape(), &[12]);
 /// ```
-pub fn flatten<A: AsRef<Tensor>>(x: A) -> Tensor {
+pub fn flatten<T: Float, A: AsRef<Tensor<T>>>(x: A) -> Tensor<T> {
     Tensor::builder()
-        .set_inputs(vec![x.as_ref(), &scalar(-1.)])
+        .set_inputs(vec![x.as_ref(), &scalar(T::one().neg())])
         .set_shape(x.as_ref().shape())
         .build(array_ops::Reshape)
 }
@@ -1028,7 +1070,7 @@ pub fn flatten<A: AsRef<Tensor>>(x: A) -> Tensor {
 ///     &[-1., 1., 0.]
 /// );
 /// ```
-pub fn sign<A: AsRef<Tensor>>(a: A) -> Tensor {
+pub fn sign<T: Float, A: AsRef<Tensor<T>>>(a: A) -> Tensor<T> {
     Tensor::builder()
         .set_shape(a.as_ref().shape())
         .set_input(a.as_ref())
@@ -1048,7 +1090,7 @@ pub fn sign<A: AsRef<Tensor>>(a: A) -> Tensor {
 ///     Some(ndarray::arr1(&[0.2, 0., 0.2]).into_dyn())
 /// );
 /// ```
-pub fn abs<A: AsRef<Tensor>>(a: A) -> Tensor {
+pub fn abs<T: Float, A: AsRef<Tensor<T>>>(a: A) -> Tensor<T> {
     Tensor::builder()
         .set_shape(a.as_ref().shape())
         .set_input(a.as_ref())
@@ -1068,7 +1110,7 @@ pub fn abs<A: AsRef<Tensor>>(a: A) -> Tensor {
 ///     Some(ndarray::arr1(&[-2., -2., -1.,  0.,  1.,  1.,  2.]).into_dyn())
 /// );
 /// ```
-pub fn floor<A: AsRef<Tensor>>(a: A) -> Tensor {
+pub fn floor<T: Float, A: AsRef<Tensor<T>>>(a: A) -> Tensor<T> {
     Tensor::builder()
         .set_shape(a.as_ref().shape())
         .set_input(a.as_ref())
@@ -1088,7 +1130,7 @@ pub fn floor<A: AsRef<Tensor>>(a: A) -> Tensor {
 ///     Some(ndarray::arr1(&[-2., -3.]).into_dyn())
 /// );
 /// ```
-pub fn neg<A: AsRef<Tensor>>(a: A) -> Tensor {
+pub fn neg<T: Float, A: AsRef<Tensor<T>>>(a: A) -> Tensor<T> {
     Tensor::builder()
         .set_shape(a.as_ref().shape())
         .set_input(a.as_ref())
@@ -1108,7 +1150,7 @@ pub fn neg<A: AsRef<Tensor>>(a: A) -> Tensor {
 ///     Some(ndarray::arr1(&[4., 9.]).into_dyn())
 /// );
 /// ```
-pub fn square<A: AsRef<Tensor>>(a: A) -> Tensor {
+pub fn square<T: Float, A: AsRef<Tensor<T>>>(a: A) -> Tensor<T> {
     Tensor::builder()
         .set_shape(a.as_ref().shape())
         .set_input(a.as_ref())
@@ -1128,7 +1170,7 @@ pub fn square<A: AsRef<Tensor>>(a: A) -> Tensor {
 ///     Some(ndarray::arr1(&[0.5]).into_dyn())
 /// );
 /// ```
-pub fn reciprocal<A: AsRef<Tensor>>(x: A) -> Tensor {
+pub fn reciprocal<T: Float, A: AsRef<Tensor<T>>>(x: A) -> Tensor<T> {
     Tensor::builder()
         .set_shape(x.as_ref().shape())
         .set_input(x.as_ref())
@@ -1148,7 +1190,7 @@ pub fn reciprocal<A: AsRef<Tensor>>(x: A) -> Tensor {
 ///     Some(ndarray::arr1(&[-1., -1., -0.,  1.,  2.,  2.,  2.]).into_dyn())
 /// );
 /// ```
-pub fn ceil<A: AsRef<Tensor>>(a: A) -> Tensor {
+pub fn ceil<T: Float, A: AsRef<Tensor<T>>>(a: A) -> Tensor<T> {
     Tensor::builder()
         .set_shape(a.as_ref().shape())
         .set_input(a.as_ref())
@@ -1159,7 +1201,7 @@ pub fn ceil<A: AsRef<Tensor>>(a: A) -> Tensor {
 ///
 /// # Panics
 /// When broadcast is impossible
-pub fn greater<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor {
+pub fn greater<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>>(a: A, b: B) -> Tensor<T> {
     Tensor::builder()
         .set_inputs(vec![a.as_ref(), b.as_ref()])
         .build(math_ops::Greater)
@@ -1169,7 +1211,7 @@ pub fn greater<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor {
 ///
 /// # Panics
 /// When broadcast is impossible
-pub fn greater_equal<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor {
+pub fn greater_equal<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>>(a: A, b: B) -> Tensor<T> {
     Tensor::builder()
         .set_inputs(vec![a.as_ref(), b.as_ref()])
         .build(math_ops::GreaterEqual)
@@ -1179,7 +1221,7 @@ pub fn greater_equal<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor {
 ///
 /// # Panics
 /// When broadcast is impossible
-pub fn lesser<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor {
+pub fn lesser<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>>(a: A, b: B) -> Tensor<T> {
     Tensor::builder()
         .set_inputs(vec![a.as_ref(), b.as_ref()])
         .build(math_ops::Lesser)
@@ -1189,14 +1231,14 @@ pub fn lesser<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor {
 ///
 /// # Panics
 /// When broadcast is impossible
-pub fn lesser_equal<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor {
+pub fn lesser_equal<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>>(a: A, b: B) -> Tensor<T> {
     Tensor::builder()
         .set_inputs(vec![a.as_ref(), b.as_ref()])
         .build(math_ops::LesserEqual)
 }
 
 /// Elementwise logistic sigmoid function.
-pub fn sigmoid<A: AsRef<Tensor>>(x: A) -> Tensor {
+pub fn sigmoid<T: Float, A: AsRef<Tensor<T>>>(x: A) -> Tensor<T> {
     Tensor::builder()
         .set_shape(x.as_ref().shape())
         .set_input(x.as_ref())
@@ -1206,7 +1248,7 @@ pub fn sigmoid<A: AsRef<Tensor>>(x: A) -> Tensor {
 /// Elementwise exponential linear unit.
 ///
 /// See https://arxiv.org/abs/1511.07289
-pub fn elu<A: AsRef<Tensor>>(x: A, alpha: f32) -> Tensor {
+pub fn elu<T: Float, A: AsRef<Tensor<T>>>(x: A, alpha: T) -> Tensor<T> {
     Tensor::builder()
         .set_shape(x.as_ref().shape())
         .set_input(x.as_ref())
@@ -1214,7 +1256,7 @@ pub fn elu<A: AsRef<Tensor>>(x: A, alpha: f32) -> Tensor {
 }
 
 /// Elementwise rectified linear unit.
-pub fn relu<A: AsRef<Tensor>>(x: A) -> Tensor {
+pub fn relu<T: Float, A: AsRef<Tensor<T>>>(x: A) -> Tensor<T> {
     Tensor::builder()
         .set_shape(x.as_ref().shape())
         .set_input(x.as_ref())
@@ -1226,12 +1268,12 @@ pub fn relu<A: AsRef<Tensor>>(x: A) -> Tensor {
 /// In common, `alpha` is around 0.1 ~ 0.2.
 ///
 /// See http://web.stanford.edu/~awni/papers/relu_hybrid_icml2013_final.pdf
-pub fn leaky_relu<A: AsRef<Tensor>>(x: A, alpha: f32) -> Tensor {
-    maximum(&x, alpha * x.as_ref())
+pub fn leaky_relu<T: Float, A: AsRef<Tensor<T>>>(x: A, alpha: T) -> Tensor<T> {
+    maximum(&x, scalar(alpha) * x.as_ref())
 }
 
 /// Elementwise softplus.
-pub fn softplus<A: AsRef<Tensor>>(x: A) -> Tensor {
+pub fn softplus<T: Float, A: AsRef<Tensor<T>>>(x: A) -> Tensor<T> {
     Tensor::builder()
         .set_shape(x.as_ref().shape())
         .set_input(x.as_ref())
@@ -1241,7 +1283,11 @@ pub fn softplus<A: AsRef<Tensor>>(x: A) -> Tensor {
 /// Computes `log(sum(exp(x)))` along specified axis.
 ///
 /// `axis` can be negative.
-pub fn reduce_logsumexp<A: AsRef<Tensor>>(x: A, axis: isize, keep_dim: bool) -> Tensor {
+pub fn reduce_logsumexp<T: Float, A: AsRef<Tensor<T>>>(
+    x: A,
+    axis: isize,
+    keep_dim: bool,
+) -> Tensor<T> {
     let op = math_ops::LogSumExp {
         axis,
         keep_dims: keep_dim,
@@ -1254,7 +1300,7 @@ pub fn reduce_logsumexp<A: AsRef<Tensor>>(x: A, axis: isize, keep_dim: bool) -> 
 /// Computes `softmax(x)` along specified axis and
 /// takes logarithm of it.
 /// `axis` can be negative.
-pub fn log_softmax<A: AsRef<Tensor>>(x: A, axis: isize) -> Tensor {
+pub fn log_softmax<T: Float, A: AsRef<Tensor<T>>>(x: A, axis: isize) -> Tensor<T> {
     Tensor::builder()
         .set_shape(x.as_ref().shape())
         .set_input(x.as_ref())
@@ -1264,7 +1310,7 @@ pub fn log_softmax<A: AsRef<Tensor>>(x: A, axis: isize) -> Tensor {
 /// Computes softmax along specified axis
 ///
 /// `axis` can be negative.
-pub fn softmax<A: AsRef<Tensor>>(x: A, axis: isize) -> Tensor {
+pub fn softmax<T: Float, A: AsRef<Tensor<T>>>(x: A, axis: isize) -> Tensor<T> {
     let op = activation_ops::Softmax { axis };
     Tensor::builder().set_input(x.as_ref()).build(op)
 }
@@ -1283,7 +1329,10 @@ pub fn softmax<A: AsRef<Tensor>>(x: A, axis: isize) -> Tensor {
 ///
 /// # Returns
 /// Loss tensor with same shape as inputs's shapes
-pub fn sigmoid_cross_entropy<A: AsRef<Tensor>, B: AsRef<Tensor>>(y: A, t: B) -> Tensor {
+pub fn sigmoid_cross_entropy<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>>(
+    y: A,
+    t: B,
+) -> Tensor<T> {
     let op = xent_ops::SigmoidCrossEntropy;
     Tensor::builder()
         .set_shape(y.as_ref().shape())
@@ -1302,7 +1351,10 @@ pub fn sigmoid_cross_entropy<A: AsRef<Tensor>, B: AsRef<Tensor>>(y: A, t: B) -> 
 ///
 /// # Returns
 /// Loss tensor with shape (batch_size, 1)
-pub fn softmax_cross_entropy<A: AsRef<Tensor>, B: AsRef<Tensor>>(y: A, t: B) -> Tensor {
+pub fn softmax_cross_entropy<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>>(
+    y: A,
+    t: B,
+) -> Tensor<T> {
     let op = xent_ops::SoftmaxCrossEntropy;
     Tensor::builder()
         .set_inputs(vec![y.as_ref(), t.as_ref()])
@@ -1320,7 +1372,10 @@ pub fn softmax_cross_entropy<A: AsRef<Tensor>, B: AsRef<Tensor>>(y: A, t: B) -> 
 ///
 /// # Returns
 /// Loss tensor with shape (batch_size, 1)
-pub fn sparse_softmax_cross_entropy<A: AsRef<Tensor>, B: AsRef<Tensor>>(y: A, t: B) -> Tensor {
+pub fn sparse_softmax_cross_entropy<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>>(
+    y: A,
+    t: B,
+) -> Tensor<T> {
     let op = xent_ops::SparseSoftmaxCrossEntropy;
     Tensor::builder()
         .set_inputs(vec![y.as_ref(), t.as_ref()])
@@ -1334,13 +1389,13 @@ pub fn sparse_softmax_cross_entropy<A: AsRef<Tensor>, B: AsRef<Tensor>>(y: A, t:
 /// ```
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::zeros(&[4, 2]);
-/// let ref b = ag::zeros(&[2, 3]);
+/// let ref a = ag::zeros::<f32, [usize; 2]>(&[4, 2]);
+/// let ref b = ag::zeros::<f32, [usize; 2]>(&[2, 3]);
 /// let ref c = ag::matmul(a, b);
 ///
 /// assert_eq!(c.eval(&[]).unwrap().shape(), &[4, 3]);
 /// ```
-pub fn matmul<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor {
+pub fn matmul<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>>(a: A, b: B) -> Tensor<T> {
     let op = dot_ops::MatMul {
         transpose_a: false,
         transpose_b: false,
@@ -1360,18 +1415,18 @@ pub fn matmul<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor {
 /// ```
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::zeros(&[2, 4]);
-/// let ref b = ag::zeros(&[2, 3]);
+/// let ref a = ag::zeros::<f32, [usize; 2]>(&[2, 4]);
+/// let ref b = ag::zeros::<f32, [usize; 2]>(&[2, 3]);
 /// let ref c = ag::matmul_t(a, b, true, false);
 ///
 /// assert_eq!(c.eval(&[]).unwrap().shape(), &[4, 3]);
 /// ```
-pub fn matmul_t<A: AsRef<Tensor>, B: AsRef<Tensor>>(
+pub fn matmul_t<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>>(
     a: A,
     b: B,
     transpose_a: bool,
     transpose_b: bool,
-) -> Tensor {
+) -> Tensor<T> {
     let op = dot_ops::MatMul {
         transpose_a,
         transpose_b,
@@ -1397,32 +1452,37 @@ pub fn matmul_t<A: AsRef<Tensor>, B: AsRef<Tensor>>(
 /// extern crate autograd as ag;
 ///
 ///
-/// let ref a = ag::zeros(&[3, 4, 5]);
-/// let ref b = ag::zeros(&[4, 3, 2]);
+/// let ref a = ag::zeros::<f32, [usize; 3]>(&[3, 4, 5]);
+/// let ref b = ag::zeros::<f32, [usize; 3]>(&[4, 3, 2]);
 /// let ref c = ag::tensordot(a, b, &[1, 0], &[0, 1]);
 /// assert_eq!(c.eval(&[]).unwrap().shape(), &[5, 2]);
 /// ```
 ///
 /// For detailed description,
 /// see https://docs.scipy.org/doc/numpy/reference/generated/numpy.tensordot.html.
-pub fn tensordot<A, B, T>(a: A, b: B, a_axes: &T, b_axes: &T) -> Tensor
+pub fn tensordot<A, B, AL, T>(a: A, b: B, a_axes: &AL, b_axes: &AL) -> Tensor<T>
 where
-    T: ArrayLike,
-    A: AsRef<Tensor>,
-    B: AsRef<Tensor>,
+    T: Float,
+    A: AsRef<Tensor<T>>,
+    B: AsRef<Tensor<T>>,
+    AL: ArrayLike<T>,
 {
-    fn normalize_negative_axes(axes: &Tensor, x_rank: &Tensor) -> Tensor {
+    fn normalize_negative_axes<T: Float>(axes: &Tensor<T>, x_rank: &Tensor<T>) -> Tensor<T> {
         let ref zero = zeros(&axes.shape());
         let ge = greater_equal(axes, zero);
         let lt = lesser(axes, zero);
         add_inplace(mul_inplace(ge, axes), &mul_inplace(lt, &(axes + x_rank)))
     }
 
-    fn preprocess<T: ArrayLike>(x: &Tensor, axes: &T, flip: bool) -> (Tensor, Tensor) {
+    fn preprocess<T: Float, AL: ArrayLike<T>>(
+        x: &Tensor<T>,
+        axes: &AL,
+        flip: bool,
+    ) -> (Tensor<T>, Tensor<T>) {
         let ref x_shape = x.shape();
         let ref x_rank = x.rank();
         let ref axes = normalize_negative_axes(&axes.as_tensor(), x_rank);
-        let ref free = setdiff1d(&range(&scalar(0.), x_rank, &scalar(1.)), axes);
+        let ref free = setdiff1d(&range(&scalar(T::zero()), x_rank, &scalar(T::one())), axes);
 
         let free_dims = gather(x_shape, free, 0);
         let ref axes_dims = gather(x_shape, axes, 0);
@@ -1461,15 +1521,15 @@ where
 /// ```
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::zeros(&[2, 3, 4, 2]);
-/// let ref b = ag::zeros(&[2, 3, 2, 3]);
+/// let ref a = ag::zeros::<f32, [usize; 4]>(&[2, 3, 4, 2]);
+/// let ref b = ag::zeros::<f32, [usize; 4]>(&[2, 3, 2, 3]);
 /// let ref c = ag::batch_matmul(a, b);
 ///
 /// assert_eq!(c.eval(&[]).unwrap().shape(), &[2, 3, 4, 3]);
 /// ```
 ///
 /// For detailed description, see https://www.tensorflow.org/api_docs/python/tf/matmul
-pub fn batch_matmul<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor {
+pub fn batch_matmul<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>>(a: A, b: B) -> Tensor<T> {
     let op = dot_ops::BatchMatMul {
         transpose_a: false,
         transpose_b: false,
@@ -1497,7 +1557,7 @@ pub fn batch_matmul<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor {
 /// )
 /// ```
 ///
-pub fn setdiff1d<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor {
+pub fn setdiff1d<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>>(a: A, b: B) -> Tensor<T> {
     let op = array_ops::SetDiff1D;
     Tensor::builder()
         .set_inputs(vec![a.as_ref(), b.as_ref()])
@@ -1511,12 +1571,12 @@ pub fn setdiff1d<A: AsRef<Tensor>, B: AsRef<Tensor>>(a: A, b: B) -> Tensor {
 /// ```
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::zeros(&[1, 2, 3, 4, 5]);
+/// let ref a = ag::zeros::<f32, [usize; 5]>(&[1, 2, 3, 4, 5]);
 /// let ref b = ag::transpose(a, &[4, 2, 3, 0, 1]);
 ///
 /// assert_eq!(b.eval(&[]).unwrap().shape(), &[5, 3, 4, 1, 2]);
 /// ```
-pub fn transpose<T: ArrayLike, A: AsRef<Tensor>>(x: A, perm: &T) -> Tensor {
+pub fn transpose<AL: ArrayLike<T>, T: Float, A: AsRef<Tensor<T>>>(x: A, perm: &AL) -> Tensor<T> {
     let op = math_ops::Transpose { zip: true };
     Tensor::builder()
         .set_inputs(vec![x.as_ref(), &perm.as_tensor()])
@@ -1533,7 +1593,7 @@ pub fn transpose<T: ArrayLike, A: AsRef<Tensor>>(x: A, perm: &T) -> Tensor {
 /// ```
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::zeros(&[3, 7, 5]);
+/// let ref a = ag::zeros::<f32, [usize; 3]>(&[3, 7, 5]);
 /// let ref b = ag::split(a, &[2, 3, 2], 1);
 ///
 /// let evaluated = ag::eval(&[&b[0], &b[1], &b[2]], &[]);
@@ -1545,7 +1605,7 @@ pub fn transpose<T: ArrayLike, A: AsRef<Tensor>>(x: A, perm: &T) -> Tensor {
 /// assert_eq!(e1.as_ref().unwrap().shape(), &[3, 3, 5]);
 /// assert_eq!(e2.as_ref().unwrap().shape(), &[3, 2, 5]);
 /// ```
-pub fn split<A: AsRef<Tensor>>(x: A, sizes: &[usize], axis: isize) -> Vec<Tensor> {
+pub fn split<T: Float, A: AsRef<Tensor<T>>>(x: A, sizes: &[usize], axis: isize) -> Vec<Tensor<T>> {
     (0..sizes.len())
         .map(|i| {
             let op = array_ops::Split {
@@ -1569,12 +1629,12 @@ pub fn split<A: AsRef<Tensor>>(x: A, sizes: &[usize], axis: isize) -> Vec<Tensor
 /// ```
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::zeros(&[4, 4]);
+/// let ref a = ag::zeros::<f32, [usize; 2]>(&[4, 4]);
 /// let ref b = ag::slice(a, &[0, 0], &[-1, 2]); // numpy equivalent is a[:, 0:2]
 ///
 /// assert_eq!(b.eval(&[]).unwrap().shape(), &[4, 2]);
 /// ```
-pub fn slice<A: AsRef<Tensor>>(x: A, starts: &[isize], ends: &[isize]) -> Tensor {
+pub fn slice<T: Float, A: AsRef<Tensor<T>>>(x: A, starts: &[isize], ends: &[isize]) -> Tensor<T> {
     // TODO: Make starts and ends ArrayLike
     assert_eq!(starts.len(), ends.len());
     let starts_ends = starts.iter().zip(ends.iter());
@@ -1596,14 +1656,14 @@ pub fn slice<A: AsRef<Tensor>>(x: A, starts: &[isize], ends: &[isize]) -> Tensor
 /// ```
 /// extern crate autograd as ag;
 ///
-/// let ref a = ag::zeros(&[3, 2]);
-/// let ref b = ag::zeros(&[3, 2]);
-/// let ref c = ag::zeros(&[3, 2]);
+/// let ref a = ag::zeros::<f32, [usize; 2]>(&[3, 2]);
+/// let ref b = ag::zeros::<f32, [usize; 2]>(&[3, 2]);
+/// let ref c = ag::zeros::<f32, [usize; 2]>(&[3, 2]);
 /// let ref d = ag::concat(&[a, b, c], 0);
 ///
 /// assert_eq!(d.eval(&[]).unwrap().shape(), &[9, 2]);
 /// ```
-pub fn concat(tensors: &[&Tensor], axis: isize) -> Tensor {
+pub fn concat<T: Float>(tensors: &[&Tensor<T>], axis: isize) -> Tensor<T> {
     let op = array_ops::Concat { axis };
     Tensor::builder().set_inputs(tensors.to_vec()).build(op)
 }
@@ -1622,13 +1682,17 @@ pub fn concat(tensors: &[&Tensor], axis: isize) -> Tensor {
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref param = ag::constant(ag::ndarray_ext::zeros(&[5, 4, 8, 2]));
+/// let ref param = ag::constant(ag::ndarray_ext::zeros::<f32>(&[5, 4, 8, 2]));
 /// let ref indices = ag::constant(ndarray::arr2(&[[5., -1., 3.], [2., 1., -2.]]));
 /// let ref y = ag::gather_common(param, indices, 2);
 ///
 /// assert_eq!(y.eval(&[]).unwrap().shape(), &[5, 4, 2, 3, 2])
 /// ```
-pub fn gather_common<T: ArrayLike, A: AsRef<Tensor>>(param: A, indices: &T, axis: isize) -> Tensor {
+pub fn gather_common<AL: ArrayLike<T>, T: Float, A: AsRef<Tensor<T>>>(
+    param: A,
+    indices: &AL,
+    axis: isize,
+) -> Tensor<T> {
     let op = array_ops::Gather {
         axis,
         should_normalize_negative_indices: true,
@@ -1650,13 +1714,18 @@ pub fn gather_common<T: ArrayLike, A: AsRef<Tensor>>(param: A, indices: &T, axis
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref param = ag::constant(ag::ndarray_ext::zeros(&[5, 4, 8, 2]));
+/// let ref param = ag::constant(ag::ndarray_ext::zeros::<f32>(&[5, 4, 8, 2]));
 /// let ref indices = ag::constant(ndarray::arr2(&[[5., 4., 3.], [2., 1., 0.]]));
 /// let ref y = ag::gather(param, indices, 2);
 ///
 /// assert_eq!(y.eval(&[]).unwrap().shape(), &[5, 4, 2, 3, 2])
 /// ```
-pub fn gather<T: ArrayLike, A: AsRef<Tensor>>(param: A, indices: &T, axis: isize) -> Tensor {
+pub fn gather<AL, T, A>(param: A, indices: &AL, axis: isize) -> Tensor<T>
+where
+    T: Float,
+    AL: ArrayLike<T>,
+    A: AsRef<Tensor<T>>,
+{
     let op = array_ops::Gather {
         axis,
         should_normalize_negative_indices: false,
@@ -1672,7 +1741,7 @@ pub fn gather<T: ArrayLike, A: AsRef<Tensor>>(param: A, indices: &T, axis: isize
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref x = ag::standard_normal(&[3, 4]);
+/// let ref x = ag::standard_normal::<f32, [usize; 2]>(&[3, 4]);
 /// let ref y1 = ag::normalize(x, &[0]);
 /// let ref y2 = ag::normalize(x, &[0]);
 ///
@@ -1682,13 +1751,14 @@ pub fn gather<T: ArrayLike, A: AsRef<Tensor>>(param: A, indices: &T, axis: isize
 /// assert_eq!(e0.as_ref().unwrap().shape(), &[3, 4]);
 /// assert_eq!(e1.as_ref().unwrap().shape(), &[3, 4]);
 /// ```
-pub fn normalize<T: ArrayLike, A: AsRef<Tensor>>(x: A, axes: &T) -> Tensor {
+pub fn normalize<AL: ArrayLike<T>, T: Float, A: AsRef<Tensor<T>>>(x: A, axes: &AL) -> Tensor<T> {
     let x = x.as_ref();
     let axes = axes.as_tensor();
     let ref mean = reduce_mean(x, &axes, true);
     let ref centered = x - mean;
     let ref variance = reduce_mean(square(centered), &axes, true);
-    (x - mean) / sqrt(&(variance + 1e-5))
+    let em5 = T::from(1e-5).unwrap();
+    (x - mean) / sqrt(&(variance + em5))
 }
 
 /// Applies batch normalization.
@@ -1701,24 +1771,33 @@ pub fn normalize<T: ArrayLike, A: AsRef<Tensor>>(x: A, axes: &T) -> Tensor {
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let ref x = ag::standard_normal(&[3, 4]);
-/// let ref scale = ag::variable(ag::ndarray_ext::ones(&[1, 4]));
-/// let ref shift = ag::variable(ag::ndarray_ext::zeros(&[1, 4]));
+/// let ref x = ag::standard_normal::<f32, [usize; 2]>(&[3, 4]);
+/// let ref scale = ag::variable(ag::ndarray_ext::ones::<f32>(&[1, 4]));
+/// let ref shift = ag::variable(ag::ndarray_ext::zeros::<f32>(&[1, 4]));
 /// let ref norm = ag::batch_norm(x, scale, shift);
 ///
 /// assert_eq!(norm.eval(&[]).unwrap().shape(), &[3, 4]);
 /// ```
-pub fn batch_norm<A, B, C>(x: A, scale: B, shift: C) -> Tensor
+pub fn batch_norm<A, B, C, T>(x: A, scale: B, shift: C) -> Tensor<T>
 where
-    A: AsRef<Tensor>,
-    B: AsRef<Tensor>,
-    C: AsRef<Tensor>,
+    T: Float,
+    A: AsRef<Tensor<T>>,
+    B: AsRef<Tensor<T>>,
+    C: AsRef<Tensor<T>>,
 {
     normalize(x, &[0]) * scale.as_ref() + shift.as_ref()
 }
 
 /// Generates a zero-ranked tensor from a scalar value.
-pub fn scalar(val: f32) -> Tensor {
+///
+/// ```
+/// extern crate autograd as ag;
+///
+/// let a = ag::scalar(3.);
+/// println!("{}", a.eval(&[]).unwrap());  // => 3.
+/// assert_eq!(a.eval(&[]).unwrap().shape(), &[]);
+/// ```
+pub fn scalar<T: Float>(val: T) -> Tensor<T> {
     let op = const_gen_ops::Scalar { val };
     Tensor::builder()
         .set_shape(convert_to_tensor(::ndarray_ext::scalar_shape()))
@@ -1726,17 +1805,17 @@ pub fn scalar(val: f32) -> Tensor {
 }
 
 /// Outputs values sampled from the normal distribution.
-pub fn random_normal<T: ArrayLike>(shape: &T, mean: f64, stddev: f64) -> Tensor {
+pub fn random_normal<T: Float, AL: ArrayLike<T>>(shape: &AL, mean: f64, stddev: f64) -> Tensor<T> {
     random_normal_rng(Default::default(), shape, mean, stddev)
 }
 
 /// Outputs values sampled from the normal distribution.
-pub fn random_normal_rng<T: ArrayLike, R: Rng + 'static>(
-    arr_rng: ArrRng<R>,
-    shape: &T,
+pub fn random_normal_rng<T: Float, AL: ArrayLike<T>, R: Rng + 'static>(
+    arr_rng: ArrRng<T, R>,
+    shape: &AL,
     mean: f64,
     stddev: f64,
-) -> Tensor {
+) -> Tensor<T> {
     let shape = shape.as_tensor();
     Tensor::builder()
         .set_input(&shape)
@@ -1745,17 +1824,17 @@ pub fn random_normal_rng<T: ArrayLike, R: Rng + 'static>(
 }
 
 /// Outputs values sampled from the uniform distribution.
-pub fn random_uniform<T: ArrayLike>(shape: &T, min: f64, max: f64) -> Tensor {
+pub fn random_uniform<T: Float, AL: ArrayLike<T>>(shape: &AL, min: f64, max: f64) -> Tensor<T> {
     random_uniform_rng(Default::default(), shape, min, max)
 }
 
 /// Outputs values sampled from the uniform distribution.
-pub fn random_uniform_rng<T: ArrayLike, R: Rng + 'static>(
-    arr_rng: ArrRng<R>,
-    shape: &T,
+pub fn random_uniform_rng<T: Float, AL: ArrayLike<T>, R: Rng + 'static>(
+    arr_rng: ArrRng<T, R>,
+    shape: &AL,
     min: f64,
     max: f64,
-) -> Tensor {
+) -> Tensor<T> {
     let shape = shape.as_tensor();
     Tensor::builder()
         .set_input(&shape)
@@ -1764,15 +1843,15 @@ pub fn random_uniform_rng<T: ArrayLike, R: Rng + 'static>(
 }
 
 /// Outputs values sampled from the standard normal distribution.
-pub fn standard_normal<T: ArrayLike>(shape: &T) -> Tensor {
+pub fn standard_normal<T: Float, AL: ArrayLike<T>>(shape: &AL) -> Tensor<T> {
     standard_normal_rng(Default::default(), shape)
 }
 
 /// Outputs values sampled from the standard normal distribution.
-pub fn standard_normal_rng<T: ArrayLike, R: Rng + 'static>(
-    arr_rng: ArrRng<R>,
-    shape: &T,
-) -> Tensor {
+pub fn standard_normal_rng<T: Float, AL: ArrayLike<T>, R: Rng + 'static>(
+    arr_rng: ArrRng<T, R>,
+    shape: &AL,
+) -> Tensor<T> {
     let shape = shape.as_tensor();
     Tensor::builder()
         .set_input(&shape)
@@ -1781,15 +1860,15 @@ pub fn standard_normal_rng<T: ArrayLike, R: Rng + 'static>(
 }
 
 /// Outputs values sampled from the standard uniform distribution.
-pub fn standard_uniform<T: ArrayLike>(shape: &T) -> Tensor {
+pub fn standard_uniform<T: Float, AL: ArrayLike<T>>(shape: &AL) -> Tensor<T> {
     standard_uniform_rng(Default::default(), shape)
 }
 
 /// Outputs values sampled from the standard uniform distribution.
-pub fn standard_uniform_rng<T: ArrayLike, R: Rng + 'static>(
-    arr_rng: ArrRng<R>,
-    shape: &T,
-) -> Tensor {
+pub fn standard_uniform_rng<T: Float, AL: ArrayLike<T>, R: Rng + 'static>(
+    arr_rng: ArrRng<T, R>,
+    shape: &AL,
+) -> Tensor<T> {
     let shape = shape.as_tensor();
     Tensor::builder()
         .set_input(&shape)
@@ -1798,16 +1877,16 @@ pub fn standard_uniform_rng<T: ArrayLike, R: Rng + 'static>(
 }
 
 /// Outputs values sampled from the bernoulli distribution.
-pub fn bernoulli<T: ArrayLike>(shape: &T, p: f64) -> Tensor {
+pub fn bernoulli<T: Float, AL: ArrayLike<T>>(shape: &AL, p: f64) -> Tensor<T> {
     bernoulli_rng(Default::default(), shape, p)
 }
 
 /// Outputs values sampled from the bernoulli distribution.
-pub fn bernoulli_rng<T: ArrayLike, R: Rng + 'static>(
-    arr_rng: ArrRng<R>,
-    shape: &T,
+pub fn bernoulli_rng<T: Float, AL: ArrayLike<T>, R: Rng + 'static>(
+    arr_rng: ArrRng<T, R>,
+    shape: &AL,
     p: f64,
-) -> Tensor {
+) -> Tensor<T> {
     let shape = shape.as_tensor();
     Tensor::builder()
         .set_input(&shape)
@@ -1816,16 +1895,16 @@ pub fn bernoulli_rng<T: ArrayLike, R: Rng + 'static>(
 }
 
 /// Outputs values sampled from the exponential distribution.
-pub fn random_exp<T: ArrayLike>(shape: &T, lambda: f64) -> Tensor {
+pub fn random_exp<T: Float, AL: ArrayLike<T>>(shape: &AL, lambda: f64) -> Tensor<T> {
     random_exp_rng(Default::default(), shape, lambda)
 }
 
 /// Outputs values sampled from the exponential distribution.
-pub fn random_exp_rng<T: ArrayLike, R: Rng + 'static>(
-    arr_rng: ArrRng<R>,
-    shape: &T,
+pub fn random_exp_rng<T: Float + 'static, AL: ArrayLike<T>, R: Rng + 'static>(
+    arr_rng: ArrRng<T, R>,
+    shape: &AL,
     lambda: f64,
-) -> Tensor {
+) -> Tensor<T> {
     let shape = shape.as_tensor();
     Tensor::builder()
         .set_input(&shape)
@@ -1834,17 +1913,21 @@ pub fn random_exp_rng<T: ArrayLike, R: Rng + 'static>(
 }
 
 /// Outputs values sampled from the gamma distribution.
-pub fn random_gamma<T: ArrayLike>(shape: &T, shape_param: f64, scale: f64) -> Tensor {
+pub fn random_gamma<T: Float, AL: ArrayLike<T>>(
+    shape: &AL,
+    shape_param: f64,
+    scale: f64,
+) -> Tensor<T> {
     random_gamma_rng(Default::default(), shape, shape_param, scale)
 }
 
 /// Outputs values sampled from the gamma distribution.
-pub fn random_gamma_rng<T: ArrayLike, R: Rng + 'static>(
-    arr_rng: ArrRng<R>,
-    shape: &T,
+pub fn random_gamma_rng<T: Float, AL: ArrayLike<T>, R: Rng + 'static>(
+    arr_rng: ArrRng<T, R>,
+    shape: &AL,
     shape_param: f64,
     scale: f64,
-) -> Tensor {
+) -> Tensor<T> {
     let shape = shape.as_tensor();
     Tensor::builder()
         .set_input(&shape)
@@ -1853,17 +1936,17 @@ pub fn random_gamma_rng<T: ArrayLike, R: Rng + 'static>(
 }
 
 /// Outputs values sampled from the log-normal distribution.
-pub fn log_normal<T: ArrayLike>(shape: &T, mean: f64, stddev: f64) -> Tensor {
+pub fn log_normal<T: Float, AL: ArrayLike<T>>(shape: &AL, mean: f64, stddev: f64) -> Tensor<T> {
     log_normal_rng(Default::default(), shape, mean, stddev)
 }
 
 /// Outputs values sampled from the log-normal distribution.
-pub fn log_normal_rng<T: ArrayLike, R: Rng + 'static>(
-    arr_rng: ArrRng<R>,
-    shape: &T,
+pub fn log_normal_rng<T: Float, AL: ArrayLike<T>, R: Rng + 'static>(
+    arr_rng: ArrRng<T, R>,
+    shape: &AL,
     mean: f64,
     stddev: f64,
-) -> Tensor {
+) -> Tensor<T> {
     let shape = shape.as_tensor();
     Tensor::builder()
         .set_input(&shape)
@@ -1881,9 +1964,10 @@ pub fn log_normal_rng<T: ArrayLike, R: Rng + 'static>(
 /// let tensor = ag::convert_to_tensor(arr.clone());
 /// assert_eq!(tensor.eval(&[]), Some(arr.into_dyn()));
 /// ```
-pub fn convert_to_tensor<T>(arr: ndarray::Array<f32, T>) -> Tensor
+pub fn convert_to_tensor<T, D>(arr: ndarray::Array<T, D>) -> Tensor<T>
 where
-    T: ndarray::Dimension,
+    T: Float,
+    D: ndarray::Dimension,
 {
     let arr = arr.into_dyn();
     let shape = {
@@ -1903,10 +1987,10 @@ where
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let a = ag::zeros(&[4, 2]);
+/// let a = ag::zeros::<f32, [usize; 2]>(&[4, 2]);
 /// assert_eq!(a.eval(&[]), Some(ndarray::Array2::<f32>::zeros((4, 2)).into_dyn()));
 /// ```
-pub fn zeros<T: ArrayLike>(shape: &T) -> Tensor {
+pub fn zeros<T: Float, AL: ArrayLike<T>>(shape: &AL) -> Tensor<T> {
     Tensor::builder()
         .set_input(&shape.as_tensor())
         .build(const_gen_ops::Zeros)
@@ -1918,10 +2002,10 @@ pub fn zeros<T: ArrayLike>(shape: &T) -> Tensor {
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// let a = ag::ones(&[4, 2]);
+/// let a = ag::ones::<f32, [usize; 2]>(&[4, 2]);
 /// assert_eq!(a.eval(&[]), Some(ndarray::Array2::<f32>::from_elem((4, 2), 1.).into_dyn()));
 /// ```
-pub fn ones<T: ArrayLike>(shape: &T) -> Tensor {
+pub fn ones<T: Float, AL: ArrayLike<T>>(shape: &AL) -> Tensor<T> {
     Tensor::builder()
         .set_input(&shape.as_tensor())
         .build(const_gen_ops::Ones)
@@ -1940,7 +2024,7 @@ pub fn ones<T: ArrayLike>(shape: &T) -> Tensor {
 ///
 /// assert_eq!(z.eval(&[]), Some(ndarray::Array1::range(0., 5., 1.).into_dyn()));
 /// ```
-pub fn range<T: ArrayLike>(start: &T, end: &T, step: &T) -> Tensor {
+pub fn range<T: Float, AL: ArrayLike<T>>(start: &AL, end: &AL, step: &AL) -> Tensor<T> {
     Tensor::builder()
         .set_inputs(vec![
             &start.as_tensor(),
@@ -1962,10 +2046,10 @@ pub fn range<T: ArrayLike>(start: &T, end: &T, step: &T) -> Tensor {
 ///   * `out_h` = `(h + 2 * pad - filter_h) / stride + 1`
 ///   * `out_w` = `(w + 2 * pad - filter_w) / stride + 1`
 ///
-pub fn conv2d<A, B>(x: A, w: B, pad: usize, stride: usize) -> Tensor
+pub fn conv2d<A, B>(x: A, w: B, pad: usize, stride: usize) -> Tensor<f32>
 where
-    A: AsRef<Tensor>,
-    B: AsRef<Tensor>,
+    A: AsRef<Tensor<f32>>,
+    B: AsRef<Tensor<f32>>,
 {
     Tensor::builder()
         .set_inputs(vec![x.as_ref(), w.as_ref()])
@@ -1988,10 +2072,10 @@ where
 ///   * `out_h` = `(h + 2 * pad - (dilate * (filter - 1) + 1)) / stride + 1`
 ///   * `out_w` = `(w + 2 * pad - (dilate * (filter - 1) + 1)) / stride + 1`
 ///
-pub fn dilated_conv2d<A, B>(x: A, w: B, pad: usize, stride: usize, dilate: usize) -> Tensor
+pub fn dilated_conv2d<A, B, T>(x: A, w: B, pad: usize, stride: usize, dilate: usize) -> Tensor<f32>
 where
-    A: AsRef<Tensor>,
-    B: AsRef<Tensor>,
+    A: AsRef<Tensor<f32>>,
+    B: AsRef<Tensor<f32>>,
 {
     Tensor::builder()
         .set_inputs(vec![x.as_ref(), w.as_ref()])
@@ -2014,10 +2098,10 @@ where
 ///   * `out_h` = `stride * (h - 1) - pad + filter_h`
 ///   * `out_w` = `stride * (w - 1) - pad + filter_w`
 ///
-pub fn conv2d_transpose<A, B>(x: A, w: B, pad: usize, stride: usize) -> Tensor
+pub fn conv2d_transpose<A, B>(x: A, w: B, pad: usize, stride: usize) -> Tensor<f32>
 where
-    A: AsRef<Tensor>,
-    B: AsRef<Tensor>,
+    A: AsRef<Tensor<f32>>,
+    B: AsRef<Tensor<f32>>,
 {
     Tensor::builder()
         .set_inputs(vec![x.as_ref(), w.as_ref()])
@@ -2046,10 +2130,10 @@ pub fn dilated_conv2d_transpose<A, B>(
     pad: usize,
     stride: usize,
     dilate: usize,
-) -> Tensor
+) -> Tensor<f32>
 where
-    A: AsRef<Tensor>,
-    B: AsRef<Tensor>,
+    A: AsRef<Tensor<f32>>,
+    B: AsRef<Tensor<f32>>,
 {
     Tensor::builder()
         .set_inputs(vec![x.as_ref(), w.as_ref()])
@@ -2071,7 +2155,12 @@ where
 ///   * `out_h` = `(h + 2 * pad - pool_size) / stride + 1`
 ///   * `out_w` = `(w + 2 * pad - pool_size) / stride + 1`
 ///
-pub fn max_pool2d<A: AsRef<Tensor>>(x: A, pool_size: usize, pad: usize, stride: usize) -> Tensor {
+pub fn max_pool2d<A: AsRef<Tensor<f32>>>(
+    x: A,
+    pool_size: usize,
+    pad: usize,
+    stride: usize,
+) -> Tensor<f32> {
     Tensor::builder()
         .set_input(x.as_ref())
         .build(conv_ops::max_pool2d::MaxPool2D {

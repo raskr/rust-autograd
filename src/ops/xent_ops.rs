@@ -2,8 +2,8 @@ use ndarray;
 use ndarray_ext::NdArray;
 use op;
 use ops;
-use std::f32;
 use tensor::Tensor;
+use Float;
 
 pub struct SoftmaxCrossEntropy;
 pub struct SparseSoftmaxCrossEntropy;
@@ -13,17 +13,19 @@ pub struct LogSoftmax {
     pub axis: isize,
 }
 
-impl op::Op for LogSoftmax {
+impl<T: Float> op::Op<T> for LogSoftmax {
     fn name(&self) -> &str {
         "LogSoftmax"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        vec![Ok(xs[0] - &ops::math_ops::logsumexp_forward(xs[0], self.axis, true))]
+        vec![Ok(
+            xs[0] - &ops::math_ops::logsumexp_forward(xs[0], self.axis, true)
+        )]
     }
 
-    fn grad(&self, gy: &Tensor, _: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
+    fn grad(&self, gy: &Tensor<T>, _: &[&Tensor<T>], output: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
         let sm = ops::exp(output);
         let sum = ops::reduce_sum(gy, &[1], true);
         let ref mul = sm * sum;
@@ -31,32 +33,33 @@ impl op::Op for LogSoftmax {
     }
 }
 
-impl op::Op for SigmoidCrossEntropy {
+impl<T: Float> op::Op<T> for SigmoidCrossEntropy {
     fn name(&self) -> &str {
         "SigmoidCrossEntropy"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
         let x = xs[0];
         let t = xs[1];
 
         assert_eq!(x.shape(), t.shape(), "x.shape must match t.shape");
 
-        let e = f32::consts::E;
-        let max_fn = f32::max;
-        let mut tmp = x.map(move |a| ((-a.abs()).exp() + 1.).log(e) + max_fn(0., *a));
+        use std::f64;
+        let e = T::from(f64::consts::E).unwrap();
+        let max_fn = T::max;
+        let mut tmp = x.map(move |a| ((-a.abs()).exp() + T::one()).log(e) + max_fn(T::zero(), *a));
         tmp -= &(t * x);
         vec![Ok(tmp)]
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
+    fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
         let x = inputs[0];
         let t = inputs[1];
 
         let gx1 = {
             let ref exp = ops::exp(x);
-            ((exp / (exp + 1)) - t) * gy
+            ((exp / (ops::scalar(T::one()) + exp)) - t) * gy
         };
 
         let gx2 = ops::neg(&(gy * t));
@@ -65,15 +68,15 @@ impl op::Op for SigmoidCrossEntropy {
     }
 }
 
-impl op::Op for SparseSoftmaxCrossEntropy {
+impl<T: Float> op::Op<T> for SparseSoftmaxCrossEntropy {
     fn name(&self) -> &str {
         "SparseSoftmaxCrossEntropy"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
         let (x, t) = (xs[0], xs[1]);
-        let log_x: NdArray = x - &ops::math_ops::logsumexp_forward(x, 1, true);
+        let log_x: NdArray<T> = x - &ops::math_ops::logsumexp_forward(x, 1, true);
 
         // validation
         {
@@ -92,7 +95,7 @@ impl op::Op for SparseSoftmaxCrossEntropy {
         // unwrap is safe
         let ret = log_x
             .map_axis(ndarray::Axis(1), move |row| {
-                -row[*t_iter.next().unwrap() as usize]
+                -row[t_iter.next().unwrap().to_usize().unwrap()]
             })
             .into_shape(ndarray::IxDyn(&[log_x.shape()[0], 1]))
             .unwrap();
@@ -100,7 +103,12 @@ impl op::Op for SparseSoftmaxCrossEntropy {
         vec![Ok(ret), Ok(log_x)]
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
+    fn grad(
+        &self,
+        gy: &Tensor<T>,
+        inputs: &[&Tensor<T>],
+        output: &Tensor<T>,
+    ) -> Vec<Option<Tensor<T>>> {
         let t = inputs[1];
         let ref log_x = ops::nth_tensor(output, 1);
 
@@ -119,12 +127,12 @@ impl op::Op for SparseSoftmaxCrossEntropy {
     }
 }
 
-impl op::Op for SparseSoftmaxCrossEntropyGrad {
+impl<T: Float> op::Op<T> for SparseSoftmaxCrossEntropyGrad {
     fn name(&self) -> &str {
         "SparseSoftmaxCrossEntropyGrad"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
         let log_x = xs[0]; // x is softmax  [2, 1]
         let t = xs[1]; // (2,)
@@ -132,36 +140,47 @@ impl op::Op for SparseSoftmaxCrossEntropyGrad {
         let mut x = log_x.map(|a| a.exp());
 
         for (mut row, &t_) in x.axis_iter_mut(ndarray::Axis(0)).zip(t) {
-            row[t_ as usize] -= 1.;
+            row[t_.to_usize().unwrap()] -= T::one();
         }
 
         x *= gy;
         vec![Ok(x)]
     }
 
-    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
+    fn grad(&self, _: &Tensor<T>, _: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
         vec![None, None]
     }
 }
 
-impl op::Op for SoftmaxCrossEntropy {
+impl<T: Float> op::Op<T> for SoftmaxCrossEntropy {
     fn name(&self) -> &str {
         "SoftmaxCrossEntropy"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
         let x = xs[0];
-        let log_x: NdArray = x - &ops::math_ops::logsumexp_forward(x, 1, true);
+        let log_x: NdArray<T> = x - &ops::math_ops::logsumexp_forward(x, 1, true);
         // `t` must be one-hot
         let t = xs[1];
         assert_eq!(log_x.ndim(), 2, "x must be 2-ranked tensor");
         assert_eq!(t.ndim(), 2, "t must be 2-ranked tensor");
         // - t log x ( =(batch, num_classes))
-        vec![Ok((t * &log_x).sum_axis(ndarray::Axis(1)) * -1.), Ok(log_x)]
+        let minus_one = T::one().neg();
+        vec![
+            Ok((t * &log_x)
+                .sum_axis(ndarray::Axis(1))
+                .mapv(move |elem| elem * minus_one)),
+            Ok(log_x),
+        ]
     }
 
-    fn grad(&self, gy: &Tensor, inputs: &[&Tensor], output: &Tensor) -> Vec<Option<Tensor>> {
+    fn grad(
+        &self,
+        gy: &Tensor<T>,
+        inputs: &[&Tensor<T>],
+        output: &Tensor<T>,
+    ) -> Vec<Option<Tensor<T>>> {
         let ref log_x = ops::nth_tensor(output, 1);
         let ref x = ops::exp(log_x);
         let t = inputs[1];

@@ -4,6 +4,8 @@ extern crate ndarray;
 
 use std::time::Instant;
 
+type Tensor = ag::Tensor<f32>;
+
 // This is a softmax regression with Adam optimizer for mnist.
 // 0.918 test accuracy after 3 epochs,
 // 0.28 sec/epoch on 2.7GHz Intel Core i5 (blas feature is disabled)
@@ -27,11 +29,11 @@ macro_rules! eval_with_time {
     }};
 }
 
-fn logits(x: &ag::Tensor, w: &ag::Tensor, b: &ag::Tensor) -> ag::Tensor {
+fn logits(x: &Tensor, w: &Tensor, b: &Tensor) -> Tensor {
     ag::matmul(x, w) + b
 }
 
-fn inputs() -> (ag::Tensor, ag::Tensor) {
+fn inputs() -> (Tensor, Tensor) {
     let x = ag::placeholder(&[-1, 28 * 28]);
     let y = ag::placeholder(&[-1, 1]);
     (x, y)
@@ -62,7 +64,7 @@ fn main() {
                 let mean_loss = ag::reduce_mean(loss, &[0, 1], false);
                 let grads = &ag::grad(&[&mean_loss], &[w, b]);
                 let adam = ag::gradient_descent_ops::Adam::default();
-                let update_ops: &[ag::Tensor] = &adam.compute_updates(params, grads);
+                let update_ops: &[Tensor] = &adam.compute_updates(params, grads);
 
                 let i = *i as isize;
                 let x_batch = x_train.slice(s![i..i + batch_size, ..]).to_owned();

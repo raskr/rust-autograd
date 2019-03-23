@@ -4,6 +4,8 @@ extern crate ndarray;
 
 use std::time::Instant;
 
+type Tensor = ag::Tensor<f32>;
+
 // This is a toy convolutional network for MNIST.
 // Got 0.983 test accuracy in 400 sec on 2.7GHz Intel Core i5 (blas feature is disabled)
 //
@@ -23,17 +25,17 @@ macro_rules! eval_with_time {
     }};
 }
 
-fn conv_pool(x: &ag::Tensor, w: &ag::Tensor, b: &ag::Tensor) -> ag::Tensor {
+fn conv_pool(x: &Tensor, w: &Tensor, b: &Tensor) -> Tensor {
     let y1 = ag::conv2d(x, w, 1, 1) + b;
     let y2 = ag::relu(y1);
     ag::max_pool2d(y2, 2, 0, 2)
 }
 
-fn logits(x: &ag::Tensor, w: &ag::Tensor, b: &ag::Tensor) -> ag::Tensor {
+fn logits(x: &Tensor, w: &Tensor, b: &Tensor) -> Tensor {
     ag::matmul(x, w) + b
 }
 
-fn inputs() -> (ag::Tensor, ag::Tensor) {
+fn inputs() -> (Tensor, Tensor) {
     let x = ag::placeholder(&[-1, 1, 28, 28]);
     let y = ag::placeholder(&[-1, 1]);
     (x, y)
@@ -59,7 +61,7 @@ fn main() {
     let mean_loss = ag::reduce_mean(loss, &[0, 1], false);
     let grads = &ag::grad(&[&mean_loss], params);
     let adam = ag::gradient_descent_ops::Adam::default();
-    let update_ops: &[ag::Tensor] = &adam.compute_updates(params_adam, grads);
+    let update_ops: &[Tensor] = &adam.compute_updates(params_adam, grads);
 
     // -- actual training --
     let max_epoch = 5;

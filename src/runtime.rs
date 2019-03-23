@@ -6,6 +6,7 @@ use std::collections::BTreeMap;
 use std::mem;
 use std::rc::Rc;
 use tensor::Tensor;
+use Float;
 
 /// Helper structure for batched evaluation.
 ///
@@ -25,26 +26,26 @@ use tensor::Tensor;
 ///     .extend(&[y, z])
 ///     .run(&[(a, &nd::arr0(2.).into_dyn())]);  // Do eval
 /// ```
-pub struct Eval<'a> {
-    buf: Vec<&'a Tensor>,
+pub struct Eval<'tsr, T: 'tsr + Float> {
+    buf: Vec<&'tsr Tensor<T>>,
 }
 
-impl<'t> Eval<'t> {
+impl<'tpl, 'tsr: 'tpl, 'arr: 'tpl, T: Float + 'tsr + 'arr> Eval<'tsr, T> {
     /// Instantiates a new evaluation session.
     pub fn new() -> Self {
         Eval { buf: Vec::new() }
     }
 
     /// Appends a tensor to the back of the evaluation targets.
-    pub fn push(&mut self, x: &'t Tensor) -> &mut Self {
+    pub fn push(&mut self, x: &'tsr Tensor<T>) -> &mut Self {
         self.buf.push(x);
         self
     }
 
     /// Extends the evaluation targets with `xs`.
-    pub fn extend<A>(&mut self, xs: &'t [A]) -> &mut Self
+    pub fn extend<A>(&mut self, xs: &'tsr [A]) -> &mut Self
     where
-        A: AsRef<Tensor>,
+        A: AsRef<Tensor<T>>,
     {
         self.buf.extend(xs.iter().map(|x| x.as_ref()));
         self
@@ -53,44 +54,44 @@ impl<'t> Eval<'t> {
     /// Evaluates the buffered tensors.
     ///
     /// `feeds` is a stream of `(placeholder tensor, its value)`
-    pub fn run<'tpl, 'tsr: 'tpl, 'arr: 'tpl, F>(&self, feed: F) -> Vec<Option<NdArray>>
+    pub fn run<F>(&self, feed: F) -> Vec<Option<NdArray<T>>>
     where
-        F: IntoIterator<Item = &'tpl (&'tsr Tensor, &'arr ndarray::Array<f32, ndarray::IxDyn>)>,
+        F: IntoIterator<Item = &'tpl (&'tsr Tensor<T>, &'arr ndarray::Array<T, ndarray::IxDyn>)>,
     {
         eval(&self.buf, feed)
     }
 }
 
 // Context in evaluation of `node`
-pub struct OpComputeContext<'a, 'b> {
-    node: &'a Tensor,
-    xs: Vec<&'b NdArray>,
+pub struct OpComputeContext<'a, 'b, T: Float + 'a + 'b> {
+    node: &'a Tensor<T>,
+    xs: Vec<&'b NdArray<T>>,
 }
 
-impl<'a, 'b> OpComputeContext<'a, 'b> {
+impl<'a, 'b, T: Float> OpComputeContext<'a, 'b, T> {
     #[inline]
-    pub fn new(node: &'a Tensor, xs: Vec<&'b NdArray>) -> Self {
+    pub fn new(node: &'a Tensor<T>, xs: Vec<&'b NdArray<T>>) -> Self {
         OpComputeContext { node, xs }
     }
 
     #[inline]
-    pub fn get_node(&self) -> &Tensor {
+    pub fn get_node(&self) -> &Tensor<T> {
         &self.node
     }
 
     #[inline]
-    pub fn grab_inputs(&self) -> &[&NdArray] {
+    pub fn grab_inputs(&self) -> &[&NdArray<T>] {
         self.xs.as_slice()
     }
 
     #[inline]
     #[allow(mutable_transmutes)]
-    pub unsafe fn grab_assignable_inputs(&mut self) -> &mut [&mut NdArray] {
+    pub unsafe fn grab_assignable_inputs(&mut self) -> &mut [&mut NdArray<T>] {
         mem::transmute(self.xs.as_slice())
     }
 
     #[inline]
-    pub fn grab_input_node(&self, i: usize) -> &Tensor {
+    pub fn grab_input_node(&self, i: usize) -> &Tensor<T> {
         &self.node.inputs[i]
     }
 
@@ -98,16 +99,16 @@ impl<'a, 'b> OpComputeContext<'a, 'b> {
     // Grabs input arrays for `node`'s evaluation.
     // Returns "None" when failed to aggregate even one of input arrays.
     fn _grab_inputs<'n, 's: 'n>(
-        node: &'s Tensor,
-        store: &'n ResourceStore,
-        feed_store: &FeedStore<'n>,
-    ) -> Option<Vec<&'n NdArray>> {
-        fn recurse<'n, 's: 'n>(
-            x: &'s Tensor,
-            store: &'n ResourceStore,
-            feed_store: &FeedStore<'n>,
+        node: &'s Tensor<T>,
+        store: &'n ResourceStore<T>,
+        feed_store: &FeedStore<'n, T>,
+    ) -> Option<Vec<&'n NdArray<T>>> {
+        fn recurse<'n, 's: 'n, T: Float>(
+            x: &'s Tensor<T>,
+            store: &'n ResourceStore<T>,
+            feed_store: &FeedStore<'n, T>,
             value_index: usize,
-        ) -> Option<&'n NdArray> {
+        ) -> Option<&'n NdArray<T>> {
             if let Some(per) = x.get_persistent_array() {
                 Some(per)
             } else if x.is_placeholder {
@@ -138,17 +139,17 @@ impl<'a, 'b> OpComputeContext<'a, 'b> {
     }
 }
 
-struct NodeWithValue<'a> {
-    node: &'a Tensor,
-    value: op::ComputeResult,
+struct NodeWithValue<'a, T: Float + 'a> {
+    node: &'a Tensor<T>,
+    value: op::ComputeResult<T>,
     // How many resources of this node does user requires.
     // When this is reduced to one, `value` is ready to be moved out (without copy).
     pending_count: usize,
 }
 
-impl<'a> Tensor {
+impl<'a, T: Float> Tensor<T> {
     #[inline]
-    fn with_value(&'a self, val: op::ComputeResult) -> NodeWithValue<'a> {
+    fn with_value(&'a self, val: op::ComputeResult<T>) -> NodeWithValue<'a, T> {
         NodeWithValue {
             node: self,
             value: val,
@@ -179,10 +180,13 @@ impl<'a> Tensor {
 /// assert_eq!(evaluated[1], Some(ndarray::arr1(&[1., 1.]).into_dyn()));
 /// ```
 // FIXME: Annoying lifetime params
-pub fn eval<'a, 'b: 'a, 'c: 'a, T, U>(tensors: &[T], feeds: U) -> Vec<Option<NdArray>>
+pub fn eval<'a, 'b: 'a, 'c: 'a, V, U, T: Float + 'c + 'b>(
+    tensors: &[V],
+    feeds: U,
+) -> Vec<Option<NdArray<T>>>
 where
-    T: AsRef<Tensor>,
-    U: IntoIterator<Item = &'a (&'b Tensor, &'c ndarray::Array<f32, ndarray::IxDyn>)>,
+    V: AsRef<Tensor<T>>,
+    U: IntoIterator<Item = &'a (&'b Tensor<T>, &'c ndarray::Array<T, ndarray::IxDyn>)>,
 {
     // Run graph
     let feeds = feeds.into_iter().collect::<Vec<_>>();
@@ -202,10 +206,10 @@ where
             };
             creator
         })
-        .collect::<Vec<&Tensor>>();
+        .collect::<Vec<&Tensor<T>>>();
 
     // Shrink to fit (output_storage is moved)
-    let mut key2res: BTreeMap<usize, NodeWithValue> = finalize_resource_store(output_storage);
+    let mut key2res: BTreeMap<usize, NodeWithValue<T>> = finalize_resource_store(output_storage);
 
     // Aggregate return values
     creators
@@ -243,7 +247,10 @@ where
 
 // Recursive function which seeks a node holding the x's resource.
 // Actual recursion "rarely" happens.
-fn find_resource_creator<'a, 'b>(storage: &ResourceStore, x: &'b Tensor) -> &'b Tensor {
+fn find_resource_creator<'a, 'b, T: Float>(
+    storage: &ResourceStore<T>,
+    x: &'b Tensor<T>,
+) -> &'b Tensor<T> {
     match storage[x.resource_lookup_key.get()].value[0] {
         Err(::op::ComputeException::Delegate { to: i }) => {
             find_resource_creator(storage, &x.inputs[i])
@@ -253,7 +260,7 @@ fn find_resource_creator<'a, 'b>(storage: &ResourceStore, x: &'b Tensor) -> &'b 
 }
 
 #[inline]
-fn map_err<'a>(res: Result<NdArray, ::op::ComputeException>) -> Option<NdArray> {
+fn map_err<'a, T: Float>(res: Result<NdArray<T>, ::op::ComputeException>) -> Option<NdArray<T>> {
     match res {
         Ok(arr) => Some(arr),
         Err(::op::ComputeException::NoOutput) => None,
@@ -261,11 +268,14 @@ fn map_err<'a>(res: Result<NdArray, ::op::ComputeException>) -> Option<NdArray> 
     }
 }
 
-type ResourceStore<'a> = Vec<NodeWithValue<'a>>;
-type FeedStore<'a> = Vec<&'a NdArray>;
+type ResourceStore<'a, T> = Vec<NodeWithValue<'a, T>>;
+type FeedStore<'a, T> = Vec<&'a NdArray<T>>;
 
 #[inline]
-fn find_fed_resource<'a>(node: &Tensor, feeds: &Vec<&(&Tensor, &'a NdArray)>) -> &'a NdArray {
+fn find_fed_resource<'a, T: Float>(
+    node: &Tensor<T>,
+    feeds: &Vec<&(&Tensor<T>, &'a NdArray<T>)>,
+) -> &'a NdArray<T> {
     // Linear search is suitable because the number of feeds are so small in most cases.
     for feed in feeds {
         if Rc::ptr_eq(feed.0, node) {
@@ -276,16 +286,16 @@ fn find_fed_resource<'a>(node: &Tensor, feeds: &Vec<&(&Tensor, &'a NdArray)>) ->
 }
 
 // Evaluates "targets".
-fn eval_internal<'a>(
-    targets: &Vec<&'a Tensor>,
-    feeds: &Vec<&(&'a Tensor, &NdArray)>,
-) -> ResourceStore<'a> {
+fn eval_internal<'a, T: Float>(
+    targets: &Vec<&'a Tensor<T>>,
+    feeds: &Vec<&(&'a Tensor<T>, &NdArray<T>)>,
+) -> ResourceStore<'a, T> {
     let mut res_store = Vec::new();
     let mut feed_store = Vec::new();
 
     // Obtain array resources while visiting nodes in topological order.
     // Stack-based depth-first-search is used to avoid stack overflow in explicit recursion.
-    let mut dfs_stack: Vec<(&Tensor, bool)> = targets.iter().map(|&x| (x, false)).collect();
+    let mut dfs_stack: Vec<(&Tensor<T>, bool)> = targets.iter().map(|&x| (x, false)).collect();
     while let Some((node, is_parent)) = dfs_stack.pop() {
         if is_parent {
             // Visit this node
@@ -326,7 +336,9 @@ fn eval_internal<'a>(
 
 // Shrink it by dropping useless resources
 // and convert it into mappings of {lookup key => resource}
-fn finalize_resource_store(mut vec: ResourceStore) -> BTreeMap<usize, NodeWithValue> {
+fn finalize_resource_store<T: Float>(
+    mut vec: ResourceStore<T>,
+) -> BTreeMap<usize, NodeWithValue<T>> {
     let mut retained_keys = Vec::new();
     let len = vec.len();
     {
@@ -361,7 +373,7 @@ fn finalize_resource_store(mut vec: ResourceStore) -> BTreeMap<usize, NodeWithVa
 
 #[test]
 fn test_eval() {
-    let ref v = ::ops::placeholder(&[3, 2, 1]);
+    let ref v = ::ops::placeholder::<f32>(&[3, 2, 1]);
     let ref z = ::ops::reduce_sum(&::ops::squeeze(v, &[2]), &[0, 1], false);
     let ref g = ::ops::grad(&[z], &[v]);
     let eval_result = &eval(g, &[(v, &::ndarray_ext::ones(&[3, 2, 1]))])[0];
@@ -376,7 +388,7 @@ fn test_constant_eval() {
 
 #[test]
 fn test_placeholder_eval() {
-    let arr = ::ndarray_ext::ones(&[3, 2, 1]);
+    let arr = ::ndarray_ext::ones::<f32>(&[3, 2, 1]);
     let ref v = ::ops::placeholder(&[3, 2, 1]);
     let eval_result = eval(&[v], &[(v, &arr)]);
     assert_eq!(eval_result[0], Some(arr));
@@ -384,7 +396,7 @@ fn test_placeholder_eval() {
 
 #[test]
 fn test_eval_internal() {
-    let ref v = ::ops::placeholder(&[3, 2, 1]);
+    let ref v = ::ops::placeholder::<f32>(&[3, 2, 1]);
     let ref z = ::ops::squeeze(v, &[2]);
     let ref g = ::ops::grad_with_default(&[z], &[v], &[&::ones(&z.shape())]);
     let storage = eval_internal(&vec![&g[0]], &vec![&(v, &::ndarray_ext::ones(&[3, 2, 1]))]);

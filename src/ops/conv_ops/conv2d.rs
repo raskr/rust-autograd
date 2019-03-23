@@ -20,16 +20,16 @@ pub struct Conv2DWithCols {
     pub dilation: usize,
 }
 
-impl ::op::Op for Conv2D {
+impl ::op::Op<f32> for Conv2D {
     fn name(&self) -> &str {
         "Conv2D"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> ::op::ComputeResult {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<f32>) -> ::op::ComputeResult<f32> {
         // Grab inputs
         let xs = ctx.grab_inputs();
-        let x: &NdArray = xs[0];
-        let w: &NdArray = xs[1];
+        let x: &NdArray<f32> = xs[0];
+        let w: &NdArray<f32> = xs[1];
 
         // Extract size params
         let (batch_size, xch, xh, xw) = {
@@ -158,7 +158,12 @@ impl ::op::Op for Conv2D {
         vec![Ok(y), Ok(cols)]
     }
 
-    fn grad(&self, gy: &Tensor, xs: &[&Tensor], y: &Tensor) -> Vec<Option<Tensor>> {
+    fn grad(
+        &self,
+        gy: &Tensor<f32>,
+        xs: &[&Tensor<f32>],
+        y: &Tensor<f32>,
+    ) -> Vec<Option<Tensor<f32>>> {
         let x = xs[0];
         let w = xs[1];
 
@@ -184,16 +189,16 @@ impl ::op::Op for Conv2D {
     }
 }
 
-impl ::op::Op for Conv2DWithCols {
+impl ::op::Op<f32> for Conv2DWithCols {
     fn name(&self) -> &str {
         "Conv2DWithCols"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> ::op::ComputeResult {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<f32>) -> ::op::ComputeResult<f32> {
         // Grab inputs
         let xs = ctx.grab_inputs();
-        let cols: &NdArray = xs[0];
-        let w: &NdArray = xs[1];
+        let cols: &NdArray<f32> = xs[0];
+        let w: &NdArray<f32> = xs[1];
 
         // Extract size params
         let cols_shape = cols.shape();
@@ -260,7 +265,12 @@ impl ::op::Op for Conv2DWithCols {
         vec![Ok(y)]
     }
 
-    fn grad(&self, gy: &Tensor, xs: &[&Tensor], y: &Tensor) -> Vec<Option<Tensor>> {
+    fn grad(
+        &self,
+        gy: &Tensor<f32>,
+        xs: &[&Tensor<f32>],
+        y: &Tensor<f32>,
+    ) -> Vec<Option<Tensor<f32>>> {
         let cols = xs[0];
         let w = xs[1];
 
@@ -288,12 +298,12 @@ impl ::op::Op for Conv2DWithCols {
     }
 }
 
-impl ::op::Op for Conv2DFilterGrad {
+impl ::op::Op<f32> for Conv2DFilterGrad {
     fn name(&self) -> &str {
         "Conv2DFilterGrad"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> ::op::ComputeResult {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<f32>) -> ::op::ComputeResult<f32> {
         let xs = ctx.grab_inputs();
         let cols = xs[0]; // must be columns
         let gy = xs[1];
@@ -336,7 +346,12 @@ impl ::op::Op for Conv2DFilterGrad {
         vec![Ok(NdArray::from_shape_vec(k_shape, gw).unwrap())]
     }
 
-    fn grad(&self, ggw: &Tensor, xs: &[&Tensor], y: &Tensor) -> Vec<Option<Tensor>> {
+    fn grad(
+        &self,
+        ggw: &Tensor<f32>,
+        xs: &[&Tensor<f32>],
+        y: &Tensor<f32>,
+    ) -> Vec<Option<Tensor<f32>>> {
         let cols = xs[0];
         let gy = xs[1]; // For example, gradient of output of Conv2D.
 
@@ -496,10 +511,7 @@ fn test_conv2d() {
         .into_dyn();
 
     let w = ::ndarray_ext::ones(&[
-        /*out_ch=*/ 2,
-        /*in_ch=*/ 2,
-        /*row=*/ 2,
-        /*col=*/ 2,
+        /*out_ch=*/ 2, /*in_ch=*/ 2, /*row=*/ 2, /*col=*/ 2,
     ]);
 
     let y = op.compute(::runtime::OpComputeContext::new(

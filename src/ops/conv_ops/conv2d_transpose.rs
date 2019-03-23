@@ -12,16 +12,16 @@ pub struct Conv2DTransposeFilterGrad {
     pub dilation: usize,
 }
 
-impl ::op::Op for Conv2DTranspose {
+impl ::op::Op<f32> for Conv2DTranspose {
     fn name(&self) -> &str {
         "Conv2DTranspose"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> ::op::ComputeResult {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<f32>) -> ::op::ComputeResult<f32> {
         let xs = ctx.grab_inputs();
 
-        let gy: &NdArray = xs[0]; // (batch, ych, yh, yw)
-        let w: &NdArray = xs[1]; // (ych, xch, kh, kw)
+        let gy: &NdArray<f32> = xs[0]; // (batch, ych, yh, yw)
+        let w: &NdArray<f32> = xs[1]; // (ych, xch, kh, kw)
         let gy_shape = gy.shape();
         let f_shape = w.shape();
 
@@ -149,7 +149,12 @@ impl ::op::Op for Conv2DTranspose {
         vec![Ok(gx.unwrap())]
     }
 
-    fn grad(&self, gy: &Tensor, xs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
+    fn grad(
+        &self,
+        gy: &Tensor<f32>,
+        xs: &[&Tensor<f32>],
+        _: &Tensor<f32>,
+    ) -> Vec<Option<Tensor<f32>>> {
         let x = xs[0];
         let w = xs[1];
 
@@ -173,12 +178,12 @@ impl ::op::Op for Conv2DTranspose {
     }
 }
 
-impl ::op::Op for Conv2DTransposeFilterGrad {
+impl ::op::Op<f32> for Conv2DTransposeFilterGrad {
     fn name(&self) -> &str {
         "Conv2DTransposeFilterGrad"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> ::op::ComputeResult {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<f32>) -> ::op::ComputeResult<f32> {
         let xs = ctx.grab_inputs();
         let gy = xs[0];
         let x = xs[1];
@@ -247,7 +252,12 @@ impl ::op::Op for Conv2DTransposeFilterGrad {
         vec![Ok(NdArray::from_shape_vec(k_shape, gw).unwrap())]
     }
 
-    fn grad(&self, gw: &Tensor, xs: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
+    fn grad(
+        &self,
+        gw: &Tensor<f32>,
+        xs: &[&Tensor<f32>],
+        _: &Tensor<f32>,
+    ) -> Vec<Option<Tensor<f32>>> {
         let gy = xs[0];
         let x = xs[1];
 
@@ -358,7 +368,7 @@ fn test_deconv() {
         vec![&g, &w],
     ));
 
-    let x = ::ndarray_ext::ones(&[batch_size, xch, xh, xw]);
+    let x = ::ndarray_ext::ones::<f32>(&[batch_size, xch, xh, xw]);
     assert_eq!(x.shape(), ret[0].as_ref().unwrap().shape());
 
     assert_eq!(

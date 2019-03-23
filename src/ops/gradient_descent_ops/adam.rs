@@ -5,32 +5,33 @@ use op;
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use tensor::Tensor;
+use Float;
 
-struct AdamOp {
-    static_params: StaticParams,
+struct AdamOp<T: Float> {
+    static_params: StaticParams<T>,
 }
 
-impl ::op::Op for AdamOp {
+impl<T: Float> ::op::Op<T> for AdamOp<T> {
     fn name(&self) -> &str {
         "Adam"
     }
 
-    fn compute(&self, mut ctx: ::runtime::OpComputeContext) -> op::ComputeResult {
+    fn compute(&self, mut ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let StaticParams { alpha, eps, b1, b2 } = self.static_params;
         let xs = unsafe { ctx.grab_assignable_inputs() };
 
         // Make new m
         let new_m = {
-            let mut new_m = (xs[2] as &NdArray) * b1;
-            let tmp = 1. - b1;
+            let mut new_m = (xs[2] as &NdArray<T>).mapv(move |x2_elem| x2_elem * b1);
+            let tmp = T::one() - b1;
             new_m.zip_mut_with(xs[1], move |a, &g| *a += tmp * g);
             new_m
         };
 
         // Make new v
         let new_v = {
-            let mut new_v = (xs[3] as &NdArray) * b2;
-            let tmp = 1. - b2;
+            let mut new_v = (xs[3] as &NdArray<T>).mapv(move |x3_elem| x3_elem * b2);
+            let tmp = T::one() - b2;
             new_v.zip_mut_with(xs[1], move |a, &g| *a += tmp * g * g);
             new_v
         };
@@ -38,53 +39,55 @@ impl ::op::Op for AdamOp {
         // Make hat
         let m_hat = {
             let t = xs[4][ndarray::IxDyn(&[])];
-            let v_hat = new_v * (1. / (1. - b2.powf(t)));
-            let mut m_hat = new_m * (1. / (1. - b1.powf(t)));
+            let rhs = T::one() / (T::one() - b2.powf(t));
+            let v_hat = new_v.mapv(move |new_v_elem| new_v_elem * rhs);
+            let rhs = T::one() / (T::one() - b1.powf(t));
+            let mut m_hat = new_m.mapv(move |new_m_elem| new_m_elem * rhs);
             m_hat.zip_mut_with(&v_hat, move |a, &b| (*a) /= b.sqrt() + eps);
             m_hat
         };
 
         // Update t and param
-        xs[4][ndarray::IxDyn(&[])] += 1.;
+        xs[4][ndarray::IxDyn(&[])] += T::one();
         xs[0].scaled_add(-alpha, &m_hat);
         vec![Err(::op::ComputeException::NoOutput)]
     }
 
-    fn grad(&self, _: &Tensor, _: &[&Tensor], _: &Tensor) -> Vec<Option<Tensor>> {
+    fn grad(&self, _: &Tensor<T>, _: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
         vec![None]
     }
 }
 
-pub struct StatefulVariable<'a> {
-    pub var: &'a Tensor,
-    pub state: StatefulParams,
+pub struct StatefulVariable<'a, T: Float + 'a> {
+    pub var: &'a Tensor<T>,
+    pub state: StatefulParams<T>,
 }
 
 /// Adam optimizer
 ///
 /// The implementation is based on http://arxiv.org/abs/1412.6980v8
-pub struct Adam {
-    pub alpha: f32,
-    pub eps: f32,
-    pub b1: f32,
-    pub b2: f32,
+pub struct Adam<T: Float> {
+    pub alpha: T,
+    pub eps: T,
+    pub b1: T,
+    pub b2: T,
 }
 
-impl Default for Adam {
-    fn default() -> Adam {
+impl<T: Float> Default for Adam<T> {
+    fn default() -> Adam<T> {
         Adam {
-            alpha: 0.001,
-            eps: 1e-08,
-            b1: 0.9,
-            b2: 0.999,
+            alpha: T::from(0.001).unwrap(),
+            eps: T::from(1e-08).unwrap(),
+            b1: T::from(0.9).unwrap(),
+            b2: T::from(0.999).unwrap(),
         }
     }
 }
 
-impl Adam {
+impl<T: Float> Adam<T> {
     /// Creates stateful variable tensors used for Adam optimizer.
-    pub fn vars_with_states<'a>(tensors: &[&'a Tensor]) -> Vec<StatefulVariable<'a>> {
-        let mut var2state = BTreeMap::<super::StateKey<'a>, StatefulParams>::new();
+    pub fn vars_with_states<'a>(tensors: &[&'a Tensor<T>]) -> Vec<StatefulVariable<'a, T>> {
+        let mut var2state = BTreeMap::<super::StateKey<'a, T>, StatefulParams<T>>::new();
         tensors
             .into_iter()
             .map(|var| {
@@ -95,7 +98,7 @@ impl Adam {
                             let inserted = ent.insert(StatefulParams {
                                 m: ::ops::variable(NdArray::zeros(var_arr.shape())),
                                 v: ::ops::variable(NdArray::zeros(var_arr.shape())),
-                                t: ::ops::variable(::ndarray_ext::from_scalar(1.)),
+                                t: ::ops::variable(::ndarray_ext::from_scalar(T::one())),
                             });
                             StatefulVariable {
                                 var,
@@ -115,11 +118,11 @@ impl Adam {
     }
 
     // Resolves states
-    pub fn compute_updates<T: AsRef<Tensor>>(
+    pub fn compute_updates<A: AsRef<Tensor<T>>>(
         &self,
-        params: &[StatefulVariable],
-        grads: &[T],
-    ) -> Vec<Tensor> {
+        params: &[StatefulVariable<T>],
+        grads: &[A],
+    ) -> Vec<Tensor<T>> {
         params
             .into_iter()
             .zip(grads)
@@ -145,16 +148,16 @@ impl Adam {
 }
 
 #[derive(Copy, Clone)]
-pub struct StaticParams {
-    pub alpha: f32,
-    pub eps: f32,
-    pub b1: f32,
-    pub b2: f32,
+pub struct StaticParams<T: Float> {
+    pub alpha: T,
+    pub eps: T,
+    pub b1: T,
+    pub b2: T,
 }
 
 #[derive(Clone)]
-pub struct StatefulParams {
-    pub m: Tensor,
-    pub v: Tensor,
-    pub t: Tensor, // shape: []
+pub struct StatefulParams<T: Float> {
+    pub m: Tensor<T>,
+    pub v: Tensor<T>,
+    pub t: Tensor<T>,
 }

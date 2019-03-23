@@ -3,7 +3,7 @@ extern crate ndarray;
 
 #[test]
 fn reduce_prod() {
-    let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[3, 2]));
+    let ref v = ag::variable(ag::ndarray_ext::standard_normal::<f32>(&[3, 2]));
     let ref z = ag::reduce_prod(v, &[0, 1], false); // keep_dims=false
     let empty_shape: &[usize] = &[];
     assert_eq!(z.eval(&[]).unwrap().shape(), empty_shape);

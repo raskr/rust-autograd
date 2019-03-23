@@ -2,18 +2,20 @@ use ndarray_ext::NdArray;
 use std::cmp::Ordering;
 use std::collections::btree_set::BTreeSet;
 use tensor::Tensor;
+use Float;
 
 /// Checks the validity of `gradients` with finite difference trick.
 /// For this test only, `variables` must be "shared" variables.
-pub fn check_theoretical_grads<'a, 'b, T>(
-    objective: &Tensor,
-    gradients: &[T],
-    variables: &[&Tensor],
-    feeds: &[(&Tensor, &NdArray)],
-    eps: f32,
-    tol: f32,
+pub fn check_theoretical_grads<'a, 'b, A, T>(
+    objective: &Tensor<T>,
+    gradients: &[A],
+    variables: &[&Tensor<T>],
+    feeds: &[(&Tensor<T>, &NdArray<T>)],
+    eps: T,
+    tol: T,
 ) where
-    T: AsRef<Tensor>,
+    A: AsRef<Tensor<T>>,
+    T: Float,
 {
     // backprop
     let theoretical_grads = ::runtime::eval(gradients, feeds);
@@ -25,7 +27,7 @@ pub fn check_theoretical_grads<'a, 'b, T>(
                 .get_persistent_array_mut()
                 .expect("This is not a variable")
         };
-        let head_ptr: *mut f32 = v_arr.as_mut_ptr();
+        let head_ptr: *mut T = v_arr.as_mut_ptr();
 
         // for each values
         for i in 0..v_arr.len() as isize {
@@ -53,7 +55,8 @@ pub fn check_theoretical_grads<'a, 'b, T>(
                 *head_ptr.offset(i) = evacuated;
             }
 
-            let g_num = (obj_pos - obj_neg).scalar_sum() / (2. * eps);
+            let two = T::one() + T::one();
+            let g_num = (obj_pos - obj_neg).scalar_sum() / (two * eps);
             let g_th = unsafe { *th_grad.as_ref().unwrap().as_ptr().offset(i) };
 
             // compare
@@ -69,16 +72,19 @@ pub fn check_theoretical_grads<'a, 'b, T>(
 }
 
 /// Traverse a graph from endpoint "t".
-pub fn visit_once<F>(t: &Tensor, f: &mut F)
+pub fn visit_once<F, T: Float>(t: &Tensor<T>, f: &mut F)
 where
-    F: FnMut(&Tensor) -> (),
+    F: FnMut(&Tensor<T>) -> (),
 {
     visit_once_internal(t, f, &mut BTreeSet::new())
 }
 
-fn visit_once_internal<'a, F>(t: &'a Tensor, f: &mut F, visited: &mut BTreeSet<&'a Tensor>)
-where
-    F: FnMut(&'a Tensor) -> (),
+fn visit_once_internal<'a, F, T: Float>(
+    t: &'a Tensor<T>,
+    f: &mut F,
+    visited: &mut BTreeSet<&'a Tensor<T>>,
+) where
+    F: FnMut(&'a Tensor<T>) -> (),
 {
     if visited.contains(&t) {
         return; // exit early
@@ -93,22 +99,22 @@ where
     }
 }
 
-impl<'a> Ord for &'a Tensor {
+impl<'a, T: Float> Ord for &'a Tensor<T> {
     #[inline]
     /// Compares the addresses of the two tensors.
     /// This can be used for ordering-based data structures (e.g. BinaryTree).
-    fn cmp(&self, other: &&'a Tensor) -> Ordering {
-        let a = (*self) as *const Tensor;
-        let b = (*other) as *const Tensor;
+    fn cmp(&self, other: &&'a Tensor<T>) -> Ordering {
+        let a = (*self) as *const Tensor<T>;
+        let b = (*other) as *const Tensor<T>;
         a.cmp(&b)
     }
 }
 
-impl<'a> PartialOrd for &'a Tensor {
+impl<'a, T: Float> PartialOrd for &'a Tensor<T> {
     #[inline]
     /// Compares the addresses of the two tensors.
     /// This can be used for ordering-based data structures (e.g. BinaryTree).
-    fn partial_cmp(&self, other: &&'a Tensor) -> Option<Ordering> {
+    fn partial_cmp(&self, other: &&'a Tensor<T>) -> Option<Ordering> {
         Some(self.cmp(&other))
     }
 }

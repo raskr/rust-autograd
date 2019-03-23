@@ -2,8 +2,9 @@ extern crate ndarray;
 
 use ndarray_ext::NdArray;
 use tensor::Tensor;
+use Float;
 
-pub type ComputeResult = Vec<Result<NdArray, ComputeException>>;
+pub type ComputeResult<T> = Vec<Result<NdArray<T>, ComputeException>>;
 
 #[derive(Clone, Debug)]
 /// This is an `exception`, not an error.
@@ -25,12 +26,12 @@ pub enum ComputeException {
 /// extern crate ndarray;
 /// extern crate autograd as ag;
 ///
-/// type NdArray = ndarray::Array<f32, ndarray::IxDyn>;
+/// type NdArray<T: ag::Float> = ndarray::Array<T, ndarray::IxDyn>;
 ///
 /// // Implements `Op` trait for `Sigmoid`.
 /// struct Sigmoid;
 ///
-/// impl ag::op::Op for Sigmoid {
+/// impl<T: ag::Float> ag::op::Op<T> for Sigmoid {
 ///
 ///     fn name(&self) -> &str
 ///     {
@@ -39,18 +40,19 @@ pub enum ComputeException {
 ///
 ///     // In this method, any errors caused by bad user-inputs should results in "panic".
 ///     // (`ag::op::ComputeException` represents an exception rather than an error.)
-///     fn compute(&self, ctx: ag::runtime::OpComputeContext)
-///         -> Vec<Result<NdArray, ag::op::ComputeException>>
+///     fn compute(&self, ctx: ag::runtime::OpComputeContext<T>)
+///         -> Vec<Result<NdArray<T>, ag::op::ComputeException>>
 ///     {
 ///         let xs = ctx.grab_inputs();
 ///         let x = xs[0];
 ///         // Use `ndarray::Array::mapv` for element-wise computation.
-///         let y = x.mapv(|a| ((a * 0.5).tanh() * 0.5) + 0.5);
+///         let half = T::from(0.5).unwrap();
+///         let y = x.mapv(|a| ((a * half).tanh() * half) + half);
 ///         vec![Ok(y)]
 ///     }
 ///
-///     fn grad(&self, gy: &ag::Tensor, xs: &[&ag::Tensor], y: &ag::Tensor)
-///         -> Vec<Option<ag::Tensor>>
+///     fn grad(&self, gy: &ag::Tensor<T>, xs: &[&ag::Tensor<T>], y: &ag::Tensor<T>)
+///         -> Vec<Option<ag::Tensor<T>>>
 ///     {
 ///         // Symbolic gradient of `x`
 ///         let gx = gy * (y - ag::square(y));
@@ -59,7 +61,7 @@ pub enum ComputeException {
 /// }
 ///
 /// // Symbolic `sigmoid` function for end-user.
-/// fn sigmoid(x: &ag::Tensor) -> ag::Tensor
+/// fn sigmoid<T: ag::Float>(x: &ag::Tensor<T>) -> ag::Tensor<T>
 /// {
 ///     ag::Tensor::builder()
 ///         .set_inputs(vec![x])
@@ -67,12 +69,12 @@ pub enum ComputeException {
 ///         .build(Sigmoid)
 /// }
 /// ```
-pub trait Op {
+pub trait Op<T: Float> {
     /// Name of this op
     fn name(&self) -> &str;
 
     /// Runs this op.
-    fn compute(&self, ctx: ::runtime::OpComputeContext) -> ComputeResult;
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ComputeResult<T>;
 
     /// Returns symbolic gradients for input nodes by use of output gradient etc.
     ///
@@ -84,5 +86,5 @@ pub trait Op {
     ///
     /// NOTE:
     /// The number of return values must match `xs.len()`.
-    fn grad(&self, gy: &Tensor, xs: &[&Tensor], y: &Tensor) -> Vec<Option<Tensor>>;
+    fn grad(&self, gy: &Tensor<T>, xs: &[&Tensor<T>], y: &Tensor<T>) -> Vec<Option<Tensor<T>>>;
 }

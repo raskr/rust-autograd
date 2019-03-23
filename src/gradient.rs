@@ -5,18 +5,23 @@ use std::fmt;
 use std::mem;
 use std::rc::Rc;
 use tensor::Tensor;
+use Float;
 
-struct GradInfo<'a> {
-    node: &'a Tensor, // information of this node
+struct GradInfo<'a, T: Float + 'a> {
+    node: &'a Tensor<T>, // information of this node
     has_gradient: bool,
     grad_called: bool,
-    computed_grads: Vec<Tensor>,
-    default_grad: Option<&'a Tensor>,
+    computed_grads: Vec<Tensor<T>>,
+    default_grad: Option<&'a Tensor<T>>,
 }
 
-impl<'a> GradInfo<'a> {
+impl<'a, T: Float> GradInfo<'a, T> {
     #[inline]
-    fn new(t: &'a Tensor, has_gradient: bool, default_grad: Option<&'a Tensor>) -> GradInfo<'a> {
+    fn new(
+        t: &'a Tensor<T>,
+        has_gradient: bool,
+        default_grad: Option<&'a Tensor<T>>,
+    ) -> GradInfo<'a, T> {
         GradInfo {
             node: t,
             has_gradient,
@@ -27,13 +32,13 @@ impl<'a> GradInfo<'a> {
     }
 }
 
-impl<'a> fmt::Debug for GradInfo<'a> {
+impl<'a, T: Float> fmt::Debug for GradInfo<'a, T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.node.op.name())
     }
 }
 
-impl fmt::Debug for Tensor {
+impl<T: Float> fmt::Debug for Tensor<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.op.name())
     }
@@ -46,7 +51,7 @@ macro_rules! access_grad_info_of {
 }
 
 #[inline]
-fn has_marked_child(parent: &Tensor, path: &Vec<GradInfo>) -> bool {
+fn has_marked_child<T: Float>(parent: &Tensor<T>, path: &Vec<GradInfo<T>>) -> bool {
     let mut it = if let Some(ref a) = parent.inputs_on_backprop {
         a.iter()
     } else {
@@ -65,13 +70,16 @@ fn has_marked_child(parent: &Tensor, path: &Vec<GradInfo>) -> bool {
 // Strategy
 //   1. Record all nodes that are reachable from `ys` into `path`.
 //   2. Mark the path between `ys` and `xs` as `has_gradient`.
-fn mark_gradient_path<'a>(ys: &[&'a Tensor], xs: &[&'a Tensor]) -> Vec<GradInfo<'a>> {
+fn mark_gradient_path<'a, T: Float>(
+    ys: &[&'a Tensor<T>],
+    xs: &[&'a Tensor<T>],
+) -> Vec<GradInfo<'a, T>> {
     // Randomly accessible by use of each node's lookup key.
-    let mut path: Vec<GradInfo<'a>> = Vec::new();
+    let mut path: Vec<GradInfo<'a, T>> = Vec::new();
 
     // Builds GradInfo while performing depth-first-search.
     // `has_gradient` properties are filled at the same time.
-    let mut dfs_stack: Vec<(&Tensor, bool)> = ys.iter().map(|&y| (y, false)).collect();
+    let mut dfs_stack: Vec<(&Tensor<T>, bool)> = ys.iter().map(|&y| (y, false)).collect();
     while let Some((node, should_visit)) = dfs_stack.pop() {
         if should_visit {
             let marker = xs.contains(&node) || has_marked_child(node, &path);
@@ -113,13 +121,13 @@ fn test_gradient_path() {
     let ref x1 = ::ops::placeholder(&[]);
     let ref x2 = ::ops::placeholder(&[]);
     let ref x3 = ::ops::placeholder(&[]);
-    let ref a = 3 * x1; // rank 1
+    let ref a = 3. * x1; // rank 1
     let ref b = a * x1; // rank 2
-    let ref c = 5 * x2; // rank 1
+    let ref c = 5. * x2; // rank 1
     let ref d = b + c; // rank 3
     let ref y = d + x3; // rank 4
     let path = mark_gradient_path(&[y], &[x1, x2]);
-    let path_: Vec<&Tensor> = path.iter().map(|a| a.node).collect();
+    let path_: Vec<&Tensor<f64>> = path.iter().map(|a| a.node).collect();
 
     assert!(path_.contains(&x1));
     assert!(path_.contains(&x2));
@@ -179,11 +187,11 @@ fn test_gradient_path() {
 ///
 /// NOTE: Nodes that do not have gradients won't be included in the subgraph to avoid
 /// unnecessary computation.
-pub fn symbolic_gradients(
-    ys: &[&Tensor],
-    xs: &[&Tensor],
-    known_gys: &[Option<&Tensor>],
-) -> Vec<Tensor> {
+pub fn symbolic_gradients<T: Float>(
+    ys: &[&Tensor<T>],
+    xs: &[&Tensor<T>],
+    known_gys: &[Option<&Tensor<T>>],
+) -> Vec<Tensor<T>> {
     assert_eq!(
         ys.len(),
         known_gys.len(),
@@ -199,19 +207,25 @@ pub fn symbolic_gradients(
         if let &Some(gy_) = gy {
             y_info.default_grad = Some(gy_);
         } else {
-            y_info.computed_grads.push(ops::scalar(1.));
+            y_info.computed_grads.push(ops::scalar(T::one()));
         }
     }
 
     // Prepare a heap with given ys.
-    let mut heap = ys.into_iter()
+    let mut heap = ys
+        .into_iter()
         .map(|y| y.wrapped())
-        .collect::<BinaryHeap<TensorWrapper>>();
+        .collect::<BinaryHeap<TensorWrapper<T>>>();
 
     // Backprop.
     // c.f. https://github.com/chainer/chainer/blob/master/chainer/variable.py
     while let Some(y) = heap.pop() {
-        let xs_ = y.inner.inputs.iter().map(|a| a).collect::<Vec<&Tensor>>();
+        let xs_ = y
+            .inner
+            .inputs
+            .iter()
+            .map(|a| a)
+            .collect::<Vec<&Tensor<T>>>();
         let gxs = {
             let info = &mut access_grad_info_of!(y.inner, path);
             let gy = if let Some(def) = info.default_grad {
@@ -272,21 +286,21 @@ pub fn symbolic_gradients(
             debug_assert_eq!(gxs.len(), 1);
             gxs.remove(0)
         })
-        .collect::<Vec<Tensor>>()
+        .collect::<Vec<Tensor<T>>>()
 }
 
-struct TensorWrapper<'a> {
-    inner: &'a Tensor,
+struct TensorWrapper<'a, T: Float + 'a> {
+    inner: &'a Tensor<T>,
 }
 
-impl<'a> Ord for TensorWrapper<'a> {
+impl<'a, T: Float> Ord for TensorWrapper<'a, T> {
     // Compares the ranks in topological ordering
     fn cmp(&self, other: &Self) -> Ordering {
         self.inner.top_rank.cmp(&other.inner.top_rank)
     }
 }
 
-impl<'a> PartialOrd for TensorWrapper<'a> {
+impl<'a, T: Float> PartialOrd for TensorWrapper<'a, T> {
     #[inline]
     // Compares the ranks in topological ordering
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
@@ -294,24 +308,24 @@ impl<'a> PartialOrd for TensorWrapper<'a> {
     }
 }
 
-impl<'a> Eq for TensorWrapper<'a> {}
+impl<'a, T: Float> Eq for TensorWrapper<'a, T> {}
 
-impl<'a> PartialEq for TensorWrapper<'a> {
+impl<'a, T: Float> PartialEq for TensorWrapper<'a, T> {
     #[inline]
-    fn eq(&self, other: &TensorWrapper<'a>) -> bool {
+    fn eq(&self, other: &TensorWrapper<'a, T>) -> bool {
         Rc::ptr_eq(&self.inner, &other.inner)
     }
 }
 
-impl Tensor {
+impl<T: Float> Tensor<T> {
     #[inline]
-    fn wrapped(&self) -> TensorWrapper {
+    fn wrapped(&self) -> TensorWrapper<T> {
         TensorWrapper { inner: self }
     }
 }
 
 #[inline]
-fn accumulate_grads_if_needed(grads: &mut Vec<Tensor>) {
+fn accumulate_grads_if_needed<T: Float>(grads: &mut Vec<Tensor<T>>) {
     if grads.len() > 1 {
         let mut acc = {
             let refs = grads.iter().map(|a| a).collect::<Vec<_>>();

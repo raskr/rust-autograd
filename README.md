@@ -8,7 +8,7 @@ A library which provides differentiable operations and tensors.
 ## Features
 
 * **Lazy, side-effect-free tensors.**
-`autograd::Tensor` itself doesn't have its value basically.
+`autograd::Tensor<T>` itself doesn't have its value basically.
 It realizes graphs that are eagerly executable at any timing, 
 that is, it supports both *run-by-define* and *define-by-run* naturally
 in the context of neural networks.
@@ -32,19 +32,19 @@ extern crate autograd as ag;
 
 let ref x = ag::placeholder(&[]);
 let ref y = ag::placeholder(&[]);
-let ref z = 2*x*x + 3*y + 1;
+let ref z = 2.*x*x + 3.*y + 1.;
 
 // dz/dy
 let gy = &ag::grad(&[z], &[y])[0];
-println!("{:?}", gy.eval(&[]));   // => Ok(3.)
+println!("{:?}", gy.eval(&[]));   // => Some(3.)
 
 // dz/dx (requires to fill the placeholder `x`)
 let gx = &ag::grad(&[z], &[x])[0];
-println!("{:?}", gx.eval(&[(x, &ag::ndarray::arr0(2.))]));  // => Ok(8.)
+println!("{:?}", gx.eval(&[(x, &ag::ndarray::arr0(2.).into_dyn())]));  // => Some(8.)
 
 // ddz/dx (differentiates `z` again)
 let ggx = &ag::grad(&[gx], &[x])[0];
-println!("{:?}", ggx.eval(&[]));  // => Ok(4.)
+println!("{:?}", ggx.eval(&[]));  // => Some(4.)
 ```
 
 Another example: softmax regression for MNIST digits classification with Adam.
@@ -53,10 +53,11 @@ Another example: softmax regression for MNIST digits classification with Adam.
 // This achieves 0.918 test accuracy after 3 epochs,
 // 0.27 sec/epoch on 2.7GHz Intel Core i5 (blas feature is disabled)
 
+
+let ref w = ag::variable(ag::ndarray_ext::glorot_uniform::<f32>(&[28*28, 10]));
+let ref b = ag::variable(ag::ndarray_ext::zeros::<f32>(&[1, 10]));
 let ref x = ag::placeholder(&[-1, 28*28]);
 let ref y = ag::placeholder(&[-1]);
-let ref w = ag::variable(ag::ndarray_ext::glorot_uniform(&[28*28, 10]));
-let ref b = ag::variable(ag::ndarray_ext::zeros(&[1, 10]));
 let ref z = ag::matmul(x, w) + b;
 let ref loss = ag::reduce_mean(&ag::sparse_softmax_cross_entropy(z, y), &[0, 1], false);
 let ref params = [w, b];
@@ -65,7 +66,7 @@ let ref predictions = ag::argmax(z, -1, true);
 let ref accuracy = ag::reduce_mean(&ag::equal(predictions, y), &[0], false);
 let ref adam = ag::gradient_descent_ops::Adam::default();
 let mut stateful_params = ag::gradient_descent_ops::Adam::vars_with_states(params);
-let ref update_ops = adam.compute_updates(stateful_params, grads);
+let ref update_ops = adam.compute_updates(&stateful_params, grads);
 
 // -- dataset --
 let ((x_train, y_train), (x_test, y_test)) = dataset::load();

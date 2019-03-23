@@ -12,7 +12,7 @@
 //!
 //! let ref x = ag::placeholder(&[]);
 //! let ref y = ag::placeholder(&[]);
-//! let ref z = 2*x*x + 3*y + 1;
+//! let ref z = 2.*x*x + 3.*y + 1.;
 //!
 //! // dz/dy
 //! let gy = &ag::grad(&[z], &[y])[0];
@@ -34,10 +34,10 @@
 //! extern crate autograd as ag;
 //! # fn main() {
 //! // -- graph def --
+//! let ref w = ag::variable(ag::ndarray_ext::glorot_uniform::<f32>(&[28*28, 10]));
+//! let ref b = ag::variable(ag::ndarray_ext::zeros::<f32>(&[1, 10]));
 //! let ref x = ag::placeholder(&[-1, 28*28]);
 //! let ref y = ag::placeholder(&[-1]);
-//! let ref w = ag::variable(ag::ndarray_ext::glorot_uniform(&[28*28, 10]));
-//! let ref b = ag::variable(ag::ndarray_ext::zeros(&[1, 10]));
 //! let ref z = ag::matmul(x, w) + b;
 //! let ref loss = ag::reduce_mean(&ag::sparse_softmax_cross_entropy(z, y), &[0, 1], false);
 //! let ref params = [w, b];
@@ -60,6 +60,8 @@
 //! ```
 #[macro_use(s)]
 extern crate ndarray;
+extern crate num;
+extern crate num_traits;
 extern crate rand;
 extern crate rayon;
 
@@ -81,9 +83,42 @@ pub mod ndarray_ext;
 
 pub mod op;
 
-pub use ndarray_ext::array_gen;
+use std::fmt;
 
-pub use tensor::Tensor;
+pub trait Float:
+    num_traits::Float + num_traits::NumAssignOps + Copy + Send + Sync + fmt::Display + 'static
+{
+}
+
+pub trait Int:
+    num::Integer
+    + num_traits::NumAssignOps
+    + num_traits::ToPrimitive
+    + Copy
+    + Send
+    + fmt::Display
+    + 'static
+{
+}
+
+impl<T> Float for T where
+    T: num::Float + num_traits::NumAssignOps + Copy + Send + Sync + fmt::Display + 'static
+{
+}
+
+impl<T> Int for T where
+    T: num::Integer
+        + num_traits::NumAssignOps
+        + num_traits::ToPrimitive
+        + Copy
+        + Send
+        + Sync
+        + fmt::Display
+        + 'static
+{
+}
+
+pub use ndarray_ext::array_gen;
 
 pub use ops::*;
 
@@ -93,3 +128,5 @@ pub use ops::gradient_descent_ops;
 pub use ndarray_ext::NdArray;
 
 pub use runtime::{eval, Eval};
+
+pub use tensor::Tensor;

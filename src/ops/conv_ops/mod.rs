@@ -605,18 +605,14 @@ fn test_max_pool_cpu() {
     let output = alloc_uninitialized_buf(4);
     let argmax = alloc_uninitialized_buf(4);
     max_pool(
-        &x[0],
-        0, // pad
-        3,
-        3, // h, w
-        2,
-        2, // out_h, out_w
+        &x[0], 0, // pad
+        3, 3, // h, w
+        2, 2, // out_h, out_w
         1, // c
         1, // batch
         2, // size
         1, // stride
-        &output[0],
-        &argmax[0],
+        &output[0], &argmax[0],
     );
     assert_eq!(output, vec![5., 4., 7., 8.]);
     assert_eq!(argmax, vec![3., 4., 7., 8.]);

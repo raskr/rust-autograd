@@ -4,7 +4,7 @@ extern crate ndarray;
 #[test]
 fn get() {
     let ref v = ag::variable(ndarray::arr1(&[1., 2., 3.]));
-    let ref a: ag::Tensor = 2 * v;
+    let ref a: ag::Tensor<f32> = 2. * v;
     let ref z = a.get(1);
     let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);

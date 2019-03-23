@@ -1,13 +1,15 @@
 extern crate autograd as ag;
 extern crate ndarray;
 
+type Tensor = ag::Tensor<f32>;
+
 struct LSTM {
     vector_dim: usize,
-    hs: Vec<ag::Tensor>,
-    cells: Vec<ag::Tensor>,
-    wx: ag::Tensor,
-    wh: ag::Tensor,
-    b: ag::Tensor,
+    hs: Vec<Tensor>,
+    cells: Vec<Tensor>,
+    wx: Tensor,
+    wh: Tensor,
+    b: Tensor,
 }
 
 impl LSTM {
@@ -35,7 +37,7 @@ impl LSTM {
     ///
     /// # Returns
     /// Output tensor of this unit with shape `(batch_size, state_size)`.
-    fn step(&mut self, x: &ag::Tensor) -> &ag::Tensor {
+    fn step(&mut self, x: &Tensor) -> &Tensor {
         let (cell, h) = {
             let ref last_output = self.hs.pop().unwrap_or_else(|| ag::zeros(&x.shape()));
             let ref last_cell = self.cells.pop().unwrap_or_else(|| ag::zeros(&x.shape()));
@@ -80,7 +82,7 @@ pub fn main() {
     ));
 
     // Compute cross entropy losses for each LSTM step
-    let losses: Vec<ag::Tensor> = (0..max_sent)
+    let losses: Vec<Tensor> = (0..max_sent)
         .map(|i| {
             let cur_id = ag::slice(sentences, &[0, i], &[-1, i + 1]);
             let next_id = ag::slice(sentences, &[0, i + 1], &[-1, i + 2]);
