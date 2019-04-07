@@ -21,6 +21,3 @@ install:
 
 script:
   - cargo test -v
-
-compiler:
-    - clang
