@@ -3,7 +3,7 @@ language: rust
 env: TYPE=default RUST_BACKTRACE=1
 
 rust:
-  - "1.28.0"
+  - "1.33.0"
   - stable
   - beta
   - nightly
