@@ -3,25 +3,30 @@
 [![Build Status](https://travis-ci.org/raskr/rust-autograd.svg?branch=master)](https://travis-ci.org/raskr/rust-autograd)
 [![](http://meritbadge.herokuapp.com/autograd)](https://crates.io/crates/autograd)
 
-A library which provides differentiable operations and tensors.
+Provides differentiable operations and tensors.
 
 ## Features
-
 * **Lazy, side-effect-free tensors.**
 `autograd::Tensor<T>` itself doesn't have its value basically.
-It realizes graphs that are eagerly executable at any timing, 
+It realizes graphs that are immutable and eagerly executable at any timing, 
 that is, it supports both *run-by-define* and *define-by-run* naturally
 in the context of neural networks.
 
 * **Reverse-mode automatic differentiation.**
-There are a lot of [built-in operations](https://docs.rs/autograd/0.8.0/autograd/ops/index.html)
+There are a lot of [built-in operations](https://docs.rs/autograd/0.9.0/autograd/ops/index.html)
 that support *higher-order* derivatives, and
-you can [define your own ops](https://docs.rs/autograd/0.8.0/autograd/op/trait.Op.html) with ndarrays easily.
+you can [define your own ops](https://docs.rs/autograd/0.9.0/autograd/op/trait.Op.html) with ndarrays easily.
 
-* **Runtime using ndarray.**
-Graph execution engine is implemented in pure Rust,  
-so it's compilable to WebAssembly with few or no modifications.
-GPUs are not supported for now.
+* **Pure Rust.**
+The graph execution engine is implemented in pure Rust, so it's compilable to WebAssembly.
+
+## Installation
+```
+[dependencies]
+autograd = "0.9.0"
+```
+`mkl` feature is enabled by default to speedup gemm operations.
+
 
 ## Examples
 Here we are computing partial derivatives of `z = 2x^2 + 3y + 1`.
@@ -50,8 +55,7 @@ println!("{:?}", ggx.eval(&[]));  // => Some(4.)
 Another example: softmax regression for MNIST digits classification with Adam.
 
 ```rust
-// This achieves 0.918 test accuracy after 3 epochs,
-// 0.27 sec/epoch on 2.7GHz Intel Core i5 (blas feature is disabled)
+// This achieves 0.918 test accuracy after 3 epochs, 0.14 sec/epoch on 2.7GHz Intel Core i5
 
 
 let ref w = ag::variable(ag::ndarray_ext::glorot_uniform::<f32>(&[28*28, 10]));

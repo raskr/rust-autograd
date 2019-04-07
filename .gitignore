@@ -3,4 +3,5 @@ target
 Cargo.lock
 .idea
 .vscode
+.DS_Store
 TODO
