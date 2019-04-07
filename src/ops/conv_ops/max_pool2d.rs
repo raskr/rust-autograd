@@ -88,7 +88,6 @@ impl_max_pool!(f64, max_pool_f64);
 #[test]
 fn test_max_pool() {
     let x = vec![0., 1., 2., 5., 4., 3., 6., 7., 8.];
-    let argmax = uninitialized_vec::<f64>(4);
     let (output, argmax) = unsafe {
         max_pool_f64(
             x.as_ptr(),

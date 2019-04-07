@@ -86,15 +86,12 @@ fn test_im2col_batch() {
     let xch = 2;
     let (xh, xw) = (3, 3);
     let (kh, kw) = (2, 2);
-    let yh = get_yh!(&op, xh, kh);
-    let yw = get_yw!(&op, xw, kw);
 
     let x: Vec<f32> = vec![(0..xch * xw * xh).map(|a| a as f32).collect::<Vec<f32>>(); 2]
         .into_iter()
         .flat_map(|a| a)
         .collect();
 
-    let cols = uninitialized_vec::<f32>(2 * xch * kw * kh * yh * yw);
     let batch_size = 2;
 
     let ret = im2col_batch(
