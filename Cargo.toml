@@ -1,6 +1,6 @@
 [package]
 name = "autograd"
-version = "0.9.0"
+version = "0.9.1"
 authors = ["raskr <janne.dc.ib.sa@gmail.com>"]
 
 repository = "https://github.com/raskr/rust-autograd"
