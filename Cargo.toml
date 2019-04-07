@@ -23,7 +23,6 @@ num = "0.2"
 
 [features]
 mkl = ["intel-mkl-src"]
-default = ["mkl"]
 
 [lib]
 name = "autograd"
