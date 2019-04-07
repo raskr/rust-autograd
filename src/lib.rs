@@ -58,8 +58,14 @@
 //! // }
 //! # }
 //! ```
+#[allow(unused_imports)]
 #[macro_use(s)]
 extern crate ndarray;
+#[cfg(feature = "mkl")]
+extern crate intel_mkl_src;
+extern crate libc;
+#[cfg(not(feature = "mkl"))]
+extern crate matrixmultiply;
 extern crate num;
 extern crate num_traits;
 extern crate rand;
@@ -83,10 +89,18 @@ pub mod ndarray_ext;
 
 pub mod op;
 
+use std::any::TypeId;
 use std::fmt;
 
 pub trait Float:
-    num_traits::Float + num_traits::NumAssignOps + Copy + Send + Sync + fmt::Display + 'static
+    num_traits::Float
+    + num_traits::NumAssignOps
+    + Copy
+    + Send
+    + Sync
+    + fmt::Display
+    + fmt::Debug
+    + 'static
 {
 }
 
@@ -102,7 +116,14 @@ pub trait Int:
 }
 
 impl<T> Float for T where
-    T: num::Float + num_traits::NumAssignOps + Copy + Send + Sync + fmt::Display + 'static
+    T: num::Float
+        + num_traits::NumAssignOps
+        + Copy
+        + Send
+        + Sync
+        + fmt::Display
+        + fmt::Debug
+        + 'static
 {
 }
 
@@ -116,6 +137,13 @@ impl<T> Int for T where
         + fmt::Display
         + 'static
 {
+}
+
+#[doc(hidden)]
+#[inline(always)]
+/// Return `true` if `A` and `B` are the same type
+pub fn same_type<A: 'static, B: 'static>() -> bool {
+    TypeId::of::<A>() == TypeId::of::<B>()
 }
 
 pub use ndarray_ext::array_gen;

@@ -7,15 +7,14 @@ use std::time::Instant;
 type Tensor = ag::Tensor<f32>;
 
 // This is a softmax regression with Adam optimizer for mnist.
-// 0.918 test accuracy after 3 epochs,
-// 0.28 sec/epoch on 2.7GHz Intel Core i5 (blas feature is disabled)
+// 0.918 test accuracy after 3 epochs, 0.14 sec/epoch on 2.7GHz Intel Core i5
 //
 // First, run "./download_mnist.sh" beforehand if you don't have dataset and then run
 // "cargo run --example mlp_mnist --release" in `examples` directory.
 //
 // NOTE: This example is written in define-by-run style, so
 // the performance is spoiled little bit.
-macro_rules! eval_with_time {
+macro_rules! timeit {
     ($x:expr) => {{
         let start = Instant::now();
         let result = $x;
@@ -55,7 +54,7 @@ fn main() {
     let num_batches = num_samples / batch_size as usize;
 
     for epoch in 0..max_epoch {
-        eval_with_time!({
+        timeit!({
             let perm = ag::ndarray_ext::permutation(num_batches) * batch_size as usize;
             for i in perm.into_iter() {
                 let (x, y) = inputs();

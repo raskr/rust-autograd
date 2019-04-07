@@ -167,8 +167,8 @@ fn squeeze() {
 
 #[test]
 fn matmul() {
-    let ref a = ag::constant(ag::ndarray_ext::standard_normal(&[4, 2]));
-    let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[2, 3]));
+    let ref a = ag::constant(ag::ndarray_ext::standard_normal::<f32>(&[4, 2]));
+    let ref v = ag::variable(ag::ndarray_ext::standard_normal::<f32>(&[2, 3]));
     let ref z = ag::matmul(a, v);
     let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -580,8 +580,8 @@ fn conv2d_x_grad() {
 #[test]
 fn conv2d() {
     let ref x = ag::variable(ag::ndarray_ext::standard_normal(&[2, 3, 5, 5]));
-    let ref w = ag::variable(ag::ndarray_ext::standard_normal(&[2, 3, 2, 2]));
-    let ref y = ag::conv2d(x, w, 0, 1);
+    let ref w = ag::variable(ag::ndarray_ext::standard_normal(&[2, 3, 3, 3]));
+    let ref y = ag::conv2d(x, w, 1, 2);
     let ref g = ag::grad_with_default(&[y], &[x, w], &[&ag::ones(&y.shape())]);
     ag::test_helper::check_theoretical_grads(y, g, &[x, w], &[], 1e-3, 1e-2);
 }
@@ -591,7 +591,7 @@ fn max_pool2d() {
     let arr_x = ndarray::Array::from_iter(0..2 * 2 * 3 * 3)
         .into_shape(ndarray::IxDyn(&[2, 2, 3, 3]))
         .unwrap();
-    let ref x = ag::variable(arr_x.map(|a| *a as f32));
+    let ref x = ag::variable(arr_x.map(|a| *a as f64));
     let ref y = ag::max_pool2d(x, 2, 0, 1);
     let ref g = ag::grad_with_default(&[y], &[x], &[&ag::ones(&y.shape())]);
     ag::test_helper::check_theoretical_grads(y, g, &[x], &[], 1e-3, 1e-2);

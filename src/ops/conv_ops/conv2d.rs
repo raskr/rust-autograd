@@ -20,16 +20,66 @@ pub struct Conv2DWithCols {
     pub dilation: usize,
 }
 
-impl ::op::Op<f32> for Conv2D {
+#[cfg(not(feature = "mkl"))]
+macro_rules! slow_gemm {
+    ($trans_a:expr, $trans_b:expr, $a:expr, $b:expr, $c:expr,
+        $m:expr, $n:expr, $k:expr, $alpha:expr, $beta:expr) => {
+        let rsa = if $trans_a { 1 } else { $k };
+        let csa = if $trans_a { $m } else { 1 };
+        let rsb = if $trans_b { 1 } else { $n };
+        let csb = if $trans_b { $k } else { 1 };
+        let rsc = $n;
+        let csc = 1;
+        if same_type::<T, f32>() {
+            matrixmultiply::sgemm(
+                $m,
+                $k,
+                $n,
+                $alpha as f32,
+                $a as *const f32,
+                rsa as isize,
+                csa as isize,
+                $b as *const f32,
+                rsb as isize,
+                csb as isize,
+                $beta as f32,
+                $c as *mut f32,
+                rsc as isize,
+                csc as isize,
+            )
+        } else if same_type::<T, f64>() {
+            matrixmultiply::dgemm(
+                $m,
+                $k,
+                $n,
+                $alpha,
+                $a as *const f64,
+                rsa as isize,
+                csa as isize,
+                $b as *const f64,
+                rsb as isize,
+                csb as isize,
+                $beta,
+                $c as *mut f64,
+                rsc as isize,
+                csc as isize,
+            )
+        } else {
+            panic!("matrixmultiply::?gemm supports only f32 and f64.")
+        }
+    };
+}
+
+impl<T: Float> ::op::Op<T> for Conv2D {
     fn name(&self) -> &str {
         "Conv2D"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<f32>) -> ::op::ComputeResult<f32> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ::op::ComputeResult<T> {
         // Grab inputs
         let xs = ctx.grab_inputs();
-        let x: &NdArray<f32> = xs[0];
-        let w: &NdArray<f32> = xs[1];
+        let x: &NdArray<T> = xs[0];
+        let w: &NdArray<T> = xs[1];
 
         // Extract size params
         let (batch_size, xch, xh, xw) = {
@@ -60,9 +110,7 @@ impl ::op::Op<f32> for Conv2D {
         let yh = get_yh!(self, xh, kh);
         let yw = get_yw!(self, xw, kw);
 
-        let num_elements_in_batch_x = xch * xh * xw;
-        let num_elements_in_batch_y = ych * yh * yw;
-        let num_elements_in_batch_c = xch * kw * kh * yh * yw;
+        let size_per_batch_y = ych * yh * yw;
 
         // Parameters for sgemm
         let m = ych;
@@ -71,85 +119,119 @@ impl ::op::Op<f32> for Conv2D {
 
         // Prepare pointers to buffers
         let x = unsafe { slice::from_raw_parts(x.as_ptr(), batch_size * xch * xh * xw) };
-        let c = alloc_uninitialized_buf(batch_size * num_elements_in_batch_c);
-        let y = alloc_uninitialized_buf(batch_size * num_elements_in_batch_y);
-        let w: &f32 = unsafe { &*w.as_ptr() };
+        let y = ::dot_ops::uninitialized_vec(batch_size * size_per_batch_y);
+
+        let c = im2col_batch(
+            x,
+            batch_size,
+            xch as isize,
+            xh as isize,
+            xw as isize,
+            kh as isize,
+            kw as isize,
+            self.pad as isize,
+            self.pad as isize,
+            self.stride as isize,
+            self.stride as isize,
+            self.dilation as isize,
+            self.dilation as isize,
+        );
 
         #[cfg(feature = "mkl")]
         {
-            (0..batch_size).into_par_iter().for_each(|i| {
-                // for each batch
-                let x_region_head = &x[i * num_elements_in_batch_x];
-                let c_region_head = &c[i * num_elements_in_batch_c];
-                im2col(
-                    x_region_head,
-                    xch,
-                    xh,
-                    xw,
-                    kh,
-                    kw,
-                    self.pad,
-                    self.pad,
-                    self.stride,
-                    self.stride,
-                    self.dilation,
-                    self.dilation,
-                    c_region_head,
-                );
-            });
-            cblas_sgemm_batch_wrapper(
-                false,
-                false,
-                m,
-                n,
-                k,
-                &[1.],
-                vec![w; batch_size],
-                get_region_heads(batch_size, c.as_slice()),
-                &[0.],
-                get_region_heads(batch_size, y.as_slice()),
-                1,
-                batch_size,
-            );
-        }
-        #[cfg(not(feature = "mkl"))]
-        {
-            // fallback: parallel im2col + sgemm using rayon
-            (0..batch_size).into_par_iter().for_each(|i| {
-                // for each batch
-                let x_region_head = &x[i * num_elements_in_batch_x];
-                let c_region_head = &c[i * num_elements_in_batch_c];
-                let y_region_head = &y[i * num_elements_in_batch_y];
-                im2col(
-                    x_region_head,
-                    xch,
-                    xh,
-                    xw,
-                    kh,
-                    kw,
-                    self.pad,
-                    self.pad,
-                    self.stride,
-                    self.stride,
-                    self.dilation,
-                    self.dilation,
-                    c_region_head,
-                );
-                sgemm(
+            let w: *const T = w.as_ptr();
+            if same_type::<T, f32>() {
+                ::ops::dot_ops::cblas_sgemm_batch_wrapper(
                     false,
                     false,
-                    w,
-                    c_region_head,
-                    y_region_head,
                     m,
                     n,
                     k,
-                    1.,
-                    0.,
+                    &[1.],
+                    vec![w as *const f32; batch_size],
+                    ::dot_ops::get_region_heads(batch_size, c.as_slice()),
+                    &[0.],
+                    ::dot_ops::get_region_heads(batch_size, y.as_slice()),
+                    1,
+                    batch_size,
                 );
+            } else if same_type::<T, f64>() {
+                ::ops::dot_ops::cblas_dgemm_batch_wrapper(
+                    false,
+                    false,
+                    m,
+                    n,
+                    k,
+                    &[1.],
+                    vec![w as *const f64; batch_size],
+                    ::dot_ops::get_region_heads(batch_size, c.as_slice()),
+                    &[0.],
+                    ::dot_ops::get_region_heads(batch_size, y.as_slice()),
+                    1,
+                    batch_size,
+                );
+            } else {
+                panic!("gemm supports only f32 and f64.")
+            }
+        }
+        #[cfg(not(feature = "mkl"))]
+        {
+            let size_per_batch_c = xch * kw * kh * yh * yw;
+            (0..batch_size).into_par_iter().for_each(|i| {
+                // for each batch
+                unsafe {
+                    let w: *const T = mem::transmute(w.as_ptr());
+                    let c_region_head = &c[i * size_per_batch_c] as *const T;
+                    let y_region_head: *mut T = mem::transmute(&y[i * size_per_batch_y]);
+                    let trans_a = false;
+                    let trans_b = false;
+                    let rsa = if trans_a { 1 } else { k };
+                    let csa = if trans_a { m } else { 1 };
+                    let rsb = if trans_b { 1 } else { n };
+                    let csb = if trans_b { k } else { 1 };
+                    let rsc = n;
+                    let csc = 1;
+                    if same_type::<T, f32>() {
+                        matrixmultiply::sgemm(
+                            m,
+                            k,
+                            n,
+                            1.,
+                            w as *const f32,
+                            rsa as isize,
+                            csa as isize,
+                            c_region_head as *const f32,
+                            rsb as isize,
+                            csb as isize,
+                            0.,
+                            y_region_head as *mut f32,
+                            rsc as isize,
+                            csc as isize,
+                        );
+                    } else if same_type::<T, f64>() {
+                        matrixmultiply::dgemm(
+                            m,
+                            k,
+                            n,
+                            1.,
+                            w as *const f64,
+                            rsa as isize,
+                            csa as isize,
+                            c_region_head as *const f64,
+                            rsb as isize,
+                            csb as isize,
+                            0.,
+                            y_region_head as *mut f64,
+                            rsc as isize,
+                            csc as isize,
+                        );
+                    } else {
+                        panic!("gemm supports only f32 and f64.")
+                    }
+                }
             });
         }
-        // Move vectors into NdArrays
+        // move vectors into ndarrays
         let y = NdArray::from_shape_vec(ndarray::IxDyn(&[batch_size, ych, yh, yw]), y).unwrap();
 
         let cols =
@@ -158,12 +240,7 @@ impl ::op::Op<f32> for Conv2D {
         vec![Ok(y), Ok(cols)]
     }
 
-    fn grad(
-        &self,
-        gy: &Tensor<f32>,
-        xs: &[&Tensor<f32>],
-        y: &Tensor<f32>,
-    ) -> Vec<Option<Tensor<f32>>> {
+    fn grad(&self, gy: &Tensor<T>, xs: &[&Tensor<T>], y: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
         let x = xs[0];
         let w = xs[1];
 
@@ -189,16 +266,16 @@ impl ::op::Op<f32> for Conv2D {
     }
 }
 
-impl ::op::Op<f32> for Conv2DWithCols {
+impl<T: Float> ::op::Op<T> for Conv2DWithCols {
     fn name(&self) -> &str {
         "Conv2DWithCols"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<f32>) -> ::op::ComputeResult<f32> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ::op::ComputeResult<T> {
         // Grab inputs
         let xs = ctx.grab_inputs();
-        let cols: &NdArray<f32> = xs[0];
-        let w: &NdArray<f32> = xs[1];
+        let cols: &NdArray<T> = xs[0];
+        let w: &NdArray<T> = xs[1];
 
         // Extract size params
         let cols_shape = cols.shape();
@@ -209,43 +286,60 @@ impl ::op::Op<f32> for Conv2DWithCols {
         let batch_size = cols_shape[0];
 
         // Parameters for sgemm
-        let num_elements_in_batch_y = ych * yh * yw;
+        let size_per_batch_y = ych * yh * yw;
         let m = ych;
         let n = yh * yw;
         let k = xch * kh * kw;
 
         // Prepare buffers
         let c = unsafe { slice::from_raw_parts(cols.as_ptr(), cols.len()) };
-        let y = alloc_uninitialized_buf(batch_size * num_elements_in_batch_y);
-        let w: &f32 = unsafe { &*w.as_ptr() };
+        let y = ::dot_ops::uninitialized_vec(batch_size * size_per_batch_y);
 
         #[cfg(feature = "mkl")]
         {
-            cblas_sgemm_batch_wrapper(
-                false,
-                false,
-                m,
-                n,
-                k,
-                &[1.],
-                vec![w; batch_size],
-                get_region_heads(batch_size, c),
-                &[0.],
-                get_region_heads(batch_size, y.as_slice()),
-                1,
-                batch_size,
-            );
+            let w: *const T = w.as_ptr();
+            if same_type::<T, f32>() {
+                ::ops::dot_ops::cblas_sgemm_batch_wrapper(
+                    false,
+                    false,
+                    m,
+                    n,
+                    k,
+                    &[1.],
+                    vec![w as *const f32; batch_size],
+                    ::dot_ops::get_region_heads(batch_size, c),
+                    &[0.],
+                    ::dot_ops::get_region_heads(batch_size, y.as_slice()),
+                    1,
+                    batch_size,
+                );
+            } else {
+                ::ops::dot_ops::cblas_dgemm_batch_wrapper(
+                    false,
+                    false,
+                    m,
+                    n,
+                    k,
+                    &[1.],
+                    vec![w as *const f64; batch_size],
+                    ::dot_ops::get_region_heads(batch_size, c),
+                    &[0.],
+                    ::dot_ops::get_region_heads(batch_size, y.as_slice()),
+                    1,
+                    batch_size,
+                );
+            }
         }
         #[cfg(not(feature = "mkl"))]
         {
-            let num_elements_in_batch_c =
+            let size_per_batch_c =
                 { cols_shape[1] * cols_shape[2] * cols_shape[3] * cols_shape[4] * cols_shape[5] };
             // fallback: parallel sgemm using rayon
-            (0..batch_size).into_par_iter().for_each(|i| {
-                // for each batch
-                let c_region_head = &c[i * num_elements_in_batch_c];
-                let y_region_head = &y[i * num_elements_in_batch_y];
-                sgemm(
+            (0..batch_size).into_par_iter().for_each(|i| unsafe {
+                let c_region_head = &c[i * size_per_batch_c] as *const T;
+                let y_region_head: *mut T = mem::transmute(&y[i * size_per_batch_y]);
+                let w: *const T = mem::transmute(w.as_ptr());
+                slow_gemm!(
                     false,
                     false,
                     w,
@@ -255,22 +349,17 @@ impl ::op::Op<f32> for Conv2DWithCols {
                     n,
                     k,
                     1.,
-                    0.,
+                    0.
                 );
             });
         }
-        // Move vectors into NdArrays
+        // move vectors into ndarrays
         let y = NdArray::from_shape_vec(ndarray::IxDyn(&[batch_size, ych, yh, yw]), y).unwrap();
 
         vec![Ok(y)]
     }
 
-    fn grad(
-        &self,
-        gy: &Tensor<f32>,
-        xs: &[&Tensor<f32>],
-        y: &Tensor<f32>,
-    ) -> Vec<Option<Tensor<f32>>> {
+    fn grad(&self, gy: &Tensor<T>, xs: &[&Tensor<T>], y: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
         let cols = xs[0];
         let w = xs[1];
 
@@ -298,12 +387,12 @@ impl ::op::Op<f32> for Conv2DWithCols {
     }
 }
 
-impl ::op::Op<f32> for Conv2DFilterGrad {
+impl<T: Float> ::op::Op<T> for Conv2DFilterGrad {
     fn name(&self) -> &str {
         "Conv2DFilterGrad"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<f32>) -> ::op::ComputeResult<f32> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ::op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
         let cols = xs[0]; // must be columns
         let gy = xs[1];
@@ -311,9 +400,9 @@ impl ::op::Op<f32> for Conv2DFilterGrad {
         let cols_shape = cols.shape();
         let gy_shape = gy.shape();
 
-        let num_elements_in_batch_g = { gy_shape[1] * gy_shape[2] * gy_shape[3] };
+        let size_per_batch_g = { gy_shape[1] * gy_shape[2] * gy_shape[3] };
 
-        let num_elements_in_batch_c =
+        let size_per_batch_c =
             { cols_shape[1] * cols_shape[2] * cols_shape[3] * cols_shape[4] * cols_shape[5] };
 
         let (xch, kh, kw) = (k_shape[1], k_shape[2], k_shape[3]);
@@ -326,32 +415,64 @@ impl ::op::Op<f32> for Conv2DFilterGrad {
         // Prepare bufs
         let cols = unsafe { slice::from_raw_parts(cols.as_ptr(), cols.len()) };
         let gy = unsafe { slice::from_raw_parts(gy.as_ptr(), gy.len()) };
-        let gw = alloc_uninitialized_buf(ych * xch * kh * kw);
-        let gw_head = unsafe { &*gw.as_ptr() };
+        let mut gw = ::dot_ops::uninitialized_vec::<T>(ych * xch * kh * kw);
+        let gw_head: *mut T = gw.as_mut_ptr();
 
         for i in 0..batch_size {
-            sgemm(
-                false,
-                true,
-                &gy[i * num_elements_in_batch_g],
-                &cols[i * num_elements_in_batch_c],
-                gw_head,
-                m,
-                n,
-                k,
-                1.,
-                (i != 0) as i32 as f32, // beta: if i==0 then 0 else 1
-            );
+            #[cfg(feature = "mkl")]
+            {
+                if same_type::<T, f32>() {
+                    ::dot_ops::cblas_sgemm_wrapper(
+                        false,
+                        true,
+                        m,
+                        n,
+                        k,
+                        1.,
+                        &gy[i * size_per_batch_g] as *const T as *const f32,
+                        &cols[i * size_per_batch_c] as *const T as *const f32,
+                        if i == 0 { 0. } else { 1. },
+                        gw_head as *mut f32,
+                    );
+                } else if same_type::<T, f64>() {
+                    ::dot_ops::cblas_dgemm_wrapper(
+                        false,
+                        true,
+                        m,
+                        n,
+                        k,
+                        1.,
+                        &gy[i * size_per_batch_g] as *const T as *const f64,
+                        &cols[i * size_per_batch_c] as *const T as *const f64,
+                        if i == 0 { 0. } else { 1. },
+                        gw_head as *mut f64,
+                    );
+                } else {
+                    panic!("gemm supports only f32 and f64.")
+                }
+            }
+            #[cfg(not(feature = "mkl"))]
+            {
+                unsafe {
+                    slow_gemm!(
+                        false,
+                        true,
+                        &gy[i * size_per_batch_g] as *const T as *const f32,
+                        &cols[i * size_per_batch_c] as *const T as *const f32,
+                        gw_head as *mut f32,
+                        m,
+                        n,
+                        k,
+                        1.,
+                        if i == 0 { 0. } else { 1. }
+                    );
+                }
+            }
         }
         vec![Ok(NdArray::from_shape_vec(k_shape, gw).unwrap())]
     }
 
-    fn grad(
-        &self,
-        ggw: &Tensor<f32>,
-        xs: &[&Tensor<f32>],
-        y: &Tensor<f32>,
-    ) -> Vec<Option<Tensor<f32>>> {
+    fn grad(&self, ggw: &Tensor<T>, xs: &[&Tensor<T>], y: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
         let cols = xs[0];
         let gy = xs[1]; // For example, gradient of output of Conv2D.
 
@@ -394,106 +515,6 @@ fn test_tensor_size_after_convolution() {
     let yw = get_yw!(&op, xw, kw);
     assert_eq!(yh, 2);
     assert_eq!(yw, 2);
-}
-
-#[test]
-fn test_parallel_im2col() {
-    let op = Conv2D {
-        pad: 0,
-        stride: 1,
-        dilation: 1,
-    };
-
-    let batch_size = 2;
-    let xch = 2;
-    let (xh, xw) = (3, 3);
-    let (kh, kw) = (2, 2);
-    let yh = get_yh!(&op, xh, kh);
-    let yw = get_yw!(&op, xw, kw);
-    let num_elements_in_batch_x = xch * xh * xw;
-    let num_elements_in_batch_c = xch * kw * kh * yh * yw;
-    let x = (0..(batch_size * num_elements_in_batch_x))
-        .map(|a| a as f32)
-        .collect::<Vec<_>>();
-    let c = alloc_uninitialized_buf(batch_size * num_elements_in_batch_c);
-    // Call im2col on 2 chunks in parallel.
-    (0..batch_size).into_par_iter().for_each(|i| {
-        // for each mini-batch
-        im2col(
-            &x[i * num_elements_in_batch_x],
-            xch,
-            xh,
-            xw,
-            kh,
-            kw,
-            op.pad,
-            op.pad,
-            op.stride,
-            op.stride,
-            op.dilation,
-            op.dilation,
-            &c[i * num_elements_in_batch_c],
-        );
-    });
-
-    assert_eq!(
-        c,
-        vec![
-            0.0, 1.0, 3.0, 4.0, 1.0, 2.0, 4.0, 5.0, 3.0, 4.0, 6.0, 7.0, 4.0, 5.0, 7.0, 8.0, 9.0,
-            10.0, 12.0, 13.0, 10.0, 11.0, 13.0, 14.0, 12.0, 13.0, 15.0, 16.0, 13.0, 14.0, 16.0,
-            17.0, 18.0, 19.0, 21.0, 22.0, 19.0, 20.0, 22.0, 23.0, 21.0, 22.0, 24.0, 25.0, 22.0,
-            23.0, 25.0, 26.0, 27.0, 28.0, 30.0, 31.0, 28.0, 29.0, 31.0, 32.0, 30.0, 31.0, 33.0,
-            34.0, 31.0, 32.0, 34.0, 35.0,
-        ]
-    );
-}
-
-#[test]
-fn test_im2col() {
-    let op = Conv2D {
-        pad: 0,
-        stride: 1,
-        dilation: 1,
-    };
-
-    let xch = 2;
-    let (xh, xw) = (3, 3);
-    let (kh, kw) = (2, 2);
-    let yh = get_yh!(&op, xh, kh);
-    let yw = get_yw!(&op, xw, kw);
-
-    let x = ndarray::Array1::range(0., (xch * xw * xh) as f32, 1.)
-        .into_shape((1, xch as usize, xw as usize, xh as usize))
-        .unwrap();
-
-    let cols = alloc_uninitialized_buf(1 * xch * kw * kh * yh * yw);
-
-    unsafe {
-        im2col_cpu(
-            x.as_ptr(),
-            xch as i32,
-            xh as i32,
-            xw as i32,
-            kh as i32,
-            kw as i32,
-            op.pad as i32,
-            op.pad as i32,
-            op.stride as i32,
-            op.stride as i32,
-            op.dilation as i32,
-            op.dilation as i32,
-            cols.as_ptr(),
-        )
-    };
-
-    assert_eq!(
-        cols,
-        vec![
-            0.0, 1.0, 3.0, 4.0, 1.0, 2.0, 4.0, 5.0, 3.0, 4.0, 6.0, 7.0, 4.0, 5.0, 7.0, 8.0, 9.0,
-            10.0, 12.0, 13.0, 10.0, 11.0, 13.0, 14.0, 12.0, 13.0, 15.0, 16.0, 13.0, 14.0, 16.0,
-            17.0,
-        ]
-    )
 }
 
 #[test]

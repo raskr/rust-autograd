@@ -11,7 +11,8 @@ mod basic_source_ops;
 pub mod binary_ops;
 mod const_gen_ops;
 mod conv_ops;
-mod dot_ops;
+#[macro_use]
+pub mod dot_ops;
 pub mod gradient_descent_ops;
 mod gradient_ops;
 mod math_ops;
@@ -1529,6 +1530,36 @@ where
 /// ```
 ///
 /// For detailed description, see https://www.tensorflow.org/api_docs/python/tf/matmul
+pub fn batch_matmul_t<T, A, B>(a: A, b: B, trans_a: bool, trans_b: bool) -> Tensor<T>
+where
+    T: Float,
+    A: AsRef<Tensor<T>>,
+    B: AsRef<Tensor<T>>,
+{
+    let op = dot_ops::BatchMatMul {
+        transpose_a: trans_a,
+        transpose_b: trans_b,
+    };
+    Tensor::builder()
+        .set_inputs(vec![a.as_ref(), b.as_ref()])
+        .build(op)
+}
+
+/// Batched matrix multiplication.
+///
+/// The rank of `a` and `b` must be equals.
+///
+/// ```
+/// extern crate autograd as ag;
+///
+/// let ref a: ag::Tensor<f32> = ag::zeros(&[2, 3, 4, 2]);
+/// let ref b: ag::Tensor<f32> = ag::zeros(&[2, 3, 2, 3]);
+/// let ref c = ag::batch_matmul(a, b);
+///
+/// assert_eq!(c.eval(&[]).unwrap().shape(), &[2, 3, 4, 3]);
+/// ```
+///
+/// For detailed description, see https://www.tensorflow.org/api_docs/python/tf/matmul
 pub fn batch_matmul<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>>(a: A, b: B) -> Tensor<T> {
     let op = dot_ops::BatchMatMul {
         transpose_a: false,
@@ -2026,11 +2057,7 @@ pub fn ones<T: Float, AL: ArrayLike<T>>(shape: &AL) -> Tensor<T> {
 /// ```
 pub fn range<T: Float>(start: T, end: T, step: T) -> Tensor<T> {
     Tensor::builder()
-        .set_inputs(vec![
-            &scalar(start),
-            &scalar(end),
-            &scalar(step)
-        ])
+        .set_inputs(vec![&scalar(start), &scalar(end), &scalar(step)])
         .build(const_gen_ops::Range)
 }
 
@@ -2042,14 +2069,6 @@ pub fn _range<T: Float, AL: ArrayLike<T>>(start: &AL, end: &AL, step: &AL) -> Te
             &step.as_tensor(),
         ])
         .build(const_gen_ops::Range)
-}
-
-// internal helper
-fn slice_as_tensor<T: Float>(slice: &[T]) -> Tensor<T> {
-    let vec = slice.to_vec();
-    // unwrap is safe
-    let arr = NdArray::from_shape_vec(ndarray::IxDyn(&[vec.len()]), vec).unwrap();
-    convert_to_tensor(arr)
 }
 
 /// 2D convolution.
@@ -2173,12 +2192,12 @@ where
 ///   * `out_h` = `(h + 2 * pad - pool_size) / stride + 1`
 ///   * `out_w` = `(w + 2 * pad - pool_size) / stride + 1`
 ///
-pub fn max_pool2d<A: AsRef<Tensor<f32>>>(
+pub fn max_pool2d<T: Float, A: AsRef<Tensor<T>>>(
     x: A,
     pool_size: usize,
     pad: usize,
     stride: usize,
-) -> Tensor<f32> {
+) -> Tensor<T> {
     Tensor::builder()
         .set_input(x.as_ref())
         .build(conv_ops::max_pool2d::MaxPool2D {

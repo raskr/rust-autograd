@@ -12,16 +12,16 @@ pub struct Conv2DTransposeFilterGrad {
     pub dilation: usize,
 }
 
-impl ::op::Op<f32> for Conv2DTranspose {
+impl<T: Float> ::op::Op<T> for Conv2DTranspose {
     fn name(&self) -> &str {
         "Conv2DTranspose"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<f32>) -> ::op::ComputeResult<f32> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ::op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
 
-        let gy: &NdArray<f32> = xs[0]; // (batch, ych, yh, yw)
-        let w: &NdArray<f32> = xs[1]; // (ych, xch, kh, kw)
+        let gy: &NdArray<T> = xs[0]; // (batch, ych, yh, yw)
+        let w: &NdArray<T> = xs[1]; // (ych, xch, kh, kw)
         let gy_shape = gy.shape();
         let f_shape = w.shape();
 
@@ -59,102 +59,92 @@ impl ::op::Op<f32> for Conv2DTranspose {
         let n = yh * yw;
         let m = kh * kw * xch;
 
-        let num_elements_in_batch_gx = xch * xh * xw;
-        let num_elements_in_batch_col = xch * kh * kw * yh * yw;
+        let size_per_batch_col = xch * kh * kw * yh * yw;
 
         let gy = unsafe { slice::from_raw_parts(gy.as_ptr(), gy.len()) };
-        let w: &f32 = unsafe { &*w.as_ptr() };
-        let col = alloc_uninitialized_buf(batch_size * num_elements_in_batch_col);
+        let col = ::dot_ops::uninitialized_vec(batch_size * size_per_batch_col);
         // Col2im buffer must be initialized with zeros
-        let gx = vec![0.; batch_size * num_elements_in_batch_gx];
 
         #[cfg(feature = "mkl")]
         {
-            cblas_sgemm_batch_wrapper(
-                true,
-                false,
-                m,
-                n,
-                k,
-                &[1.],
-                vec![w; batch_size],
-                get_region_heads(batch_size, gy),
-                &[0.],
-                get_region_heads(batch_size, col.as_slice()),
-                1,
-                batch_size,
-            );
-
-            (0..batch_size).into_par_iter().for_each(|i| {
-                // for each mini-batch
-                let col_region_head = &col[i * num_elements_in_batch_col];
-                let gx_region_head = &gx[i * num_elements_in_batch_gx];
-                col2im(
-                    col_region_head,
-                    xch,
-                    xh,
-                    xw,
-                    kh,
-                    kw,
-                    self.pad,
-                    self.pad,
-                    self.stride,
-                    self.stride,
-                    self.dilation,
-                    self.dilation,
-                    gx_region_head,
+            let w = w.as_ptr();
+            if same_type::<T, f32>() {
+                ::ops::dot_ops::cblas_sgemm_batch_wrapper(
+                    true,
+                    false,
+                    m,
+                    n,
+                    k,
+                    &[1.],
+                    vec![w as *const f32; batch_size],
+                    ::dot_ops::get_region_heads(batch_size, gy),
+                    &[0.],
+                    ::dot_ops::get_region_heads(batch_size, col.as_slice()),
+                    1,
+                    batch_size,
                 );
-            });
+            } else if same_type::<T, f64>() {
+                ::ops::dot_ops::cblas_dgemm_batch_wrapper(
+                    true,
+                    false,
+                    m,
+                    n,
+                    k,
+                    &[1.],
+                    vec![w as *const f64; batch_size],
+                    ::dot_ops::get_region_heads(batch_size, gy),
+                    &[0.],
+                    ::dot_ops::get_region_heads(batch_size, col.as_slice()),
+                    1,
+                    batch_size,
+                );
+            } else {
+                panic!("gemm supports only f32 and f64.")
+            }
         }
         #[cfg(not(feature = "mkl"))]
         {
-            let num_elements_in_batch_gy = ych * yh * yw;
-            // fallback: parallel sgemm + col2im using rayon
-            (0..batch_size).into_par_iter().for_each(|i| {
-                // for each mini-batch
-                let gy_region_head = &gy[i * num_elements_in_batch_gy];
-                let col_region_head = &col[i * num_elements_in_batch_col];
-                let gx_region_head = &gx[i * num_elements_in_batch_gx];
-                sgemm(
+            let size_per_batch_gy = ych * yh * yw;
+            (0..batch_size).into_par_iter().for_each(|i| unsafe {
+                let w: *const T = mem::transmute(w.as_ptr());
+                let gy_region_head = &gy[i * size_per_batch_gy] as *const T;
+                let col_region_head: *mut T = mem::transmute(&col[i * size_per_batch_col]);
+                slow_gemm!(
                     true,
                     false,
-                    w,
-                    gy_region_head,
-                    col_region_head,
+                    w as *const f32,
+                    gy_region_head as *const f32,
+                    col_region_head as *mut f32,
                     m,
                     n,
                     k,
                     1.,
-                    0.,
-                );
-                col2im(
-                    col_region_head,
-                    xch,
-                    xh,
-                    xw,
-                    kh,
-                    kw,
-                    self.pad,
-                    self.pad,
-                    self.stride,
-                    self.stride,
-                    self.dilation,
-                    self.dilation,
-                    gx_region_head,
+                    0.
                 );
             });
         }
+
+        let gx = col2im_batch(
+            col.as_slice(),
+            batch_size,
+            xch as isize,
+            xh as isize,
+            xw as isize,
+            kh as isize,
+            kw as isize,
+            self.pad as isize,
+            self.pad as isize,
+            self.stride as isize,
+            self.stride as isize,
+            self.dilation as isize,
+            self.dilation as isize,
+        );
 
         let gx = NdArray::from_shape_vec(ndarray::IxDyn(&[batch_size, xch, xh, xw]), gx);
         vec![Ok(gx.unwrap())]
     }
 
-    fn grad(
-        &self,
-        gy: &Tensor<f32>,
-        xs: &[&Tensor<f32>],
-        _: &Tensor<f32>,
-    ) -> Vec<Option<Tensor<f32>>> {
+    fn grad(&self, gy: &Tensor<T>, xs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
         let x = xs[0];
         let w = xs[1];
 
@@ -178,12 +168,12 @@ impl ::op::Op<f32> for Conv2DTranspose {
     }
 }
 
-impl ::op::Op<f32> for Conv2DTransposeFilterGrad {
+impl<T: Float> ::op::Op<T> for Conv2DTransposeFilterGrad {
     fn name(&self) -> &str {
         "Conv2DTransposeFilterGrad"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<f32>) -> ::op::ComputeResult<f32> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ::op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
         let gy = xs[0];
         let x = xs[1];
@@ -195,11 +185,10 @@ impl ::op::Op<f32> for Conv2DTransposeFilterGrad {
         let batch_size = x_shape[0];
         let (kh, kw) = (k_shape[2], k_shape[3]);
 
-        let num_elements_in_batch_g = { gy_shape[1] * gy_shape[2] * gy_shape[3] };
-        let num_elements_in_batch_c = {
+        let size_per_batch_c = {
             get_yh!(self, gy_shape[2], kh) * get_yw!(self, gy_shape[3], kw) * kh * kw * gy_shape[1]
         };
-        let num_elements_in_batch_x = x_shape[1] * x_shape[2] * x_shape[3];
+        let size_per_batch_x = x_shape[1] * x_shape[2] * x_shape[3];
 
         // sgemm params
         let m = x_shape[1];
@@ -208,56 +197,81 @@ impl ::op::Op<f32> for Conv2DTransposeFilterGrad {
 
         let x = unsafe { slice::from_raw_parts(x.as_ptr(), x.len()) };
         let gy = unsafe { slice::from_raw_parts(gy.as_ptr(), gy.len()) };
-        let cols = alloc_uninitialized_buf(batch_size * num_elements_in_batch_c);
-        let gw = alloc_uninitialized_buf(k_shape[0] * k_shape[1] * k_shape[2] * k_shape[3]);
-        let gw_head = unsafe { &*gw.as_ptr() };
+        let mut gw = uninitialized_vec(k_shape[0] * k_shape[1] * k_shape[2] * k_shape[3]);
+        let gw_head = gw.as_mut_ptr();
 
-        (0..batch_size).into_par_iter().for_each(|i| {
-            let c_region_head = &cols[i * num_elements_in_batch_c];
-            let g_region_head = &gy[i * num_elements_in_batch_g];
-            im2col(
-                g_region_head,
-                gy_shape[1],
-                gy_shape[2],
-                gy_shape[3],
-                kh,
-                kw,
-                self.pad,
-                self.pad,
-                self.stride,
-                self.stride,
-                self.dilation,
-                self.dilation,
-                c_region_head,
-            );
-        });
+        let cols = im2col_batch(
+            gy,
+            batch_size,
+            gy_shape[1] as isize,
+            gy_shape[2] as isize,
+            gy_shape[3] as isize,
+            kh as isize,
+            kw as isize,
+            self.pad as isize,
+            self.pad as isize,
+            self.stride as isize,
+            self.stride as isize,
+            self.dilation as isize,
+            self.dilation as isize,
+        );
 
         for i in 0..batch_size {
-            let x_region_head = &x[i * num_elements_in_batch_x];
-            let c_region_head = &cols[i * num_elements_in_batch_c];
-            sgemm(
-                false,
-                true,
-                x_region_head,
-                c_region_head,
-                gw_head,
-                m,
-                n,
-                k,
-                1.,
-                (i != 0) as i32 as f32,
-            );
+            let x_region_head = &x[i * size_per_batch_x] as *const T;
+            let c_region_head = &cols[i * size_per_batch_c] as *const T;
+            #[cfg(feature = "mkl")]
+            {
+                if same_type::<T, f32>() {
+                    ::ops::dot_ops::cblas_sgemm_wrapper(
+                        false,
+                        true,
+                        m,
+                        n,
+                        k,
+                        1.,
+                        x_region_head as *const f32,
+                        c_region_head as *const f32,
+                        if i == 1 { 1. } else { 0. },
+                        gw_head as *mut f32,
+                    )
+                } else if same_type::<T, f64>() {
+                    ::ops::dot_ops::cblas_dgemm_wrapper(
+                        false,
+                        true,
+                        m,
+                        n,
+                        k,
+                        1.,
+                        x_region_head as *const f64,
+                        c_region_head as *const f64,
+                        if i == 1 { 1. } else { 0. },
+                        gw_head as *mut f64,
+                    )
+                }
+            }
+            #[cfg(not(feature = "mkl"))]
+            {
+                unsafe {
+                    slow_gemm!(
+                        false,
+                        true,
+                        x_region_head as *const f32,
+                        c_region_head as *const f32,
+                        gw_head as *mut f32,
+                        m,
+                        n,
+                        k,
+                        1.,
+                        if i == 1 { 1. } else { 0. }
+                    );
+                }
+            }
         }
 
         vec![Ok(NdArray::from_shape_vec(k_shape, gw).unwrap())]
     }
 
-    fn grad(
-        &self,
-        gw: &Tensor<f32>,
-        xs: &[&Tensor<f32>],
-        _: &Tensor<f32>,
-    ) -> Vec<Option<Tensor<f32>>> {
+    fn grad(&self, gw: &Tensor<T>, xs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
         let gy = xs[0];
         let x = xs[1];
 
@@ -297,56 +311,6 @@ fn test_tensor_size_after_convolution_t() {
 }
 
 #[test]
-fn test_parallel_col2im() {
-    let batch_size = 2;
-    let op = Conv2DTranspose {
-        pad: 0,
-        stride: 1,
-        dilation: 1,
-    };
-    let xch = 3;
-    let (yh, yw) = (2, 2);
-    let (kh, kw) = (2, 2);
-    let xh = get_xh!(&op, yh, kh);
-    let xw = get_xw!(&op, yw, kw);
-
-    let num_elements_in_batch_col = xch * kh * kw * yh * yw;
-    let num_elements_in_batch_im = xch * xh * xw;
-    let cols = vec![2f32; 108 * batch_size];
-    let im = vec![0f32; batch_size * xch * xh * xw];
-
-    (0..batch_size).into_par_iter().for_each(|i| unsafe {
-        let cols_head = (&cols[i * num_elements_in_batch_col]) as *const f32;
-        let im_head = (&im[i * num_elements_in_batch_im]) as *const f32;
-        col2im_cpu(
-            cols_head,
-            xch as i32,
-            xh as i32,
-            xw as i32,
-            kh as i32,
-            kw as i32,
-            op.pad as i32,
-            op.pad as i32,
-            op.stride as i32,
-            op.stride as i32,
-            op.dilation as i32,
-            op.dilation as i32,
-            im_head,
-        );
-    });
-
-    assert_eq!(
-        im,
-        vec![
-            2.0, 4.0, 2.0, 4.0, 8.0, 4.0, 2.0, 4.0, 2.0, 2.0, 4.0, 2.0, 4.0, 8.0, 4.0, 2.0, 4.0,
-            2.0, 2.0, 4.0, 2.0, 4.0, 8.0, 4.0, 2.0, 4.0, 2.0, 2.0, 4.0, 2.0, 4.0, 8.0, 4.0, 2.0,
-            4.0, 2.0, 2.0, 4.0, 2.0, 4.0, 8.0, 4.0, 2.0, 4.0, 2.0, 2.0, 4.0, 2.0, 4.0, 8.0, 4.0,
-            2.0, 4.0, 2.0,
-        ]
-    );
-}
-
-#[test]
 fn test_deconv() {
     use op::Op;
     let op = Conv2DTranspose {
@@ -360,7 +324,7 @@ fn test_deconv() {
     let (xh, xw) = (3, 3);
     let batch_size = 2;
 
-    let w = ::ndarray_ext::ones(&[ych, xch, kh, kw]);
+    let w = ::ndarray_ext::ones::<f32>(&[ych, xch, kh, kw]);
     let g = ::ndarray_ext::ones(&[batch_size, ych, yh, yw]);
 
     let ret = op.compute(::runtime::OpComputeContext::new(
