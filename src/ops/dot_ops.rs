@@ -1,4 +1,3 @@
-use ndarray;
 use ndarray_ext::NdArray;
 use op;
 #[cfg(feature = "mkl")]
@@ -483,8 +482,8 @@ impl<T: Float> op::Op<T> for MatMul {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let x0 = xs[0];
-        let x1 = xs[1];
+        let x0 = &xs[0];
+        let x1 = &xs[1];
         let x0_shape = x0.shape();
         let x1_shape = x1.shape();
         assert_eq!(
@@ -563,8 +562,8 @@ impl<T: Float> op::Op<T> for BatchMatMul {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let x0: &NdArray<T> = xs[0];
-        let x1: &NdArray<T> = xs[1];
+        let x0 = &xs[0];
+        let x1 = &xs[1];
         let shape0 = x0.shape();
         let shape1 = x1.shape();
         let rank0 = x0.ndim();
@@ -620,7 +619,6 @@ impl<T: Float> op::Op<T> for BatchMatMul {
         }
         #[cfg(not(feature = "mkl"))]
         {
-            use ndarray_ext;
             use rayon::iter::*;
             // squashes dims (remains last two dims)
             // unwrap is always safe
@@ -665,7 +663,11 @@ impl<T: Float> op::Op<T> for BatchMatMul {
             // owned to ref
             let mut dot_view = Vec::with_capacity(dot.len());
             for i in 0..dot.len() {
-                dot_view.push(ndarray_ext::expand_dims_view(dot[i].view(), 0));
+                let dot_i: &NdArray<T> = &dot[i];
+                // insert new dim
+                let mut shape = dot_i.shape().to_vec();
+                shape.insert(0, 1);
+                dot_view.push(dot_i.view().into_shape(shape).unwrap());
             }
 
             // stack dot result

@@ -1,6 +1,6 @@
 use ndarray;
 use ndarray::Zip;
-use ndarray_ext::NdArray;
+use ndarray_ext::{NdArray, NdArrayView};
 use op;
 use ops;
 use tensor::Tensor;
@@ -85,8 +85,8 @@ macro_rules! impl_cmp_op {
 
             fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
                 let xs = ctx.grab_inputs();
-                let x0 = xs[0];
-                let x1 = xs[1];
+                let x0 = &xs[0];
+                let x1 = &xs[1];
                 let shape0 = x0.shape();
                 let shape1 = x1.shape();
 
@@ -192,8 +192,8 @@ fn min_max_grad<T: Float>(
     let selected_a = ops::equal(a, y);
     let selected_b = ops::equal(b, y);
     vec![
-        Some(ops::mul_inplace(selected_a, gy)),
-        Some(ops::mul_inplace(selected_b, gy)),
+        Some(ops::mul(selected_a, gy)),
+        Some(ops::mul(selected_b, gy)),
     ]
 }
 
@@ -316,12 +316,11 @@ impl<T: Float> op::Op<T> for Transpose {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let x = xs[0].view();
-        let perm: &NdArray<T> = &xs[1];
+        let perm = &xs[1];
         assert!(perm.len() >= 2);
 
         let ret = if transpose_reversed(perm) {
-            Ok(xs[0].clone().reversed_axes())
+            Ok(xs[0].to_owned().reversed_axes())
         } else {
             // preprocess
             let src_dst = if self.zip {
@@ -340,7 +339,7 @@ impl<T: Float> op::Op<T> for Transpose {
             };
 
             // permutes dimensions
-            Ok(do_transpose(x, src_dst))
+            Ok(do_transpose(xs[0].view(), src_dst))
         };
         vec![ret]
     }
@@ -355,7 +354,7 @@ impl<T: Float> op::Op<T> for Transpose {
 }
 
 fn do_transpose<T: Float>(
-    mut x: ::ndarray_ext::NdArrayView<T>,
+    mut x: NdArrayView<T>,
     mut src_dst: Vec<(usize, usize)>,
 ) -> NdArray<T> {
     for i in 0..src_dst.len() {
@@ -390,7 +389,7 @@ fn do_transpose<T: Float>(
 }
 
 // Helper for transpose. Returns true if axes are just reversed
-fn transpose_reversed<T: Float>(perm: &NdArray<T>) -> bool {
+fn transpose_reversed<T: Float>(perm: &NdArrayView<T>) -> bool {
     let mut last = T::max_value();
     for a in perm.iter() {
         if *a > last {
@@ -401,7 +400,7 @@ fn transpose_reversed<T: Float>(perm: &NdArray<T>) -> bool {
     true
 }
 
-pub fn logsumexp_forward<T: Float>(x: &NdArray<T>, axis: isize, keep_dims: bool) -> NdArray<T> {
+pub fn logsumexp_forward<T: Float>(x: &NdArrayView<T>, axis: isize, keep_dims: bool) -> NdArray<T> {
     let axis = if axis < 0 {
         (x.ndim() as isize + axis) as usize
     } else {
@@ -450,7 +449,7 @@ impl<T: Float> op::Op<T> for LogSumExp {
     }
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
-        let x = ctx.grab_inputs()[0];
+        let x = &ctx.grab_inputs()[0];
         vec![Ok(logsumexp_forward(x, self.axis, self.keep_dims))]
     }
 
@@ -469,7 +468,7 @@ impl<T: Float> op::Op<T> for Pow<T> {
     }
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
-        let x0 = ctx.grab_inputs()[0];
+        let x0 = &ctx.grab_inputs()[0];
         let a = self.a;
         vec![Ok(x0.map(move |x| x.powf(a)))]
     }
@@ -487,7 +486,7 @@ impl<T: Float> op::Op<T> for Sqrt {
     }
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
-        let x0 = ctx.grab_inputs()[0];
+        let x0 = &ctx.grab_inputs()[0];
         vec![Ok(x0.map(|a| a.sqrt()))]
     }
 
@@ -505,7 +504,7 @@ impl<T: Float> op::Op<T> for Log<T> {
     }
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
-        let x = ctx.grab_inputs()[0];
+        let x = &ctx.grab_inputs()[0];
         vec![Ok(x.map(move |a| a.log(self.a)))]
     }
 
@@ -520,7 +519,7 @@ impl<T: Float> op::Op<T> for Exp {
     }
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
-        let x = ctx.grab_inputs()[0];
+        let x = &ctx.grab_inputs()[0];
         vec![Ok(x.map(|a| a.exp()))]
     }
 
@@ -535,7 +534,7 @@ impl<T: Float> op::Op<T> for Atanh {
     }
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
-        let x = ctx.grab_inputs()[0];
+        let x = &ctx.grab_inputs()[0];
         vec![Ok(x.map(|a| a.atanh()))]
     }
 
@@ -553,7 +552,7 @@ impl<T: Float> op::Op<T> for Acosh {
     }
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
-        let x = ctx.grab_inputs()[0];
+        let x = &ctx.grab_inputs()[0];
         vec![Ok(x.map(|a| a.acosh()))]
     }
 
@@ -571,7 +570,7 @@ impl<T: Float> op::Op<T> for Asinh {
     }
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
-        let x = ctx.grab_inputs()[0];
+        let x = &ctx.grab_inputs()[0];
         vec![Ok(x.map(|a| a.asinh()))]
     }
 
@@ -589,7 +588,7 @@ impl<T: Float> op::Op<T> for Tanh {
     }
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
-        let x = ctx.grab_inputs()[0];
+        let x = &ctx.grab_inputs()[0];
         vec![Ok(x.map(|a| a.tanh()))]
     }
 
@@ -604,7 +603,7 @@ impl<T: Float> op::Op<T> for Cosh {
     }
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
-        let x = ctx.grab_inputs()[0];
+        let x = &ctx.grab_inputs()[0];
         vec![Ok(x.map(|a| a.cosh()))]
     }
 
@@ -619,7 +618,7 @@ impl<T: Float> op::Op<T> for Sinh {
     }
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
-        let x = ctx.grab_inputs()[0];
+        let x = &ctx.grab_inputs()[0];
         vec![Ok(x.map(|a| a.sinh()))]
     }
 
@@ -634,7 +633,7 @@ impl<T: Float> op::Op<T> for Atan {
     }
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
-        let x = ctx.grab_inputs()[0];
+        let x = &ctx.grab_inputs()[0];
         vec![Ok(x.map(|a| a.atan()))]
     }
 
@@ -651,7 +650,7 @@ impl<T: Float> op::Op<T> for Acos {
     }
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
-        let x = ctx.grab_inputs()[0];
+        let x = &ctx.grab_inputs()[0];
         vec![Ok(x.map(|a| a.acos()))]
     }
 
@@ -668,7 +667,7 @@ impl<T: Float> op::Op<T> for Asin {
     }
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
-        let x = ctx.grab_inputs()[0];
+        let x = &ctx.grab_inputs()[0];
         vec![Ok(x.map(|a| a.asin()))]
     }
 
@@ -685,7 +684,7 @@ impl<T: Float> op::Op<T> for Sin {
     }
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
-        let x = ctx.grab_inputs()[0];
+        let x = &ctx.grab_inputs()[0];
         vec![Ok(x.map(|a| a.sin()))]
     }
 
@@ -700,7 +699,7 @@ impl<T: Float> op::Op<T> for Cos {
     }
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
-        let x = ctx.grab_inputs()[0];
+        let x = &ctx.grab_inputs()[0];
         vec![Ok(x.map(|a| a.cos()))]
     }
 
@@ -715,7 +714,7 @@ impl<T: Float> op::Op<T> for Tan {
     }
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
-        let x = ctx.grab_inputs()[0];
+        let x = &ctx.grab_inputs()[0];
         vec![Ok(x.map(|a| a.tan()))]
     }
 

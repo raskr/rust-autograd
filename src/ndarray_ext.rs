@@ -1,15 +1,17 @@
 use ndarray;
 use Float;
 
-pub type NdArray<T> = ndarray::Array<T, ndarray::IxDyn>;
+pub type NdArray<T: Float> = ndarray::Array<T, ndarray::IxDyn>;
 
-pub type NdArrayView<'a, T> = ndarray::ArrayView<'a, T, ndarray::IxDyn>;
+pub type NdArrayView<'a, T: Float> = ndarray::ArrayView<'a, T, ndarray::IxDyn>;
+
+pub type NdArrayViewMut<'a, T: Float> = ndarray::ArrayViewMut<'a, T, ndarray::IxDyn>;
 
 /// exposes array_gen
 pub use array_gen::*;
 
 #[inline]
-pub fn arr_to_shape<T: Float>(arr: &NdArray<T>) -> Vec<usize> {
+pub fn arr_to_shape<T: Float>(arr: &NdArrayView<T>) -> Vec<usize> {
     arr.iter()
         .map(|&a| a.to_usize().unwrap())
         .collect::<Vec<_>>()
@@ -59,7 +61,7 @@ pub fn normalize_negative_axis(axis: isize, ndim: usize) -> usize {
 }
 
 #[inline]
-pub fn normalize_negative_axes<T: Float>(axes: &NdArray<T>, ndim: usize) -> Vec<usize> {
+pub fn normalize_negative_axes<T: Float>(axes: &NdArrayView<T>, ndim: usize) -> Vec<usize> {
     let mut axes_ret: Vec<usize> = Vec::with_capacity(axes.len());
     for &axis in axes.iter() {
         let axis = if axis < T::zero() {
@@ -73,7 +75,7 @@ pub fn normalize_negative_axes<T: Float>(axes: &NdArray<T>, ndim: usize) -> Vec<
 }
 
 #[inline]
-pub fn sparse_to_dense<T: Float>(arr: &NdArray<T>) -> Vec<usize> {
+pub fn sparse_to_dense<T: Float>(arr: &NdArrayView<T>) -> Vec<usize> {
     let mut axes: Vec<usize> = vec![];
     for (i, &a) in arr.iter().enumerate() {
         if a == T::one() {
@@ -86,7 +88,7 @@ pub fn sparse_to_dense<T: Float>(arr: &NdArray<T>) -> Vec<usize> {
 #[doc(hidden)]
 #[inline]
 /// This works well only for small arrays
-pub fn vec_as_shape<T: Float>(x: &NdArray<T>) -> Vec<usize> {
+pub fn vec_as_shape<T: Float>(x: &NdArrayView<T>) -> Vec<usize> {
     let mut target = Vec::with_capacity(x.len());
     for &a in x.iter() {
         target.push(a.to_usize().unwrap());
@@ -105,6 +107,19 @@ pub fn scalar_shape<T: Float>() -> NdArray<T> {
 #[inline]
 pub fn is_scalar_shape(shape: &[usize]) -> bool {
     shape == &[] || shape == &[0]
+}
+
+#[doc(hidden)]
+#[inline]
+pub fn shape_of_view<T: Float>(x: &NdArrayView<T>) -> NdArray<T> {
+    let shape = x
+        .shape()
+        .iter()
+        .map(|&a| T::from(a).unwrap())
+        .collect::<Vec<T>>();
+    let rank = shape.len();
+    // safe unwrap
+    NdArray::from_shape_vec(ndarray::IxDyn(&[rank]), shape).unwrap()
 }
 
 #[doc(hidden)]

@@ -20,8 +20,8 @@ impl<T: Float> ::op::Op<T> for Conv2DTranspose {
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ::op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
 
-        let gy: &NdArray<T> = xs[0]; // (batch, ych, yh, yw)
-        let w: &NdArray<T> = xs[1]; // (ych, xch, kh, kw)
+        let gy = &xs[0]; // (batch, ych, yh, yw)
+        let w = &xs[1]; // (ych, xch, kh, kw)
         let gy_shape = gy.shape();
         let f_shape = w.shape();
 
@@ -175,8 +175,8 @@ impl<T: Float> ::op::Op<T> for Conv2DTransposeFilterGrad {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ::op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let gy = xs[0];
-        let x = xs[1];
+        let gy = &xs[0];
+        let x = &xs[1];
         let k_shape = xs[2].shape();
 
         let x_shape = x.shape();

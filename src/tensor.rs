@@ -209,7 +209,7 @@ impl<T: Float> TensorBuilder<T> {
     }
 }
 
-impl<'a, 'b: 'a, 'c: 'a, T: Float + 'b + 'c> Tensor<T> {
+impl<T: Float> Tensor<T> {
     #[inline]
     pub fn builder() -> TensorBuilder<T> {
         TensorBuilder {
@@ -226,11 +226,12 @@ impl<'a, 'b: 'a, 'c: 'a, T: Float + 'b + 'c> Tensor<T> {
     /// Evaluates this tensor as an ndarray's array object.
     ///
     /// See [eval](../fn.eval.html).
-    pub fn eval<I>(&self, feeds: I) -> Option<NdArray<T>>
+    pub fn eval<'k, F>(&'k self, feeds: F) -> Option<NdArray<T>>
     where
-        I: IntoIterator<Item = &'a (&'b Tensor<T>, &'c ndarray::Array<T, ndarray::IxDyn>)>,
+        F: IntoIterator<Item = ::runtime::Feed<'k, T>>,
     {
-        ::runtime::eval(&[self], feeds).remove(0)
+        let a = [self];
+        ::runtime::eval(&a, feeds).remove(0)
     }
 
     /// Returns the (symbolic) shape of this tensor.

@@ -2,7 +2,7 @@
 /// +=, -=, *=, /= are provided as methods of ops::inplace_*.
 /// *=, /= don't propagate gradients.
 use ndarray;
-use ndarray_ext::NdArray;
+use ndarray_ext::{NdArray, NdArrayView};
 use op;
 use ops;
 use std::mem;
@@ -30,8 +30,8 @@ impl<T: Float> op::Op<T> for PreprocessBinOpGrad {
     // Inputs: [gy, target_shape]
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let gy = xs[0];
-        let x_shape_ = ::ndarray_ext::vec_as_shape(xs[1]);
+        let gy = &xs[0];
+        let x_shape_ = ::ndarray_ext::vec_as_shape(&xs[1]);
         let x_shape = x_shape_.as_slice();
         let gy_shape = gy.shape();
 
@@ -54,11 +54,22 @@ impl<T: Float> op::Op<T> for PreprocessBinOpGrad {
                     if *x_axis == 1 {
                         // `fold_axis` squashes the axis automatically.
                         let axis = ndarray::Axis(if x_is_scalar { 0 } else { i });
-                        let ret = folded.as_ref().unwrap_or(gy).fold_axis(
-                            axis.clone(),
-                            T::zero(),
-                            |a, b| a.clone() + b.clone(),
-                        );
+                        let ret = match folded {
+                            Some(ref a) => {
+                                a.fold_axis(
+                                    axis.clone(),
+                                    T::zero(),
+                                    |a, b| a.clone() + b.clone(),
+                                )
+                            }
+                            None => {
+                                gy.fold_axis(
+                                    axis.clone(),
+                                    T::zero(),
+                                    |a, b| a.clone() + b.clone(),
+                                )
+                            }
+                        };
                         if x_is_scalar {
                             mem::swap(&mut folded, &mut Some(ret));
                         } else {
@@ -97,8 +108,8 @@ impl<T: Float> op::Op<T> for PreprocessBinOpGradGrad {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let gy = xs[0];
-        let target_shape_ = xs[1];
+        let gy = xs[0].view();
+        let target_shape_ = &xs[1];
         let target_shape_ = ::ndarray_ext::vec_as_shape(target_shape_);
         let target_shape = target_shape_.as_slice();
 
@@ -109,7 +120,7 @@ impl<T: Float> op::Op<T> for PreprocessBinOpGradGrad {
         let gy_is_scalar = ::ndarray_ext::is_scalar_shape(gy.shape());
 
         let ret = {
-            let mut gy = gy.view();
+            let mut gy = gy;
 
             // make broadcast dims if needed
             if gy_is_scalar {
@@ -144,7 +155,7 @@ impl<T: Float> op::Op<T> for AddOp {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        add_forward(xs[0], xs[1])
+        add_forward(&xs[0], &xs[1])
     }
 
     fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
@@ -160,8 +171,8 @@ impl<T: Float> op::Op<T> for SubOp {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let x0 = xs[0];
-        let x1 = xs[1];
+        let x0 = &xs[0];
+        let x1 = &xs[1];
         let shape0: &[usize] = x0.shape();
         let ret = if shape0 == &[] {
             // is scalar
@@ -186,7 +197,7 @@ impl<T: Float> op::Op<T> for MulOp {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        mul_forward(xs[0], xs[1])
+        mul_forward(&xs[0], &xs[1])
     }
 
     fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
@@ -204,8 +215,8 @@ impl<T: Float> op::Op<T> for DivOp {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let x0 = xs[0];
-        let x1 = xs[1];
+        let x0 = &xs[0];
+        let x1 = &xs[1];
         let shape0: &[usize] = x0.shape();
         let shape1: &[usize] = x1.shape();
         let is_scalar0 = shape0 == &[] || shape0 == &[0];
@@ -236,79 +247,79 @@ impl<T: Float> op::Op<T> for DivOp {
     }
 }
 
-impl<T: Float> op::Op<T> for InplaceAddOp {
-    fn name(&self) -> &str {
-        "InplaceAdd"
-    }
+//impl<T: Float> op::Op<T> for InplaceAddOp {
+//    fn name(&self) -> &str {
+//        "InplaceAdd"
+//    }
+//
+//    fn compute(&self, mut ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+//        let xs = unsafe { ctx.grab_assignable_inputs() };
+//        // safe transmute probably
+//        let x1: &&NdArray<T> = unsafe { mem::transmute(&mut xs[1]) };
+//        xs[0].zip_mut_with(x1, |a, &b| *a += b);
+//        vec![Err(::op::ComputeException::Delegate { to: 0 })]
+//    }
+//
+//    fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
+//        let (gy1, gy2) = preprocess_gy(inputs[0], inputs[1], gy);
+//        vec![Some(gy1), Some(gy2)]
+//    }
+//}
 
-    fn compute(&self, mut ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
-        let xs = unsafe { ctx.grab_assignable_inputs() };
-        // safe transmute probably
-        let x1: &&NdArray<T> = unsafe { mem::transmute(&mut xs[1]) };
-        xs[0].zip_mut_with(x1, |a, &b| *a += b);
-        vec![Err(::op::ComputeException::Delegate { to: 0 })]
-    }
+//impl<T: Float> op::Op<T> for InplaceSubOp {
+//    fn name(&self) -> &str {
+//        "InplaceSub"
+//    }
+//
+//    fn compute(&self, mut ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+//        let xs = unsafe { ctx.grab_assignable_inputs() };
+//        // safe transmute probably
+//        let x1: &&NdArray<T> = unsafe { mem::transmute(&mut xs[1]) };
+//        xs[0].zip_mut_with(x1, |a, &b| *a -= b);
+//        vec![Err(::op::ComputeException::Delegate { to: 0 })]
+//    }
+//
+//    fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
+//        let (gy1, gy2) = preprocess_gy(inputs[0], inputs[1], gy);
+//        vec![Some(gy1), Some(ops::neg(&gy2))]
+//    }
+//}
 
-    fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
-        let (gy1, gy2) = preprocess_gy(inputs[0], inputs[1], gy);
-        vec![Some(gy1), Some(gy2)]
-    }
-}
+//impl<T: Float> op::Op<T> for InplaceMulOp {
+//    fn name(&self) -> &str {
+//        "InplaceMul"
+//    }
+//
+//    fn compute(&self, mut ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+//        let xs = unsafe { ctx.grab_assignable_inputs() };
+//        // safe transmute probably
+//        let x1: &&NdArray<T> = unsafe { mem::transmute(&mut xs[1]) };
+//        xs[0].zip_mut_with(x1, |a, &b| *a *= b);
+//        vec![Err(::op::ComputeException::Delegate { to: 0 })]
+//    }
+//
+//    fn grad(&self, _: &Tensor<T>, _: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
+//        vec![None, None]
+//    }
+//}
 
-impl<T: Float> op::Op<T> for InplaceSubOp {
-    fn name(&self) -> &str {
-        "InplaceSub"
-    }
-
-    fn compute(&self, mut ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
-        let xs = unsafe { ctx.grab_assignable_inputs() };
-        // safe transmute probably
-        let x1: &&NdArray<T> = unsafe { mem::transmute(&mut xs[1]) };
-        xs[0].zip_mut_with(x1, |a, &b| *a -= b);
-        vec![Err(::op::ComputeException::Delegate { to: 0 })]
-    }
-
-    fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
-        let (gy1, gy2) = preprocess_gy(inputs[0], inputs[1], gy);
-        vec![Some(gy1), Some(ops::neg(&gy2))]
-    }
-}
-
-impl<T: Float> op::Op<T> for InplaceMulOp {
-    fn name(&self) -> &str {
-        "InplaceMul"
-    }
-
-    fn compute(&self, mut ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
-        let xs = unsafe { ctx.grab_assignable_inputs() };
-        // safe transmute probably
-        let x1: &&NdArray<T> = unsafe { mem::transmute(&mut xs[1]) };
-        xs[0].zip_mut_with(x1, |a, &b| *a *= b);
-        vec![Err(::op::ComputeException::Delegate { to: 0 })]
-    }
-
-    fn grad(&self, _: &Tensor<T>, _: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
-        vec![None, None]
-    }
-}
-
-impl<T: Float> op::Op<T> for InplaceDivOp {
-    fn name(&self) -> &str {
-        "InplaceDiv"
-    }
-
-    fn compute(&self, mut ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
-        let xs = unsafe { ctx.grab_assignable_inputs() };
-        // safe transmute probably
-        let x1: &&NdArray<T> = unsafe { mem::transmute(&mut xs[1]) };
-        xs[0].zip_mut_with(x1, |a, &b| *a /= b);
-        vec![Err(::op::ComputeException::Delegate { to: 0 })]
-    }
-
-    fn grad(&self, _: &Tensor<T>, _: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
-        vec![None, None]
-    }
-}
+//impl<T: Float> op::Op<T> for InplaceDivOp {
+//    fn name(&self) -> &str {
+//        "InplaceDiv"
+//    }
+//
+//    fn compute(&self, mut ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+//        let xs = unsafe { ctx.grab_assignable_inputs() };
+//        // safe transmute probably
+//        let x1: &&NdArray<T> = unsafe { mem::transmute(&mut xs[1]) };
+//        xs[0].zip_mut_with(x1, |a, &b| *a /= b);
+//        vec![Err(::op::ComputeException::Delegate { to: 0 })]
+//    }
+//
+//    fn grad(&self, _: &Tensor<T>, _: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
+//        vec![None, None]
+//    }
+//}
 
 // Reduce gy if broadcast occurred in the forward path.
 fn preprocess_gy<T: Float>(
@@ -331,7 +342,7 @@ fn preprocess_gy<T: Float>(
 
 macro_rules! impl_bin_op_forward {
     ($forward_name:ident, $bin_op:tt) => {
-        fn $forward_name<T: Float>(x0: &NdArray<T>, x1: &NdArray<T>) -> op::ComputeResult<T>
+        fn $forward_name<T: Float>(x0: &NdArrayView<T>, x1: &NdArrayView<T>) -> op::ComputeResult<T>
         {
             let shape0: &[usize]  = x0.shape();
             let shape1: &[usize]  = x1.shape();

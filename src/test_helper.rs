@@ -1,24 +1,24 @@
-use ndarray_ext::NdArray;
 use std::cmp::Ordering;
 use std::collections::btree_set::BTreeSet;
 use tensor::Tensor;
-use Float;
+use ::{Float, Feed};
 
 /// Checks the validity of `gradients` with finite difference trick.
 /// For this test only, `variables` must be "shared" variables.
-pub fn check_theoretical_grads<'a, 'b, A, T>(
-    objective: &Tensor<T>,
-    gradients: &[A],
+pub fn check_theoretical_grads<'k, A, T, U>(
+    objective: &'k Tensor<T>,
+    gradients: &'k [A],
     variables: &[&Tensor<T>],
-    feeds: &[(&Tensor<T>, &NdArray<T>)],
+    feeds: U,
     eps: T,
     tol: T,
 ) where
     A: AsRef<Tensor<T>>,
+    U: IntoIterator<Item = Feed<'k, T>> + Clone,
     T: Float,
 {
     // backprop
-    let theoretical_grads = ::runtime::eval(gradients, feeds);
+    let theoretical_grads = ::runtime::eval(gradients, feeds.clone());
 
     // for each variable nodes
     for (var_node, th_grad) in variables.iter().zip(theoretical_grads) {
@@ -40,7 +40,7 @@ pub fn check_theoretical_grads<'a, 'b, A, T>(
             }
 
             // eval
-            let obj_pos = objective.eval(feeds).unwrap();
+            let obj_pos = objective.eval(feeds.clone()).unwrap();
 
             // perturbation (-)
             unsafe {
@@ -48,7 +48,7 @@ pub fn check_theoretical_grads<'a, 'b, A, T>(
             }
 
             // eval
-            let obj_neg = objective.eval(feeds).unwrap();
+            let obj_neg = objective.eval(feeds.clone()).unwrap();
 
             // restore
             unsafe {

@@ -78,8 +78,8 @@ impl<T: Float> ::op::Op<T> for Conv2D {
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ::op::ComputeResult<T> {
         // Grab inputs
         let xs = ctx.grab_inputs();
-        let x: &NdArray<T> = xs[0];
-        let w: &NdArray<T> = xs[1];
+        let x = &xs[0];
+        let w = &xs[1];
 
         // Extract size params
         let (batch_size, xch, xh, xw) = {
@@ -274,8 +274,8 @@ impl<T: Float> ::op::Op<T> for Conv2DWithCols {
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ::op::ComputeResult<T> {
         // Grab inputs
         let xs = ctx.grab_inputs();
-        let cols: &NdArray<T> = xs[0];
-        let w: &NdArray<T> = xs[1];
+        let cols = &xs[0];
+        let w = &xs[1];
 
         // Extract size params
         let cols_shape = cols.shape();
@@ -394,8 +394,8 @@ impl<T: Float> ::op::Op<T> for Conv2DFilterGrad {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ::op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let cols = xs[0]; // must be columns
-        let gy = xs[1];
+        let cols = &xs[0]; // must be columns
+        let gy = &xs[1];
         let k_shape = xs[2].shape();
         let cols_shape = cols.shape();
         let gy_shape = gy.shape();

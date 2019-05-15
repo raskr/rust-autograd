@@ -170,7 +170,7 @@ impl<T: Float> ::op::Op<T> for MaxPool2D {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ::op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let x: &NdArray<T> = xs[0];
+        let x = &xs[0];
         let x_shape = x.shape();
         let batch = x_shape[0];
         let c = x_shape[1];
@@ -259,8 +259,8 @@ impl<T: Float> ::op::Op<T> for MaxPool2DGrad {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ::op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let gy = xs[0];
-        let argmax = xs[1];
+        let gy = &xs[0];
+        let argmax = &xs[1];
         let gy_shape = gy.shape();
         let batch = gy_shape[0];
         let c = gy_shape[1];
@@ -318,7 +318,7 @@ impl<T: Float> ::op::Op<T> for MaxPool2DGradGrad {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ::op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let ggx = xs[0];
+        let ggx = &xs[0];
         let x_shape = ggx.shape();
         let batch = x_shape[0];
         let c = x_shape[1];
@@ -326,7 +326,7 @@ impl<T: Float> ::op::Op<T> for MaxPool2DGradGrad {
         let xw = x_shape[3];
         let yh = (xh + 2 * self.pad - self.size) / self.stride + 1;
         let yw = (xw + 2 * self.pad - self.size) / self.stride + 1;
-        let argmax = xs[1];
+        let argmax = &xs[1];
         let ggy = if same_type::<T, f32>() {
             max_pool_grad_grad_f32(
                 ggx.as_ptr(),

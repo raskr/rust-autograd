@@ -36,7 +36,7 @@ impl<T: Float> op::Op<T> for Zeros {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let shape: &NdArray<T> = xs[0];
+        let shape = &xs[0];
         let ret = if let Some(a) = shape.as_slice() {
             Ok(ndarray_ext::zeros(
                 a.iter()
@@ -68,7 +68,7 @@ impl<T: Float> op::Op<T> for Ones {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let shape: &NdArray<T> = xs[0];
+        let shape = &xs[0];
         let ret = if let Some(a) = shape.as_slice() {
             Ok(ndarray_ext::ones(
                 a.iter()
@@ -100,9 +100,9 @@ impl<T: Float> op::Op<T> for Range {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let x0 = xs[0];
-        let x1 = xs[1];
-        let x2 = xs[2];
+        let x0 = &xs[0];
+        let x1 = &xs[1];
+        let x2 = &xs[2];
 
         let true_shape = &[];
         if x0.shape() != true_shape || x1.shape() != true_shape || x2.shape() != true_shape {

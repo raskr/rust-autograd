@@ -551,108 +551,108 @@ pub fn div<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>>(a: A, b: B) -> Te
     bin_op_helper(a, b, binary_ops::DivOp)
 }
 
-/// Inplace multiplication.
-/// This function takes `a`'s ownership.
-/// Note that this **doesn't** support gradient propagation.
-///
-/// # Panics
-///
-/// In case of `a` is a `constant`.
-///
-/// ```
-/// extern crate ndarray;
-/// extern crate autograd as ag;
-///
-///
-/// let a = ag::ones(&[2]);
-/// let ref b: ag::Tensor<f32> = ag::zeros(&[2]);
-/// let ref c = ag::mul_inplace(a, b);
-///
-/// assert_eq!(c.eval(&[]), Some(ndarray::arr1(&[0., 0.]).into_dyn()));
-/// ```
-pub fn mul_inplace<T: Float, A: AsRef<Tensor<T>>>(a: Tensor<T>, b: A) -> Tensor<T> {
-    Tensor::builder()
-        .set_inputs(vec![&a, b.as_ref()])
-        .set_shape(a.shape())
-        .build(binary_ops::InplaceMulOp)
-}
+///// Inplace multiplication.
+///// This function takes `a`'s ownership.
+///// Note that this **doesn't** support gradient propagation.
+/////
+///// # Panics
+/////
+///// In case of `a` is a `constant`.
+/////
+///// ```
+///// extern crate ndarray;
+///// extern crate autograd as ag;
+/////
+/////
+///// let a = ag::ones(&[2]);
+///// let ref b: ag::Tensor<f32> = ag::zeros(&[2]);
+///// let ref c = ag::mul_inplace(a, b);
+/////
+///// assert_eq!(c.eval(&[]), Some(ndarray::arr1(&[0., 0.]).into_dyn()));
+///// ```
+//pub fn mul_inplace<T: Float, A: AsRef<Tensor<T>>>(a: Tensor<T>, b: A) -> Tensor<T> {
+//    Tensor::builder()
+//        .set_inputs(vec![&a, b.as_ref()])
+//        .set_shape(a.shape())
+//        .build(binary_ops::InplaceMulOp)
+//}
 
-/// Inplace division.
-///
-/// This function takes `a`'s ownership.
-/// Note that this **doesn't** support gradient propagation.
-///
-/// # Panics
-///
-/// In case of `a` is a `constant`.
-///
-/// ```
-/// extern crate ndarray;
-/// extern crate autograd as ag;
-///
-/// let a = ag::ones(&[2]);
-/// let ref c = ag::div_inplace(a, &ag::scalar(2.));
-///
-/// assert_eq!(c.eval(&[]), Some(ndarray::arr1(&[0.5, 0.5]).into_dyn()));
-/// ```
-pub fn div_inplace<T: Float, A: AsRef<Tensor<T>>>(a: Tensor<T>, b: A) -> Tensor<T> {
-    Tensor::builder()
-        .set_inputs(vec![&a, b.as_ref()])
-        .set_shape(a.shape())
-        .build(binary_ops::InplaceDivOp)
-}
+///// Inplace division.
+/////
+///// This function takes `a`'s ownership.
+///// Note that this **doesn't** support gradient propagation.
+/////
+///// # Panics
+/////
+///// In case of `a` is a `constant`.
+/////
+///// ```
+///// extern crate ndarray;
+///// extern crate autograd as ag;
+/////
+///// let a = ag::ones(&[2]);
+///// let ref c = ag::div_inplace(a, &ag::scalar(2.));
+/////
+///// assert_eq!(c.eval(&[]), Some(ndarray::arr1(&[0.5, 0.5]).into_dyn()));
+///// ```
+//pub fn div_inplace<T: Float, A: AsRef<Tensor<T>>>(a: Tensor<T>, b: A) -> Tensor<T> {
+//    Tensor::builder()
+//        .set_inputs(vec![&a, b.as_ref()])
+//        .set_shape(a.shape())
+//        .build(binary_ops::InplaceDivOp)
+//}
 
-/// Inplace addition
-///
-/// Returns `a` after performing `a += b`.
-/// This function takes `a`'s ownership.
-///
-/// # Panics
-///
-/// In case of `a` is a `constant`.
-///
-/// ```
-/// extern crate ndarray;
-/// extern crate autograd as ag;
-///
-/// let a = ag::ones(&[2]);
-/// let ref b = ag::ones(&[2]);
-/// let ref c = ag::add_inplace(a, b);
-///
-/// assert_eq!(c.eval(&[]), Some(ndarray::arr1(&[2., 2.]).into_dyn()));
-/// ```
-pub fn add_inplace<T: Float, A: AsRef<Tensor<T>>>(a: Tensor<T>, b: A) -> Tensor<T> {
-    Tensor::builder()
-        .set_inputs(vec![&a, b.as_ref()])
-        .set_shape(a.shape())
-        .build(binary_ops::InplaceAddOp)
-}
+///// Inplace addition
+/////
+///// Returns `a` after performing `a += b`.
+///// This function takes `a`'s ownership.
+/////
+///// # Panics
+/////
+///// In case of `a` is a `constant`.
+/////
+///// ```
+///// extern crate ndarray;
+///// extern crate autograd as ag;
+/////
+///// let a = ag::ones(&[2]);
+///// let ref b = ag::ones(&[2]);
+///// let ref c = ag::add_inplace(a, b);
+/////
+///// assert_eq!(c.eval(&[]), Some(ndarray::arr1(&[2., 2.]).into_dyn()));
+///// ```
+//pub fn add_inplace<T: Float, A: AsRef<Tensor<T>>>(a: Tensor<T>, b: A) -> Tensor<T> {
+//    Tensor::builder()
+//        .set_inputs(vec![&a, b.as_ref()])
+//        .set_shape(a.shape())
+//        .build(binary_ops::InplaceAddOp)
+//}
 
-/// Inplace subtraction
-///
-/// Returns `a` after performing `a -= b`.
-/// This function takes `a`'s ownership.
-///
-/// # Panics
-///
-/// In case of `a` is a `constant`.
-///
-/// ```
-/// extern crate ndarray;
-/// extern crate autograd as ag;
-///
-/// let a = ag::ones(&[2, 2]);
-/// let ref b = ag::ones(&[2, 2]);
-/// let ref c = ag::sub_inplace(a, b);
-///
-/// assert_eq!(c.eval(&[]), Some(ndarray::arr2(&[[0., 0.], [0., 0.]]).into_dyn()));
-/// ```
-pub fn sub_inplace<T: Float, A: AsRef<Tensor<T>>>(a: Tensor<T>, b: A) -> Tensor<T> {
-    Tensor::builder()
-        .set_inputs(vec![&a, b.as_ref()])
-        .set_shape(a.shape())
-        .build(binary_ops::InplaceSubOp)
-}
+///// Inplace subtraction
+/////
+///// Returns `a` after performing `a -= b`.
+///// This function takes `a`'s ownership.
+/////
+///// # Panics
+/////
+///// In case of `a` is a `constant`.
+/////
+///// ```
+///// extern crate ndarray;
+///// extern crate autograd as ag;
+/////
+///// let a = ag::ones(&[2, 2]);
+///// let ref b = ag::ones(&[2, 2]);
+///// let ref c = ag::sub_inplace(a, b);
+/////
+///// assert_eq!(c.eval(&[]), Some(ndarray::arr2(&[[0., 0.], [0., 0.]]).into_dyn()));
+///// ```
+//pub fn sub_inplace<T: Float, A: AsRef<Tensor<T>>>(a: Tensor<T>, b: A) -> Tensor<T> {
+//    Tensor::builder()
+//        .set_inputs(vec![&a, b.as_ref()])
+//        .set_shape(a.shape())
+//        .build(binary_ops::InplaceSubOp)
+//}
 
 /// Elementwise sqrt
 pub fn sqrt<T: Float, A: AsRef<Tensor<T>>>(x: A) -> Tensor<T> {
@@ -1472,7 +1472,7 @@ where
         let ref zero = zeros(&axes.shape());
         let ge = greater_equal(axes, zero);
         let lt = lesser(axes, zero);
-        add_inplace(mul_inplace(ge, axes), &mul_inplace(lt, &(axes + x_rank)))
+        add(mul(ge, axes), &mul(lt, &(axes + x_rank)))
     }
 
     fn preprocess<T: Float, AL: ArrayLike<T>>(
@@ -2083,10 +2083,11 @@ pub fn _range<T: Float, AL: ArrayLike<T>>(start: &AL, end: &AL, step: &AL) -> Te
 ///   * `out_h` = `(h + 2 * pad - filter_h) / stride + 1`
 ///   * `out_w` = `(w + 2 * pad - filter_w) / stride + 1`
 ///
-pub fn conv2d<A, B>(x: A, w: B, pad: usize, stride: usize) -> Tensor<f32>
+pub fn conv2d<T, A, B>(x: A, w: B, pad: usize, stride: usize) -> Tensor<T>
 where
-    A: AsRef<Tensor<f32>>,
-    B: AsRef<Tensor<f32>>,
+    T: Float,
+    A: AsRef<Tensor<T>>,
+    B: AsRef<Tensor<T>>,
 {
     Tensor::builder()
         .set_inputs(vec![x.as_ref(), w.as_ref()])
@@ -2109,10 +2110,11 @@ where
 ///   * `out_h` = `(h + 2 * pad - (dilate * (filter - 1) + 1)) / stride + 1`
 ///   * `out_w` = `(w + 2 * pad - (dilate * (filter - 1) + 1)) / stride + 1`
 ///
-pub fn dilated_conv2d<A, B, T>(x: A, w: B, pad: usize, stride: usize, dilate: usize) -> Tensor<f32>
+pub fn dilated_conv2d<A, B, T>(x: A, w: B, pad: usize, stride: usize, dilate: usize) -> Tensor<T>
 where
-    A: AsRef<Tensor<f32>>,
-    B: AsRef<Tensor<f32>>,
+    T: Float,
+    A: AsRef<Tensor<T>>,
+    B: AsRef<Tensor<T>>,
 {
     Tensor::builder()
         .set_inputs(vec![x.as_ref(), w.as_ref()])
@@ -2135,10 +2137,11 @@ where
 ///   * `out_h` = `stride * (h - 1) - pad + filter_h`
 ///   * `out_w` = `stride * (w - 1) - pad + filter_w`
 ///
-pub fn conv2d_transpose<A, B>(x: A, w: B, pad: usize, stride: usize) -> Tensor<f32>
+pub fn conv2d_transpose<T, A, B>(x: A, w: B, pad: usize, stride: usize) -> Tensor<T>
 where
-    A: AsRef<Tensor<f32>>,
-    B: AsRef<Tensor<f32>>,
+    T: Float,
+    A: AsRef<Tensor<T>>,
+    B: AsRef<Tensor<T>>,
 {
     Tensor::builder()
         .set_inputs(vec![x.as_ref(), w.as_ref()])
@@ -2161,16 +2164,17 @@ where
 ///   * `out_h` = `stride * (h - 1) - pad + (dilate * (filter_h - 1) + 1)`
 ///   * `out_w` = `stride * (w - 1) - pad + (dilate * (filter_w - 1) + 1)`
 ///
-pub fn dilated_conv2d_transpose<A, B>(
+pub fn dilated_conv2d_transpose<T, A, B>(
     x: A,
     w: B,
     pad: usize,
     stride: usize,
     dilate: usize,
-) -> Tensor<f32>
+) -> Tensor<T>
 where
-    A: AsRef<Tensor<f32>>,
-    B: AsRef<Tensor<f32>>,
+    T: Float,
+    A: AsRef<Tensor<T>>,
+    B: AsRef<Tensor<T>>,
 {
     Tensor::builder()
         .set_inputs(vec![x.as_ref(), w.as_ref()])

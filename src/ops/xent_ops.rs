@@ -1,5 +1,5 @@
 use ndarray;
-use ndarray_ext::NdArray;
+use ndarray_ext::{NdArray, NdArrayView};
 use op;
 use ops;
 use tensor::Tensor;
@@ -21,7 +21,7 @@ impl<T: Float> op::Op<T> for LogSoftmax {
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
         vec![Ok(
-            xs[0] - &ops::math_ops::logsumexp_forward(xs[0], self.axis, true)
+            (&xs[0]) - &ops::math_ops::logsumexp_forward(&xs[0], self.axis, true)
         )]
     }
 
@@ -40,15 +40,15 @@ impl<T: Float> op::Op<T> for SigmoidCrossEntropy {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let x = xs[0];
-        let t = xs[1];
+        let x: &NdArrayView<T> = &xs[0];
+        let t: &NdArrayView<T> = &xs[1];
 
         assert_eq!(x.shape(), t.shape(), "x.shape must match t.shape");
 
         use std::f64;
         let e = T::from(f64::consts::E).unwrap();
         let max_fn = T::max;
-        let mut tmp = x.map(move |a| ((-a.abs()).exp() + T::one()).log(e) + max_fn(T::zero(), *a));
+        let mut tmp: NdArray<T> = x.map(move |a| ((-a.abs()).exp() + T::one()).log(e) + max_fn(T::zero(), *a));
         tmp -= &(t * x);
         vec![Ok(tmp)]
     }
@@ -75,7 +75,7 @@ impl<T: Float> op::Op<T> for SparseSoftmaxCrossEntropy {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let (x, t) = (xs[0], xs[1]);
+        let (x, t) = (&xs[0], &xs[1]);
         let log_x: NdArray<T> = x - &ops::math_ops::logsumexp_forward(x, 1, true);
 
         // validation
@@ -134,9 +134,9 @@ impl<T: Float> op::Op<T> for SparseSoftmaxCrossEntropyGrad {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let log_x = xs[0]; // x is softmax  [2, 1]
-        let t = xs[1]; // (2,)
-        let gy = xs[2]; // (0)
+        let log_x = &xs[0]; // x is softmax  [2, 1]
+        let t = &xs[1]; // (2,)
+        let gy = &xs[2]; // (0)
         let mut x = log_x.map(|a| a.exp());
 
         for (mut row, &t_) in x.axis_iter_mut(ndarray::Axis(0)).zip(t) {
@@ -159,10 +159,10 @@ impl<T: Float> op::Op<T> for SoftmaxCrossEntropy {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let x = xs[0];
+        let x = &xs[0];
         let log_x: NdArray<T> = x - &ops::math_ops::logsumexp_forward(x, 1, true);
         // `t` must be one-hot
-        let t = xs[1];
+        let t = &xs[1];
         assert_eq!(log_x.ndim(), 2, "x must be 2-ranked tensor");
         assert_eq!(t.ndim(), 2, "t must be 2-ranked tensor");
         // - t log x ( =(batch, num_classes))

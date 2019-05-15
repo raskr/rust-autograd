@@ -1,6 +1,6 @@
 use ndarray;
 use ndarray_ext;
-use ndarray_ext::NdArray;
+use ndarray_ext::{NdArray, NdArrayView};
 use op;
 use ops;
 use std::collections::HashSet;
@@ -94,8 +94,8 @@ impl<T: Float> op::Op<T> for InferBinOpShape {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let a_shape_float = xs[0];
-        let b_shape_float = xs[1];
+        let a_shape_float = &xs[0];
+        let b_shape_float = &xs[1];
         let a_shape = a_shape_float
             .map(|x| x.clone().to_usize().unwrap())
             .into_raw_vec();
@@ -135,8 +135,8 @@ impl<T: Float> op::Op<T> for Shape {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let x = xs[0];
-        vec![Ok(ndarray_ext::shape_of(x))]
+        let x = &xs[0];
+        vec![Ok(ndarray_ext::shape_of_view(x))]
     }
 
     fn grad(&self, _: &Tensor<T>, _: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
@@ -151,7 +151,7 @@ impl<T: Float> op::Op<T> for Rank {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let x: &NdArray<T> = xs[0];
+        let x = &xs[0];
         vec![Ok(NdArray::from_elem(
             ndarray::IxDyn(&[]),
             T::from(x.ndim()).unwrap(),
@@ -170,7 +170,7 @@ impl<T: Float> op::Op<T> for Size {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let x: &NdArray<T> = xs[0];
+        let x = &xs[0];
         vec![Ok(NdArray::from_elem(
             ndarray::IxDyn(&[]),
             T::from(x.len()).unwrap(),
@@ -189,8 +189,8 @@ impl<T: Float> op::Op<T> for Reshape {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let ret = xs[0].clone();
-        let shape_arr: &NdArray<T> = xs[1];
+        let ret = xs[0].to_owned();
+        let shape_arr = &xs[1];
         let target = shape_arr
             .iter()
             .map(|&dim_size| {
@@ -226,8 +226,8 @@ impl<T: Float> op::Op<T> for SetDiff1D {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let x0: &NdArray<T> = xs[0];
-        let x1: &NdArray<T> = xs[1];
+        let x0 = &xs[0];
+        let x1 = &xs[1];
 
         let set_a: HashSet<isize> = HashSet::from_iter(
             x0.as_slice()
@@ -269,7 +269,7 @@ impl<T: Float> op::Op<T> for IndexOp {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let x: &NdArray<T> = xs[0];
+        let x = &xs[0];
         let i = if self.index < 0 {
             ((x.len() as isize) + self.index) as usize
         } else {
@@ -302,8 +302,8 @@ impl<T: Float> op::Op<T> for IndexOpGrad {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let x = xs[0];
-        let gy = xs[1];
+        let x = &xs[0];
+        let gy = &xs[1];
         let mut result = NdArray::zeros(x.shape());
         let i = if self.index < 0 {
             ((x.len() as isize) + self.index) as usize
@@ -337,8 +337,8 @@ impl<T: Float> op::Op<T> for Gather {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let param = xs[1];
-        let indices = xs[0];
+        let param = &xs[1];
+        let indices = &xs[0];
         let indices_shape = indices.shape();
         let param_shape = param.shape();
         let axis = ndarray_ext::normalize_negative_axis(self.axis, param.ndim());
@@ -380,10 +380,10 @@ impl<T: Float> op::Op<T> for GatherGrad {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let indices: &NdArray<T> = xs[0];
-        let param: &NdArray<T> = xs[1];
+        let indices = &xs[0];
+        let param = &xs[1];
         let param_shape = param.shape();
-        let gy: &NdArray<T> = xs[2];
+        let gy = &xs[2];
         let axis = if self.axis == -1 {
             param.ndim()
         } else {
@@ -449,11 +449,11 @@ impl<T: Float> op::Op<T> for AddN {
         } else if 1 == xs.len() {
             Err(::op::ComputeException::Delegate { to: 0 })
         } else if 2 == xs.len() {
-            Ok(xs[0] + xs[1])
+            Ok(&xs[0] + &xs[1])
         } else {
-            let mut base = xs[0] + xs[1];
-            for &x in xs[2..].iter() {
-                base += x;
+            let mut base = &xs[0] + &xs[1];
+            for x in xs[2..].iter() {
+                base += &x;
             }
             Ok(base)
         };
@@ -499,7 +499,7 @@ impl<T: Float> op::Op<T> for ClipGrad<T> {
             // x > min && x < max
             T::from((((x > self.min) as i32) as f32) * (((x < self.max) as i32) as f32)).unwrap()
         });
-        ret *= xs[1];
+        ret *= &xs[1];
         vec![Ok(ret)]
     }
 
@@ -563,7 +563,7 @@ impl<T: Float> op::Op<T> for ConcatGrad {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let gy = xs[0];
+        let gy = &xs[0];
         let xs = xs[1..].to_vec();
 
         let axis = if self.axis < 0 {
@@ -606,7 +606,7 @@ impl<T: Float> op::Op<T> for Tile {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let x: &NdArray<T> = xs[0];
+        let x = &xs[0];
 
         let axis = if self.axis >= 0 {
             self.axis as usize
@@ -638,7 +638,7 @@ impl<T: Float> op::Op<T> for Split {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let x = xs[0];
+        let x = &xs[0];
 
         let axis = if self.axis < 0 {
             (x.ndim() as isize + self.axis) as usize
@@ -673,8 +673,8 @@ impl<T: Float> op::Op<T> for SplitGrad {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let x = xs[0];
-        let gy = xs[1];
+        let x = &xs[0];
+        let gy = &xs[1];
         let mut gx = NdArray::zeros(x.shape());
 
         let axis = if self.axis < 0 {
@@ -685,7 +685,7 @@ impl<T: Float> op::Op<T> for SplitGrad {
 
         let start_index = self.sizes[..self.index].iter().cloned().sum::<usize>() as isize;
         let end_index = start_index + self.sizes[self.index] as isize;
-        let indices = make_indices_split(x, start_index, end_index, axis);
+        let indices = make_indices_split(&x, start_index, end_index, axis);
 
         gx.slice_mut(indices.as_slice())
             .zip_mut_with(gy, |a, &g| *a = g);
@@ -699,7 +699,7 @@ impl<T: Float> op::Op<T> for SplitGrad {
 
 #[inline]
 fn make_indices_split<T: Float>(
-    x: &NdArray<T>,
+    x: &NdArrayView<T>,
     start_index: isize,
     end_index: isize,
     axis: usize,
@@ -725,7 +725,7 @@ impl<T: Float> op::Op<T> for Slice {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let y: NdArray<T> = xs[0].slice(&*self.indices).to_owned();
+        let y= xs[0].slice(&*self.indices).to_owned();
         // TODO: for now, if the size of last axis is 1, removing it.
         let last_axis = y.ndim() - 1;
         let ret = if y.shape()[last_axis] == 1 {
@@ -755,8 +755,8 @@ impl<T: Float> op::Op<T> for SliceGrad {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let x = xs[0];
-        let gy = xs[1];
+        let x = &xs[0];
+        let gy = &xs[1];
         let mut gx = NdArray::zeros(x.shape());
         // sliced view
         gx.slice_mut(&*self.indices)
@@ -810,7 +810,7 @@ impl<T: Float> op::Op<T> for ExpandDims {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let ret = xs[0].clone();
+        let ret = xs[0].to_owned();
         let mut axes = xs[1]
             .iter()
             .map(|&a| a.to_isize().unwrap())

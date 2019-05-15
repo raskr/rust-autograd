@@ -1,14 +1,15 @@
 extern crate ndarray;
 
 use ndarray_ext::NdArray;
-use op;
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use tensor::Tensor;
 use Float;
+use std::cell::Cell;
 
 struct AdamOp<T: Float> {
     static_params: StaticParams<T>,
+    t: Cell<T>
 }
 
 impl<T: Float> ::op::Op<T> for AdamOp<T> {
@@ -16,29 +17,29 @@ impl<T: Float> ::op::Op<T> for AdamOp<T> {
         "Adam"
     }
 
-    fn compute(&self, mut ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ::op::ComputeResult<T> {
         let StaticParams { alpha, eps, b1, b2 } = self.static_params;
-        let xs = unsafe { ctx.grab_assignable_inputs() };
+        let xs = ctx.grab_inputs();
+        let t = self.t.get();
 
         // Make new m
-        let new_m = {
-            let mut new_m = (xs[2] as &NdArray<T>).mapv(move |x2_elem| x2_elem * b1);
+        let mut new_m = {
+            let mut new_m = xs[2].mapv(move |x2_elem| x2_elem * b1);
             let tmp = T::one() - b1;
-            new_m.zip_mut_with(xs[1], move |a, &g| *a += tmp * g);
+            new_m.zip_mut_with(&xs[1], move |a, &g| *a += tmp * g);
             new_m
         };
 
         // Make new v
-        let new_v = {
-            let mut new_v = (xs[3] as &NdArray<T>).mapv(move |x3_elem| x3_elem * b2);
+        let mut new_v = {
+            let mut new_v = xs[3].mapv(move |x3_elem| x3_elem * b2);
             let tmp = T::one() - b2;
-            new_v.zip_mut_with(xs[1], move |a, &g| *a += tmp * g * g);
+            new_v.zip_mut_with(&xs[1], move |a, &g| *a += tmp * g * g);
             new_v
         };
 
         // Make hat
         let m_hat = {
-            let t = xs[4][ndarray::IxDyn(&[])];
             let rhs = T::one() / (T::one() - b2.powf(t));
             let v_hat = new_v.mapv(move |new_v_elem| new_v_elem * rhs);
             let rhs = T::one() / (T::one() - b1.powf(t));
@@ -47,9 +48,17 @@ impl<T: Float> ::op::Op<T> for AdamOp<T> {
             m_hat
         };
 
-        // Update t and param
-        xs[4][ndarray::IxDyn(&[])] += T::one();
-        xs[0].scaled_add(-alpha, &m_hat);
+        // Update t and params
+        // xs[4][ndarray::IxDyn(&[])] += T::one();
+        // xs[0].scaled_add(-alpha, &m_hat);
+        unsafe {
+            ::swap_arr_content(&xs[0], &mut (&xs[0] - &m_hat.mapv(move |x| x * -alpha)));  // variable
+            ::swap_arr_content(&xs[2], &mut new_m);  // m
+            ::swap_arr_content(&xs[3], &mut new_v);  // v
+            self.t.set(t + T::one());
+        }
+
+//        let ret0 = xs[0] - alpha * &m_hat;
         vec![Err(::op::ComputeException::NoOutput)]
     }
 
@@ -98,7 +107,6 @@ impl<T: Float> Adam<T> {
                             let inserted = ent.insert(StatefulParams {
                                 m: ::ops::variable(NdArray::zeros(var_arr.shape())),
                                 v: ::ops::variable(NdArray::zeros(var_arr.shape())),
-                                t: ::ops::variable(::ndarray_ext::from_scalar(T::one())),
                             });
                             StatefulVariable {
                                 var,
@@ -130,11 +138,11 @@ impl<T: Float> Adam<T> {
                 let StatefulParams {
                     ref m,
                     ref v,
-                    ref t,
                 } = param.state;
                 Tensor::builder()
-                    .set_inputs(vec![param.var, grad.as_ref(), m, v, t])
+                    .set_inputs(vec![param.var, grad.as_ref(), m, v])
                     .build(AdamOp {
+                        t: Cell::new(T::one()),
                         static_params: StaticParams {
                             alpha: self.alpha,
                             eps: self.eps,
@@ -159,5 +167,4 @@ pub struct StaticParams<T: Float> {
 pub struct StatefulParams<T: Float> {
     pub m: Tensor<T>,
     pub v: Tensor<T>,
-    pub t: Tensor<T>,
 }

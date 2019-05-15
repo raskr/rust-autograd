@@ -70,6 +70,7 @@ extern crate num;
 extern crate num_traits;
 extern crate rand;
 extern crate rayon;
+extern crate core;
 
 #[macro_use]
 #[doc(hidden)]
@@ -100,6 +101,7 @@ pub trait Float:
     + Sync
     + fmt::Display
     + fmt::Debug
+    + Sized
     + 'static
 {
 }
@@ -111,6 +113,7 @@ pub trait Int:
     + Copy
     + Send
     + fmt::Display
+    + Sized
     + 'static
 {
 }
@@ -123,6 +126,7 @@ impl<T> Float for T where
         + Sync
         + fmt::Display
         + fmt::Debug
+        + Sized
         + 'static
 {
 }
@@ -135,6 +139,7 @@ impl<T> Int for T where
         + Send
         + Sync
         + fmt::Display
+        + Sized
         + 'static
 {
 }
@@ -152,9 +157,18 @@ pub use ops::*;
 
 pub use ops::gradient_descent_ops;
 
-#[doc(hidden)]
 pub use ndarray_ext::NdArray;
 
-pub use runtime::{eval, Eval};
+pub use runtime::{eval, Eval, Feed};
 
 pub use tensor::Tensor;
+use ndarray_ext::NdArrayView;
+
+#[doc(hidden)]
+pub unsafe fn swap_arr_content<T: Float>(a: &NdArrayView<T>, b: &mut NdArray<T>) {
+    use std::mem;
+    assert_eq!(a.shape(), b.shape());
+    let ap: &mut T = mem::transmute(a.as_ptr());
+    let bp: &mut T = mem::transmute(b.as_mut_ptr());
+    mem::swap(ap, bp);
+}

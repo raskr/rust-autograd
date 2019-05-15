@@ -41,7 +41,7 @@ pub enum ComputeException {
 ///     // In this method, any errors caused by bad user-inputs should results in "panic".
 ///     // (`ag::op::ComputeException` represents an exception rather than an error.)
 ///     fn compute(&self, ctx: ag::runtime::OpComputeContext<T>)
-///         -> Vec<Result<NdArray<T>, ag::op::ComputeException>>
+///         -> ag::op::ComputeResult<T>
 ///     {
 ///         let xs = ctx.grab_inputs();
 ///         let x = xs[0];

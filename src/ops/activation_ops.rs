@@ -1,5 +1,5 @@
 use ndarray;
-use ndarray_ext::NdArray;
+use ndarray_ext::{NdArray, NdArrayView};
 use op;
 use ops;
 use tensor::Tensor;
@@ -26,7 +26,7 @@ pub struct Softmax {
 }
 
 #[inline]
-pub fn softmax_forward<T: Float>(x: &NdArray<T>, axis: isize) -> NdArray<T> {
+pub fn softmax_forward<T: Float>(x: &NdArrayView<T>, axis: isize) -> NdArray<T> {
     let axis = if axis < 0 {
         (x.ndim() as isize + axis) as usize
     } else {
@@ -62,7 +62,7 @@ impl<T: Float> op::Op<T> for Softmax {
     }
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
-        vec![Ok(softmax_forward(ctx.grab_inputs()[0], self.axis))]
+        vec![Ok(softmax_forward(&ctx.grab_inputs()[0], self.axis))]
     }
 
     fn grad(&self, gy: &Tensor<T>, _: &[&Tensor<T>], output: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
@@ -97,7 +97,7 @@ impl<T: Float> op::Op<T> for Sigmoid {
     }
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
-        let x = ctx.grab_inputs()[0];
+        let x = &ctx.grab_inputs()[0];
         let half = T::from(0.5).unwrap();
         vec![Ok(x.mapv(move |a| ((a * half).tanh() * half) + half))]
     }
@@ -113,15 +113,13 @@ impl<T: Float> op::Op<T> for ReLU {
     }
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
-        let x = ctx.grab_inputs()[0];
+        let x = &ctx.grab_inputs()[0];
         vec![Ok(x.map(|a| a.max(T::zero())))]
     }
 
     fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
         let bin = ops::greater(inputs[0], &ops::scalar(T::zero()));
-        // inplace is ok because the second derivative of relu is 0.
-        // (`mul_inplace` returns `None` as an input gradient.)
-        vec![Some(ops::mul_inplace(bin, gy))]
+        vec![Some(ops::mul(bin, gy))]
     }
 }
 
@@ -147,7 +145,7 @@ impl<T: Float> op::Op<T> for ELU<T> {
     }
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
-        let x = ctx.grab_inputs()[0];
+        let x = &ctx.grab_inputs()[0];
         let ret = x.mapv(move |a| {
             if a > T::zero() {
                 a
@@ -174,8 +172,8 @@ impl<T: Float> op::Op<T> for ELUGrad<T> {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let x = xs[0];
-        let gy = xs[1];
+        let x = &xs[0];
+        let gy = &xs[1];
         let a = x.mapv(move |a| {
             if a > T::zero() {
                 T::one()

@@ -1,6 +1,6 @@
 use ndarray;
 use ndarray_ext;
-use ndarray_ext::NdArray;
+use ndarray_ext::{NdArray, NdArrayView};
 use op;
 use ops;
 use std::f32;
@@ -46,7 +46,7 @@ pub struct ReduceGradCommon {
 macro_rules! impl_reduce_forward {
     ($forward_name:ident, $reduce_fn_name:ident, $reduce_default:ident) => {
         fn $forward_name<T: Float>(
-            x: &NdArray<T>,
+            x: &NdArrayView<T>,
             mut axes: Vec<usize>,
             keep_dims: bool,
         ) -> Result<NdArray<T>, ::op::ComputeException> {
@@ -54,7 +54,7 @@ macro_rules! impl_reduce_forward {
 
             if ndarray_ext::is_scalar_shape(x_shape) {
                 // case of 0 rank
-                Ok((*x).clone())
+                Ok((*x).to_owned())
             } else {
                 // reduction axes are empty => do nothing
                 if axes.is_empty() {
@@ -67,11 +67,22 @@ macro_rules! impl_reduce_forward {
 
                 for axis in axes.into_iter().rev() {
                     let func = T::$reduce_fn_name;
-                    let ret = folded.as_ref().unwrap_or(x).fold_axis(
-                        ndarray::Axis(axis),
-                        T::$reduce_default(),
-                        move |&a, &b| func(a, b),
-                    );
+
+                    let ret = match folded {
+                        Some(ref a) => {
+                            a.fold_axis(
+                                ndarray::Axis(axis),
+                                T::$reduce_default(),
+                                move |&l, &r| func(l, r),
+                            )
+                        }
+                        None => {
+                            x.fold_axis(ndarray::Axis(axis),
+                                T::$reduce_default(),
+                                move |&l, &r| func(l, r),
+                            )
+                        }
+                    };
 
                     if keep_dims {
                         mem::swap(&mut folded, &mut Some(ndarray_ext::expand_dims(ret, axis)));
@@ -80,7 +91,7 @@ macro_rules! impl_reduce_forward {
                     }
                 }
 
-                Ok(folded.unwrap_or_else(|| x.clone()))
+                Ok(folded.unwrap_or_else(|| x.to_owned()))
             }
         }
     };
@@ -92,7 +103,7 @@ impl_reduce_forward!(compute_reduce_max, max, min_value);
 impl_reduce_forward!(compute_reduce_prod, mul, one);
 
 #[inline]
-fn preprocess_axes<T: Float>(x: &NdArray<T>, axes: &NdArray<T>, sparse_axes: bool) -> Vec<usize> {
+fn preprocess_axes<T: Float>(x: &NdArrayView<T>, axes: &NdArrayView<T>, sparse_axes: bool) -> Vec<usize> {
     if sparse_axes {
         ndarray_ext::sparse_to_dense(axes)
     } else {
@@ -107,8 +118,8 @@ impl<T: Float> op::Op<T> for ReduceSum {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let x = xs[0];
-        let axes = preprocess_axes(x, xs[1], self.sparse_axes);
+        let x = &xs[0];
+        let axes = preprocess_axes(x, &xs[1], self.sparse_axes);
         vec![compute_reduce_sum(x, axes, self.keep_dims)]
     }
 
@@ -131,8 +142,8 @@ impl<T: Float> op::Op<T> for ReduceMean {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let x = xs[0];
-        let axes = preprocess_axes(x, xs[1], self.sparse_axes);
+        let x = &xs[0];
+        let axes = preprocess_axes(x, &xs[1], self.sparse_axes);
         let x_shape = x.shape();
         if axes.is_empty() {
             return vec![Err(::op::ComputeException::Delegate { to: 0 })];
@@ -185,9 +196,9 @@ impl<T: Float> op::Op<T> for ReduceProd {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let x = xs[0];
-        let axes = preprocess_axes(x, xs[1], self.sparse_axes);
-        let ret = compute_reduce_prod(x, axes, self.keep_dims);
+        let x = &xs[0];
+        let axes = preprocess_axes(x, &xs[1], self.sparse_axes);
+        let ret = compute_reduce_prod(&x, axes, self.keep_dims);
         vec![ret]
     }
 
@@ -216,9 +227,9 @@ impl<T: Float> op::Op<T> for ReduceMin {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let x = xs[0];
-        let axes = preprocess_axes(x, xs[1], self.sparse_axes);
-        vec![compute_reduce_min(x, axes, self.keep_dims)]
+        let x = &xs[0];
+        let axes = preprocess_axes(x, &xs[1], self.sparse_axes);
+        vec![compute_reduce_min(&x, axes, self.keep_dims)]
     }
 
     fn grad(
@@ -238,8 +249,8 @@ impl<T: Float> op::Op<T> for ReduceMax {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let x = xs[0];
-        let axes = preprocess_axes(x, xs[1], self.sparse_axes);
+        let x = &xs[0];
+        let axes = preprocess_axes(x, &xs[1], self.sparse_axes);
         vec![compute_reduce_max(x, axes, self.keep_dims)]
     }
 
@@ -277,7 +288,7 @@ fn min_max_grad<T: Float>(
         .set_inputs(vec![gy, &x_shape, inputs[1]])
         .build(grad_op2);
     let eq = ops::equal(&x, &y);
-    vec![Some(ops::mul_inplace(eq, &gy)), None]
+    vec![Some(ops::mul(eq, &gy)), None]
 }
 
 impl<T: Float> op::Op<T> for ArgMax {
@@ -288,7 +299,7 @@ impl<T: Float> op::Op<T> for ArgMax {
     // cf. https://github.com/tensorflow/compiler/tf2xla/kernels/index_ops.cc
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let x = xs[0];
+        let x = &xs[0];
         let axis = ndarray_ext::normalize_negative_axis(self.axis, x.ndim());
         let x_shape = x.shape();
 
@@ -297,7 +308,7 @@ impl<T: Float> op::Op<T> for ArgMax {
             let max_fn = T::max;
             let min_val = T::min_value();
             let maxed = x.fold_axis(ndarray::Axis(axis), min_val, move |&a, &b| max_fn(a, b));
-            let mut mask = x.clone();
+            let mut mask = x.to_owned();
             let mut found = ndarray::Array::<bool, ndarray::IxDyn>::from_elem(maxed.shape(), false);
             for mut sub in mask.axis_iter_mut(ndarray::Axis(axis)) {
                 ndarray::Zip::from(&mut sub)
@@ -364,8 +375,8 @@ impl<T: Float> op::Op<T> for ReduceGradCommon {
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
         //  broadcast `gy` into `target_shape`
-        let gy = xs[0];
-        let target_shape = ndarray_ext::vec_as_shape(xs[1]); // x's shape
+        let gy = &xs[0];
+        let target_shape = ndarray_ext::vec_as_shape(&xs[1]); // x's shape
 
         if gy.shape() == target_shape.as_slice() {
             return vec![Err(::op::ComputeException::Delegate { to: 0 })];
@@ -378,7 +389,7 @@ impl<T: Float> op::Op<T> for ReduceGradCommon {
 
             // make broadcast dims if needed
             if self.should_make_broadcast_dims || x_is_scalar {
-                let axes = xs[2];
+                let axes = &xs[2];
 
                 // convert axes to usize vec
                 let mut axes = if self.sparse_axes {

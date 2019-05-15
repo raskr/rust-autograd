@@ -1,4 +1,3 @@
-use ndarray_ext::NdArray;
 use op;
 use tensor::Tensor;
 use Float;
@@ -12,13 +11,17 @@ impl<T: Float> ::op::Op<T> for SGDOp<T> {
         "SGD"
     }
 
-    fn compute(&self, mut ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
-        let xs = unsafe { ctx.grab_assignable_inputs() };
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+        let xs = ctx.grab_inputs();
         let updates = {
-            let grad: &NdArray<T> = xs[1];
+            let grad = &xs[1];
             grad.mapv(|x| x * self.lr)
         };
-        xs[0].zip_mut_with(&updates, |a, &b| *a -= b);
+        unsafe {
+            // xs[0].zip_mut_with(&updates, |a, &b| *a -= b);
+            let mut ret = &xs[0] - &updates;
+            ::swap_arr_content(&xs[0], &mut ret);
+        }
         vec![Err(::op::ComputeException::NoOutput)]
     }
 
