@@ -28,7 +28,7 @@ impl<T: Float> op::Op<T> for PreprocessBinOpGrad {
     // Computes x's gradient.
     // Involves reduction as necessary.
     // Inputs: [gy, target_shape]
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let gy = &xs[0];
         let x_shape_ = ::ndarray_ext::vec_as_shape(&xs[1]);
@@ -56,18 +56,10 @@ impl<T: Float> op::Op<T> for PreprocessBinOpGrad {
                         let axis = ndarray::Axis(if x_is_scalar { 0 } else { i });
                         let ret = match folded {
                             Some(ref a) => {
-                                a.fold_axis(
-                                    axis.clone(),
-                                    T::zero(),
-                                    |a, b| a.clone() + b.clone(),
-                                )
+                                a.fold_axis(axis.clone(), T::zero(), |a, b| a.clone() + b.clone())
                             }
                             None => {
-                                gy.fold_axis(
-                                    axis.clone(),
-                                    T::zero(),
-                                    |a, b| a.clone() + b.clone(),
-                                )
+                                gy.fold_axis(axis.clone(), T::zero(), |a, b| a.clone() + b.clone())
                             }
                         };
                         if x_is_scalar {
@@ -106,7 +98,7 @@ impl<T: Float> op::Op<T> for PreprocessBinOpGradGrad {
         "PreprocessBinOpGradGrad"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let gy = xs[0].view();
         let target_shape_ = &xs[1];
@@ -153,7 +145,7 @@ impl<T: Float> op::Op<T> for AddOp {
         "Add"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         add_forward(&xs[0], &xs[1])
     }
@@ -169,7 +161,7 @@ impl<T: Float> op::Op<T> for SubOp {
         "Sub"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let x0 = &xs[0];
         let x1 = &xs[1];
@@ -195,7 +187,7 @@ impl<T: Float> op::Op<T> for MulOp {
         "Mul"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         mul_forward(&xs[0], &xs[1])
     }
@@ -213,7 +205,7 @@ impl<T: Float> op::Op<T> for DivOp {
         "Div"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let x0 = &xs[0];
         let x1 = &xs[1];

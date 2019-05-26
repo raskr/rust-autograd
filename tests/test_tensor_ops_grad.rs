@@ -342,24 +342,6 @@ fn reshape_after_transpose() {
 }
 
 #[test]
-fn add_inplace() {
-    let a = ag::ones(&[2, 2]) + ag::zeros(&[2, 2]);
-    let ref b = ag::variable(ag::ndarray_ext::standard_normal(&[2, 2]));
-    let ref c = ag::add_inplace(a, b);
-    let ref g = ag::grad_with_default(&[c], &[b], &[&ag::ones(&c.shape())]);
-    ag::test_helper::check_theoretical_grads(c, g.as_slice(), &[b], &[], 1e-3, 1e-3);
-}
-
-#[test]
-fn sub_inplace() {
-    let a = ag::zeros(&[2, 2]) + ag::ones(&[2, 2]);
-    let ref b = ag::variable(ag::ndarray_ext::standard_normal(&[2, 2]));
-    let ref c = ag::sub_inplace(a, b);
-    let ref g = ag::grad_with_default(&[c], &[b], &[&ag::ones(&c.shape())]);
-    ag::test_helper::check_theoretical_grads(c, g.as_slice(), &[b], &[], 1e-3, 1e-3);
-}
-
-#[test]
 fn add() {
     let ref a = ag::variable(ag::ndarray_ext::standard_normal(&[2, 2]));
     let ref b = ag::variable(ag::ndarray_ext::standard_normal(&[2, 2]));
@@ -658,11 +640,13 @@ fn primitive_back_propagation_through_time() {
         g.as_slice(),
         params,
         &[
-            (
+            ag::Feed(
                 sentences,
-                &ndarray::arr2(&[[2., 3., 1., 3.], [0., 2., 0., 1.]]).into_dyn(),
+                ndarray::arr2(&[[2., 3., 1., 3.], [0., 2., 0., 1.]])
+                    .into_dyn()
+                    .view(),
             ),
-            (&h_buf[0], &ag::ndarray_ext::zeros(&[batch_size, 3])),
+            ag::Feed(&h_buf[0], ag::ndarray_ext::zeros(&[batch_size, 3]).view()),
         ],
         1e-3,
         1e-3,

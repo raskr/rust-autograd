@@ -1,20 +1,19 @@
 use std::cmp::Ordering;
 use std::collections::btree_set::BTreeSet;
 use tensor::Tensor;
-use ::{Float, Feed};
+use {Feed, Float};
 
 /// Checks the validity of `gradients` with finite difference trick.
 /// For this test only, `variables` must be "shared" variables.
-pub fn check_theoretical_grads<'k, A, T, U>(
+pub fn check_theoretical_grads<'k, 'v, A, T>(
     objective: &'k Tensor<T>,
     gradients: &'k [A],
     variables: &[&Tensor<T>],
-    feeds: U,
+    feeds: &'v [Feed<'k, 'v, T>],
     eps: T,
     tol: T,
 ) where
     A: AsRef<Tensor<T>>,
-    U: IntoIterator<Item = Feed<'k, T>> + Clone,
     T: Float,
 {
     // backprop

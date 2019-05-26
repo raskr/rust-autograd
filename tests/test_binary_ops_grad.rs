@@ -48,7 +48,8 @@ fn expr2() {
     let ref grad = ag::grad(&[y], &[x])[0];
     assert_eq!(
         18.,
-        grad.eval(&[(x, &ndarray::arr0(3.).into_dyn())]).unwrap()[ndarray::IxDyn(&[])]
+        grad.eval(&[ag::Feed(x, ndarray::arr0(3.).into_dyn().view())])
+            .unwrap()[ndarray::IxDyn(&[])]
     );
 }
 
@@ -59,7 +60,8 @@ fn expr3() {
     let ref grad = ag::grad(&[y], &[x])[0];
     assert_eq!(
         18.,
-        grad.eval(&[(x, &ndarray::arr0(3.).into_dyn())]).unwrap()[ndarray::IxDyn(&[])]
+        grad.eval(&[ag::Feed(x, ndarray::arr0(3.).into_dyn().view())])
+            .unwrap()[ndarray::IxDyn(&[])]
     );
 }
 
@@ -70,7 +72,8 @@ fn expr4() {
     let ref grad = ag::grad(&[y], &[x])[0];
     assert_eq!(
         20.,
-        grad.eval(&[(x, &ndarray::arr0(3.).into_dyn())]).unwrap()[ndarray::IxDyn(&[])]
+        grad.eval(&[ag::Feed(x, ndarray::arr0(3.).into_dyn().view())])
+            .unwrap()[ndarray::IxDyn(&[])]
     );
 }
 
@@ -82,7 +85,8 @@ fn expr5() {
     let ref grad = ag::grad(&[y], &[x1])[0];
     assert_eq!(
         20.,
-        grad.eval(&[(x1, &ndarray::arr0(3.).into_dyn())]).unwrap()[ndarray::IxDyn(&[])]
+        grad.eval(&[ag::Feed(x1, ndarray::arr0(3.).into_dyn().view())])
+            .unwrap()[ndarray::IxDyn(&[])]
     );
 }
 
@@ -118,6 +122,7 @@ fn expr7() {
     assert_eq!(4., gg1.eval(&[]).unwrap()[ndarray::IxDyn(&[])]);
     assert_eq!(
         8.,
-        g1.eval(&[(x1, &ndarray::arr0(2.).into_dyn())]).unwrap()[ndarray::IxDyn(&[])]
+        g1.eval(&[ag::Feed(x1, ndarray::arr0(2.).into_dyn().view())])
+            .unwrap()[ndarray::IxDyn(&[])]
     );
 }

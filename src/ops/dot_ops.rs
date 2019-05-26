@@ -1,3 +1,4 @@
+use ndarray;
 use ndarray_ext::NdArray;
 use op;
 #[cfg(feature = "mkl")]
@@ -154,7 +155,7 @@ pub fn cblas_sgemm_wrapper(
 fn test_sgemm() {
     let x = vec![1., 2., 3., 4.]; // (2, 2)
     let y = vec![1., 2., 3., 4.]; // (2, 2)
-    let mut z = uninitialized_vec::<f32>(4); // (2, 2, 2)
+    let mut z = ::uninitialized_vec::<f32>(4); // (2, 2, 2)
 
     cblas_sgemm_wrapper(
         false,
@@ -335,7 +336,7 @@ fn test_dgemm_batch_trans_a() {
     let batch = 2;
     let w = vec![0., 1., 2., 3., 4., 5.]; // (2, 3)
     let x = vec![0., 1., 2., 3., 4., 5., 6., 7.]; // (2, 2, 2)
-    let z = uninitialized_vec::<f64>(12); // (2, 2, 2)
+    let z = ::uninitialized_vec::<f64>(12); // (2, 2, 2)
     let m = 3; // row of op(a)
     let n = 2; // col of op(b)
     let k = 2; // col of op(a)
@@ -365,7 +366,7 @@ fn test_dgemm_batch() {
     let batch = 2;
     let x = vec![0., 1., 2., 3.]; // (2, 2)
     let y = vec![0., 1., 2., 3., 4., 5., 6., 7.]; // (2, 2, 2)
-    let z = uninitialized_vec::<f64>(8); // (2, 2, 2)
+    let z = ::uninitialized_vec::<f64>(8); // (2, 2, 2)
 
     cblas_dgemm_batch_wrapper(
         false,
@@ -396,16 +397,6 @@ pub struct BatchMatMul {
     pub transpose_b: bool,
 }
 
-#[inline]
-#[doc(hidden)]
-pub fn uninitialized_vec<T: Float>(size: usize) -> Vec<T> {
-    let mut buf = Vec::with_capacity(size);
-    unsafe {
-        buf.set_len(size);
-    }
-    buf
-}
-
 #[cfg(feature = "mkl")]
 macro_rules! mkl_mm {
     ($f:expr, $x0:expr, $x1:expr, $x0_shape:expr, $x1_shape:expr, $self:expr, $typ:ty) => {{
@@ -423,7 +414,7 @@ macro_rules! mkl_mm {
             col1
         };
 
-        let mut c = uninitialized_vec::<T>(ret_row * ret_col);
+        let mut c = ::uninitialized_vec::<T>(ret_row * ret_col);
         $f(
             $self.transpose_a,
             $self.transpose_b,
@@ -452,7 +443,7 @@ macro_rules! mkl_batch_mm {
         let n = if $self.transpose_b { $row1 } else { $col1 }; // cols of b
         let k = if $self.transpose_a { $row0 } else { $col0 }; // cols of a
 
-        let ret = uninitialized_vec($ret_shape.iter().product());
+        let ret = ::uninitialized_vec($ret_shape.iter().product());
         $f(
             $self.transpose_a,
             $self.transpose_b,
@@ -480,7 +471,7 @@ impl<T: Float> op::Op<T> for MatMul {
         "MatMul"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let x0 = &xs[0];
         let x1 = &xs[1];
@@ -560,7 +551,7 @@ impl<T: Float> op::Op<T> for BatchMatMul {
         "BatchMatMul"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let x0 = &xs[0];
         let x1 = &xs[1];

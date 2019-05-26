@@ -11,16 +11,11 @@ impl<T: Float> ::op::Op<T> for SGDOp<T> {
         "SGD"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
-        let updates = {
-            let grad = &xs[1];
-            grad.mapv(|x| x * self.lr)
-        };
+        let grad = &xs[1];
         unsafe {
-            // xs[0].zip_mut_with(&updates, |a, &b| *a -= b);
-            let mut ret = &xs[0] - &updates;
-            ::swap_arr_content(&xs[0], &mut ret);
+            ::ndarray_ext::axpy(&xs[0], -self.lr, grad.as_ptr(), grad.shape());
         }
         vec![Err(::op::ComputeException::NoOutput)]
     }
@@ -37,7 +32,7 @@ pub struct SGD<T: Float> {
 
 impl<'a, T: Float> SGD<T> {
     pub fn compute_updates<A: AsRef<Tensor<T>>>(
-        &mut self,
+        &self,
         params: &[&'a Tensor<T>],
         grads: &[A],
     ) -> Vec<Tensor<T>> {

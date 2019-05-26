@@ -226,12 +226,8 @@ impl<T: Float> Tensor<T> {
     /// Evaluates this tensor as an ndarray's array object.
     ///
     /// See [eval](../fn.eval.html).
-    pub fn eval<'k, F>(&'k self, feeds: F) -> Option<NdArray<T>>
-    where
-        F: IntoIterator<Item = ::runtime::Feed<'k, T>>,
-    {
-        let a = [self];
-        ::runtime::eval(&a, feeds).remove(0)
+    pub fn eval<'k, 'v>(&'k self, feeds: &'v [::runtime::Feed<'k, 'v, T>]) -> Option<NdArray<T>> {
+        ::runtime::eval(&[self], feeds).remove(0)
     }
 
     /// Returns the (symbolic) shape of this tensor.

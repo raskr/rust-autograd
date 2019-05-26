@@ -7,7 +7,7 @@ use std::time::Instant;
 type Tensor = ag::Tensor<f32>;
 
 // This is a softmax regression with Adam optimizer for mnist.
-// 0.918 test accuracy after 3 epochs, 0.14 sec/epoch on 2.7GHz Intel Core i5
+// 0.918 test accuracy after 3 epochs, 0.11 sec/epoch on 2.7GHz Intel Core i5
 //
 // First, run "./download_mnist.sh" beforehand if you don't have dataset and then run
 // "cargo run --example mlp_mnist --release" in `examples` directory.
@@ -42,10 +42,19 @@ fn main() {
     let ((x_train, y_train), (x_test, y_test)) = dataset::load();
 
     // -- variable tensors (target of optimization) --
-    let ref w = ag::variable(ag::ndarray_ext::glorot_uniform(&[28 * 28, 10]));
-    let ref b = ag::variable(ag::ndarray_ext::zeros(&[1, 10]));
-    let params = &[w, b];
-    let ref params = ag::gradient_descent_ops::Adam::vars_with_states(params);
+    let w = &ag::variable(ag::ndarray_ext::glorot_uniform(&[28 * 28, 10]));
+    let b = &ag::variable(ag::ndarray_ext::zeros(&[1, 10]));
+//    let params = &[w, b];
+    let params = &ag::gradient_descent_ops::Adam::vars_with_states(&[w, b]);
+    let (x, y) = inputs();
+    let z = logits(&x, w, b);
+    let loss = ag::sparse_softmax_cross_entropy(z, &y);
+    let mean_loss = ag::reduce_mean(loss, &[0, 1], false);
+    let grads = &ag::grad(&[&mean_loss], &[w, b]);
+    let adam = ag::gradient_descent_ops::Adam::default();
+//    let sgd = ag::gradient_descent_ops::SGD {lr: 0.1};
+    let update_ops: &[Tensor] = &adam.compute_updates(params, grads);
+//    let update_ops: &[Tensor] = &sgd.compute_updates(params, grads);
 
     // -- actual training --
     let max_epoch = 3;
@@ -57,18 +66,10 @@ fn main() {
         timeit!({
             let perm = ag::ndarray_ext::permutation(num_batches) * batch_size as usize;
             for i in perm.into_iter() {
-                let (x, y) = inputs();
-                let z = logits(&x, w, b);
-                let loss = ag::sparse_softmax_cross_entropy(z, &y);
-                let mean_loss = ag::reduce_mean(loss, &[0, 1], false);
-                let grads = &ag::grad(&[&mean_loss], &[w, b]);
-                let adam = ag::gradient_descent_ops::Adam::default();
-                let update_ops: &[Tensor] = &adam.compute_updates(params, grads);
-
                 let i = *i as isize;
-                let x_batch = x_train.slice(s![i..i + batch_size, ..]).to_owned();
-                let y_batch = y_train.slice(s![i..i + batch_size, ..]).to_owned();
-                ag::eval(update_ops, &[(&x, &x_batch), (&y, &y_batch)]);
+                let x_batch = x_train.slice(s![i..i + batch_size, ..]);
+                let y_batch = y_train.slice(s![i..i + batch_size, ..]);
+                ag::eval(update_ops, &[ag::Feed(&x, x_batch), ag::Feed(&y, y_batch)]);
             }
         });
         println!("finish epoch {}", epoch);
@@ -81,7 +82,7 @@ fn main() {
     let accuracy = ag::reduce_mean(&ag::equal(predictions, &y), &[0, 1], false);
     println!(
         "test accuracy: {:?}",
-        accuracy.eval(&[(&x, &x_test), (&y, &y_test)])
+        accuracy.eval(&[ag::Feed(&x, x_test.view()), ag::Feed(&y, y_test.view())])
     );
 }
 

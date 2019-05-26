@@ -17,7 +17,7 @@ impl<T: Float> ::op::Op<T> for Conv2DTranspose {
         "Conv2DTranspose"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ::op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ::op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
 
         let gy = &xs[0]; // (batch, ych, yh, yw)
@@ -62,7 +62,7 @@ impl<T: Float> ::op::Op<T> for Conv2DTranspose {
         let size_per_batch_col = xch * kh * kw * yh * yw;
 
         let gy = unsafe { slice::from_raw_parts(gy.as_ptr(), gy.len()) };
-        let col = ::dot_ops::uninitialized_vec(batch_size * size_per_batch_col);
+        let col = uninitialized_vec(batch_size * size_per_batch_col);
         // Col2im buffer must be initialized with zeros
 
         #[cfg(feature = "mkl")]
@@ -173,7 +173,7 @@ impl<T: Float> ::op::Op<T> for Conv2DTransposeFilterGrad {
         "Conv2DTransposeFilterGrad"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ::op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ::op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let gy = &xs[0];
         let x = &xs[1];
@@ -329,7 +329,7 @@ fn test_deconv() {
 
     let ret = op.compute(::runtime::OpComputeContext::new(
         &::ops::zeros(&[0]), // dummy (not used)
-        vec![&g, &w],
+        vec![g.view(), w.view()],
     ));
 
     let x = ::ndarray_ext::ones::<f32>(&[batch_size, xch, xh, xw]);

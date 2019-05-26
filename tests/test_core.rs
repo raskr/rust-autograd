@@ -1,4 +1,5 @@
 extern crate autograd as ag;
+extern crate ndarray;
 
 struct MultiOutputOp;
 
@@ -7,7 +8,7 @@ impl ag::op::Op<f32> for MultiOutputOp {
         "MultiOutputOp"
     }
 
-    fn compute(&self, _: ag::runtime::OpComputeContext<f32>) -> ag::op::ComputeResult<f32> {
+    fn compute(&self, _: ag::runtime::OpComputeContext<f32>) -> ag::op::ComputeResults<f32> {
         let a = ag::ndarray_ext::zeros(&[2, 3]);
         let b = ag::ndarray_ext::zeros(&[1, 3]);
         vec![Ok(a), Ok(b)]

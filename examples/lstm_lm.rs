@@ -105,9 +105,11 @@ pub fn main() {
         loss,
         &grads,
         vars,
-        &[(
+        &[ag::Feed(
             sentences,
-            &ndarray::arr2(&[[2., 3., 1.], [3., 0., 1.]]).into_dyn(),
+            ndarray::arr2(&[[2., 3., 1.], [3., 0., 1.]])
+                .into_dyn()
+                .view(),
         )],
         1e-3,
         1e-3,

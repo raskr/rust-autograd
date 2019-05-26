@@ -61,7 +61,7 @@ impl<T: Float> op::Op<T> for Softmax {
         "Softmax"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         vec![Ok(softmax_forward(&ctx.grab_inputs()[0], self.axis))]
     }
 
@@ -76,7 +76,7 @@ impl<T: Float> op::Op<T> for Softplus {
         "Softplus"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         use std::f64;
         let e = T::from(f64::consts::E).unwrap();
@@ -96,7 +96,7 @@ impl<T: Float> op::Op<T> for Sigmoid {
         "Sigmoid"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let x = &ctx.grab_inputs()[0];
         let half = T::from(0.5).unwrap();
         vec![Ok(x.mapv(move |a| ((a * half).tanh() * half) + half))]
@@ -112,7 +112,7 @@ impl<T: Float> op::Op<T> for ReLU {
         "ReLU"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let x = &ctx.grab_inputs()[0];
         vec![Ok(x.map(|a| a.max(T::zero())))]
     }
@@ -128,7 +128,7 @@ impl<T: Float> op::Op<T> for Identity {
         "Identity"
     }
 
-    fn compute(&self, _: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, _: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         // do nothing
         vec![Err(::op::ComputeException::Delegate { to: 0 })]
     }
@@ -144,7 +144,7 @@ impl<T: Float> op::Op<T> for ELU<T> {
         "ELU"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let x = &ctx.grab_inputs()[0];
         let ret = x.mapv(move |a| {
             if a > T::zero() {
@@ -170,7 +170,7 @@ impl<T: Float> op::Op<T> for ELUGrad<T> {
         "ELUGrad"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let x = &xs[0];
         let gy = &xs[1];

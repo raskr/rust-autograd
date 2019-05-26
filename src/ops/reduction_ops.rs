@@ -70,17 +70,14 @@ macro_rules! impl_reduce_forward {
 
                     let ret = match folded {
                         Some(ref a) => {
-                            a.fold_axis(
-                                ndarray::Axis(axis),
-                                T::$reduce_default(),
-                                move |&l, &r| func(l, r),
-                            )
+                            a.fold_axis(ndarray::Axis(axis), T::$reduce_default(), move |&l, &r| {
+                                func(l, r)
+                            })
                         }
                         None => {
-                            x.fold_axis(ndarray::Axis(axis),
-                                T::$reduce_default(),
-                                move |&l, &r| func(l, r),
-                            )
+                            x.fold_axis(ndarray::Axis(axis), T::$reduce_default(), move |&l, &r| {
+                                func(l, r)
+                            })
                         }
                     };
 
@@ -103,7 +100,11 @@ impl_reduce_forward!(compute_reduce_max, max, min_value);
 impl_reduce_forward!(compute_reduce_prod, mul, one);
 
 #[inline]
-fn preprocess_axes<T: Float>(x: &NdArrayView<T>, axes: &NdArrayView<T>, sparse_axes: bool) -> Vec<usize> {
+fn preprocess_axes<T: Float>(
+    x: &NdArrayView<T>,
+    axes: &NdArrayView<T>,
+    sparse_axes: bool,
+) -> Vec<usize> {
     if sparse_axes {
         ndarray_ext::sparse_to_dense(axes)
     } else {
@@ -116,7 +117,7 @@ impl<T: Float> op::Op<T> for ReduceSum {
         "ReduceSum"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let x = &xs[0];
         let axes = preprocess_axes(x, &xs[1], self.sparse_axes);
@@ -140,7 +141,7 @@ impl<T: Float> op::Op<T> for ReduceMean {
         "ReduceMean"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let x = &xs[0];
         let axes = preprocess_axes(x, &xs[1], self.sparse_axes);
@@ -194,7 +195,7 @@ impl<T: Float> op::Op<T> for ReduceProd {
         "ReduceProd"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let x = &xs[0];
         let axes = preprocess_axes(x, &xs[1], self.sparse_axes);
@@ -225,7 +226,7 @@ impl<T: Float> op::Op<T> for ReduceMin {
         "ReduceMin"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let x = &xs[0];
         let axes = preprocess_axes(x, &xs[1], self.sparse_axes);
@@ -247,7 +248,7 @@ impl<T: Float> op::Op<T> for ReduceMax {
         "ReduceMax"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let x = &xs[0];
         let axes = preprocess_axes(x, &xs[1], self.sparse_axes);
@@ -297,7 +298,7 @@ impl<T: Float> op::Op<T> for ArgMax {
     }
 
     // cf. https://github.com/tensorflow/compiler/tf2xla/kernels/index_ops.cc
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let x = &xs[0];
         let axis = ndarray_ext::normalize_negative_axis(self.axis, x.ndim());
@@ -372,7 +373,7 @@ impl<T: Float> op::Op<T> for ReduceGradCommon {
         "ReduceGradCommon"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         //  broadcast `gy` into `target_shape`
         let gy = &xs[0];

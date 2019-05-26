@@ -74,9 +74,9 @@ fn main() {
             let perm = ag::ndarray_ext::permutation(num_batches) * batch_size as usize;
             for i in perm.into_iter() {
                 let i = *i as isize;
-                let x_batch = x_train.slice(s![i..i + batch_size, .., .., ..]).to_owned();
-                let y_batch = y_train.slice(s![i..i + batch_size, ..]).to_owned();
-                ag::eval(update_ops, &[(&x, &x_batch), (&y, &y_batch)]);
+                let x_batch = x_train.slice(s![i..i + batch_size, .., .., ..]);
+                let y_batch = y_train.slice(s![i..i + batch_size, ..]);
+                ag::eval(update_ops, &[ag::Feed(&x, x_batch), ag::Feed(&y, y_batch)]);
             }
         });
         println!("finish epoch {}", epoch);
@@ -87,7 +87,7 @@ fn main() {
     let accuracy = ag::reduce_mean(&ag::equal(predictions, &y), &[0, 1], false);
     println!(
         "test accuracy: {:?}",
-        accuracy.eval(&[(&x, &x_test), (&y, &y_test)])
+        accuracy.eval(&[ag::Feed(&x, x_test.view()), ag::Feed(&y, y_test.view())])
     );
 }
 

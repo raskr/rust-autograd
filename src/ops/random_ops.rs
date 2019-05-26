@@ -111,7 +111,7 @@ impl<T: Float, R: Rng> op::Op<T> for RandomNormal<T, R> {
         "RandomNormal"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let shape = ndarray_ext::arr_to_shape(&xs[0]);
         vec![Ok(self.arr_rng.random_normal(
@@ -131,7 +131,7 @@ impl<R: Rng, T: Float> op::Op<T> for RandomUniform<T, R> {
         "RandomUniform"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let shape = ndarray_ext::arr_to_shape(&xs[0]);
         vec![Ok(self.arr_rng.random_uniform(
@@ -151,7 +151,7 @@ impl<R: Rng, T: Float> op::Op<T> for StandardNormal<T, R> {
         "StandardNormal"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let shape = ndarray_ext::arr_to_shape(&xs[0]);
         vec![Ok(self.arr_rng.standard_normal(shape.as_slice()))]
@@ -167,7 +167,7 @@ impl<R: Rng, T: Float> op::Op<T> for StandardUniform<T, R> {
         "StandardUniform"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let shape = ndarray_ext::arr_to_shape(&xs[0]);
         vec![Ok(self.arr_rng.standard_uniform(shape.as_slice()))]
@@ -183,7 +183,7 @@ impl<R: Rng, T: Float> op::Op<T> for Bernoulli<T, R> {
         "Bernoulli"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let shape = ndarray_ext::arr_to_shape(&xs[0]);
         vec![Ok(self.arr_rng.bernoulli(shape.as_slice(), self.p))]
@@ -199,7 +199,7 @@ impl<R: Rng, T: Float> op::Op<T> for Exponential<T, R> {
         "Exponential"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let shape = ndarray_ext::arr_to_shape(&xs[0]);
         vec![Ok(self.arr_rng.exponential(shape.as_slice(), self.lambda))]
@@ -215,7 +215,7 @@ impl<R: Rng, T: Float> op::Op<T> for LogNormal<T, R> {
         "LogNormal"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let shape = ndarray_ext::arr_to_shape(&xs[0]);
         vec![Ok(self.arr_rng.log_normal(
@@ -235,7 +235,7 @@ impl<R: Rng, T: Float> op::Op<T> for Gamma<T, R> {
         "Gamma"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let shape = ndarray_ext::arr_to_shape(&xs[0]);
         vec![Ok(self.arr_rng.gamma(

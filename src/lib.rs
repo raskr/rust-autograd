@@ -20,7 +20,7 @@
 //!
 //! // dz/dx (requires to fill the placeholder `x`)
 //! let gx = &ag::grad(&[z], &[x])[0];
-//! println!("{:?}", gx.eval(&[(x, &ndarray::arr0(2.).into_dyn())]));  // => Some(8.)
+//! println!("{:?}", gx.eval(&[ag::Feed(x, ndarray::arr0(2.).into_dyn().view())]));  // => Some(8.)
 //!
 //! // ddz/dx (differentiates `z` again)
 //! let ggx = &ag::grad(&[gx], &[x])[0];
@@ -54,13 +54,13 @@
 //! // -- training loop --
 //! // for epoch in 0..30 {
 //!     // ...
-//!     // ag::run(update_ops, &[(x, &x_batch), (y, &y_batch)]);
+//!     // ag::run(update_ops, &[(x, x_batch), (y, y_batch)]);
 //! // }
 //! # }
 //! ```
 #[allow(unused_imports)]
 #[macro_use(s)]
-extern crate ndarray;
+pub extern crate ndarray;
 #[cfg(feature = "mkl")]
 extern crate intel_mkl_src;
 extern crate libc;
@@ -70,7 +70,6 @@ extern crate num;
 extern crate num_traits;
 extern crate rand;
 extern crate rayon;
-extern crate core;
 
 #[macro_use]
 #[doc(hidden)]
@@ -162,13 +161,13 @@ pub use ndarray_ext::NdArray;
 pub use runtime::{eval, Eval, Feed};
 
 pub use tensor::Tensor;
-use ndarray_ext::NdArrayView;
 
+#[inline]
 #[doc(hidden)]
-pub unsafe fn swap_arr_content<T: Float>(a: &NdArrayView<T>, b: &mut NdArray<T>) {
-    use std::mem;
-    assert_eq!(a.shape(), b.shape());
-    let ap: &mut T = mem::transmute(a.as_ptr());
-    let bp: &mut T = mem::transmute(b.as_mut_ptr());
-    mem::swap(ap, bp);
+pub fn uninitialized_vec<T: Float>(size: usize) -> Vec<T> {
+    let mut buf = Vec::with_capacity(size);
+    unsafe {
+        buf.set_len(size);
+    }
+    buf
 }

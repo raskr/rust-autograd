@@ -9,7 +9,7 @@ impl<T: Float> op::Op<T> for StopGradient {
         "StopGradient"
     }
 
-    fn compute(&self, _: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, _: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         vec![Err(::op::ComputeException::Delegate { to: 0 })]
     }
 

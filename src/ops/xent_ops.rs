@@ -3,6 +3,7 @@ use ndarray_ext::{NdArray, NdArrayView};
 use op;
 use ops;
 use tensor::Tensor;
+use uninitialized_vec;
 use Float;
 
 pub struct SoftmaxCrossEntropy;
@@ -18,7 +19,7 @@ impl<T: Float> op::Op<T> for LogSoftmax {
         "LogSoftmax"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         vec![Ok(
             (&xs[0]) - &ops::math_ops::logsumexp_forward(&xs[0], self.axis, true)
@@ -38,7 +39,7 @@ impl<T: Float> op::Op<T> for SigmoidCrossEntropy {
         "SigmoidCrossEntropy"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let x: &NdArrayView<T> = &xs[0];
         let t: &NdArrayView<T> = &xs[1];
@@ -48,7 +49,8 @@ impl<T: Float> op::Op<T> for SigmoidCrossEntropy {
         use std::f64;
         let e = T::from(f64::consts::E).unwrap();
         let max_fn = T::max;
-        let mut tmp: NdArray<T> = x.map(move |a| ((-a.abs()).exp() + T::one()).log(e) + max_fn(T::zero(), *a));
+        let mut tmp: NdArray<T> =
+            x.map(move |a| ((-a.abs()).exp() + T::one()).log(e) + max_fn(T::zero(), *a));
         tmp -= &(t * x);
         vec![Ok(tmp)]
     }
@@ -68,20 +70,48 @@ impl<T: Float> op::Op<T> for SigmoidCrossEntropy {
     }
 }
 
+unsafe fn sparse_sce_forward_f32<T: Float>(
+    log_x: *const T,
+    t: *const T,
+    row: isize,
+    col: isize,
+) -> Vec<T> {
+    let mut ret = uninitialized_vec(row as usize);
+    let ret_p: *mut T = ret.as_mut_ptr();
+    for i in 0..row {
+        *ret_p.offset(i) = -*log_x.offset(i * col + *(t.offset(i) as *const f32) as isize);
+    }
+    ret
+}
+
+unsafe fn sparse_sce_forward_f64<T: Float>(
+    log_x: *const T,
+    t: *const T,
+    row: isize,
+    col: isize,
+) -> Vec<T> {
+    let mut ret = uninitialized_vec(row as usize);
+    let ret_p: *mut T = ret.as_mut_ptr();
+    for i in 0..row {
+        *ret_p.offset(i) = -*log_x.offset(i * col + *(t.offset(i) as *const f64) as isize);
+    }
+    ret
+}
+
 impl<T: Float> op::Op<T> for SparseSoftmaxCrossEntropy {
     fn name(&self) -> &str {
         "SparseSoftmaxCrossEntropy"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let (x, t) = (&xs[0], &xs[1]);
         let log_x: NdArray<T> = x - &ops::math_ops::logsumexp_forward(x, 1, true);
 
         // validation
         {
-            assert_eq!(log_x.ndim(), 2, "Bad first argument's shape");
             let t_shape = t.shape();
+            assert_eq!(log_x.ndim(), 2, "Bad first argument's shape");
             let t_rank = t_shape.len();
             if t_rank == 2 {
                 assert_eq!(t_shape[1], 1, "Bad second argument's shape");
@@ -90,15 +120,31 @@ impl<T: Float> op::Op<T> for SparseSoftmaxCrossEntropy {
             }
         }
 
-        let mut t_iter = t.iter();
-
+        let batch_size = t.len();
+        let log_x_p = log_x.as_ptr();
+        let t_p = t.as_ptr();
+        let ret = unsafe {
+            use same_type;
+            if same_type::<T, f32>() {
+                sparse_sce_forward_f32(
+                    log_x_p,
+                    t_p,
+                    batch_size as isize,
+                    (log_x.len() / batch_size) as isize,
+                )
+            } else if same_type::<T, f64>() {
+                sparse_sce_forward_f64(
+                    log_x_p,
+                    t_p,
+                    batch_size as isize,
+                    (log_x.len() / batch_size) as isize,
+                )
+            } else {
+                panic!("sparse_softmax_cross_entropy supports only f32 and f64");
+            }
+        };
         // unwrap is safe
-        let ret = log_x
-            .map_axis(ndarray::Axis(1), move |row| {
-                -row[t_iter.next().unwrap().to_usize().unwrap()]
-            })
-            .into_shape(ndarray::IxDyn(&[log_x.shape()[0], 1]))
-            .unwrap();
+        let ret = NdArray::from_shape_vec(ndarray::IxDyn(&[batch_size, 1]), ret).unwrap();
 
         vec![Ok(ret), Ok(log_x)]
     }
@@ -132,7 +178,7 @@ impl<T: Float> op::Op<T> for SparseSoftmaxCrossEntropyGrad {
         "SparseSoftmaxCrossEntropyGrad"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let log_x = &xs[0]; // x is softmax  [2, 1]
         let t = &xs[1]; // (2,)
@@ -157,7 +203,7 @@ impl<T: Float> op::Op<T> for SoftmaxCrossEntropy {
         "SoftmaxCrossEntropy"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let x = &xs[0];
         let log_x: NdArray<T> = x - &ops::math_ops::logsumexp_forward(x, 1, true);

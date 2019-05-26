@@ -72,7 +72,8 @@ macro_rules! impl_max_pool {
                             }
                             let out_index = j + i_base;
                             *output.get_unchecked_mut(out_index) = max;
-                            *indices.get_unchecked_mut(out_index) = *(&(max_i as $t) as *const $t as *const T)
+                            *indices.get_unchecked_mut(out_index) =
+                                *(&(max_i as $t) as *const $t as *const T)
                         }
                     }
                 }
@@ -168,7 +169,7 @@ impl<T: Float> ::op::Op<T> for MaxPool2D {
         "MaxPool"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ::op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ::op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let x = &xs[0];
         let x_shape = x.shape();
@@ -240,7 +241,9 @@ fn test_max_pool2d() {
     let x = vec![0., 1., 2., 5., 4., 3., 6., 7., 8.];
     let y = op.compute(::runtime::OpComputeContext::new(
         &::zeros(&[0]),
-        vec![&NdArray::from_shape_vec(ndarray::IxDyn(&[1, 1, 3, 3]), x).unwrap()],
+        vec![NdArray::from_shape_vec(ndarray::IxDyn(&[1, 1, 3, 3]), x)
+            .unwrap()
+            .view()],
     ));
     assert_eq!(
         vec![5., 4., 7., 8.],
@@ -257,7 +260,7 @@ impl<T: Float> ::op::Op<T> for MaxPool2DGrad {
         "MaxPoolGrad"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ::op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ::op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let gy = &xs[0];
         let argmax = &xs[1];
@@ -316,7 +319,7 @@ impl<T: Float> ::op::Op<T> for MaxPool2DGradGrad {
         "MaxPoolGradGrad"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ::op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ::op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let ggx = &xs[0];
         let x_shape = ggx.shape();

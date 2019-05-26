@@ -20,7 +20,7 @@ impl<T: Float> op::Op<T> for Scalar<T> {
         "Scalar"
     }
 
-    fn compute(&self, _: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, _: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         vec![Ok(ndarray::arr0(self.val).into_dyn())]
     }
 
@@ -34,7 +34,7 @@ impl<T: Float> op::Op<T> for Zeros {
         "Zeros"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let shape = &xs[0];
         let ret = if let Some(a) = shape.as_slice() {
@@ -66,7 +66,7 @@ impl<T: Float> op::Op<T> for Ones {
         "Ones"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let shape = &xs[0];
         let ret = if let Some(a) = shape.as_slice() {
@@ -98,7 +98,7 @@ impl<T: Float> op::Op<T> for Range {
         "Range"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let x0 = &xs[0];
         let x1 = &xs[1];
@@ -126,7 +126,7 @@ impl<T: Float> op::Op<T> for ConvertToTensor<T> {
         "ConvertToTensor"
     }
 
-    fn compute(&self, _: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, _: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         vec![Ok(self.arr.clone())]
     }
 

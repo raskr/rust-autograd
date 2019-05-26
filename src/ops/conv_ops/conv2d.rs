@@ -75,7 +75,7 @@ impl<T: Float> ::op::Op<T> for Conv2D {
         "Conv2D"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ::op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ::op::ComputeResults<T> {
         // Grab inputs
         let xs = ctx.grab_inputs();
         let x = &xs[0];
@@ -119,7 +119,7 @@ impl<T: Float> ::op::Op<T> for Conv2D {
 
         // Prepare pointers to buffers
         let x = unsafe { slice::from_raw_parts(x.as_ptr(), batch_size * xch * xh * xw) };
-        let y = ::dot_ops::uninitialized_vec(batch_size * size_per_batch_y);
+        let y = uninitialized_vec(batch_size * size_per_batch_y);
 
         let c = im2col_batch(
             x,
@@ -271,7 +271,7 @@ impl<T: Float> ::op::Op<T> for Conv2DWithCols {
         "Conv2DWithCols"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ::op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ::op::ComputeResults<T> {
         // Grab inputs
         let xs = ctx.grab_inputs();
         let cols = &xs[0];
@@ -293,7 +293,7 @@ impl<T: Float> ::op::Op<T> for Conv2DWithCols {
 
         // Prepare buffers
         let c = unsafe { slice::from_raw_parts(cols.as_ptr(), cols.len()) };
-        let y = ::dot_ops::uninitialized_vec(batch_size * size_per_batch_y);
+        let y = uninitialized_vec(batch_size * size_per_batch_y);
 
         #[cfg(feature = "mkl")]
         {
@@ -392,7 +392,7 @@ impl<T: Float> ::op::Op<T> for Conv2DFilterGrad {
         "Conv2DFilterGrad"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ::op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ::op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let cols = &xs[0]; // must be columns
         let gy = &xs[1];
@@ -415,7 +415,7 @@ impl<T: Float> ::op::Op<T> for Conv2DFilterGrad {
         // Prepare bufs
         let cols = unsafe { slice::from_raw_parts(cols.as_ptr(), cols.len()) };
         let gy = unsafe { slice::from_raw_parts(gy.as_ptr(), gy.len()) };
-        let mut gw = ::dot_ops::uninitialized_vec::<T>(ych * xch * kh * kw);
+        let mut gw = uninitialized_vec::<T>(ych * xch * kh * kw);
         let gw_head: *mut T = gw.as_mut_ptr();
 
         for i in 0..batch_size {
@@ -537,7 +537,7 @@ fn test_conv2d() {
 
     let y = op.compute(::runtime::OpComputeContext::new(
         &::ops::zeros(&[0]), // dummy (not used)
-        vec![&x, &w],
+        vec![x.view(), w.view()],
     ));
 
     assert_eq!(

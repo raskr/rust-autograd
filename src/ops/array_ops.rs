@@ -92,7 +92,7 @@ impl<T: Float> op::Op<T> for InferBinOpShape {
         "InferBinOpShape"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let a_shape_float = &xs[0];
         let b_shape_float = &xs[1];
@@ -133,7 +133,7 @@ impl<T: Float> op::Op<T> for Shape {
         "Shape"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let x = &xs[0];
         vec![Ok(ndarray_ext::shape_of_view(x))]
@@ -149,7 +149,7 @@ impl<T: Float> op::Op<T> for Rank {
         "Rank"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let x = &xs[0];
         vec![Ok(NdArray::from_elem(
@@ -168,7 +168,7 @@ impl<T: Float> op::Op<T> for Size {
         "Size"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let x = &xs[0];
         vec![Ok(NdArray::from_elem(
@@ -187,7 +187,7 @@ impl<T: Float> op::Op<T> for Reshape {
         "Reshape"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let ret = xs[0].to_owned();
         let shape_arr = &xs[1];
@@ -224,7 +224,7 @@ impl<T: Float> op::Op<T> for SetDiff1D {
         "SetDiff1D"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let x0 = &xs[0];
         let x1 = &xs[1];
@@ -267,7 +267,7 @@ impl<T: Float> op::Op<T> for IndexOp {
         "IndexOp"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let x = &xs[0];
         let i = if self.index < 0 {
@@ -300,7 +300,7 @@ impl<T: Float> op::Op<T> for IndexOpGrad {
         "IndexOpGrad"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let x = &xs[0];
         let gy = &xs[1];
@@ -335,7 +335,7 @@ impl<T: Float> op::Op<T> for Gather {
         "Gather"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let param = &xs[1];
         let indices = &xs[0];
@@ -378,7 +378,7 @@ impl<T: Float> op::Op<T> for GatherGrad {
         "GatherGrad"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let indices = &xs[0];
         let param = &xs[1];
@@ -442,7 +442,7 @@ impl<T: Float> op::Op<T> for AddN {
         "AddN"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let ret = if 0 == xs.len() {
             unreachable!()
@@ -472,7 +472,7 @@ impl<T: Float> op::Op<T> for Clip<T> {
         "Clip"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         vec![Ok(xs[0].mapv(move |a| a.min(self.max).max(self.min)))]
     }
@@ -493,7 +493,7 @@ impl<T: Float> op::Op<T> for ClipGrad<T> {
     fn name(&self) -> &str {
         "ClipGrad"
     }
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let mut ret = xs[0].mapv(move |x| {
             // x > min && x < max
@@ -513,7 +513,7 @@ impl<T: Float> op::Op<T> for Concat {
         "Concat"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let mut views = vec![];
         let xs = ctx.grab_inputs();
         for x in xs.iter() {
@@ -561,7 +561,7 @@ impl<T: Float> op::Op<T> for ConcatGrad {
         "ConcatGrad"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let gy = &xs[0];
         let xs = xs[1..].to_vec();
@@ -604,7 +604,7 @@ impl<T: Float> op::Op<T> for Tile {
         "Tile"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let x = &xs[0];
 
@@ -636,7 +636,7 @@ impl<T: Float> op::Op<T> for Split {
         "Split"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let x = &xs[0];
 
@@ -671,7 +671,7 @@ impl<T: Float> op::Op<T> for SplitGrad {
         "SplitGrad"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let x = &xs[0];
         let gy = &xs[1];
@@ -723,9 +723,9 @@ impl<T: Float> op::Op<T> for Slice {
         "Slice"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
-        let y= xs[0].slice(&*self.indices).to_owned();
+        let y = xs[0].slice(&*self.indices).to_owned();
         // TODO: for now, if the size of last axis is 1, removing it.
         let last_axis = y.ndim() - 1;
         let ret = if y.shape()[last_axis] == 1 {
@@ -753,7 +753,7 @@ impl<T: Float> op::Op<T> for SliceGrad {
         "SliceGrad"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let x = &xs[0];
         let gy = &xs[1];
@@ -774,7 +774,7 @@ impl<T: Float> op::Op<T> for Squeeze {
         "Squeeze"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let mut x = xs[0].view();
         let mut axes = xs[1]
@@ -808,7 +808,7 @@ impl<T: Float> op::Op<T> for ExpandDims {
         "ExpandDims"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let ret = xs[0].to_owned();
         let mut axes = xs[1]

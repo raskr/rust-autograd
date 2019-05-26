@@ -83,7 +83,7 @@ impl<T: Float> Tensor<T> {
 /// assert_eq!(4., ggx.eval(&[]).unwrap()[ndarray::IxDyn(&[])]);
 ///
 /// // dz/dx requires to fill the placeholder `x`
-/// assert_eq!(8., gx.eval(&[(x, &ndarray::arr0(2.).into_dyn())]).unwrap()[ndarray::IxDyn(&[])]);
+/// assert_eq!(8., gx.eval(&[ag::Feed(x, ndarray::arr0(2.).into_dyn().view())]).unwrap()[ndarray::IxDyn(&[])]);
 ///
 /// ```
 pub fn grad<T: Float>(ys: &[&Tensor<T>], xs: &[&Tensor<T>]) -> Vec<Tensor<T>> {
@@ -234,7 +234,7 @@ pub fn variable<T: Float, D: ndarray::Dimension>(arr: ndarray::Array<T, D>) -> T
 ///
 /// // Fills placeholder, then eval
 /// let arr = ndarray::arr1(&[1., 1.]).into_dyn();
-/// assert_eq!(x.eval(&[(&x, &arr.clone())]), Some(arr));
+/// assert_eq!(x.eval(&[ag::Feed(&x, arr.clone().view())]), Some(arr));
 /// ```
 #[inline]
 pub fn placeholder<T: Float>(shape_: &[isize]) -> Tensor<T> {

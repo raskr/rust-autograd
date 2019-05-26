@@ -1,11 +1,11 @@
 use ndarray;
 use Float;
 
-pub type NdArray<T: Float> = ndarray::Array<T, ndarray::IxDyn>;
+pub type NdArray<T> = ndarray::Array<T, ndarray::IxDyn>;
 
-pub type NdArrayView<'a, T: Float> = ndarray::ArrayView<'a, T, ndarray::IxDyn>;
+pub type NdArrayView<'a, T> = ndarray::ArrayView<'a, T, ndarray::IxDyn>;
 
-pub type NdArrayViewMut<'a, T: Float> = ndarray::ArrayViewMut<'a, T, ndarray::IxDyn>;
+pub type NdArrayViewMut<'a, T> = ndarray::ArrayViewMut<'a, T, ndarray::IxDyn>;
 
 /// exposes array_gen
 pub use array_gen::*;
@@ -143,6 +143,29 @@ pub fn into_mat<T: Float>(x: NdArray<T>) -> ndarray::Array<T, ndarray::Ix2> {
         (shape[0], shape[1])
     };
     x.into_shape(ndarray::Ix2(a, b)).unwrap()
+}
+
+#[doc(hidden)]
+pub unsafe fn assign<T: Float>(a: &NdArrayView<T>, b: *const T, b_shape: &[usize])
+{
+    use std::mem;
+    assert_eq!(a.shape(), b_shape);
+    let size = a.len() as isize;
+    let c: *mut T = mem::transmute(a.as_ptr());
+    for i in 0..size {
+        *c.offset(i) = *b.offset(i);
+    }
+}
+
+#[doc(hidden)]
+pub unsafe fn axpy<T: Float>(a: &NdArrayView<T>, alpha: T, b: *const T, b_shape: &[usize]) {
+    use std::mem;
+    assert_eq!(a.shape(), b_shape);
+    let size = a.len() as isize;
+    let c: *mut T = mem::transmute(a.as_ptr());
+    for i in 0..size {
+        *c.offset(i) += alpha * *b.offset(i);
+    }
 }
 
 /// Generates ndarrays which can be fed to `autograd::variable()` etc.

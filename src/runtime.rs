@@ -23,13 +23,13 @@ use Float;
 /// ag::Eval::new()
 ///     .push(&y)
 ///     .extend(&[y, z])
-///     .run(&[(a, &nd::arr0(2.).into_dyn())]);  // Do eval
+///     .run(&[ag::Feed(a, nd::arr0(2.).into_dyn().view())]);  // Do eval
 /// ```
-pub struct Eval<'tsr, T: 'tsr + Float> {
-    buf: Vec<&'tsr Tensor<T>>,
+pub struct Eval<'k, T: Float> {
+    buf: Vec<&'k Tensor<T>>,
 }
 
-impl<'k, T: Float + 'k> Eval<'k, T> {
+impl<'a, 'k: 'a, 'v: 'a, T: Float> Eval<'k, T> {
     /// Instantiates a new evaluation session.
     pub fn new() -> Self {
         Eval { buf: Vec::new() }
@@ -53,16 +53,13 @@ impl<'k, T: Float + 'k> Eval<'k, T> {
     /// Evaluates the buffered tensors.
     ///
     /// `feeds` is a stream of `(placeholder tensor, its value)`
-    pub fn run<F>(&'k self, feed: F) -> Vec<Option<NdArray<T>>>
-    where
-        F: IntoIterator<Item = Feed<'k, T>>
-    {
-        eval(&self.buf, feed)
+    pub fn run(&'k self, feeds: &'a [::runtime::Feed<'k, 'v, T>]) -> Vec<Option<NdArray<T>>> {
+        eval(&self.buf, feeds)
     }
 }
 
 // Context in evaluation of `node`
-pub struct OpComputeContext<'k, T: Float + 'k> {
+pub struct OpComputeContext<'k, T: Float> {
     node: &'k Tensor<T>,
     xs: Vec<NdArrayView<'k, T>>,
 }
@@ -134,7 +131,7 @@ impl<'k, T: Float> OpComputeContext<'k, T> {
 
 struct NodeWithValue<'a, T: Float + 'a> {
     node: &'a Tensor<T>,
-    value: op::ComputeResult<T>,
+    value: op::ComputeResults<T>,
     // How many resources of this node does user requires.
     // When this is reduced to one, `value` is ready to be moved out (without copy).
     pending_count: usize,
@@ -142,7 +139,7 @@ struct NodeWithValue<'a, T: Float + 'a> {
 
 impl<'a, T: Float> Tensor<T> {
     #[inline]
-    fn with_value(&'a self, val: op::ComputeResult<T>) -> NodeWithValue<'a, T> {
+    fn with_value(&'a self, val: op::ComputeResults<T>) -> NodeWithValue<'a, T> {
         NodeWithValue {
             node: self,
             value: val,
@@ -151,7 +148,10 @@ impl<'a, T: Float> Tensor<T> {
     }
 }
 
-pub struct Feed<'k, T: Float>(&'k Tensor<T>, ndarray::ArrayView<'k, T, ndarray::IxDyn>);
+pub struct Feed<'k, 'v, T: Float>(
+    pub &'k Tensor<T>,
+    pub ndarray::ArrayView<'v, T, ndarray::IxDyn>,
+);
 
 /// Evaluates given symbolic tensors.
 ///
@@ -174,20 +174,16 @@ pub struct Feed<'k, T: Float>(&'k Tensor<T>, ndarray::ArrayView<'k, T, ndarray::
 /// assert_eq!(evaluated[0], Some(ndarray::arr1(&[0., 0.]).into_dyn()));
 /// assert_eq!(evaluated[1], Some(ndarray::arr1(&[1., 1.]).into_dyn()));
 /// ```
-// FIXME: Annoying lifetime params
-pub fn eval<'c, 'k, V, U, T: Float + 'k>(
-    tensors: &'c [V],  // output_storage などは
-    feeds: U,
+pub fn eval<'a, 'b, 'k: 'b, 'v: 'b, K, T: Float>(
+    tensors: &'a [K],
+    feeds: &'b [Feed<'k, 'v, T>],
 ) -> Vec<Option<NdArray<T>>>
 where
-    V: AsRef<Tensor<T>>,
-    U: IntoIterator<Item = Feed<'k, T>>,
+    K: AsRef<Tensor<T>>,
 {
     // Run graph
-    let feeds = feeds.into_iter().collect::<Vec<_>>();
-
-    let mut output_storage = eval_internal(
-        tensors.iter().map(|t| t.as_ref()).collect::<Vec<_>>().as_slice(), feeds.as_slice());
+    // let tensors = tensors.iter().map(|t| t.as_ref().clone()).collect::<Vec<Tensor<T>>>();
+    let mut output_storage = eval_internal(tensors, feeds);
 
     // Treat in-place or delegation ops
     let creators = tensors
@@ -217,7 +213,13 @@ where
                 Some(per.clone())
             } else if creator.is_placeholder {
                 // Rarely happens (case that a feed by user is required)
-                Some(find_fed_resource(creator, &feeds).to_owned())
+                let mut found = None;
+                for feed in feeds {
+                    if Rc::ptr_eq(feed.0, creator) {
+                        found = Some(feed.1.view());
+                    }
+                }
+                Some(found.expect("Placeholder unfilled.").to_owned())
             } else {
                 let res = match key2res.entry(creator.resource_lookup_key.get()) {
                     Entry::Occupied(mut ent) => {
@@ -244,10 +246,10 @@ where
 
 // Recursive function which seeks a node holding the x's resource.
 // Actual recursion "rarely" happens.
-fn find_resource_creator<'a, T: Float>(
+fn find_resource_creator<'k, T: Float>(
     storage: &ResourceStore<T>,
-    x: &'a Tensor<T>,
-) -> &'a Tensor<T> {
+    x: &'k Tensor<T>,
+) -> &'k Tensor<T> {
     match storage[x.resource_lookup_key.get()].value[0] {
         Err(::op::ComputeException::Delegate { to: i }) => {
             find_resource_creator(storage, &x.inputs[i])
@@ -268,44 +270,39 @@ fn map_err<'a, T: Float>(res: Result<NdArray<T>, ::op::ComputeException>) -> Opt
 type ResourceStore<'a, T> = Vec<NodeWithValue<'a, T>>;
 type FeedStore<'a, T> = Vec<NdArrayView<'a, T>>;
 
-#[inline]
-fn find_fed_resource<'c, 'k: 'c, T: Float>(
-    node: &'k Tensor<T>,
-    feeds: &'c [Feed<'k, T>],
-) -> NdArrayView<'c, T> {
-    // Linear search is suitable because the number of feeds are so small in most cases.
-    for feed in feeds {
-        if Rc::ptr_eq(feed.0, node) {
-            return feed.1.view();
-        }
-    }
-    panic!("Placeholder unfilled.");
-}
-
 // Evaluates "targets".
-fn eval_internal<'k, 'c, T: Float>(
-    targets: &'c [&'k Tensor<T>],
-    feeds: &[Feed<'k, T>],
+fn eval_internal<'d, 'k: 'd, 'v: 'd, K, T: Float>(
+    targets: &'k [K],
+    feeds: &'d [Feed<'k, 'v, T>],
 ) -> ResourceStore<'k, T>
+where
+    K: AsRef<Tensor<T>>,
 {
     let mut res_store: Vec<NodeWithValue<'k, T>> = Vec::new();
     let mut feed_store = Vec::new();
 
     // Obtain array resources while visiting nodes in topological order.
     // Stack-based depth-first-search is used to avoid stack overflow in explicit recursion.
-    let mut dfs_stack: Vec<(&Tensor<T>, bool)> = targets.iter().map(|&x| (x, false)).collect();
+    let mut dfs_stack: Vec<(&Tensor<T>, bool)> =
+        targets.iter().map(|x| (x.as_ref(), false)).collect();
     while let Some((node, is_parent)) = dfs_stack.pop() {
         if is_parent {
             // Visit this node
             if node.is_placeholder {
                 node.resource_lookup_key.set(feed_store.len());
-                // ここで return してる
-                feed_store.push(find_fed_resource(node, feeds));
+                let mut found = None;
+                for feed in feeds {
+                    if Rc::ptr_eq(feed.0, node) {
+                        found = Some(feed.1.view());
+                    }
+                }
+                feed_store.push(found.expect("Placeholder unfilled."));
             } else {
                 node.resource_lookup_key.set(res_store.len());
                 if !node.has_persistent_array() {
                     let y = {
-                        let in_nodes = OpComputeContext::_grab_inputs(node, &res_store, &feed_store);
+                        let in_nodes =
+                            OpComputeContext::_grab_inputs(node, &res_store, &feed_store);
                         if let Some(in_nodes_) = in_nodes {
                             let mut xs = Vec::with_capacity(in_nodes_.len());
                             for (value_index, x) in in_nodes_ {
@@ -314,16 +311,20 @@ fn eval_internal<'k, 'c, T: Float>(
                                 } else if x.is_placeholder {
                                     xs.push(feed_store[x.resource_lookup_key.get()].view())
                                 } else {
-                                    let tmp = res_store[x.resource_lookup_key.get()].value[value_index].as_ref().unwrap().view();
-                                    xs.push(tmp) // ノードのライフタイム
+                                    let tmp = res_store[x.resource_lookup_key.get()].value
+                                        [value_index]
+                                        .as_ref()
+                                        .unwrap()
+                                        .view();
+                                    xs.push(tmp)
                                 }
-
                             }
                             node.op.compute(OpComputeContext { node, xs })
                         } else {
                             vec![Err(::op::ComputeException::Delegate { to: 0 })]
                         }
                     };
+                    // ERR
                     res_store.push(node.with_value(y));
                 }
             }
@@ -341,7 +342,6 @@ fn eval_internal<'k, 'c, T: Float>(
                 }
             }
         }
-
     }
     res_store
 }
@@ -388,7 +388,7 @@ fn test_eval() {
     let ref v = ::ops::placeholder::<f32>(&[3, 2, 1]);
     let ref z = ::ops::reduce_sum(&::ops::squeeze(v, &[2]), &[0, 1], false);
     let ref g = ::ops::grad(&[z], &[v]);
-    let eval_result = &eval(g, &[(v, &::ndarray_ext::ones(&[3, 2, 1]))])[0];
+    let eval_result = &eval(g, &[Feed(v, ::ndarray_ext::ones(&[3, 2, 1]).view())])[0];
     assert_eq!(eval_result.as_ref().unwrap().shape(), &[3, 2, 1]);
 }
 
@@ -402,7 +402,7 @@ fn test_constant_eval() {
 fn test_placeholder_eval() {
     let arr = ::ndarray_ext::ones::<f32>(&[3, 2, 1]);
     let ref v = ::ops::placeholder(&[3, 2, 1]);
-    let eval_result = eval(&[v], &[(v, &arr)]);
+    let eval_result = eval(&[v], &[Feed(v, arr.view())]);
     assert_eq!(eval_result[0], Some(arr));
 }
 
@@ -411,7 +411,10 @@ fn test_eval_internal() {
     let ref v = ::ops::placeholder::<f32>(&[3, 2, 1]);
     let ref z = ::ops::squeeze(v, &[2]);
     let ref g = ::ops::grad_with_default(&[z], &[v], &[&::ones(&z.shape())]);
-    let storage = eval_internal(&vec![&g[0]], &vec![&(v, &::ndarray_ext::ones(&[3, 2, 1]))]);
+    let keys = vec![&g[0]];
+    let tmp = ::ndarray_ext::ones(&[3, 2, 1]);
+    let values = vec![Feed(v, tmp.view())];
+    let storage = eval_internal(keys.as_slice(), values.as_slice());
 
     assert_eq!(
         storage.iter().map(|x| x.node.op.name()).collect::<Vec<_>>(),

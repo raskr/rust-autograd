@@ -7,6 +7,7 @@ use std::f32;
 use std::mem;
 use std::slice;
 use tensor::Tensor;
+use uninitialized_vec;
 use Float;
 
 macro_rules! get_xw {
@@ -39,15 +40,6 @@ pub mod conv2d;
 pub mod conv2d_transpose;
 pub mod max_pool2d;
 
-#[inline]
-fn uninitialized_vec<T>(size: usize) -> Vec<T> {
-    let mut buf = Vec::with_capacity(size);
-    unsafe {
-        buf.set_len(size);
-    }
-    buf
-}
-
 #[test]
 fn test_conv_filter_grad() {
     use op::Op;
@@ -68,7 +60,7 @@ fn test_conv_filter_grad() {
 
     let ret = op.compute(::runtime::OpComputeContext::new(
         &::ops::zeros(&[0]), // dummy (not used)
-        vec![&x, &g, &w],
+        vec![x.view(), g.view(), w.view()],
     ));
 
     assert_eq!(w.shape(), ret[0].as_ref().unwrap().shape()); // (2, 3, 2, 2)
@@ -172,7 +164,8 @@ fn im2col_batch<T: Float>(
 
                         let mut cur_y = y_start;
 
-                        for _ in 0..edge1 {  // pad
+                        for _ in 0..edge1 {
+                            // pad
                             for _ in 0..yw {
                                 *ret = T::zero();
                                 ret = ret.offset(1);
@@ -182,7 +175,8 @@ fn im2col_batch<T: Float>(
 
                         for _ in edge1..edge2 {
                             let mut cur_x = x_start;
-                            for _ in 0..edge3 {  // pad
+                            for _ in 0..edge3 {
+                                // pad
                                 *ret = T::zero();
                                 ret = ret.offset(1);
                                 cur_x += sw;
@@ -192,7 +186,8 @@ fn im2col_batch<T: Float>(
                                 ret = ret.offset(1);
                                 cur_x += sw;
                             }
-                            for _ in edge4..yw {  // pad
+                            for _ in edge4..yw {
+                                // pad
                                 *ret = T::zero();
                                 ret = ret.offset(1);
                                 cur_x += sw;
@@ -200,7 +195,8 @@ fn im2col_batch<T: Float>(
                             cur_y += sh;
                         }
 
-                        for _ in edge2..yh {  // pad
+                        for _ in edge2..yh {
+                            // pad
                             for _ in 0..yw {
                                 *ret = T::zero();
                                 ret = ret.offset(1);

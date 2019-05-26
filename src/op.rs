@@ -4,7 +4,9 @@ use ndarray_ext::NdArray;
 use tensor::Tensor;
 use Float;
 
-pub type ComputeResult<T> = Vec<Result<NdArray<T>, ComputeException>>;
+pub type ComputeResults<T> = Vec<Result<NdArray<T>, ComputeException>>;
+
+//ComputeResult
 
 #[derive(Clone, Debug)]
 /// This is an `exception`, not an error.
@@ -44,7 +46,7 @@ pub enum ComputeException {
 ///         -> ag::op::ComputeResult<T>
 ///     {
 ///         let xs = ctx.grab_inputs();
-///         let x = xs[0];
+///         let x = &xs[0];
 ///         // Use `ndarray::Array::mapv` for element-wise computation.
 ///         let half = T::from(0.5).unwrap();
 ///         let y = x.mapv(|a| ((a * half).tanh() * half) + half);
@@ -74,7 +76,7 @@ pub trait Op<T: Float> {
     fn name(&self) -> &str;
 
     /// Runs this op.
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ComputeResult<T>;
+    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ComputeResults<T>;
 
     /// Returns symbolic gradients for input nodes by use of output gradient etc.
     ///
