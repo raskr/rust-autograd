@@ -1,6 +1,6 @@
 use super::*;
 use std::slice;
-use NdArray;
+use crate::NdArray;
 
 pub struct Conv2D {
     pub pad: usize,
@@ -70,12 +70,12 @@ macro_rules! slow_gemm {
     };
 }
 
-impl<T: Float> ::op::Op<T> for Conv2D {
+impl<T: Float> crate::op::Op<T> for Conv2D {
     fn name(&self) -> &str {
         "Conv2D"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ::op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> crate::op::ComputeResults<T> {
         // Grab inputs
         let xs = ctx.grab_inputs();
         let x = &xs[0];
@@ -252,7 +252,7 @@ impl<T: Float> ::op::Op<T> for Conv2D {
             },
         );
 
-        let cols = &::ops::nth_tensor(y, 1);
+        let cols = &crate::ops::nth_tensor(y, 1);
         let gw = Tensor::builder()
             .set_inputs(vec![cols, gy, w])
             .set_backprop_inputs(vec![x.clone(), gy.clone()])
@@ -266,12 +266,12 @@ impl<T: Float> ::op::Op<T> for Conv2D {
     }
 }
 
-impl<T: Float> ::op::Op<T> for Conv2DWithCols {
+impl<T: Float> crate::op::Op<T> for Conv2DWithCols {
     fn name(&self) -> &str {
         "Conv2DWithCols"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ::op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> crate::op::ComputeResults<T> {
         // Grab inputs
         let xs = ctx.grab_inputs();
         let cols = &xs[0];
@@ -387,12 +387,12 @@ impl<T: Float> ::op::Op<T> for Conv2DWithCols {
     }
 }
 
-impl<T: Float> ::op::Op<T> for Conv2DFilterGrad {
+impl<T: Float> crate::op::Op<T> for Conv2DFilterGrad {
     fn name(&self) -> &str {
         "Conv2DFilterGrad"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ::op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> crate::op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let cols = &xs[0]; // must be columns
         let gy = &xs[1];
@@ -519,7 +519,7 @@ fn test_tensor_size_after_convolution() {
 
 #[test]
 fn test_conv2d() {
-    use op::Op;
+    use crate::op::Op;
     let op = Conv2D {
         pad: 0,
         stride: 1,
@@ -531,12 +531,12 @@ fn test_conv2d() {
         .unwrap()
         .into_dyn();
 
-    let w = ::ndarray_ext::ones(&[
+    let w = crate::ndarray_ext::ones(&[
         /*out_ch=*/ 2, /*in_ch=*/ 2, /*row=*/ 2, /*col=*/ 2,
     ]);
 
-    let y = op.compute(::runtime::OpComputeContext::new(
-        &::ops::zeros(&[0]), // dummy (not used)
+    let y = op.compute(crate::runtime::OpComputeContext::new(
+        &crate::ops::zeros(&[0]), // dummy (not used)
         vec![x.view(), w.view()],
     ));
 

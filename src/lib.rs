@@ -150,17 +150,17 @@ pub fn same_type<A: 'static, B: 'static>() -> bool {
     TypeId::of::<A>() == TypeId::of::<B>()
 }
 
-pub use ndarray_ext::array_gen;
+pub use crate::ndarray_ext::array_gen;
 
-pub use ops::*;
+pub use crate::ops::*;
 
-pub use ops::gradient_descent_ops;
+pub use crate::ops::gradient_descent_ops;
 
-pub use ndarray_ext::NdArray;
+pub use crate::ndarray_ext::NdArray;
 
-pub use runtime::{eval, Eval, Feed};
+pub use crate::runtime::{eval, Eval, Feed};
 
-pub use tensor::Tensor;
+pub use crate::tensor::Tensor;
 
 #[inline]
 #[doc(hidden)]

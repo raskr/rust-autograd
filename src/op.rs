@@ -1,8 +1,8 @@
 extern crate ndarray;
 
-use ndarray_ext::NdArray;
-use tensor::Tensor;
-use Float;
+use crate::ndarray_ext::NdArray;
+use crate::tensor::Tensor;
+use crate::Float;
 
 pub type ComputeResults<T> = Vec<Result<NdArray<T>, ComputeException>>;
 
@@ -43,7 +43,7 @@ pub enum ComputeException {
 ///     // In this method, any errors caused by bad user-inputs should results in "panic".
 ///     // (`ag::op::ComputeException` represents an exception rather than an error.)
 ///     fn compute(&self, ctx: ag::runtime::OpComputeContext<T>)
-///         -> ag::op::ComputeResult<T>
+///         -> ag::op::ComputeResults<T>
 ///     {
 ///         let xs = ctx.grab_inputs();
 ///         let x = &xs[0];
@@ -76,7 +76,7 @@ pub trait Op<T: Float> {
     fn name(&self) -> &str;
 
     /// Runs this op.
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ComputeResults<T>;
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> ComputeResults<T>;
 
     /// Returns symbolic gradients for input nodes by use of output gradient etc.
     ///

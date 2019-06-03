@@ -1,11 +1,11 @@
 use ndarray;
-use ndarray_ext::{NdArray, NdArrayView};
-use op;
+use crate::ndarray_ext::{NdArray, NdArrayView};
+use crate::op;
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use std::rc::Rc;
-use tensor::Tensor;
-use Float;
+use crate::tensor::Tensor;
+use crate::Float;
 
 /// Helper structure for batched evaluation.
 ///
@@ -53,7 +53,7 @@ impl<'a, 'k: 'a, 'v: 'a, T: Float> Eval<'k, T> {
     /// Evaluates the buffered tensors.
     ///
     /// `feeds` is a stream of `(placeholder tensor, its value)`
-    pub fn run(&'k self, feeds: &'a [::runtime::Feed<'k, 'v, T>]) -> Vec<Option<NdArray<T>>> {
+    pub fn run(&'k self, feeds: &'a [crate::runtime::Feed<'k, 'v, T>]) -> Vec<Option<NdArray<T>>> {
         eval(&self.buf, feeds)
     }
 }
@@ -107,7 +107,7 @@ impl<'k, T: Float> OpComputeContext<'k, T> {
                 match store[x.resource_lookup_key.get()].value[value_index] {
                     Ok(_) => Some((value_index, x)),
                     // hoping for x.inputs[i] to have the value
-                    Err(::op::ComputeException::Delegate { to: i }) => {
+                    Err(crate::op::ComputeException::Delegate { to: i }) => {
                         recurse(&x.inputs[i], store, feed_store, x.input_indices[i])
                     }
                     _ => None, // None for hopeless errors
@@ -251,7 +251,7 @@ fn find_resource_creator<'k, T: Float>(
     x: &'k Tensor<T>,
 ) -> &'k Tensor<T> {
     match storage[x.resource_lookup_key.get()].value[0] {
-        Err(::op::ComputeException::Delegate { to: i }) => {
+        Err(crate::op::ComputeException::Delegate { to: i }) => {
             find_resource_creator(storage, &x.inputs[i])
         }
         _ => x,
@@ -259,10 +259,10 @@ fn find_resource_creator<'k, T: Float>(
 }
 
 #[inline]
-fn map_err<'a, T: Float>(res: Result<NdArray<T>, ::op::ComputeException>) -> Option<NdArray<T>> {
+fn map_err<'a, T: Float>(res: Result<NdArray<T>, crate::op::ComputeException>) -> Option<NdArray<T>> {
     match res {
         Ok(arr) => Some(arr),
-        Err(::op::ComputeException::NoOutput) => None,
+        Err(crate::op::ComputeException::NoOutput) => None,
         _ => unreachable!(),
     }
 }
@@ -321,7 +321,7 @@ where
                             }
                             node.op.compute(OpComputeContext { node, xs })
                         } else {
-                            vec![Err(::op::ComputeException::Delegate { to: 0 })]
+                            vec![Err(crate::op::ComputeException::Delegate { to: 0 })]
                         }
                     };
                     // ERR
@@ -385,34 +385,34 @@ fn finalize_resource_store<T: Float>(
 
 #[test]
 fn test_eval() {
-    let ref v = ::ops::placeholder::<f32>(&[3, 2, 1]);
-    let ref z = ::ops::reduce_sum(&::ops::squeeze(v, &[2]), &[0, 1], false);
-    let ref g = ::ops::grad(&[z], &[v]);
-    let eval_result = &eval(g, &[Feed(v, ::ndarray_ext::ones(&[3, 2, 1]).view())])[0];
+    let ref v = crate::ops::placeholder::<f32>(&[3, 2, 1]);
+    let ref z = crate::ops::reduce_sum(&crate::ops::squeeze(v, &[2]), &[0, 1], false);
+    let ref g = crate::ops::grad(&[z], &[v]);
+    let eval_result = &eval(g, &[Feed(v, crate::ndarray_ext::ones(&[3, 2, 1]).view())])[0];
     assert_eq!(eval_result.as_ref().unwrap().shape(), &[3, 2, 1]);
 }
 
 #[test]
 fn test_constant_eval() {
     let arr = ndarray::arr1(&[0., 0., 0.]);
-    assert_eq!(Some(arr.clone().into_dyn()), ::variable(arr).eval(&[]));
+    assert_eq!(Some(arr.clone().into_dyn()), crate::variable(arr).eval(&[]));
 }
 
 #[test]
 fn test_placeholder_eval() {
-    let arr = ::ndarray_ext::ones::<f32>(&[3, 2, 1]);
-    let ref v = ::ops::placeholder(&[3, 2, 1]);
+    let arr = crate::ndarray_ext::ones::<f32>(&[3, 2, 1]);
+    let ref v = crate::ops::placeholder(&[3, 2, 1]);
     let eval_result = eval(&[v], &[Feed(v, arr.view())]);
     assert_eq!(eval_result[0], Some(arr));
 }
 
 #[test]
 fn test_eval_internal() {
-    let ref v = ::ops::placeholder::<f32>(&[3, 2, 1]);
-    let ref z = ::ops::squeeze(v, &[2]);
-    let ref g = ::ops::grad_with_default(&[z], &[v], &[&::ones(&z.shape())]);
+    let ref v = crate::ops::placeholder::<f32>(&[3, 2, 1]);
+    let ref z = crate::ops::squeeze(v, &[2]);
+    let ref g = crate::ops::grad_with_default(&[z], &[v], &[&crate::ones(&z.shape())]);
     let keys = vec![&g[0]];
-    let tmp = ::ndarray_ext::ones(&[3, 2, 1]);
+    let tmp = crate::ndarray_ext::ones(&[3, 2, 1]);
     let values = vec![Feed(v, tmp.view())];
     let storage = eval_internal(keys.as_slice(), values.as_slice());
 

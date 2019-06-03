@@ -1,23 +1,23 @@
 extern crate ndarray;
 
-use ndarray_ext::NdArray;
+use crate::ndarray_ext::NdArray;
 use std::cell::Cell;
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
-use tensor::Tensor;
-use Float;
+use crate::tensor::Tensor;
+use crate::Float;
 
 struct AdamOp<T: Float> {
     static_params: StaticParams<T>,
     t: Cell<T>,
 }
 
-impl<T: Float> ::op::Op<T> for AdamOp<T> {
+impl<T: Float> crate::op::Op<T> for AdamOp<T> {
     fn name(&self) -> &str {
         "Adam"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ::op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> crate::op::ComputeResults<T> {
         let StaticParams { alpha, eps, b1, b2 } = self.static_params;
         let xs = ctx.grab_inputs();
         let t = self.t.get();
@@ -50,13 +50,13 @@ impl<T: Float> ::op::Op<T> for AdamOp<T> {
 
         // Update t and params
         unsafe {
-            ::ndarray_ext::axpy(&xs[0], -alpha, m_hat.as_ptr(), m_hat.shape()); // variable
-            ::ndarray_ext::assign(&xs[2], new_m.as_ptr(), new_m.shape());
-            ::ndarray_ext::assign(&xs[3], new_v.as_ptr(), new_v.shape());
+            crate::ndarray_ext::axpy(&xs[0], -alpha, m_hat.as_ptr(), m_hat.shape()); // variable
+            crate::ndarray_ext::assign(&xs[2], new_m.as_ptr(), new_m.shape());
+            crate::ndarray_ext::assign(&xs[3], new_v.as_ptr(), new_v.shape());
             self.t.set(t + T::one());
         }
 
-        vec![Err(::op::ComputeException::NoOutput)]
+        vec![Err(crate::op::ComputeException::NoOutput)]
     }
 
     fn grad(&self, _: &Tensor<T>, _: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
@@ -102,8 +102,8 @@ impl<T: Float> Adam<T> {
                     match var2state.entry(super::StateKey(var)) {
                         Entry::Vacant(ent) => {
                             let inserted = ent.insert(StatefulParams {
-                                m: ::ops::variable(NdArray::zeros(var_arr.shape())),
-                                v: ::ops::variable(NdArray::zeros(var_arr.shape())),
+                                m: crate::ops::variable(NdArray::zeros(var_arr.shape())),
+                                v: crate::ops::variable(NdArray::zeros(var_arr.shape())),
                             });
                             StatefulVariable {
                                 var,

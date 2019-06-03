@@ -1,11 +1,11 @@
-use ops;
+use crate::ops;
 use std::cmp::Ordering;
 use std::collections::binary_heap::BinaryHeap;
 use std::fmt;
 use std::mem;
 use std::rc::Rc;
-use tensor::Tensor;
-use Float;
+use crate::tensor::Tensor;
+use crate::Float;
 
 struct GradInfo<'a, T: Float + 'a> {
     node: &'a Tensor<T>, // information of this node
@@ -118,9 +118,9 @@ fn mark_gradient_path<'a, T: Float>(
 fn test_gradient_path() {
     // dummy graph
     // y = 3 * x1 * x1 + 5 * x2 + x3;
-    let ref x1 = ::ops::placeholder(&[]);
-    let ref x2 = ::ops::placeholder(&[]);
-    let ref x3 = ::ops::placeholder(&[]);
+    let ref x1 = crate::ops::placeholder(&[]);
+    let ref x2 = crate::ops::placeholder(&[]);
+    let ref x3 = crate::ops::placeholder(&[]);
     let ref a = 3. * x1; // rank 1
     let ref b = a * x1; // rank 2
     let ref c = 5. * x2; // rank 1
@@ -329,7 +329,7 @@ fn accumulate_grads_if_needed<T: Float>(grads: &mut Vec<Tensor<T>>) {
     if grads.len() > 1 {
         let mut acc = {
             let refs = grads.iter().map(|a| a).collect::<Vec<_>>();
-            ::ops::add_n(refs.as_slice())
+            crate::ops::add_n(refs.as_slice())
         };
         mem::swap(&mut acc, &mut grads[0]);
         grads.truncate(1)

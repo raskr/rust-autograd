@@ -12,12 +12,12 @@ pub struct Conv2DTransposeFilterGrad {
     pub dilation: usize,
 }
 
-impl<T: Float> ::op::Op<T> for Conv2DTranspose {
+impl<T: Float> crate::op::Op<T> for Conv2DTranspose {
     fn name(&self) -> &str {
         "Conv2DTranspose"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ::op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> crate::op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
 
         let gy = &xs[0]; // (batch, ych, yh, yw)
@@ -157,7 +157,7 @@ impl<T: Float> ::op::Op<T> for Conv2DTranspose {
             });
 
         let gw = Tensor::builder()
-            .set_inputs(vec![gy, x, &::ops::stop_gradient(w)])
+            .set_inputs(vec![gy, x, &crate::ops::stop_gradient(w)])
             .build(Conv2DTransposeFilterGrad {
                 pad: self.pad,
                 stride: self.stride,
@@ -168,12 +168,12 @@ impl<T: Float> ::op::Op<T> for Conv2DTranspose {
     }
 }
 
-impl<T: Float> ::op::Op<T> for Conv2DTransposeFilterGrad {
+impl<T: Float> crate::op::Op<T> for Conv2DTransposeFilterGrad {
     fn name(&self) -> &str {
         "Conv2DTransposeFilterGrad"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ::op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> crate::op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let gy = &xs[0];
         let x = &xs[1];
@@ -312,7 +312,7 @@ fn test_tensor_size_after_convolution_t() {
 
 #[test]
 fn test_deconv() {
-    use op::Op;
+    use crate::op::Op;
     let op = Conv2DTranspose {
         pad: 0,
         stride: 1,
@@ -324,15 +324,15 @@ fn test_deconv() {
     let (xh, xw) = (3, 3);
     let batch_size = 2;
 
-    let w = ::ndarray_ext::ones::<f32>(&[ych, xch, kh, kw]);
-    let g = ::ndarray_ext::ones(&[batch_size, ych, yh, yw]);
+    let w = crate::ndarray_ext::ones::<f32>(&[ych, xch, kh, kw]);
+    let g = crate::ndarray_ext::ones(&[batch_size, ych, yh, yw]);
 
-    let ret = op.compute(::runtime::OpComputeContext::new(
-        &::ops::zeros(&[0]), // dummy (not used)
+    let ret = op.compute(crate::runtime::OpComputeContext::new(
+        &crate::ops::zeros(&[0]), // dummy (not used)
         vec![g.view(), w.view()],
     ));
 
-    let x = ::ndarray_ext::ones::<f32>(&[batch_size, xch, xh, xw]);
+    let x = crate::ndarray_ext::ones::<f32>(&[batch_size, xch, xh, xw]);
     assert_eq!(x.shape(), ret[0].as_ref().unwrap().shape());
 
     assert_eq!(

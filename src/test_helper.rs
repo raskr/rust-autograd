@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 use std::collections::btree_set::BTreeSet;
-use tensor::Tensor;
-use {Feed, Float};
+use crate::tensor::Tensor;
+use crate::{Feed, Float};
 
 /// Checks the validity of `gradients` with finite difference trick.
 /// For this test only, `variables` must be "shared" variables.
@@ -17,7 +17,7 @@ pub fn check_theoretical_grads<'k, 'v, A, T>(
     T: Float,
 {
     // backprop
-    let theoretical_grads = ::runtime::eval(gradients, feeds.clone());
+    let theoretical_grads = crate::runtime::eval(gradients, feeds.clone());
 
     // for each variable nodes
     for (var_node, th_grad) in variables.iter().zip(theoretical_grads) {

@@ -1,12 +1,12 @@
 use ndarray;
-use ndarray_ext::NdArray;
-use op;
+use crate::ndarray_ext::NdArray;
+use crate::op;
 #[cfg(feature = "mkl")]
 use same_type;
 #[cfg(feature = "mkl")]
 use std::mem;
-use tensor::Tensor;
-use Float;
+use crate::tensor::Tensor;
+use crate::Float;
 
 #[cfg(feature = "mkl")]
 type MklInt = i64;
@@ -471,7 +471,7 @@ impl<T: Float> op::Op<T> for MatMul {
         "MatMul"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let x0 = &xs[0];
         let x1 = &xs[1];
@@ -551,7 +551,7 @@ impl<T: Float> op::Op<T> for BatchMatMul {
         "BatchMatMul"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let x0 = &xs[0];
         let x1 = &xs[1];

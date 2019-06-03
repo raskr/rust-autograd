@@ -1,9 +1,9 @@
 extern crate ndarray;
 
-use ndarray_ext::{ArrRng, NdArray};
+use crate::ndarray_ext::{ArrRng, NdArray};
 use rand::Rng;
-use tensor::{ArrayLike, Tensor};
-use Float;
+use crate::tensor::{ArrayLike, Tensor};
+use crate::Float;
 
 mod activation_ops;
 mod array_ops;
@@ -87,7 +87,7 @@ impl<T: Float> Tensor<T> {
 ///
 /// ```
 pub fn grad<T: Float>(ys: &[&Tensor<T>], xs: &[&Tensor<T>]) -> Vec<Tensor<T>> {
-    ::gradient::symbolic_gradients(ys, xs, &vec![None; ys.len()])
+    crate::gradient::symbolic_gradients(ys, xs, &vec![None; ys.len()])
 }
 
 /// Returns gradient tensors wrt input tensors.
@@ -109,7 +109,7 @@ pub fn grad_with_default<T: Float>(
     xs: &[&Tensor<T>],
     output_grads: &[&Tensor<T>],
 ) -> Vec<Tensor<T>> {
-    ::gradient::symbolic_gradients(
+    crate::gradient::symbolic_gradients(
         ys,
         xs,
         output_grads
@@ -150,7 +150,7 @@ pub fn jacobians<T: Float>(
     let vec_vec = (0..objective_len as isize)
         .map(|i| {
             // For each scalar objective, computes gradients for all variables
-            ::gradient::symbolic_gradients(&[&y.get(i)], xs, &[None])
+            crate::gradient::symbolic_gradients(&[&y.get(i)], xs, &[None])
         })
         .collect::<Vec<Vec<_>>>();
 
@@ -176,7 +176,7 @@ pub fn _hessian_vector_product<T: Float>(
     vectors: &[&Tensor<T>],
 ) -> Vec<Tensor<T>> {
     let grads =
-        ::gradient::symbolic_gradients(ys, xs, &xs.iter().map(|_| None).collect::<Vec<_>>());
+        crate::gradient::symbolic_gradients(ys, xs, &xs.iter().map(|_| None).collect::<Vec<_>>());
 
     let products = grads
         .iter()
@@ -186,7 +186,7 @@ pub fn _hessian_vector_product<T: Float>(
 
     let products = products.iter().map(|a| a).collect::<Vec<_>>();
 
-    ::gradient::symbolic_gradients(products.as_slice(), xs, &[None])
+    crate::gradient::symbolic_gradients(products.as_slice(), xs, &[None])
 }
 
 /// Stops gradient propagation.
@@ -219,7 +219,7 @@ pub fn stop_gradient<A: AsRef<Tensor<T>>, T: Float>(x: A) -> Tensor<T> {
 pub fn variable<T: Float, D: ndarray::Dimension>(arr: ndarray::Array<T, D>) -> Tensor<T> {
     let arr = arr.into_dyn();
     Tensor::builder()
-        .set_shape(convert_to_tensor(::ndarray_ext::shape_of(&arr)))
+        .set_shape(convert_to_tensor(crate::ndarray_ext::shape_of(&arr)))
         .set_variable_array(arr)
         .build(basic_source_ops::Variable)
 }
@@ -275,7 +275,7 @@ where
 {
     let arr = arr.into_dyn();
     Tensor::builder()
-        .set_shape(convert_to_tensor(::ndarray_ext::shape_of(&arr)))
+        .set_shape(convert_to_tensor(crate::ndarray_ext::shape_of(&arr)))
         .set_constant_array(arr)
         .build(basic_source_ops::Const)
 }
@@ -468,7 +468,7 @@ fn infer_bin_op_shape<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>>(
 }
 
 #[inline]
-fn bin_op_helper<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>, O: ::op::Op<T> + 'static>(
+fn bin_op_helper<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>, O: crate::op::Op<T> + 'static>(
     a: A,
     b: B,
     op: O,
@@ -1831,7 +1831,7 @@ where
 pub fn scalar<T: Float>(val: T) -> Tensor<T> {
     let op = const_gen_ops::Scalar { val };
     Tensor::builder()
-        .set_shape(convert_to_tensor(::ndarray_ext::scalar_shape()))
+        .set_shape(convert_to_tensor(crate::ndarray_ext::scalar_shape()))
         .build(op)
 }
 
@@ -2003,7 +2003,7 @@ where
     let arr = arr.into_dyn();
     let shape = {
         let op = const_gen_ops::ConvertToTensor {
-            arr: ::ndarray_ext::shape_of(&arr),
+            arr: crate::ndarray_ext::shape_of(&arr),
         };
         Tensor::builder().build(op)
     };

@@ -1,23 +1,23 @@
-use op;
-use tensor::Tensor;
-use Float;
+use crate::op;
+use crate::tensor::Tensor;
+use crate::Float;
 
 struct SGDOp<T: Float> {
     pub lr: T,
 }
 
-impl<T: Float> ::op::Op<T> for SGDOp<T> {
+impl<T: Float> crate::op::Op<T> for SGDOp<T> {
     fn name(&self) -> &str {
         "SGD"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let grad = &xs[1];
         unsafe {
-            ::ndarray_ext::axpy(&xs[0], -self.lr, grad.as_ptr(), grad.shape());
+            crate::ndarray_ext::axpy(&xs[0], -self.lr, grad.as_ptr(), grad.shape());
         }
-        vec![Err(::op::ComputeException::NoOutput)]
+        vec![Err(crate::op::ComputeException::NoOutput)]
     }
 
     fn grad(&self, _: &Tensor<T>, _: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {

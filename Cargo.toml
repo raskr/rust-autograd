@@ -2,6 +2,7 @@
 name = "autograd"
 version = "0.9.1"
 authors = ["raskr <janne.dc.ib.sa@gmail.com>"]
+edition = "2018"
 
 repository = "https://github.com/raskr/rust-autograd"
 keywords = ["numerics", "machine-learning", "ndarray", "multidimensional", "neural-network"]

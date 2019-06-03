@@ -1,5 +1,5 @@
 use ndarray;
-use Float;
+use crate::Float;
 
 pub type NdArray<T> = ndarray::Array<T, ndarray::IxDyn>;
 
@@ -8,7 +8,7 @@ pub type NdArrayView<'a, T> = ndarray::ArrayView<'a, T, ndarray::IxDyn>;
 pub type NdArrayViewMut<'a, T> = ndarray::ArrayViewMut<'a, T, ndarray::IxDyn>;
 
 /// exposes array_gen
-pub use array_gen::*;
+pub use crate::array_gen::*;
 
 #[inline]
 pub fn arr_to_shape<T: Float>(arr: &NdArrayView<T>) -> Vec<usize> {

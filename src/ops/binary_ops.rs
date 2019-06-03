@@ -2,12 +2,12 @@
 /// +=, -=, *=, /= are provided as methods of ops::inplace_*.
 /// *=, /= don't propagate gradients.
 use ndarray;
-use ndarray_ext::{NdArray, NdArrayView};
-use op;
-use ops;
+use crate::ndarray_ext::{NdArray, NdArrayView};
+use crate::op;
+use crate::ops;
 use std::mem;
-use tensor::Tensor;
-use Float;
+use crate::tensor::Tensor;
+use crate::Float;
 
 pub struct AddOp;
 pub struct SubOp;
@@ -28,20 +28,20 @@ impl<T: Float> op::Op<T> for PreprocessBinOpGrad {
     // Computes x's gradient.
     // Involves reduction as necessary.
     // Inputs: [gy, target_shape]
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let gy = &xs[0];
-        let x_shape_ = ::ndarray_ext::vec_as_shape(&xs[1]);
+        let x_shape_ = crate::ndarray_ext::vec_as_shape(&xs[1]);
         let x_shape = x_shape_.as_slice();
         let gy_shape = gy.shape();
 
         let ret = if x_shape == gy_shape {
             // The case where forward path didn't cause broadcast.
-            Err(::op::ComputeException::Delegate { to: 0 })
+            Err(crate::op::ComputeException::Delegate { to: 0 })
         } else {
             // Broadcast occurred. We need reduction of `gy`.
             // First, handle the case where x is scalar.
-            let x_is_scalar = ::ndarray_ext::is_scalar_shape(x_shape);
+            let x_is_scalar = crate::ndarray_ext::is_scalar_shape(x_shape);
             let x_shape = if x_is_scalar {
                 vec![1; gy_shape.len()]
             } else {
@@ -66,7 +66,7 @@ impl<T: Float> op::Op<T> for PreprocessBinOpGrad {
                             mem::swap(&mut folded, &mut Some(ret));
                         } else {
                             // Expands squashed axis.
-                            mem::swap(&mut folded, &mut Some(::ndarray_ext::expand_dims(ret, i)));
+                            mem::swap(&mut folded, &mut Some(crate::ndarray_ext::expand_dims(ret, i)));
                         }
                     } else {
                         panic!("{}'s axis {} don't broadcast", ctx.grab_input_node(0), i);
@@ -98,18 +98,18 @@ impl<T: Float> op::Op<T> for PreprocessBinOpGradGrad {
         "PreprocessBinOpGradGrad"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let gy = xs[0].view();
         let target_shape_ = &xs[1];
-        let target_shape_ = ::ndarray_ext::vec_as_shape(target_shape_);
+        let target_shape_ = crate::ndarray_ext::vec_as_shape(target_shape_);
         let target_shape = target_shape_.as_slice();
 
         if gy.shape() == target_shape {
-            return vec![Err(::op::ComputeException::Delegate { to: 0 })];
+            return vec![Err(crate::op::ComputeException::Delegate { to: 0 })];
         }
 
-        let gy_is_scalar = ::ndarray_ext::is_scalar_shape(gy.shape());
+        let gy_is_scalar = crate::ndarray_ext::is_scalar_shape(gy.shape());
 
         let ret = {
             let mut gy = gy;
@@ -117,7 +117,7 @@ impl<T: Float> op::Op<T> for PreprocessBinOpGradGrad {
             // make broadcast dims if needed
             if gy_is_scalar {
                 for &axis in target_shape.iter() {
-                    gy = ::ndarray_ext::expand_dims_view(gy, axis);
+                    gy = crate::ndarray_ext::expand_dims_view(gy, axis);
                 }
             }
 
@@ -145,7 +145,7 @@ impl<T: Float> op::Op<T> for AddOp {
         "Add"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         add_forward(&xs[0], &xs[1])
     }
@@ -161,7 +161,7 @@ impl<T: Float> op::Op<T> for SubOp {
         "Sub"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let x0 = &xs[0];
         let x1 = &xs[1];
@@ -187,7 +187,7 @@ impl<T: Float> op::Op<T> for MulOp {
         "Mul"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         mul_forward(&xs[0], &xs[1])
     }
@@ -205,7 +205,7 @@ impl<T: Float> op::Op<T> for DivOp {
         "Div"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let x0 = &xs[0];
         let x1 = &xs[1];
@@ -334,7 +334,7 @@ fn preprocess_gy<T: Float>(
 
 macro_rules! impl_bin_op_forward {
     ($forward_name:ident, $bin_op:tt) => {
-        fn $forward_name<T: Float>(x0: &NdArrayView<T>, x1: &NdArrayView<T>) -> op::ComputeResult<T>
+        fn $forward_name<T: Float>(x0: &NdArrayView<T>, x1: &NdArrayView<T>) -> op::ComputeResults<T>
         {
             let shape0: &[usize]  = x0.shape();
             let shape1: &[usize]  = x1.shape();

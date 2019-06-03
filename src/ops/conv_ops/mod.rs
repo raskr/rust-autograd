@@ -1,14 +1,14 @@
 use ndarray;
-use ndarray_ext::NdArray;
+use crate::ndarray_ext::NdArray;
 #[allow(unused_imports)]
 use rayon::iter::*;
-use same_type;
+use crate::same_type;
 use std::f32;
 use std::mem;
 use std::slice;
-use tensor::Tensor;
-use uninitialized_vec;
-use Float;
+use crate::tensor::Tensor;
+use crate::uninitialized_vec;
+use crate::Float;
 
 macro_rules! get_xw {
     ($op:expr, $yw:expr, $kw:expr) => {
@@ -42,7 +42,7 @@ pub mod max_pool2d;
 
 #[test]
 fn test_conv_filter_grad() {
-    use op::Op;
+    use crate::op::Op;
     let op = conv2d::Conv2DFilterGrad {
         pad: 0,
         stride: 1,
@@ -54,12 +54,12 @@ fn test_conv_filter_grad() {
     let (yh, yw) = (2, 2);
     let batch_size = 2;
 
-    let x = ::ndarray_ext::ones::<f32>(&[batch_size, yh, yw, kh, kw, xch]);
-    let g = ::ndarray_ext::ones(&[batch_size, ych, yh, yw]);
-    let w = ::ndarray_ext::ones(&[ych, xch, kh, kw]);
+    let x = crate::ndarray_ext::ones::<f32>(&[batch_size, yh, yw, kh, kw, xch]);
+    let g = crate::ndarray_ext::ones(&[batch_size, ych, yh, yw]);
+    let w = crate::ndarray_ext::ones(&[ych, xch, kh, kw]);
 
-    let ret = op.compute(::runtime::OpComputeContext::new(
-        &::ops::zeros(&[0]), // dummy (not used)
+    let ret = op.compute(crate::runtime::OpComputeContext::new(
+        &crate::ops::zeros(&[0]), // dummy (not used)
         vec![x.view(), g.view(), w.view()],
     ));
 

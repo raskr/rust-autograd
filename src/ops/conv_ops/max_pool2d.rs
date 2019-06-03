@@ -1,5 +1,5 @@
 use super::*;
-use tensor::Tensor;
+use crate::tensor::Tensor;
 
 pub struct MaxPool2D {
     pub pad: usize,
@@ -164,12 +164,12 @@ impl_max_pool_grad!(f64, max_pool_grad_f64);
 impl_max_pool_grad_grad!(f32, max_pool_grad_grad_f32);
 impl_max_pool_grad_grad!(f64, max_pool_grad_grad_f64);
 
-impl<T: Float> ::op::Op<T> for MaxPool2D {
+impl<T: Float> crate::op::Op<T> for MaxPool2D {
     fn name(&self) -> &str {
         "MaxPool"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ::op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> crate::op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let x = &xs[0];
         let x_shape = x.shape();
@@ -217,7 +217,7 @@ impl<T: Float> ::op::Op<T> for MaxPool2D {
     }
 
     fn grad(&self, gy: &Tensor<T>, _: &[&Tensor<T>], y: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
-        let indices = ::ops::nth_tensor(y, 1);
+        let indices = crate::ops::nth_tensor(y, 1);
         let gx = Tensor::builder()
             .set_inputs(vec![&gy, &indices])
             .build(MaxPool2DGrad {
@@ -231,7 +231,7 @@ impl<T: Float> ::op::Op<T> for MaxPool2D {
 
 #[test]
 fn test_max_pool2d() {
-    use op::Op;
+    use crate::op::Op;
 
     let op = MaxPool2D {
         pad: 0,
@@ -239,8 +239,8 @@ fn test_max_pool2d() {
         size: 2,
     };
     let x = vec![0., 1., 2., 5., 4., 3., 6., 7., 8.];
-    let y = op.compute(::runtime::OpComputeContext::new(
-        &::zeros(&[0]),
+    let y = op.compute(crate::runtime::OpComputeContext::new(
+        &crate::zeros(&[0]),
         vec![NdArray::from_shape_vec(ndarray::IxDyn(&[1, 1, 3, 3]), x)
             .unwrap()
             .view()],
@@ -255,12 +255,12 @@ fn test_max_pool2d() {
     );
 }
 
-impl<T: Float> ::op::Op<T> for MaxPool2DGrad {
+impl<T: Float> crate::op::Op<T> for MaxPool2DGrad {
     fn name(&self) -> &str {
         "MaxPoolGrad"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ::op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> crate::op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let gy = &xs[0];
         let argmax = &xs[1];
@@ -314,12 +314,12 @@ impl<T: Float> ::op::Op<T> for MaxPool2DGrad {
     }
 }
 
-impl<T: Float> ::op::Op<T> for MaxPool2DGradGrad {
+impl<T: Float> crate::op::Op<T> for MaxPool2DGradGrad {
     fn name(&self) -> &str {
         "MaxPoolGradGrad"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> ::op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> crate::op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let ggx = &xs[0];
         let x_shape = ggx.shape();

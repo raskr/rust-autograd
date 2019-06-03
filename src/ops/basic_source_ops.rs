@@ -1,11 +1,11 @@
-use op;
-use tensor::Tensor;
-use Float;
+use crate::op;
+use crate::tensor::Tensor;
+use crate::Float;
 
 macro_rules! impl_op {
     ($name:ident) => {
         pub struct $name;
-        impl<T: Float> ::op::Op<T> for $name {
+        impl<T: Float> crate::op::Op<T> for $name {
             fn name(&self) -> &str {
                 stringify!($name)
             }
@@ -19,7 +19,7 @@ macro_rules! impl_op {
                 unreachable!()
             }
 
-            fn compute(&self, _: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+            fn compute(&self, _: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
                 unreachable!()
             }
         }

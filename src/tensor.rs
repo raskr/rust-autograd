@@ -1,9 +1,9 @@
-use binary_ops::{AddOp, DivOp, MulOp, SubOp};
-use op;
-use ops;
-use Float;
-use Int;
-use NdArray;
+use crate::binary_ops::{AddOp, DivOp, MulOp, SubOp};
+use crate::op;
+use crate::ops;
+use crate::Float;
+use crate::Int;
+use crate::NdArray;
 
 use std::cell::Cell;
 use std::fmt;
@@ -103,10 +103,10 @@ pub struct TensorBuilder<T: Float> {
 
 #[test]
 fn test_build() {
-    let ref a: Tensor<f32> = ::zeros(&[4, 2]);
-    let ref v: Tensor<f32> = ::zeros(&[2, 3]);
-    let ref b: Tensor<f32> = ::zeros(&[4, 3]);
-    let ref z = ::matmul(a, v) + b;
+    let ref a: Tensor<f32> = crate::zeros(&[4, 2]);
+    let ref v: Tensor<f32> = crate::zeros(&[2, 3]);
+    let ref b: Tensor<f32> = crate::zeros(&[4, 3]);
+    let ref z = crate::matmul(a, v) + b;
     let mut vars = [a, v, b, z];
     // `sort_by_key` don't reverse the order of `a` and `v`
     vars.sort_by_key(|a| a.top_rank);
@@ -226,8 +226,8 @@ impl<T: Float> Tensor<T> {
     /// Evaluates this tensor as an ndarray's array object.
     ///
     /// See [eval](../fn.eval.html).
-    pub fn eval<'k, 'v>(&'k self, feeds: &'v [::runtime::Feed<'k, 'v, T>]) -> Option<NdArray<T>> {
-        ::runtime::eval(&[self], feeds).remove(0)
+    pub fn eval<'k, 'v>(&'k self, feeds: &'v [crate::runtime::Feed<'k, 'v, T>]) -> Option<NdArray<T>> {
+        crate::runtime::eval(&[self], feeds).remove(0)
     }
 
     /// Returns the (symbolic) shape of this tensor.
@@ -235,21 +235,21 @@ impl<T: Float> Tensor<T> {
     /// See [shape](../ops/fn.shape.html).
     #[inline]
     pub fn shape(&self) -> Tensor<T> {
-        ::ops::shape(self)
+        crate::ops::shape(self)
     }
 
     /// Returns the (symbolic) rank of this tensor.
     ///
     /// See [rank](../ops/fn.rank.html).
     pub fn rank(&self) -> Tensor<T> {
-        ::ops::rank(self)
+        crate::ops::rank(self)
     }
 
     /// Returns the (symbolic) size of this tensor.
     ///
     /// See [size](../ops/fn.size.html).
     pub fn size(&self) -> Tensor<T> {
-        ::ops::size(self)
+        crate::ops::size(self)
     }
 
     #[doc(hidden)]
@@ -362,7 +362,7 @@ macro_rules! impl_bin_op_between_tensor_and_float_trait {
                 Tensor::builder()
                     .set_inputs(vec![&self, &ops::scalar(rhs)])
                     .set_shape(self.shape())
-                    .build(::binary_ops::$op)
+                    .build(crate::binary_ops::$op)
             }
         }
 
@@ -373,7 +373,7 @@ macro_rules! impl_bin_op_between_tensor_and_float_trait {
                 Tensor::builder()
                     .set_inputs(vec![&self, &ops::scalar(rhs)])
                     .set_shape(self.shape())
-                    .build(::binary_ops::$op)
+                    .build(crate::binary_ops::$op)
             }
         }
     };

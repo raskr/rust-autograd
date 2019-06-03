@@ -1,10 +1,10 @@
 use ndarray;
 use ndarray::Zip;
-use ndarray_ext::{NdArray, NdArrayView};
-use op;
-use ops;
-use tensor::Tensor;
-use Float;
+use crate::ndarray_ext::{NdArray, NdArrayView};
+use crate::op;
+use crate::ops;
+use crate::tensor::Tensor;
+use crate::Float;
 
 pub struct Sin;
 pub struct Cos;
@@ -83,15 +83,15 @@ macro_rules! impl_cmp_op {
                 stringify!($struct_name)
             }
 
-            fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
+            fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
                 let xs = ctx.grab_inputs();
                 let x0 = &xs[0];
                 let x1 = &xs[1];
                 let shape0 = x0.shape();
                 let shape1 = x1.shape();
 
-                let x0_is_scalar = ::ndarray_ext::is_scalar_shape(shape0);
-                let x1_is_scalar = ::ndarray_ext::is_scalar_shape(shape1);
+                let x0_is_scalar = crate::ndarray_ext::is_scalar_shape(shape0);
+                let x1_is_scalar = crate::ndarray_ext::is_scalar_shape(shape1);
 
                 let ret = if x0_is_scalar && x1_is_scalar {
                     let x1_elem = x1[ndarray::IxDyn(&[])];
@@ -202,7 +202,7 @@ impl<T: Float> op::Op<T> for Abs {
         "Abs"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         vec![Ok(xs[0].map(|x| x.abs()))]
     }
@@ -217,7 +217,7 @@ impl<T: Float> op::Op<T> for NegOp {
         "Neg"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         vec![Ok(xs[0].map(|x| x.neg()))]
     }
@@ -232,7 +232,7 @@ impl<T: Float> op::Op<T> for Square {
         "Square"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         vec![Ok(xs[0].map(|&x| x * x))]
     }
@@ -248,7 +248,7 @@ impl<T: Float> op::Op<T> for Reciprocal {
         "Reciprocal"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         vec![Ok(xs[0].map(|x| x.recip()))]
     }
@@ -263,7 +263,7 @@ impl<T: Float> op::Op<T> for Sign {
         "Sign"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         vec![Ok(xs[0].mapv(|x| {
             if x == T::zero() {
@@ -284,7 +284,7 @@ impl<T: Float> op::Op<T> for Floor {
         "Floor"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         vec![Ok(xs[0].map(|x| x.floor()))]
     }
@@ -299,7 +299,7 @@ impl<T: Float> op::Op<T> for Ceil {
         "Ceil"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         vec![Ok(xs[0].map(|x| x.ceil()))]
     }
@@ -314,7 +314,7 @@ impl<T: Float> op::Op<T> for Transpose {
         "Transpose"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let perm = &xs[1];
         assert!(perm.len() >= 2);
@@ -444,7 +444,7 @@ impl<T: Float> op::Op<T> for LogSumExp {
         "LogSumExp"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let x = &ctx.grab_inputs()[0];
         vec![Ok(logsumexp_forward(x, self.axis, self.keep_dims))]
     }
@@ -463,7 +463,7 @@ impl<T: Float> op::Op<T> for Pow<T> {
         "Pow"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let x0 = &ctx.grab_inputs()[0];
         let a = self.a;
         vec![Ok(x0.map(move |x| x.powf(a)))]
@@ -481,7 +481,7 @@ impl<T: Float> op::Op<T> for Sqrt {
         "Sqrt"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let x0 = &ctx.grab_inputs()[0];
         vec![Ok(x0.map(|a| a.sqrt()))]
     }
@@ -499,7 +499,7 @@ impl<T: Float> op::Op<T> for Log<T> {
         "Log"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let x = &ctx.grab_inputs()[0];
         vec![Ok(x.map(move |a| a.log(self.a)))]
     }
@@ -514,7 +514,7 @@ impl<T: Float> op::Op<T> for Exp {
         "Exp"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let x = &ctx.grab_inputs()[0];
         vec![Ok(x.map(|a| a.exp()))]
     }
@@ -529,7 +529,7 @@ impl<T: Float> op::Op<T> for Atanh {
         "Atanh"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let x = &ctx.grab_inputs()[0];
         vec![Ok(x.map(|a| a.atanh()))]
     }
@@ -547,7 +547,7 @@ impl<T: Float> op::Op<T> for Acosh {
         "Acosh"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let x = &ctx.grab_inputs()[0];
         vec![Ok(x.map(|a| a.acosh()))]
     }
@@ -565,7 +565,7 @@ impl<T: Float> op::Op<T> for Asinh {
         "Asinh"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let x = &ctx.grab_inputs()[0];
         vec![Ok(x.map(|a| a.asinh()))]
     }
@@ -583,7 +583,7 @@ impl<T: Float> op::Op<T> for Tanh {
         "Tanh"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let x = &ctx.grab_inputs()[0];
         vec![Ok(x.map(|a| a.tanh()))]
     }
@@ -598,7 +598,7 @@ impl<T: Float> op::Op<T> for Cosh {
         "Cosh"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let x = &ctx.grab_inputs()[0];
         vec![Ok(x.map(|a| a.cosh()))]
     }
@@ -613,7 +613,7 @@ impl<T: Float> op::Op<T> for Sinh {
         "Sinh"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let x = &ctx.grab_inputs()[0];
         vec![Ok(x.map(|a| a.sinh()))]
     }
@@ -628,7 +628,7 @@ impl<T: Float> op::Op<T> for Atan {
         "Atan"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let x = &ctx.grab_inputs()[0];
         vec![Ok(x.map(|a| a.atan()))]
     }
@@ -645,7 +645,7 @@ impl<T: Float> op::Op<T> for Acos {
         "Acos"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let x = &ctx.grab_inputs()[0];
         vec![Ok(x.map(|a| a.acos()))]
     }
@@ -662,7 +662,7 @@ impl<T: Float> op::Op<T> for Asin {
         "Asin"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let x = &ctx.grab_inputs()[0];
         vec![Ok(x.map(|a| a.asin()))]
     }
@@ -679,7 +679,7 @@ impl<T: Float> op::Op<T> for Sin {
         "Sin"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let x = &ctx.grab_inputs()[0];
         vec![Ok(x.map(|a| a.sin()))]
     }
@@ -694,7 +694,7 @@ impl<T: Float> op::Op<T> for Cos {
         "Cos"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let x = &ctx.grab_inputs()[0];
         vec![Ok(x.map(|a| a.cos()))]
     }
@@ -709,7 +709,7 @@ impl<T: Float> op::Op<T> for Tan {
         "Tan"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let x = &ctx.grab_inputs()[0];
         vec![Ok(x.map(|a| a.tan()))]
     }

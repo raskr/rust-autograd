@@ -8,8 +8,8 @@ pub use self::adam::Adam;
 pub use self::sgd::SGD;
 
 use std::cmp::{Eq, Ordering, PartialEq};
-use tensor::Tensor;
-use Float;
+use crate::tensor::Tensor;
+use crate::Float;
 
 /// Key to access a state tensor.
 /// Stateful optimizers use this.

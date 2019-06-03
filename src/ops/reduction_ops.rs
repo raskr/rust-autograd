@@ -1,12 +1,12 @@
 use ndarray;
-use ndarray_ext;
-use ndarray_ext::{NdArray, NdArrayView};
-use op;
-use ops;
+use crate::ndarray_ext;
+use crate::ndarray_ext::{NdArray, NdArrayView};
+use crate::op;
+use crate::ops;
 use std::f32;
 use std::mem;
-use tensor::Tensor;
-use Float;
+use crate::tensor::Tensor;
+use crate::Float;
 
 pub struct ReduceMin {
     pub keep_dims: bool,
@@ -49,7 +49,7 @@ macro_rules! impl_reduce_forward {
             x: &NdArrayView<T>,
             mut axes: Vec<usize>,
             keep_dims: bool,
-        ) -> Result<NdArray<T>, ::op::ComputeException> {
+        ) -> Result<NdArray<T>, crate::op::ComputeException> {
             let x_shape = x.shape();
 
             if ndarray_ext::is_scalar_shape(x_shape) {
@@ -58,7 +58,7 @@ macro_rules! impl_reduce_forward {
             } else {
                 // reduction axes are empty => do nothing
                 if axes.is_empty() {
-                    return Err(::op::ComputeException::Delegate { to: 0 });
+                    return Err(crate::op::ComputeException::Delegate { to: 0 });
                 }
 
                 // -- main logic --
@@ -117,7 +117,7 @@ impl<T: Float> op::Op<T> for ReduceSum {
         "ReduceSum"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let x = &xs[0];
         let axes = preprocess_axes(x, &xs[1], self.sparse_axes);
@@ -141,13 +141,13 @@ impl<T: Float> op::Op<T> for ReduceMean {
         "ReduceMean"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let x = &xs[0];
         let axes = preprocess_axes(x, &xs[1], self.sparse_axes);
         let x_shape = x.shape();
         if axes.is_empty() {
-            return vec![Err(::op::ComputeException::Delegate { to: 0 })];
+            return vec![Err(crate::op::ComputeException::Delegate { to: 0 })];
         }
 
         // Make reduction_len
@@ -195,7 +195,7 @@ impl<T: Float> op::Op<T> for ReduceProd {
         "ReduceProd"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let x = &xs[0];
         let axes = preprocess_axes(x, &xs[1], self.sparse_axes);
@@ -226,7 +226,7 @@ impl<T: Float> op::Op<T> for ReduceMin {
         "ReduceMin"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let x = &xs[0];
         let axes = preprocess_axes(x, &xs[1], self.sparse_axes);
@@ -248,7 +248,7 @@ impl<T: Float> op::Op<T> for ReduceMax {
         "ReduceMax"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let x = &xs[0];
         let axes = preprocess_axes(x, &xs[1], self.sparse_axes);
@@ -298,7 +298,7 @@ impl<T: Float> op::Op<T> for ArgMax {
     }
 
     // cf. https://github.com/tensorflow/compiler/tf2xla/kernels/index_ops.cc
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         let x = &xs[0];
         let axis = ndarray_ext::normalize_negative_axis(self.axis, x.ndim());
@@ -373,14 +373,14 @@ impl<T: Float> op::Op<T> for ReduceGradCommon {
         "ReduceGradCommon"
     }
 
-    fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
         let xs = ctx.grab_inputs();
         //  broadcast `gy` into `target_shape`
         let gy = &xs[0];
         let target_shape = ndarray_ext::vec_as_shape(&xs[1]); // x's shape
 
         if gy.shape() == target_shape.as_slice() {
-            return vec![Err(::op::ComputeException::Delegate { to: 0 })];
+            return vec![Err(crate::op::ComputeException::Delegate { to: 0 })];
         }
 
         let x_is_scalar = ndarray_ext::is_scalar_shape(gy.shape());
