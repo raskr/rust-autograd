@@ -66,8 +66,14 @@ fn main() {
                 let update_ops: &[Tensor] = &adam.compute_updates(params, grads);
 
                 let i = *i as isize;
-                let x_batch = x_train.slice(s![i..i + batch_size, ..]).to_owned();
-                let y_batch = y_train.slice(s![i..i + batch_size, ..]).to_owned();
+                let x_batch = x_train
+                    .slice(s![i..i + batch_size, ..])
+                    .to_owned()
+                    .into_dyn();
+                let y_batch = y_train
+                    .slice(s![i..i + batch_size, ..])
+                    .to_owned()
+                    .into_dyn();
                 ag::eval(update_ops, &[(&x, &x_batch), (&y, &y_batch)]);
             }
         });

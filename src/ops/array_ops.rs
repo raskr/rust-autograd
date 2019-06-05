@@ -1,4 +1,5 @@
 use ndarray;
+use ndarray::SliceOrIndex;
 use ndarray_ext;
 use ndarray_ext::NdArray;
 use op;
@@ -13,11 +14,11 @@ pub struct ExpandDims;
 pub struct Squeeze;
 
 pub struct Slice {
-    pub indices: Box<[ndarray::Si]>,
+    pub indices: Box<[ndarray::Slice]>,
 }
 
 pub struct SliceGrad {
-    pub indices: Box<[ndarray::Si]>,
+    pub indices: Box<[ndarray::Slice]>,
 }
 
 pub struct Split {
@@ -409,16 +410,27 @@ impl<T: Float> op::Op<T> for GatherGrad {
             let i = i.to_isize().unwrap();
             // get gx's sub view
             let gx_sliced = gx.slice_mut(
-                (0..param.ndim())
-                    .map(|dim| {
-                        if dim == axis {
-                            ndarray::Si(i, Some(i + 1), 1) // squeezed later
-                        } else {
-                            ndarray::Si(0, None, 1)
-                        }
-                    })
-                    .collect::<Vec<_>>()
-                    .as_slice(),
+                ndarray::SliceInfo::<_, ndarray::IxDyn>::new(
+                    (0..param.ndim())
+                        .map(|dim| {
+                            if dim == axis {
+                                ndarray::SliceOrIndex::Slice {
+                                    start: i,
+                                    end: Some(i + 1),
+                                    step: 1,
+                                }
+                            } else {
+                                ndarray::SliceOrIndex::Slice {
+                                    start: 0,
+                                    end: None,
+                                    step: 1,
+                                }
+                            }
+                        })
+                        .collect::<Vec<_>>(),
+                )
+                .unwrap()
+                .as_ref(),
             );
 
             // squeeze
@@ -582,16 +594,26 @@ impl<T: Float> op::Op<T> for ConcatGrad {
             .map(move |_axis| {
                 if _axis == axis {
                     // partial region
-                    ndarray::Si(start_idx as isize, Some(region_len), 1)
+                    ndarray::SliceOrIndex::Slice {
+                        start: start_idx as isize,
+                        end: Some(region_len),
+                        step: 1,
+                    }
                 } else {
                     // full slice
-                    ndarray::Si(0, None, 1)
+                    ndarray::SliceOrIndex::Slice {
+                        start: 0,
+                        end: None,
+                        step: 1,
+                    }
                 }
             })
-            .collect::<Vec<ndarray::Si>>();
+            .collect::<Vec<_>>();
 
         // do slice
-        vec![Ok(gy.slice(&*indices).to_owned())]
+        vec![Ok(gy
+            .slice(ndarray::SliceInfo::new(indices).unwrap().as_ref())
+            .to_owned())]
     }
 
     fn grad(&self, _: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
@@ -649,7 +671,9 @@ impl<T: Float> op::Op<T> for Split {
         let start_index = self.sizes[..self.index].iter().cloned().sum::<usize>() as isize;
         let end_index = start_index + self.sizes[self.index] as isize;
         let indices = make_indices_split(x, start_index, end_index, axis);
-        vec![Ok(x.slice(indices.as_slice()).to_owned())]
+        vec![Ok(x
+            .slice(ndarray::SliceInfo::new(indices).unwrap().as_ref())
+            .to_owned())]
     }
 
     fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
@@ -687,8 +711,12 @@ impl<T: Float> op::Op<T> for SplitGrad {
         let end_index = start_index + self.sizes[self.index] as isize;
         let indices = make_indices_split(x, start_index, end_index, axis);
 
-        gx.slice_mut(indices.as_slice())
-            .zip_mut_with(gy, |a, &g| *a = g);
+        gx.slice_mut(
+            ndarray::SliceInfo::<_, ndarray::IxDyn>::new(indices)
+                .unwrap()
+                .as_ref(),
+        )
+        .zip_mut_with(gy, |a, &g| *a = g);
         vec![Ok(gx)]
     }
 
@@ -703,19 +731,27 @@ fn make_indices_split<T: Float>(
     start_index: isize,
     end_index: isize,
     axis: usize,
-) -> Vec<ndarray::Si> {
+) -> Vec<ndarray::SliceOrIndex> {
     let ndim = x.ndim();
     assert!(ndim > axis, "Wrong split axis");
     (0..ndim)
         .map(|i| {
             if i == axis {
-                ndarray::Si(start_index, Some(end_index), 1)
+                ndarray::SliceOrIndex::Slice {
+                    start: start_index,
+                    end: Some(end_index),
+                    step: 1,
+                }
             } else {
                 // full slice
-                ndarray::Si(0, None, 1)
+                ndarray::SliceOrIndex::Slice {
+                    start: 0,
+                    end: None,
+                    step: 1,
+                }
             }
         })
-        .collect::<Vec<ndarray::Si>>()
+        .collect::<Vec<_>>()
 }
 
 impl<T: Float> op::Op<T> for Slice {
@@ -725,7 +761,19 @@ impl<T: Float> op::Op<T> for Slice {
 
     fn compute(&self, ctx: ::runtime::OpComputeContext<T>) -> op::ComputeResult<T> {
         let xs = ctx.grab_inputs();
-        let y: NdArray<T> = xs[0].slice(&*self.indices).to_owned();
+        let y: NdArray<T> = xs[0]
+            .slice(
+                ndarray::SliceInfo::new(
+                    &*self
+                        .indices
+                        .iter()
+                        .map(|&si| SliceOrIndex::from(si))
+                        .collect::<Vec<_>>(),
+                )
+                .unwrap()
+                .as_ref(),
+            )
+            .to_owned();
         // TODO: for now, if the size of last axis is 1, removing it.
         let last_axis = y.ndim() - 1;
         let ret = if y.shape()[last_axis] == 1 {
@@ -759,8 +807,18 @@ impl<T: Float> op::Op<T> for SliceGrad {
         let gy = xs[1];
         let mut gx = NdArray::zeros(x.shape());
         // sliced view
-        gx.slice_mut(&*self.indices)
-            .zip_mut_with(&gy, |a, &g| *a = g);
+        gx.slice_mut(
+            ndarray::SliceInfo::<_, ndarray::IxDyn>::new(
+                &*self
+                    .indices
+                    .iter()
+                    .map(|&si| ndarray::SliceOrIndex::from(si))
+                    .collect::<Vec<_>>(),
+            )
+            .unwrap()
+            .as_ref(),
+        )
+        .zip_mut_with(&gy, |a, &g| *a = g);
         vec![Ok(gx)]
     }
 

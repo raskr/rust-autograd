@@ -1671,8 +1671,8 @@ pub fn slice<T: Float, A: AsRef<Tensor<T>>>(x: A, starts: &[isize], ends: &[isiz
     let starts_ends = starts.iter().zip(ends.iter());
 
     let indices = starts_ends
-        .map(|(s, e)| ndarray::Si(*s, if *e == -1 { None } else { Some(*e) }, 1))
-        .collect::<Vec<ndarray::Si>>();
+        .map(|(s, e)| ndarray::Slice::new(*s, if *e == -1 { None } else { Some(*e) }, 1))
+        .collect::<Vec<ndarray::Slice>>();
 
     let op = array_ops::Slice {
         indices: indices.into_boxed_slice(),
