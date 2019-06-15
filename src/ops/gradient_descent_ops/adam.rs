@@ -28,17 +28,29 @@ impl<T: Float> crate::op::Op<T> for AdamOp<T> {
         // Make new m
         let new_m = {
             let tmp = T::one() - b1;
-            let mut new_m = xs[2].mapv(move |x2_elem| x2_elem * b1);
-            new_m.zip_mut_with(&xs[1], move |a, &g| *a += tmp * g);
-            new_m
+            unsafe {
+                if let Some(arr) = ctx.node(2).get_persistent_array_mut() {
+                    arr.zip_mut_with(&xs[1], move |x2_elem, &g| {
+                        *x2_elem = *x2_elem * b1 + tmp * g
+                    });
+                }
+            }
+            // m is not empty
+            ctx.node(2).get_persistent_array().unwrap()
         };
 
         // Make new v
         let new_v = {
-            let mut new_v = xs[3].mapv(move |x3_elem| x3_elem * b2);
             let tmp = T::one() - b2;
-            new_v.zip_mut_with(&xs[1], move |a, &g| *a += tmp * g * g);
-            new_v
+            unsafe {
+                if let Some(arr) = ctx.node(3).get_persistent_array_mut() {
+                    arr.zip_mut_with(&xs[1], move |x3_elem, &g| {
+                        *x3_elem = *x3_elem * b2 + tmp * g * g
+                    });
+                }
+            }
+            // v is not empty
+            ctx.node(3).get_persistent_array().unwrap()
         };
 
         // Make hat
@@ -51,13 +63,13 @@ impl<T: Float> crate::op::Op<T> for AdamOp<T> {
             m_hat
         };
 
-        // Update t and params
+        // Update t and variable
         unsafe {
-            crate::ndarray_ext::axpy(&xs[0], -alpha, m_hat.as_ptr(), m_hat.shape()); // variable
-            crate::ndarray_ext::assign(&xs[2], new_m.as_ptr(), new_m.shape());
-            crate::ndarray_ext::assign(&xs[3], new_v.as_ptr(), new_v.shape());
-            self.t.set(t + T::one());
+            if let Some(arr) = ctx.node(0).get_persistent_array_mut() {
+                arr.zip_mut_with(&m_hat, move |l, &r| *l -= alpha * r);
+            }
         }
+        self.t.set(t + T::one());
 
         vec![Err(crate::op::ComputeException::NoOutput)]
     }
