@@ -449,9 +449,7 @@ fn concat() {
     let ref v2 = ag::variable(ag::ndarray_ext::standard_normal(&[1, 2]));
     let ref z = ag::concat(&[v1, v2], 1);
     let ref g = ag::grad_with_default(&[z], &[v1], &[&ag::ones(&z.shape())]);
-    ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v1], &[], 1e-3, 1e-3);
-    // FIXME: uncommenting below causes SEGV
-    // ag::helper::gradient_check(z, &[v1, v2], g.as_slice(), &ag::Input::new(), 1e-3, 1e-3);
+    ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v1, v2], &[], 1e-3, 1e-3);
 }
 
 #[test]
@@ -593,6 +591,15 @@ fn max_pool2d_grad() {
     let ref g = ag::grad_with_default(&[y], &[x], &[gy])[0];
     let ref gg = ag::grad_with_default(&[g], &[gy], &[&ag::ones(&g.shape())])[0];
     ag::test_helper::check_theoretical_grads(g, &[gg], &[gy], &[], 1e-3, 1e-2);
+}
+
+#[test]
+fn tensordot() {
+    let ref a = ag::variable(ag::ndarray_ext::standard_normal(&[3, 4, 5]));
+    let ref b = ag::constant(ag::ndarray_ext::standard_normal(&[4, 3, 2]));
+    let ref c = ag::tensordot(a, b, &[1, 0], &[0, 1]);
+    let ref g = ag::grad_with_default(&[c], &[a], &[&ag::ones(&c.shape())]);
+    ag::test_helper::check_theoretical_grads(c, g, &[a], &[], 1e-3, 1e-2);
 }
 
 #[test]

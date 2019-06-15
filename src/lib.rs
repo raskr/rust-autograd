@@ -59,6 +59,7 @@
 //! # }
 //! ```
 #[allow(unused_imports)]
+// Expose to prevent version conflict
 #[macro_use(s)]
 pub extern crate ndarray;
 #[cfg(feature = "mkl")]
@@ -70,6 +71,7 @@ extern crate num;
 extern crate num_traits;
 extern crate rand;
 extern crate rayon;
+extern crate slab;
 
 #[macro_use]
 #[doc(hidden)]
@@ -161,6 +163,10 @@ pub use crate::ndarray_ext::NdArray;
 pub use crate::runtime::{eval, Eval, Feed};
 
 pub use crate::tensor::Tensor;
+
+pub use crate::ops::Hook;
+
+pub use crate::ndarray_ext::ArrRepr;
 
 #[inline]
 #[doc(hidden)]

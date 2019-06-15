@@ -1,7 +1,7 @@
-use std::cmp::Ordering;
-use std::collections::btree_set::BTreeSet;
 use crate::tensor::Tensor;
 use crate::{Feed, Float};
+use std::cmp::Ordering;
+use std::collections::btree_set::BTreeSet;
 
 /// Checks the validity of `gradients` with finite difference trick.
 /// For this test only, `variables` must be "shared" variables.
@@ -21,7 +21,7 @@ pub fn check_theoretical_grads<'k, 'v, A, T>(
 
     // for each variable nodes
     for (var_node, th_grad) in variables.iter().zip(theoretical_grads) {
-        let mut v_arr = unsafe {
+        let v_arr = unsafe {
             var_node
                 .get_persistent_array_mut()
                 .expect("This is not a variable")

@@ -1,11 +1,10 @@
-use ndarray;
 use crate::ndarray_ext::{NdArray, NdArrayView};
 use crate::op;
-use std::collections::btree_map::Entry;
-use std::collections::BTreeMap;
-use std::rc::Rc;
 use crate::tensor::Tensor;
 use crate::Float;
+use ndarray;
+use std::mem;
+use std::rc::Rc;
 
 /// Helper structure for batched evaluation.
 ///
@@ -29,7 +28,7 @@ pub struct Eval<'k, T: Float> {
     buf: Vec<&'k Tensor<T>>,
 }
 
-impl<'a, 'k: 'a, 'v: 'a, T: Float> Eval<'k, T> {
+impl<'c, 'k: 'c, 'v: 'c, T: Float> Eval<'k, T> {
     /// Instantiates a new evaluation session.
     pub fn new() -> Self {
         Eval { buf: Vec::new() }
@@ -53,104 +52,84 @@ impl<'a, 'k: 'a, 'v: 'a, T: Float> Eval<'k, T> {
     /// Evaluates the buffered tensors.
     ///
     /// `feeds` is a stream of `(placeholder tensor, its value)`
-    pub fn run(&'k self, feeds: &'a [crate::runtime::Feed<'k, 'v, T>]) -> Vec<Option<NdArray<T>>> {
+    pub fn run(&'k self, feeds: &'c [crate::runtime::Feed<'k, 'v, T>]) -> Vec<Option<NdArray<T>>> {
         eval(&self.buf, feeds)
     }
 }
 
 // Context in evaluation of `node`
-pub struct OpComputeContext<'k, T: Float> {
-    node: &'k Tensor<T>,
-    xs: Vec<NdArrayView<'k, T>>,
+pub struct OpComputeContext<'v, T: Float> {
+    nodes: Vec<Tensor<T>>,
+    xs: Vec<NdArrayView<'v, T>>,
 }
 
-impl<'k, T: Float> OpComputeContext<'k, T> {
+impl<'v, T: Float> OpComputeContext<'v, T> {
     #[inline]
-    pub fn new(node: &'k Tensor<T>, xs: Vec<NdArrayView<'k, T>>) -> Self {
-        OpComputeContext { node, xs }
+    pub fn new(nodes: Vec<Tensor<T>>, xs: Vec<NdArrayView<'v, T>>) -> Self {
+        OpComputeContext { nodes, xs }
     }
 
     #[inline]
-    pub fn get_node(&self) -> &Tensor<T> {
-        &self.node
+    pub fn node(&self, idx: usize) -> &Tensor<T> {
+        &self.nodes[idx]
     }
 
     #[inline]
-    pub fn grab_inputs(&self) -> &[NdArrayView<'k, T>] {
+    pub fn grab_inputs(&self) -> &[NdArrayView<'v, T>] {
         self.xs.as_slice()
     }
+}
 
+#[derive(Clone, Copy)]
+enum ValueType {
+    Owned,
+    View,
+    NoOutput,
+}
+
+struct ValueInfo<T: Float> {
+    ty: ValueType,
+    // key to lookup the value
+    key: usize,
+    // Owned array
+    value: Option<NdArray<T>>,
+}
+
+impl<T: Float> ValueInfo<T> {
     #[inline]
-    pub fn grab_input_node(&self, i: usize) -> &Tensor<T> {
-        &self.node.inputs[i]
-    }
-
-    // Internal of `grab_inputs`.
-    // Grabs input arrays for `node`'s evaluation.
-    // Returns "None" when failed to aggregate even one of input arrays.
-    fn _grab_inputs(
-        node: &'k Tensor<T>,
-        store: &ResourceStore<'k, T>,
-        feed_store: &FeedStore<'k, T>,
-    ) -> Option<Vec<(usize, &'k Tensor<T>)>> {
-        fn recurse<'k, 'v, T: Float>(
-            x: &'k Tensor<T>,
-            store: &ResourceStore<'k, T>,
-            feed_store: &FeedStore<'v, T>,
-            value_index: usize,
-        ) -> Option<(usize, &'k Tensor<T>)> {
-            if let Some(_) = x.get_persistent_array() {
-                Some((value_index, x))
-            } else if x.is_placeholder {
-                Some((value_index, x))
-            } else {
-                match store[x.resource_lookup_key.get()].value[value_index] {
-                    Ok(_) => Some((value_index, x)),
-                    // hoping for x.inputs[i] to have the value
-                    Err(crate::op::ComputeException::Delegate { to: i }) => {
-                        recurse(&x.inputs[i], store, feed_store, x.input_indices[i])
-                    }
-                    _ => None, // None for hopeless errors
-                }
-            }
+    fn new(ty: ValueType, key: usize) -> ValueInfo<T> {
+        ValueInfo {
+            ty,
+            key,
+            value: None,
         }
-
-        let input_nodes = &node.inputs;
-        let mut input_arrays = Vec::with_capacity(input_nodes.len());
-        for (x, &i) in input_nodes.into_iter().zip(node.input_indices.iter()) {
-            if let Some(res) = recurse(x, store, feed_store, i) {
-                input_arrays.push(res);
-            } else {
-                // Early return
-                return None;
-            }
-        }
-        Some(input_arrays)
     }
 }
 
-struct NodeWithValue<'a, T: Float + 'a> {
-    node: &'a Tensor<T>,
-    value: op::ComputeResults<T>,
-    // How many resources of this node does user requires.
-    // When this is reduced to one, `value` is ready to be moved out (without copy).
-    pending_count: usize,
+struct NodeWithValueInfo<'k, T: Float> {
+    node: &'k Tensor<T>,
+    info_list: Vec<ValueInfo<T>>,
+    contains_no_output: bool,
 }
 
-impl<'a, T: Float> Tensor<T> {
+impl<'k, T: Float> Tensor<T> {
     #[inline]
-    fn with_value(&'a self, val: op::ComputeResults<T>) -> NodeWithValue<'a, T> {
-        NodeWithValue {
+    fn with_value_info(
+        &'k self,
+        info_list: Vec<ValueInfo<T>>,
+        contains_no_output: bool,
+    ) -> NodeWithValueInfo<'k, T> {
+        NodeWithValueInfo {
             node: self,
-            value: val,
-            pending_count: 0,
+            info_list,
+            contains_no_output,
         }
     }
 }
 
-pub struct Feed<'k, 'v, T: Float>(
-    pub &'k Tensor<T>,
-    pub ndarray::ArrayView<'v, T, ndarray::IxDyn>,
+pub struct Feed<'k, 'f, T: Float>(
+    pub &'k Tensor<T>,                             // a placeholder tensor
+    pub ndarray::ArrayView<'f, T, ndarray::IxDyn>, // its value
 );
 
 /// Evaluates given symbolic tensors.
@@ -174,213 +153,181 @@ pub struct Feed<'k, 'v, T: Float>(
 /// assert_eq!(evaluated[0], Some(ndarray::arr1(&[0., 0.]).into_dyn()));
 /// assert_eq!(evaluated[1], Some(ndarray::arr1(&[1., 1.]).into_dyn()));
 /// ```
-pub fn eval<'a, 'b, 'k: 'b, 'v: 'b, K, T: Float>(
-    tensors: &'a [K],
-    feeds: &'b [Feed<'k, 'v, T>],
+#[allow(mutable_transmutes, unused_mut)]
+pub fn eval<'c, 'k: 'c, 'f: 'c, K, T>(
+    tensors: &'k [K],
+    feeds: &'c [Feed<'k, 'f, T>],
 ) -> Vec<Option<NdArray<T>>>
 where
     K: AsRef<Tensor<T>>,
+    T: Float,
 {
-    // Run graph
-    // let tensors = tensors.iter().map(|t| t.as_ref().clone()).collect::<Vec<Tensor<T>>>();
-    let mut output_storage = eval_internal(tensors, feeds);
+    let mut node_info_storage: Vec<NodeWithValueInfo<T>> = Vec::new();
+    let mut owned_storage: Vec<NdArray<T>> = Vec::new();
 
-    // Treat in-place or delegation ops
-    let creators = tensors
-        .iter()
-        .map(|x| {
-            let x = x.as_ref();
-            let creator = if x.is_placeholder || x.has_persistent_array() {
-                x
-            } else {
-                let creator = find_resource_creator(&output_storage, x);
-                output_storage[creator.resource_lookup_key.get()].pending_count += 1;
-                creator
-            };
-            creator
-        })
-        .collect::<Vec<&Tensor<T>>>();
+    {
+        let mut view_storage: Vec<NdArrayView<T>> = Vec::new();
+        let mut feed_store: Vec<NdArrayView<'f, T>> = Vec::new();
 
-    // Shrink to fit (output_storage is moved)
-    let mut key2res: BTreeMap<usize, NodeWithValue<T>> = finalize_resource_store(output_storage);
+        let mut dfs_stack: Vec<(&Tensor<T>, bool)> =
+            tensors.iter().map(|x| (x.as_ref(), false)).collect();
 
-    // Aggregate return values
-    creators
-        .iter()
-        .map(|ref creator| {
-            if let Some(per) = creator.get_persistent_array() {
-                // Rarely happens (case that a persistent array given by user is required)
-                Some(per.clone())
-            } else if creator.is_placeholder {
-                // Rarely happens (case that a feed by user is required)
-                let mut found = None;
-                for feed in feeds {
-                    if Rc::ptr_eq(feed.0, creator) {
-                        found = Some(feed.1.view());
-                    }
-                }
-                Some(found.expect("Placeholder unfilled.").to_owned())
-            } else {
-                let res = match key2res.entry(creator.resource_lookup_key.get()) {
-                    Entry::Occupied(mut ent) => {
-                        if ent.get().pending_count == 1 {
-                            // move out the resource.
-                            let mut got = ent.remove();
-                            // Using first item of the compute result
-                            map_err(got.value.remove(0))
-                        } else {
-                            // "clone" the resource.
-                            let mut got = ent.get_mut();
-                            got.pending_count -= 1;
-                            // Using first item of the compute result
-                            map_err(got.value[0].clone())
+        // Obtain array resources while visiting nodes in topological order.
+        // Stack-based depth-first-search is used to avoid stack overflow in explicit recursion.
+        while let Some((node, is_parent)) = dfs_stack.pop() {
+            if is_parent {
+                // Visit this node
+                if node.is_placeholder {
+                    node.resource_lookup_key.set(feed_store.len());
+                    let mut found = None;
+                    for feed in feeds {
+                        if Rc::ptr_eq(feed.0, node) {
+                            found = Some(feed.1.clone());
+                            break;
                         }
                     }
-                    _ => unreachable!(),
-                };
-                res
-            }
-        })
-        .collect()
-}
-
-// Recursive function which seeks a node holding the x's resource.
-// Actual recursion "rarely" happens.
-fn find_resource_creator<'k, T: Float>(
-    storage: &ResourceStore<T>,
-    x: &'k Tensor<T>,
-) -> &'k Tensor<T> {
-    match storage[x.resource_lookup_key.get()].value[0] {
-        Err(crate::op::ComputeException::Delegate { to: i }) => {
-            find_resource_creator(storage, &x.inputs[i])
-        }
-        _ => x,
-    }
-}
-
-#[inline]
-fn map_err<'a, T: Float>(res: Result<NdArray<T>, crate::op::ComputeException>) -> Option<NdArray<T>> {
-    match res {
-        Ok(arr) => Some(arr),
-        Err(crate::op::ComputeException::NoOutput) => None,
-        _ => unreachable!(),
-    }
-}
-
-type ResourceStore<'a, T> = Vec<NodeWithValue<'a, T>>;
-type FeedStore<'a, T> = Vec<NdArrayView<'a, T>>;
-
-// Evaluates "targets".
-fn eval_internal<'d, 'k: 'd, 'v: 'd, K, T: Float>(
-    targets: &'k [K],
-    feeds: &'d [Feed<'k, 'v, T>],
-) -> ResourceStore<'k, T>
-where
-    K: AsRef<Tensor<T>>,
-{
-    let mut res_store: Vec<NodeWithValue<'k, T>> = Vec::new();
-    let mut feed_store = Vec::new();
-
-    // Obtain array resources while visiting nodes in topological order.
-    // Stack-based depth-first-search is used to avoid stack overflow in explicit recursion.
-    let mut dfs_stack: Vec<(&Tensor<T>, bool)> =
-        targets.iter().map(|x| (x.as_ref(), false)).collect();
-    while let Some((node, is_parent)) = dfs_stack.pop() {
-        if is_parent {
-            // Visit this node
-            if node.is_placeholder {
-                node.resource_lookup_key.set(feed_store.len());
-                let mut found = None;
-                for feed in feeds {
-                    if Rc::ptr_eq(feed.0, node) {
-                        found = Some(feed.1.view());
+                    unsafe {
+                        mem::transmute::<_, &mut Vec<_>>(&feed_store)
+                            .push(found.expect("Placeholder unfilled."))
                     }
-                }
-                feed_store.push(found.expect("Placeholder unfilled."));
-            } else {
-                node.resource_lookup_key.set(res_store.len());
-                if !node.has_persistent_array() {
-                    let y = {
-                        let in_nodes =
-                            OpComputeContext::_grab_inputs(node, &res_store, &feed_store);
-                        if let Some(in_nodes_) = in_nodes {
-                            let mut xs = Vec::with_capacity(in_nodes_.len());
-                            for (value_index, x) in in_nodes_ {
-                                if let Some(per) = x.get_persistent_array() {
-                                    xs.push(per.view());
-                                } else if x.is_placeholder {
-                                    xs.push(feed_store[x.resource_lookup_key.get()].view())
+                } else {
+                    node.resource_lookup_key.set(node_info_storage.len());
+                    if !node.has_persistent_array() {
+                        let mut err = None;
+                        let mut xs = Vec::with_capacity(node.inputs.len());
+
+                        for (x, &i) in node.inputs.iter().zip(&node.input_indices) {
+                            if let Some(per) = x.get_persistent_array() {
+                                xs.push(per.view());
+                            } else if x.is_placeholder {
+                                xs.push(feed_store[x.resource_lookup_key.get()].view());
+                            } else {
+                                // need computed outputs
+                                let k = x.resource_lookup_key.get();
+                                if node_info_storage[k].contains_no_output {
+                                    err = Some(vec![Err(op::ComputeException::NoOutput)]);
+                                    break;
                                 } else {
-                                    let tmp = res_store[x.resource_lookup_key.get()].value
-                                        [value_index]
-                                        .as_ref()
-                                        .unwrap()
-                                        .view();
-                                    xs.push(tmp)
+                                    let info = &node_info_storage[k].info_list[i];
+                                    match info.ty {
+                                        ValueType::Owned => {
+                                            xs.push(owned_storage[info.key].view());
+                                        }
+                                        ValueType::View => {
+                                            // Clone the view
+                                            xs.push(view_storage[info.key].clone());
+                                        }
+                                        ValueType::NoOutput => {
+                                            err = Some(vec![Err(op::ComputeException::NoOutput)]);
+                                            break;
+                                        }
+                                    }
                                 }
                             }
-                            node.op.compute(OpComputeContext { node, xs })
-                        } else {
-                            vec![Err(crate::op::ComputeException::Delegate { to: 0 })]
                         }
+                        let ys: op::ComputeResults<_> = match err {
+                            Some(e) => e,
+                            _ => node.op.compute(OpComputeContext {
+                                nodes: node.inputs.clone(),
+                                xs,
+                            }),
+                        };
+                        let mut info_list = Vec::with_capacity(ys.len());
+                        let mut contains_no_output = false;
+                        for y in ys {
+                            match y {
+                                Ok(crate::ArrRepr::Owned(val)) => {
+                                    info_list.push(ValueInfo::new(
+                                        ValueType::Owned,
+                                        owned_storage.len(),
+                                    ));
+                                    unsafe {
+                                        // safe
+                                        mem::transmute::<_, &mut Vec<_>>(&owned_storage).push(val);
+                                    }
+                                }
+                                Ok(crate::ArrRepr::View(val)) => {
+                                    info_list
+                                        .push(ValueInfo::new(ValueType::View, view_storage.len()));
+                                    view_storage.push(val);
+                                }
+                                _ => {
+                                    info_list.push(ValueInfo::new(ValueType::NoOutput, 0));
+                                    contains_no_output = true;
+                                }
+                            }
+                        }
+                        node_info_storage.push(node.with_value_info(info_list, contains_no_output))
                     };
-                    // ERR
-                    res_store.push(node.with_value(y));
+                }
+            } else {
+                // Update dfs stack
+                dfs_stack.push((node, true));
+                // Push children if needed
+                for child in &node.inputs {
+                    if !visited(child, &node_info_storage) {
+                        dfs_stack.push((child, false));
+                    }
                 }
             }
-        } else {
-            // Update dfs stack
-            dfs_stack.push((node, true));
-            // Push children if needed
-            for child in &node.inputs {
-                let visited = {
-                    let k = child.resource_lookup_key.get();
-                    k < res_store.len() && Rc::ptr_eq(child, res_store[k].node)
-                };
-                if !visited {
-                    dfs_stack.push((child, false));
+        } // while loop end
+
+        // process array views
+        for t in tensors {
+            let t = t.as_ref();
+            if !t.is_placeholder && !t.has_persistent_array() {
+                let info = &node_info_storage[t.resource_lookup_key.get()].info_list[0];
+                if let ValueType::View = info.ty {
+                    node_info_storage[t.resource_lookup_key.get()].info_list[0].value =
+                        Some(view_storage[info.key].to_owned());
                 }
             }
         }
+    } // lifetime of views ends here
+
+    for t in tensors {
+        let t = t.as_ref();
+        if !t.has_persistent_array() && !t.is_placeholder {
+            let info = &node_info_storage[t.resource_lookup_key.get()].info_list[0];
+            if let ValueType::Owned = info.ty {
+                node_info_storage[t.resource_lookup_key.get()].info_list[0].value =
+                    Some(owned_storage[info.key].to_owned());
+            }
+        }
     }
-    res_store
+
+    let mut ret: Vec<Option<NdArray<T>>> = Vec::with_capacity(tensors.len());
+    for t in tensors {
+        let t = t.as_ref();
+        let arr = if let Some(per) = t.get_persistent_array() {
+            // rare case
+            Some(per.clone())
+        } else if t.is_placeholder {
+            // rare case
+            let mut found = None;
+            for feed in feeds {
+                if Rc::ptr_eq(feed.0, t) {
+                    found = Some(&feed.1);
+                    break;
+                }
+            }
+            Some(found.expect("Placeholder unfilled.").to_owned())
+        } else {
+            // TODO
+            mem::replace(
+                &mut node_info_storage[t.resource_lookup_key.get()].info_list[0].value,
+                None,
+            )
+        };
+        ret.push(arr);
+    }
+    ret
 }
 
-// Shrink it by dropping useless resources
-// and convert it into mappings of {lookup key => resource}
-fn finalize_resource_store<T: Float>(
-    mut vec: ResourceStore<T>,
-) -> BTreeMap<usize, NodeWithValue<T>> {
-    let mut retained_keys = Vec::new();
-    let len = vec.len();
-    {
-        let mut_ref = &mut vec;
-        let mut del = 0;
-        // Align the resources. Unused resources are placed in the latter part.
-        {
-            let v = &mut **mut_ref;
-
-            for i in 0..len {
-                if v[i].pending_count == 0 {
-                    del += 1;
-                    continue;
-                }
-                retained_keys.push(i);
-                if del > 0 {
-                    // slides i th node forward
-                    v.swap(i - del, i);
-                }
-            }
-        }
-        if del > 0 {
-            // Drop unused resources here
-            mut_ref.truncate(len - del);
-        }
-    }
-    debug_assert_eq!(vec.len(), retained_keys.len());
-    // `retained_keys` are sorted automatically.
-    // `vec` is moved into Map.
-    retained_keys.into_iter().zip(vec).collect()
+#[inline(always)]
+fn visited<T: Float>(node: &Tensor<T>, node_info_storage: &Vec<NodeWithValueInfo<T>>) -> bool {
+    let k = node.resource_lookup_key.get();
+    k < node_info_storage.len() && Rc::ptr_eq(node, node_info_storage[k].node)
 }
 
 #[test]
@@ -404,26 +351,4 @@ fn test_placeholder_eval() {
     let ref v = crate::ops::placeholder(&[3, 2, 1]);
     let eval_result = eval(&[v], &[Feed(v, arr.view())]);
     assert_eq!(eval_result[0], Some(arr));
-}
-
-#[test]
-fn test_eval_internal() {
-    let ref v = crate::ops::placeholder::<f32>(&[3, 2, 1]);
-    let ref z = crate::ops::squeeze(v, &[2]);
-    let ref g = crate::ops::grad_with_default(&[z], &[v], &[&crate::ones(&z.shape())]);
-    let keys = vec![&g[0]];
-    let tmp = crate::ndarray_ext::ones(&[3, 2, 1]);
-    let values = vec![Feed(v, tmp.view())];
-    let storage = eval_internal(keys.as_slice(), values.as_slice());
-
-    assert_eq!(
-        storage.iter().map(|x| x.node.op.name()).collect::<Vec<_>>(),
-        vec![
-            "ConvertToTensor",
-            "Squeeze", // forward end
-            "Shape",
-            "Ones",
-            "ExpandDims",
-        ]
-    );
 }

@@ -16,8 +16,11 @@ impl<T: Float> crate::op::Op<T> for Conv2DTranspose {
     fn name(&self) -> &str {
         "Conv2DTranspose"
     }
-
-    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> crate::op::ComputeResults<T> {
+    #[allow(unused_mut)]
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> crate::op::ComputeResults<'v, T> {
         let xs = ctx.grab_inputs();
 
         let gy = &xs[0]; // (batch, ych, yh, yw)
@@ -61,40 +64,42 @@ impl<T: Float> crate::op::Op<T> for Conv2DTranspose {
 
         let size_per_batch_col = xch * kh * kw * yh * yw;
 
-        let gy = unsafe { slice::from_raw_parts(gy.as_ptr(), gy.len()) };
-        let col = uninitialized_vec(batch_size * size_per_batch_col);
-        // Col2im buffer must be initialized with zeros
+        let mut col = uninitialized_vec(batch_size * size_per_batch_col);
+
+        let copied_gy = ndarray_ext::copy_if_dirty(gy);
+        let copied_w = ndarray_ext::copy_if_dirty(w);
+        let gy_ptr = copied_gy.map(|inner| inner.as_ptr()).unwrap_or(gy.as_ptr());
+        let w_ptr = copied_w.map(|inner| inner.as_ptr()).unwrap_or(w.as_ptr());
 
         #[cfg(feature = "mkl")]
         {
-            let w = w.as_ptr();
             if same_type::<T, f32>() {
-                ::ops::dot_ops::cblas_sgemm_batch_wrapper(
+                crate::ops::dot_ops::cblas_sgemm_batch_wrapper(
                     true,
                     false,
                     m,
                     n,
                     k,
                     &[1.],
-                    vec![w as *const f32; batch_size],
-                    ::dot_ops::get_region_heads(batch_size, gy),
+                    vec![w_ptr as *const f32; batch_size],
+                    crate::dot_ops::get_region_heads(batch_size, gy_ptr, gy.len()),
                     &[0.],
-                    ::dot_ops::get_region_heads(batch_size, col.as_slice()),
+                    crate::dot_ops::get_region_heads(batch_size, col.as_ptr(), col.len()),
                     1,
                     batch_size,
                 );
             } else if same_type::<T, f64>() {
-                ::ops::dot_ops::cblas_dgemm_batch_wrapper(
+                crate::ops::dot_ops::cblas_dgemm_batch_wrapper(
                     true,
                     false,
                     m,
                     n,
                     k,
                     &[1.],
-                    vec![w as *const f64; batch_size],
-                    ::dot_ops::get_region_heads(batch_size, gy),
+                    vec![w_ptr as *const f64; batch_size],
+                    crate::dot_ops::get_region_heads(batch_size, gy_ptr, gy.len()),
                     &[0.],
-                    ::dot_ops::get_region_heads(batch_size, col.as_slice()),
+                    crate::dot_ops::get_region_heads(batch_size, col.as_ptr(), col.len()),
                     1,
                     batch_size,
                 );
@@ -104,11 +109,15 @@ impl<T: Float> crate::op::Op<T> for Conv2DTranspose {
         }
         #[cfg(not(feature = "mkl"))]
         {
+            let w_slice = unsafe { slice::from_raw_parts(w_ptr, w.len()) };
+            let gy_slice = unsafe { slice::from_raw_parts(gy_ptr, gy.len()) };
+            let col_ref = &col[0];
             let size_per_batch_gy = ych * yh * yw;
             (0..batch_size).into_par_iter().for_each(|i| unsafe {
-                let w: *const T = mem::transmute(w.as_ptr());
-                let gy_region_head = &gy[i * size_per_batch_gy] as *const T;
-                let col_region_head: *mut T = mem::transmute(&col[i * size_per_batch_col]);
+                let w = w_slice.as_ptr();
+                let gy_region_head = gy_slice.as_ptr().offset((i * size_per_batch_gy) as isize);
+                let col_region_head: *mut T = mem::transmute(col_ref);
+                let col_region_head = col_region_head.offset((i * size_per_batch_col) as isize);
                 slow_gemm!(
                     true,
                     false,
@@ -141,7 +150,7 @@ impl<T: Float> crate::op::Op<T> for Conv2DTranspose {
         );
 
         let gx = NdArray::from_shape_vec(ndarray::IxDyn(&[batch_size, xch, xh, xw]), gx);
-        vec![Ok(gx.unwrap())]
+        vec![Ok(crate::ArrRepr::Owned(gx.unwrap()))]
     }
 
     fn grad(&self, gy: &Tensor<T>, xs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
@@ -173,7 +182,10 @@ impl<T: Float> crate::op::Op<T> for Conv2DTransposeFilterGrad {
         "Conv2DTransposeFilterGrad"
     }
 
-    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> crate::op::ComputeResults<T> {
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> crate::op::ComputeResults<'v, T> {
         let xs = ctx.grab_inputs();
         let gy = &xs[0];
         let x = &xs[1];
@@ -222,7 +234,7 @@ impl<T: Float> crate::op::Op<T> for Conv2DTransposeFilterGrad {
             #[cfg(feature = "mkl")]
             {
                 if same_type::<T, f32>() {
-                    ::ops::dot_ops::cblas_sgemm_wrapper(
+                    crate::ops::dot_ops::cblas_sgemm_wrapper(
                         false,
                         true,
                         m,
@@ -235,7 +247,7 @@ impl<T: Float> crate::op::Op<T> for Conv2DTransposeFilterGrad {
                         gw_head as *mut f32,
                     )
                 } else if same_type::<T, f64>() {
-                    ::ops::dot_ops::cblas_dgemm_wrapper(
+                    crate::ops::dot_ops::cblas_dgemm_wrapper(
                         false,
                         true,
                         m,
@@ -268,7 +280,9 @@ impl<T: Float> crate::op::Op<T> for Conv2DTransposeFilterGrad {
             }
         }
 
-        vec![Ok(NdArray::from_shape_vec(k_shape, gw).unwrap())]
+        vec![Ok(crate::ArrRepr::Owned(
+            NdArray::from_shape_vec(k_shape, gw).unwrap(),
+        ))]
     }
 
     fn grad(&self, gw: &Tensor<T>, xs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
@@ -328,15 +342,15 @@ fn test_deconv() {
     let g = crate::ndarray_ext::ones(&[batch_size, ych, yh, yw]);
 
     let ret = op.compute(crate::runtime::OpComputeContext::new(
-        &crate::ops::zeros(&[0]), // dummy (not used)
+        vec![crate::zeros(&[1])], // dummy
         vec![g.view(), w.view()],
     ));
 
     let x = crate::ndarray_ext::ones::<f32>(&[batch_size, xch, xh, xw]);
-    assert_eq!(x.shape(), ret[0].as_ref().unwrap().shape());
+    assert_eq!(x.shape(), ret[0].as_ref().unwrap().view().shape());
 
     assert_eq!(
-        ret[0].clone().unwrap().into_raw_vec(),
+        ret[0].clone().unwrap().to_owned().into_raw_vec(),
         vec![
             2.0, 4.0, 2.0, 4.0, 8.0, 4.0, 2.0, 4.0, 2.0, 2.0, 4.0, 2.0, 4.0, 8.0, 4.0, 2.0, 4.0,
             2.0, 2.0, 4.0, 2.0, 4.0, 8.0, 4.0, 2.0, 4.0, 2.0, 2.0, 4.0, 2.0, 4.0, 8.0, 4.0, 2.0,

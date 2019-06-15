@@ -226,7 +226,10 @@ impl<T: Float> Tensor<T> {
     /// Evaluates this tensor as an ndarray's array object.
     ///
     /// See [eval](../fn.eval.html).
-    pub fn eval<'k, 'v>(&'k self, feeds: &'v [crate::runtime::Feed<'k, 'v, T>]) -> Option<NdArray<T>> {
+    pub fn eval<'k, 'v>(
+        &'k self,
+        feeds: &'v [crate::runtime::Feed<'k, 'v, T>],
+    ) -> Option<NdArray<T>> {
         crate::runtime::eval(&[self], feeds).remove(0)
     }
 
@@ -257,6 +260,107 @@ impl<T: Float> Tensor<T> {
     /// Returns true if this node has no incoming nodes.
     pub fn is_source(&self) -> bool {
         self.inputs.is_empty()
+    }
+
+    #[doc(hidden)]
+    #[inline]
+    pub fn get_backprop_inputs(&self) -> &[Tensor<T>] {
+        self.inputs_on_backprop
+            .as_ref()
+            .unwrap_or(&self.inputs)
+            .as_slice()
+    }
+
+    #[doc(hidden)]
+    #[inline]
+    pub fn get_input_refs(&self) -> Vec<&Tensor<T>> {
+        self.inputs.iter().map(|a| a).collect::<Vec<&Tensor<T>>>()
+    }
+
+    #[doc(hidden)]
+    #[inline]
+    pub fn get_backprop_inputs_ref(&self) -> Vec<&Tensor<T>> {
+        self.inputs_on_backprop
+            .as_ref()
+            .unwrap_or(&self.inputs)
+            .iter()
+            .map(|a| a)
+            .collect::<Vec<_>>()
+    }
+
+    /// Registers a simple hook for a `Tensor` computation.
+    ///
+    /// Pre-defined hooks are
+    ///
+    /// * Print - prints the evaluation result of this tensor.
+    /// * PrintShape - prints the evaluated shape of this tensor.
+    ///
+    /// See also
+    ///
+    /// * [with_fn](../tensor/struct.Tensor.html#method.with_fn)
+    /// * [p](../tensor/struct.Tensor.html#method.p)
+    /// * [ps](../tensor/struct.Tensor.html#method.ps)
+    ///
+    /// ```
+    /// extern crate autograd as ag;
+    ///
+    /// let a: ag::Tensor<f32> = ag::ones(&[4, 2]).with(ag::Hook::Print);
+    /// let b: ag::Tensor<f32> = ag::zeros(&[2, 3]).with(ag::Hook::PrintShape);
+    /// let c = ag::matmul(a, b);
+    ///
+    /// c.eval(&[]);
+    /// // Shape of Ones:
+    /// // [2, 3]
+    /// //
+    /// // Zeros:
+    /// // [[0.0, 0.0],
+    /// // [0.0, 0.0],
+    /// // [0.0, 0.0],
+    /// // [0.0, 0.0]] shape=[4, 2], strides=[2, 1], layout=C (0x1)
+    /// ```
+    #[inline]
+    pub fn with(&self, hook: crate::ops::Hook<T>) -> Tensor<T> {
+        crate::ops::hook(hook, self)
+    }
+
+    /// Registers a hook for a `Tensor` computation.
+    ///
+    /// See also
+    ///
+    /// * [with](../tensor/struct.Tensor.html#method.with)
+    /// * [p](../tensor/struct.Tensor.html#method.p)
+    /// * [ps](../tensor/struct.Tensor.html#method.ps)
+    ///
+    /// ```
+    /// extern crate autograd as ag;
+    ///
+    /// let a: ag::Tensor<f32> = ag::ones(&[4, 2]);
+    /// let b: ag::Tensor<f32> = ag::zeros(&[2, 3]);
+    /// let c = ag::matmul(a, b).with_fn(Box::new(|arr| println!("My shape: {:?}", arr.shape())));
+    ///
+    /// c.eval(&[]);
+    /// // MatMul:
+    /// // My shape: [4, 3]
+    /// ```
+    #[inline]
+    pub fn with_fn(&self, hook: Box<Fn(&crate::ndarray::ArrayViewD<T>) -> ()>) -> Tensor<T> {
+        crate::ops::hook(crate::Hook::Raw(hook), self)
+    }
+
+    /// Shorthand for `Tensor::with(crate::Hook::Print)`
+    ///
+    /// See [with_fn](../tensor/fn.with.html)
+    #[inline]
+    pub fn p(&self) -> Tensor<T> {
+        self.with(crate::Hook::Print)
+    }
+
+    /// Shorthand for `Tensor::with(crate::Hook::PrintShape)`
+    ///
+    /// See [with_fn](../tensor/fn.with.html)
+    #[inline]
+    pub fn ps(&self) -> Tensor<T> {
+        self.with(crate::Hook::PrintShape)
     }
 }
 

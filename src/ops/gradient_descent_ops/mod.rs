@@ -7,9 +7,9 @@ pub mod sgd;
 pub use self::adam::Adam;
 pub use self::sgd::SGD;
 
-use std::cmp::{Eq, Ordering, PartialEq};
 use crate::tensor::Tensor;
 use crate::Float;
+use std::cmp::{Eq, Ordering, PartialEq};
 
 /// Key to access a state tensor.
 /// Stateful optimizers use this.

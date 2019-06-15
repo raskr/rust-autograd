@@ -1,12 +1,12 @@
-use ndarray;
 use crate::ndarray_ext;
 use crate::ndarray_ext::{NdArray, NdArrayView};
 use crate::op;
 use crate::ops;
-use std::f32;
-use std::mem;
 use crate::tensor::Tensor;
 use crate::Float;
+use ndarray;
+use std::f32;
+use std::mem;
 
 pub struct ReduceMin {
     pub keep_dims: bool,
@@ -45,20 +45,20 @@ pub struct ReduceGradCommon {
 
 macro_rules! impl_reduce_forward {
     ($forward_name:ident, $reduce_fn_name:ident, $reduce_default:ident) => {
-        fn $forward_name<T: Float>(
-            x: &NdArrayView<T>,
+        fn $forward_name<'v, T: Float>(
+            x: &NdArrayView<'v, T>,
             mut axes: Vec<usize>,
             keep_dims: bool,
-        ) -> Result<NdArray<T>, crate::op::ComputeException> {
+        ) -> crate::ArrRepr<'v, T> {
             let x_shape = x.shape();
 
             if ndarray_ext::is_scalar_shape(x_shape) {
                 // case of 0 rank
-                Ok((*x).to_owned())
+                crate::ArrRepr::View(x.clone())
             } else {
                 // reduction axes are empty => do nothing
                 if axes.is_empty() {
-                    return Err(crate::op::ComputeException::Delegate { to: 0 });
+                    return crate::ArrRepr::View(x.clone());
                 }
 
                 // -- main logic --
@@ -88,7 +88,7 @@ macro_rules! impl_reduce_forward {
                     }
                 }
 
-                Ok(folded.unwrap_or_else(|| x.to_owned()))
+                crate::ArrRepr::Owned(folded.unwrap_or_else(|| x.to_owned()))
             }
         }
     };
@@ -117,11 +117,14 @@ impl<T: Float> op::Op<T> for ReduceSum {
         "ReduceSum"
     }
 
-    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> op::ComputeResults<'v, T> {
         let xs = ctx.grab_inputs();
         let x = &xs[0];
         let axes = preprocess_axes(x, &xs[1], self.sparse_axes);
-        vec![compute_reduce_sum(x, axes, self.keep_dims)]
+        vec![Ok(compute_reduce_sum(x, axes, self.keep_dims))]
     }
 
     fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
@@ -141,13 +144,16 @@ impl<T: Float> op::Op<T> for ReduceMean {
         "ReduceMean"
     }
 
-    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> op::ComputeResults<'v, T> {
         let xs = ctx.grab_inputs();
         let x = &xs[0];
         let axes = preprocess_axes(x, &xs[1], self.sparse_axes);
         let x_shape = x.shape();
         if axes.is_empty() {
-            return vec![Err(crate::op::ComputeException::Delegate { to: 0 })];
+            return vec![Ok(crate::ArrRepr::View(x.clone()))];
         }
 
         // Make reduction_len
@@ -155,18 +161,20 @@ impl<T: Float> op::Op<T> for ReduceMean {
         for &axis in axes.iter() {
             reduction_len *= x_shape[axis as usize] as f32;
         }
-        let reduction_len_inv = T::one() / T::from(reduction_len).unwrap();
-
         // Do summation
-        let sum: Result<NdArray<T>, _> = compute_reduce_sum(x, axes, self.keep_dims);
+        let sum = compute_reduce_sum(x, axes, self.keep_dims);
 
         // Do division
-        let ret = sum.map(|mut ok| {
-            ok.mapv_inplace(move |elem| elem * reduction_len_inv);
-            ok
-        });
+        let ret = match sum {
+            crate::ArrRepr::Owned(mut arr) => {
+                let reduction_len_inv = T::one() / T::from(reduction_len).unwrap();
+                arr.mapv_inplace(move |elem| elem * reduction_len_inv);
+                crate::ArrRepr::Owned(arr)
+            }
+            view @ _ => view,
+        };
 
-        vec![ret]
+        vec![Ok(ret)]
     }
 
     fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
@@ -195,12 +203,15 @@ impl<T: Float> op::Op<T> for ReduceProd {
         "ReduceProd"
     }
 
-    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> op::ComputeResults<'v, T> {
         let xs = ctx.grab_inputs();
         let x = &xs[0];
         let axes = preprocess_axes(x, &xs[1], self.sparse_axes);
-        let ret = compute_reduce_prod(&x, axes, self.keep_dims);
-        vec![ret]
+        let ret = compute_reduce_prod(x, axes, self.keep_dims);
+        vec![Ok(ret)]
     }
 
     fn grad(
@@ -226,11 +237,14 @@ impl<T: Float> op::Op<T> for ReduceMin {
         "ReduceMin"
     }
 
-    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> op::ComputeResults<'v, T> {
         let xs = ctx.grab_inputs();
         let x = &xs[0];
         let axes = preprocess_axes(x, &xs[1], self.sparse_axes);
-        vec![compute_reduce_min(&x, axes, self.keep_dims)]
+        vec![Ok(compute_reduce_min(x, axes, self.keep_dims))]
     }
 
     fn grad(
@@ -248,11 +262,14 @@ impl<T: Float> op::Op<T> for ReduceMax {
         "ReduceMax"
     }
 
-    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> op::ComputeResults<'v, T> {
         let xs = ctx.grab_inputs();
         let x = &xs[0];
         let axes = preprocess_axes(x, &xs[1], self.sparse_axes);
-        vec![compute_reduce_max(x, axes, self.keep_dims)]
+        vec![Ok(compute_reduce_max(x, axes, self.keep_dims))]
     }
 
     fn grad(
@@ -298,7 +315,10 @@ impl<T: Float> op::Op<T> for ArgMax {
     }
 
     // cf. https://github.com/tensorflow/compiler/tf2xla/kernels/index_ops.cc
-    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> op::ComputeResults<'v, T> {
         let xs = ctx.grab_inputs();
         let x = &xs[0];
         let axis = ndarray_ext::normalize_negative_axis(self.axis, x.ndim());
@@ -360,7 +380,7 @@ impl<T: Float> op::Op<T> for ArgMax {
                 .unwrap()
         };
 
-        vec![Ok(result)]
+        vec![Ok(crate::ArrRepr::Owned(result))]
     }
 
     fn grad(&self, _: &Tensor<T>, _: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
@@ -373,14 +393,17 @@ impl<T: Float> op::Op<T> for ReduceGradCommon {
         "ReduceGradCommon"
     }
 
-    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> op::ComputeResults<'v, T> {
         let xs = ctx.grab_inputs();
         //  broadcast `gy` into `target_shape`
         let gy = &xs[0];
         let target_shape = ndarray_ext::vec_as_shape(&xs[1]); // x's shape
 
         if gy.shape() == target_shape.as_slice() {
-            return vec![Err(crate::op::ComputeException::Delegate { to: 0 })];
+            return vec![Ok(crate::ArrRepr::View(gy.clone()))];
         }
 
         let x_is_scalar = ndarray_ext::is_scalar_shape(gy.shape());
@@ -419,7 +442,7 @@ impl<T: Float> op::Op<T> for ReduceGradCommon {
             }
         };
 
-        vec![Ok(ret)]
+        vec![Ok(crate::ArrRepr::Owned(ret))]
     }
 
     fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {

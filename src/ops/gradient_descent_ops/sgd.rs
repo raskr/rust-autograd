@@ -11,7 +11,10 @@ impl<T: Float> crate::op::Op<T> for SGDOp<T> {
         "SGD"
     }
 
-    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> op::ComputeResults<'v, T> {
         let xs = ctx.grab_inputs();
         let grad = &xs[1];
         unsafe {

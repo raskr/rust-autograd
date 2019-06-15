@@ -1,12 +1,12 @@
-use ndarray;
 use crate::ndarray_ext::NdArray;
 use crate::op;
 #[cfg(feature = "mkl")]
-use same_type;
-#[cfg(feature = "mkl")]
-use std::mem;
+use crate::same_type;
 use crate::tensor::Tensor;
 use crate::Float;
+use ndarray;
+#[cfg(feature = "mkl")]
+use std::mem;
 
 #[cfg(feature = "mkl")]
 type MklInt = i64;
@@ -155,7 +155,7 @@ pub fn cblas_sgemm_wrapper(
 fn test_sgemm() {
     let x = vec![1., 2., 3., 4.]; // (2, 2)
     let y = vec![1., 2., 3., 4.]; // (2, 2)
-    let mut z = ::uninitialized_vec::<f32>(4); // (2, 2, 2)
+    let mut z = crate::uninitialized_vec::<f32>(4); // (2, 2, 2)
 
     cblas_sgemm_wrapper(
         false,
@@ -336,7 +336,7 @@ fn test_dgemm_batch_trans_a() {
     let batch = 2;
     let w = vec![0., 1., 2., 3., 4., 5.]; // (2, 3)
     let x = vec![0., 1., 2., 3., 4., 5., 6., 7.]; // (2, 2, 2)
-    let z = ::uninitialized_vec::<f64>(12); // (2, 2, 2)
+    let z = crate::uninitialized_vec::<f64>(12); // (2, 2, 2)
     let m = 3; // row of op(a)
     let n = 2; // col of op(b)
     let k = 2; // col of op(a)
@@ -348,9 +348,9 @@ fn test_dgemm_batch_trans_a() {
         k,
         &[1.],              // alpha
         vec![&w[0], &w[0]], // a
-        get_region_heads(batch, &x),
+        get_region_heads(batch, x.as_ptr(), x.len()),
         &[0.], // beta
-        get_region_heads(batch, &z),
+        get_region_heads(batch, z.as_ptr(), z.len()),
         1,
         batch,
     );
@@ -366,19 +366,19 @@ fn test_dgemm_batch() {
     let batch = 2;
     let x = vec![0., 1., 2., 3.]; // (2, 2)
     let y = vec![0., 1., 2., 3., 4., 5., 6., 7.]; // (2, 2, 2)
-    let z = ::uninitialized_vec::<f64>(8); // (2, 2, 2)
+    let z = crate::uninitialized_vec::<f64>(8); // (2, 2, 2)
 
     cblas_dgemm_batch_wrapper(
         false,
         false,
-        2,                           // m
-        2,                           // n
-        2,                           // k
-        &[1.],                       // alpha
-        vec![&x[0], &x[0]],          // a
-        get_region_heads(batch, &y), // b
-        &[0.],                       // beta
-        get_region_heads(batch, &z), // c
+        2,                                            // m
+        2,                                            // n
+        2,                                            // k
+        &[1.],                                        // alpha
+        vec![&x[0], &x[0]],                           // a
+        get_region_heads(batch, y.as_ptr(), y.len()), // b
+        &[0.],                                        // beta
+        get_region_heads(batch, z.as_ptr(), z.len()), // c
         1,
         batch,
     );
@@ -400,24 +400,32 @@ pub struct BatchMatMul {
 #[cfg(feature = "mkl")]
 macro_rules! mkl_mm {
     ($f:expr, $x0:expr, $x1:expr, $x0_shape:expr, $x1_shape:expr, $self:expr, $typ:ty) => {{
+        let s0l = $x0.strides()[0];
+        let s0r = $x1.strides()[0];
+        let transpose_a = if s0l == 1 {
+            !$self.transpose_a
+        } else {
+            $self.transpose_a
+        };
+        let transpose_b = if s0r == 1 {
+            !$self.transpose_b
+        } else {
+            $self.transpose_b
+        };
         let row0 = $x0_shape[0]; // rows of a
         let col0 = $x0_shape[1]; // cols of a
         let row1 = $x1_shape[0]; // rows of b
         let col1 = $x1_shape[1]; // cols of b
-        let m = if $self.transpose_a { col0 } else { row0 };
-        let n = if $self.transpose_b { row1 } else { col1 };
-        let k = if $self.transpose_a { row0 } else { col0 };
-        let ret_row = if $self.transpose_a { col0 } else { row0 };
-        let ret_col = if $self.transpose_b {
-            $x1_shape[0]
-        } else {
-            col1
-        };
+        let m = if transpose_a { col0 } else { row0 };
+        let n = if transpose_b { row1 } else { col1 };
+        let k = if transpose_a { row0 } else { col0 };
+        let ret_row = if $self.transpose_a { col0 } else { row0 }; //
+        let ret_col = if $self.transpose_b { row1 } else { col1 };
 
-        let mut c = ::uninitialized_vec::<T>(ret_row * ret_col);
+        let mut c = crate::uninitialized_vec::<T>(ret_row * ret_col);
         $f(
-            $self.transpose_a,
-            $self.transpose_b,
+            transpose_a,
+            transpose_b,
             m,
             n,
             k,
@@ -427,42 +435,108 @@ macro_rules! mkl_mm {
             0.,
             c.as_mut_ptr() as *mut $typ,
         );
-        vec![Ok(NdArray::from_shape_vec(
-            ndarray::IxDyn(&[ret_row, ret_col]),
-            c,
-        )
-        .unwrap())]
+        vec![Ok(crate::ArrRepr::Owned(
+            NdArray::from_shape_vec(ndarray::IxDyn(&[ret_row, ret_col]), c).unwrap(),
+        ))]
     }};
+}
+
+#[cfg(feature = "mkl")]
+enum BatchMatMulAxesInfo {
+    Trans,
+    NoTrans,
+    Dirty,
+}
+
+#[inline]
+#[cfg(feature = "mkl")]
+fn batch_mm_axes_info(stride: &[ndarray::Ixs]) -> BatchMatMulAxesInfo {
+    let rank = stride.len();
+    let slice = &stride[0..rank - 2];
+    let c = *slice.iter().min().unwrap();
+    let a = stride[rank - 2]; // row
+    let b = stride[rank - 1]; // col
+    if c > a && a > b {
+        BatchMatMulAxesInfo::NoTrans
+    } else if c > a && a < b {
+        BatchMatMulAxesInfo::Trans
+    } else {
+        BatchMatMulAxesInfo::Dirty
+    }
 }
 
 #[cfg(feature = "mkl")]
 macro_rules! mkl_batch_mm {
     ($f:expr, $x0:expr, $x1:expr, $row0:expr,
         $col0:expr, $row1:expr, $col1:expr, $ret_shape:expr, $self:expr, $batch_size:expr) => {{
-        let m = if $self.transpose_a { $col0 } else { $row0 }; // rows of a
-        let n = if $self.transpose_b { $row1 } else { $col1 }; // cols of b
-        let k = if $self.transpose_a { $row0 } else { $col0 }; // cols of a
+        let mut transpose_a = $self.transpose_a;
+        let mut transpose_b = $self.transpose_b;
 
-        let ret = ::uninitialized_vec($ret_shape.iter().product());
+        let s0 = $x0.strides();
+        let s1 = $x1.strides();
+        let info0 = batch_mm_axes_info(s0);
+        let info1 = batch_mm_axes_info(s1);
+
+        let mut copied0 = None;
+        let mut copied1 = None;
+
+        match info0 {
+            BatchMatMulAxesInfo::Trans => {
+                transpose_a = !transpose_a;
+            }
+            BatchMatMulAxesInfo::Dirty => {
+                copied0 = Some(crate::ndarray_ext::deep_copy($x0));
+            }
+            _ => {}
+        }
+        match info1 {
+            BatchMatMulAxesInfo::Trans => {
+                transpose_b = !transpose_b;
+            }
+            BatchMatMulAxesInfo::Dirty => {
+                copied1 = Some(crate::ndarray_ext::deep_copy($x1));
+            }
+            _ => {}
+        }
+        let m = if transpose_a { $col0 } else { $row0 }; // rows of a
+        let n = if transpose_b { $row1 } else { $col1 }; // cols of b
+        let k = if transpose_a { $row0 } else { $col0 }; // cols of a
+
+        let ret = crate::uninitialized_vec($ret_shape.iter().product());
+
         $f(
-            $self.transpose_a,
-            $self.transpose_b,
+            transpose_a,
+            transpose_b,
             m,
             n,
             k,
             &[1.],
-            get_region_heads($batch_size, $x0.as_slice().expect("Not standard layout")), // a array
-            get_region_heads($batch_size, $x1.as_slice().expect("Not standard layout")), // b array
+            get_region_heads(
+                $batch_size,
+                if let Some(v) = copied0 {
+                    v.as_ptr()
+                } else {
+                    $x0.as_ptr()
+                },
+                $x0.len(),
+            ), // a array
+            get_region_heads(
+                $batch_size,
+                if let Some(v) = copied1 {
+                    v.as_ptr()
+                } else {
+                    $x1.as_ptr()
+                },
+                $x1.len(),
+            ), // b array
             &[0.],
-            get_region_heads($batch_size, ret.as_slice()), // c array
+            get_region_heads($batch_size, ret.as_ptr(), ret.len()), // c array
             1,
             $batch_size,
         );
-        vec![Ok(NdArray::from_shape_vec(
-            ndarray::IxDyn($ret_shape.as_slice()),
-            ret,
-        )
-        .unwrap())]
+        vec![Ok(crate::ArrRepr::Owned(
+            NdArray::from_shape_vec(ndarray::IxDyn($ret_shape.as_slice()), ret).unwrap(),
+        ))]
     }};
 }
 
@@ -471,7 +545,10 @@ impl<T: Float> op::Op<T> for MatMul {
         "MatMul"
     }
 
-    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> op::ComputeResults<'v, T> {
         let xs = ctx.grab_inputs();
         let x0 = &xs[0];
         let x1 = &xs[1];
@@ -499,8 +576,8 @@ impl<T: Float> op::Op<T> for MatMul {
         }
         #[cfg(not(feature = "mkl"))]
         {
-            let x0_view = x0.view();
-            let x1_view = x1.view();
+            let x0_view = x0.clone();
+            let x1_view = x1.clone();
             // unwrap is always safe
             let mut a = x0_view.into_shape((x0_shape[0], x0_shape[1])).unwrap();
             let mut b = x1_view.into_shape((x1_shape[0], x1_shape[1])).unwrap();
@@ -510,7 +587,8 @@ impl<T: Float> op::Op<T> for MatMul {
             if self.transpose_b {
                 b.swap_axes(0, 1);
             }
-            vec![Ok(a.dot(&b).into_dyn())]
+            let ret = a.dot(&b).into_dyn();
+            vec![Ok(crate::ArrRepr::Owned(ret))]
         }
     }
 
@@ -534,9 +612,12 @@ impl<T: Float> op::Op<T> for MatMul {
 }
 
 #[inline]
-pub fn get_region_heads<'a, A: Float, B>(batch_size: usize, slice: &[A]) -> Vec<*const B> {
-    let head = slice.as_ptr();
-    let size_per_sample = slice.len() / batch_size;
+pub fn get_region_heads<A: Float, B>(
+    batch_size: usize,
+    head: *const A,
+    whole_size: usize,
+) -> Vec<*const B> {
+    let size_per_sample = whole_size / batch_size;
     let mut ret = Vec::with_capacity(batch_size);
     for i in 0..batch_size {
         unsafe {
@@ -551,7 +632,10 @@ impl<T: Float> op::Op<T> for BatchMatMul {
         "BatchMatMul"
     }
 
-    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> op::ComputeResults<'v, T> {
         let xs = ctx.grab_inputs();
         let x0 = &xs[0];
         let x1 = &xs[1];
@@ -559,6 +643,17 @@ impl<T: Float> op::Op<T> for BatchMatMul {
         let shape1 = x1.shape();
         let rank0 = x0.ndim();
         let rank1 = x1.ndim();
+
+        assert!(
+            rank0 >= 2,
+            "BatchMatMul: Left-hand-side input's ndim must be >= 2, actual: {}",
+            rank0
+        );
+        assert!(
+            rank1 >= 2,
+            "BatchMatMul: Right-hand-side input's ndim must be >= 2, actual: {}",
+            rank1
+        );
 
         if rank0 != rank1 || shape0[..rank0 - 2] != shape1[..rank0 - 2] {
             panic!("Input shapes mismatch: {:?} vs {:?}", shape0, shape1);
@@ -674,9 +769,11 @@ impl<T: Float> op::Op<T> for BatchMatMul {
             };
 
             // reshape to dst shape with safe unwrapping
-            vec![Ok(stacked
-                .into_shape(ndarray::IxDyn(dst_shape.as_slice()))
-                .unwrap())]
+            vec![Ok(crate::ArrRepr::Owned(
+                stacked
+                    .into_shape(ndarray::IxDyn(dst_shape.as_slice()))
+                    .unwrap(),
+            ))]
         }
     }
 

@@ -1,18 +1,12 @@
-extern crate ndarray;
-
-use crate::ndarray_ext::NdArray;
 use crate::tensor::Tensor;
 use crate::Float;
 
-pub type ComputeResults<T> = Vec<Result<NdArray<T>, ComputeException>>;
+// Op can have multiple output arrays.
+pub type ComputeResults<'v, T> = Vec<Result<crate::ArrRepr<'v, T>, ComputeException>>;
 
-//ComputeResult
-
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 /// This is an `exception`, not an error.
 pub enum ComputeException {
-    /// Computation finished correctly but delegates the result to its `to` th input.
-    Delegate { to: usize },
     /// Computation finished correctly with no output
     NoOutput,
 }
@@ -42,15 +36,16 @@ pub enum ComputeException {
 ///
 ///     // In this method, any errors caused by bad user-inputs should results in "panic".
 ///     // (`ag::op::ComputeException` represents an exception rather than an error.)
-///     fn compute(&self, ctx: ag::runtime::OpComputeContext<T>)
-///         -> ag::op::ComputeResults<T>
-///     {
+///     fn compute<'v>(
+///         &self,
+///         ctx: ag::runtime::OpComputeContext<'v, T>,
+///     ) -> ag::op::ComputeResults<'v, T> {
 ///         let xs = ctx.grab_inputs();
 ///         let x = &xs[0];
 ///         // Use `ndarray::Array::mapv` for element-wise computation.
 ///         let half = T::from(0.5).unwrap();
 ///         let y = x.mapv(|a| ((a * half).tanh() * half) + half);
-///         vec![Ok(y)]
+///         vec![Ok(ag::ArrRepr::Owned(y))]
 ///     }
 ///
 ///     fn grad(&self, gy: &ag::Tensor<T>, xs: &[&ag::Tensor<T>], y: &ag::Tensor<T>)
@@ -76,7 +71,7 @@ pub trait Op<T: Float> {
     fn name(&self) -> &str;
 
     /// Runs this op.
-    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> ComputeResults<T>;
+    fn compute<'v>(&self, ctx: crate::runtime::OpComputeContext<'v, T>) -> ComputeResults<'v, T>;
 
     /// Returns symbolic gradients for input nodes by use of output gradient etc.
     ///

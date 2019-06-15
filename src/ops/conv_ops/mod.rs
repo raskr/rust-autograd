@@ -1,14 +1,15 @@
-use ndarray;
+use crate::ndarray_ext;
 use crate::ndarray_ext::NdArray;
-#[allow(unused_imports)]
-use rayon::iter::*;
 use crate::same_type;
-use std::f32;
-use std::mem;
-use std::slice;
 use crate::tensor::Tensor;
 use crate::uninitialized_vec;
 use crate::Float;
+use ndarray;
+#[allow(unused_imports)]
+use rayon::iter::*;
+use std::f32;
+use std::mem;
+use std::slice;
 
 macro_rules! get_xw {
     ($op:expr, $yw:expr, $kw:expr) => {
@@ -59,12 +60,15 @@ fn test_conv_filter_grad() {
     let w = crate::ndarray_ext::ones(&[ych, xch, kh, kw]);
 
     let ret = op.compute(crate::runtime::OpComputeContext::new(
-        &crate::ops::zeros(&[0]), // dummy (not used)
+        crate::zeros(&[1]), // dummy
         vec![x.view(), g.view(), w.view()],
     ));
 
-    assert_eq!(w.shape(), ret[0].as_ref().unwrap().shape()); // (2, 3, 2, 2)
-    assert_eq!(ret[0].clone().unwrap().into_raw_vec(), vec![8.; 24]);
+    assert_eq!(w.shape(), ret[0].as_ref().unwrap().to_owned().shape()); // (2, 3, 2, 2)
+    assert_eq!(
+        ret[0].as_ref().unwrap().to_owned().into_raw_vec(),
+        vec![8.; 24]
+    );
 }
 
 #[test]

@@ -21,6 +21,7 @@ matrixmultiply = "0.1.14"
 intel-mkl-src = { version="0.2.5", optional = true, default-features = true }
 num-traits = "0.2"
 num = "0.2"
+slab = "0.4.2"
 
 [features]
 mkl = ["intel-mkl-src"]

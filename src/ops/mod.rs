@@ -1,9 +1,9 @@
 extern crate ndarray;
 
 use crate::ndarray_ext::{ArrRng, NdArray};
-use rand::Rng;
 use crate::tensor::{ArrayLike, Tensor};
 use crate::Float;
+use rand::Rng;
 
 mod activation_ops;
 mod array_ops;
@@ -15,10 +15,38 @@ mod conv_ops;
 pub mod dot_ops;
 pub mod gradient_descent_ops;
 mod gradient_ops;
+mod hook_ops;
 mod math_ops;
 mod random_ops;
 mod reduction_ops;
 mod xent_ops;
+
+pub enum Hook<T: Float> {
+    Raw(Box<Fn(&crate::ndarray_ext::NdArrayView<T>) -> ()>),
+    Print,
+    PrintShape,
+}
+
+/// Use `Tensor::with`.
+#[inline]
+pub fn hook<T: Float>(hook: Hook<T>, node: &Tensor<T>) -> Tensor<T> {
+    let op = match hook {
+        Hook::Raw(func) => crate::ops::hook_ops::Hook { func, name: None },
+        Hook::PrintShape => crate::ops::hook_ops::Hook {
+            func: Box::new(|arr| println!("{:?}\n", arr.shape())),
+            name: Some(format!("Shape of {}", node.op.name())),
+        },
+        Hook::Print => crate::ops::hook_ops::Hook {
+            func: Box::new(|arr| println!("{:?}\n", arr)),
+            name: Some(node.op.name().to_owned()),
+        },
+    };
+    Tensor::builder().set_input(node).build(op)
+}
+
+// ---------------------------------------
+// -- Ops to manipulate `Tensor` object --
+// ---------------------------------------
 
 impl<T: Float> Tensor<T> {
     /// Looks up a symbolic element from this tensor.
@@ -39,10 +67,6 @@ impl<T: Float> Tensor<T> {
         Tensor::builder().set_input(self).build(op)
     }
 }
-
-// ---------------------------------------
-// -- Ops to manipulate `Tensor` object --
-// ---------------------------------------
 
 /// Returns gradient tensors wrt input tensors.
 ///
@@ -468,7 +492,12 @@ fn infer_bin_op_shape<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>>(
 }
 
 #[inline]
-fn bin_op_helper<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>, O: crate::op::Op<T> + 'static>(
+fn bin_op_helper<
+    T: Float,
+    A: AsRef<Tensor<T>>,
+    B: AsRef<Tensor<T>>,
+    O: crate::op::Op<T> + 'static,
+>(
     a: A,
     b: B,
     op: O,
@@ -1510,7 +1539,7 @@ where
         preprocess(a.as_ref(), a_axes, false),
         preprocess(b.as_ref(), b_axes, true),
     );
-    let ref mm = matmul(&a_reshaped, &b_reshaped);
+    let ref mm = matmul(&a_reshaped, &b_reshaped); // x
     let final_shape = concat(&[&a_free_dims, &b_free_dims], 0);
     reshape(mm, &final_shape)
 }
@@ -1674,9 +1703,7 @@ pub fn slice<T: Float, A: AsRef<Tensor<T>>>(x: A, starts: &[isize], ends: &[isiz
         .map(|(s, e)| ndarray::Si(*s, if *e == -1 { None } else { Some(*e) }, 1))
         .collect::<Vec<ndarray::Si>>();
 
-    let op = array_ops::Slice {
-        indices: indices.into_boxed_slice(),
-    };
+    let op = array_ops::Slice { indices };
     Tensor::builder().set_input(x.as_ref()).build(op)
 }
 

@@ -1,10 +1,10 @@
-use ndarray;
-use ndarray::Zip;
 use crate::ndarray_ext::{NdArray, NdArrayView};
 use crate::op;
 use crate::ops;
 use crate::tensor::Tensor;
 use crate::Float;
+use ndarray;
+use ndarray::Zip;
 
 pub struct Sin;
 pub struct Cos;
@@ -75,7 +75,7 @@ fn minimum<T: Float>(a: T, b: T) -> T {
 }
 
 macro_rules! impl_cmp_op {
-    ($struct_name:ident, $assign:expr, $grad_fn:expr) => {
+    ($struct_name:ident, $name:expr, $assign:expr, $grad_fn:expr) => {
         pub struct $struct_name;
 
         impl<T: Float> op::Op<T> for $struct_name {
@@ -83,7 +83,10 @@ macro_rules! impl_cmp_op {
                 stringify!($struct_name)
             }
 
-            fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+            fn compute<'v>(
+                &self,
+                ctx: crate::runtime::OpComputeContext<'v, T>,
+            ) -> op::ComputeResults<'v, T> {
                 let xs = ctx.grab_inputs();
                 let x0 = &xs[0];
                 let x1 = &xs[1];
@@ -95,13 +98,13 @@ macro_rules! impl_cmp_op {
 
                 let ret = if x0_is_scalar && x1_is_scalar {
                     let x1_elem = x1[ndarray::IxDyn(&[])];
-                    Ok(x0.map(move |a| $assign(a.clone(), x1_elem)))
+                    x0.map(move |a| $assign(a.clone(), x1_elem))
                 } else if x0_is_scalar && !x1_is_scalar {
                     let x0_elem = x0[ndarray::IxDyn(&[])];
-                    Ok(x1.map(move |a| $assign(x0_elem, a.clone())))
+                    x1.map(move |a| $assign(x0_elem, a.clone()))
                 } else if !x0_is_scalar && x1_is_scalar {
                     let x1_elem = x1[ndarray::IxDyn(&[])];
-                    Ok(x0.map(move |a| $assign(a.clone(), x1_elem)))
+                    x0.map(move |a| $assign(a.clone(), x1_elem))
                 } else {
                     // case that scalar is not involved
                     // Check the input ranks.
@@ -109,14 +112,12 @@ macro_rules! impl_cmp_op {
 
                     // rank check
                     if shape0.len() != shape1.len() {
-                        let name0 = ctx.grab_input_node(0).op.name();
-                        let name1 = ctx.grab_input_node(1).op.name();
                         panic!(
-                            "Tensor ranks mismatch: {}({}) vs {}({})",
+                            "Tensor ranks mismatch: {}({}'s lhs input) vs {}({}'s rhs input)",
                             shape0.len(),
-                            name0,
+                            $name,
                             shape1.len(),
-                            name1
+                            $name,
                         )
                     }
 
@@ -132,16 +133,14 @@ macro_rules! impl_cmp_op {
                             .and_broadcast(x0)
                             .and(x1)
                             .apply(|r, a, b| *r = $assign(a.clone(), b.clone()));
-                        Ok(result)
+                        result
                     } else if size0 > size1 {
-                        let name0 = &ctx.grab_input_node(0).op.name();
-                        let name1 = &ctx.grab_input_node(1).op.name();
                         panic!(
-                            "Tensor ranks mismatch: {}({}) vs {}({})",
+                            "Tensor ranks mismatch: {}({}'s lhs input) vs {}({}'s rhs input)",
                             shape0.len(),
-                            name0,
+                            $name,
                             shape1.len(),
-                            name1
+                            $name
                         );
                     } else {
                         // same
@@ -150,11 +149,11 @@ macro_rules! impl_cmp_op {
                             .and(x0)
                             .and(x1)
                             .apply(|r, a, b| *r = $assign(a.clone(), b.clone()));
-                        Ok(result)
+                        result
                     }
                 };
 
-                vec![ret]
+                vec![Ok(crate::ArrRepr::Owned(ret))]
             }
 
             fn grad(
@@ -169,14 +168,14 @@ macro_rules! impl_cmp_op {
     };
 }
 
-impl_cmp_op!(Equal, equal, none_grad);
-impl_cmp_op!(NotEqual, not_equal, none_grad);
-impl_cmp_op!(Greater, greater, none_grad);
-impl_cmp_op!(Lesser, lesser, none_grad);
-impl_cmp_op!(GreaterEqual, greater_equal, none_grad);
-impl_cmp_op!(LesserEqual, lesser_equal, none_grad);
-impl_cmp_op!(Maximum, maximum, min_max_grad);
-impl_cmp_op!(Minimum, minimum, min_max_grad);
+impl_cmp_op!(Equal, "Equal", equal, none_grad);
+impl_cmp_op!(NotEqual, "NotEqual", not_equal, none_grad);
+impl_cmp_op!(Greater, "", greater, none_grad);
+impl_cmp_op!(Lesser, "", lesser, none_grad);
+impl_cmp_op!(GreaterEqual, "", greater_equal, none_grad);
+impl_cmp_op!(LesserEqual, "", lesser_equal, none_grad);
+impl_cmp_op!(Maximum, "", maximum, min_max_grad);
+impl_cmp_op!(Minimum, "", minimum, min_max_grad);
 
 fn none_grad<T: Float>(_: &Tensor<T>, _: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
     vec![None]
@@ -202,9 +201,12 @@ impl<T: Float> op::Op<T> for Abs {
         "Abs"
     }
 
-    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> op::ComputeResults<'v, T> {
         let xs = ctx.grab_inputs();
-        vec![Ok(xs[0].map(|x| x.abs()))]
+        vec![Ok(crate::ArrRepr::Owned(xs[0].map(|x| x.abs())))]
     }
 
     fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
@@ -217,9 +219,12 @@ impl<T: Float> op::Op<T> for NegOp {
         "Neg"
     }
 
-    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> op::ComputeResults<'v, T> {
         let xs = ctx.grab_inputs();
-        vec![Ok(xs[0].map(|x| x.neg()))]
+        vec![Ok(crate::ArrRepr::Owned(xs[0].map(|x| x.neg())))]
     }
 
     fn grad(&self, gy: &Tensor<T>, _: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
@@ -232,9 +237,12 @@ impl<T: Float> op::Op<T> for Square {
         "Square"
     }
 
-    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> op::ComputeResults<'v, T> {
         let xs = ctx.grab_inputs();
-        vec![Ok(xs[0].map(|&x| x * x))]
+        vec![Ok(crate::ArrRepr::Owned(xs[0].map(|&x| x * x)))]
     }
 
     fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
@@ -248,9 +256,12 @@ impl<T: Float> op::Op<T> for Reciprocal {
         "Reciprocal"
     }
 
-    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> op::ComputeResults<'v, T> {
         let xs = ctx.grab_inputs();
-        vec![Ok(xs[0].map(|x| x.recip()))]
+        vec![Ok(crate::ArrRepr::Owned(xs[0].map(|x| x.recip())))]
     }
 
     fn grad(&self, gy: &Tensor<T>, _: &[&Tensor<T>], output: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
@@ -263,15 +274,18 @@ impl<T: Float> op::Op<T> for Sign {
         "Sign"
     }
 
-    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> op::ComputeResults<'v, T> {
         let xs = ctx.grab_inputs();
-        vec![Ok(xs[0].mapv(|x| {
+        vec![Ok(crate::ArrRepr::Owned(xs[0].mapv(|x| {
             if x == T::zero() {
                 T::zero()
             } else {
                 x.signum()
             }
-        }))]
+        })))]
     }
 
     fn grad(&self, _: &Tensor<T>, _: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
@@ -284,9 +298,12 @@ impl<T: Float> op::Op<T> for Floor {
         "Floor"
     }
 
-    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> op::ComputeResults<'v, T> {
         let xs = ctx.grab_inputs();
-        vec![Ok(xs[0].map(|x| x.floor()))]
+        vec![Ok(crate::ArrRepr::Owned(xs[0].map(|x| x.floor())))]
     }
 
     fn grad(&self, _: &Tensor<T>, _: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
@@ -299,9 +316,12 @@ impl<T: Float> op::Op<T> for Ceil {
         "Ceil"
     }
 
-    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> op::ComputeResults<'v, T> {
         let xs = ctx.grab_inputs();
-        vec![Ok(xs[0].map(|x| x.ceil()))]
+        vec![Ok(crate::ArrRepr::Owned(xs[0].map(|x| x.ceil())))]
     }
 
     fn grad(&self, _: &Tensor<T>, _: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
@@ -314,34 +334,37 @@ impl<T: Float> op::Op<T> for Transpose {
         "Transpose"
     }
 
-    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> op::ComputeResults<'v, T> {
         let xs = ctx.grab_inputs();
         let perm = &xs[1];
         assert!(perm.len() >= 2);
 
-        let ret = if transpose_reversed(perm) {
-            Ok(xs[0].to_owned().reversed_axes())
+        //        let ret = if transpose_reversed(perm) {
+        //            crate::ArrRepr::View(xs[0].clone().reversed_axes())
+        //        } else {
+        // preprocess
+        let src_dst = if self.zip {
+            perm.iter()
+                .map(|&a| a.to_usize().unwrap())
+                .zip(0..perm.len())
+                .collect::<Vec<_>>()
         } else {
-            // preprocess
-            let src_dst = if self.zip {
-                perm.iter()
-                    .map(|&a| a.to_usize().unwrap())
-                    .zip(0..perm.len())
-                    .collect::<Vec<_>>()
-            } else {
-                let mut a = perm
-                    .iter()
-                    .map(|&a| a.to_usize().unwrap())
-                    .enumerate()
-                    .collect::<Vec<_>>();
-                a.sort_by_key(|sd| sd.1);
-                a
-            };
-
-            // permutes dimensions
-            Ok(do_transpose(xs[0].view(), src_dst))
+            let mut a = perm
+                .iter()
+                .map(|&a| a.to_usize().unwrap())
+                .enumerate()
+                .collect::<Vec<_>>();
+            a.sort_by_key(|sd| sd.1);
+            a
         };
-        vec![ret]
+
+        // permutes dimensions
+        let ret = do_transpose(xs[0].clone(), src_dst);
+        //        };
+        vec![Ok(ret)]
     }
 
     fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
@@ -353,7 +376,10 @@ impl<T: Float> op::Op<T> for Transpose {
     }
 }
 
-fn do_transpose<T: Float>(mut x: NdArrayView<T>, mut src_dst: Vec<(usize, usize)>) -> NdArray<T> {
+fn do_transpose<T: Float>(
+    mut x: NdArrayView<T>,
+    mut src_dst: Vec<(usize, usize)>,
+) -> crate::ArrRepr<T> {
     for i in 0..src_dst.len() {
         let (src, dst) = {
             let sd = src_dst[i];
@@ -379,22 +405,10 @@ fn do_transpose<T: Float>(mut x: NdArrayView<T>, mut src_dst: Vec<(usize, usize)
         src_dst[i].0 = dst;
     }
     if x.is_standard_layout() {
-        x.to_owned()
+        crate::ArrRepr::View(x)
     } else {
-        NdArray::from_shape_fn(x.shape(), |i| x[i])
+        crate::ArrRepr::Owned(crate::ndarray_ext::deep_copy(&x))
     }
-}
-
-// Helper for transpose. Returns true if axes are just reversed
-fn transpose_reversed<T: Float>(perm: &NdArrayView<T>) -> bool {
-    let mut last = T::max_value();
-    for a in perm.iter() {
-        if *a > last {
-            return false;
-        }
-        last = *a
-    }
-    true
 }
 
 pub fn logsumexp_forward<T: Float>(x: &NdArrayView<T>, axis: isize, keep_dims: bool) -> NdArray<T> {
@@ -444,9 +458,16 @@ impl<T: Float> op::Op<T> for LogSumExp {
         "LogSumExp"
     }
 
-    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> op::ComputeResults<'v, T> {
         let x = &ctx.grab_inputs()[0];
-        vec![Ok(logsumexp_forward(x, self.axis, self.keep_dims))]
+        vec![Ok(crate::ArrRepr::Owned(logsumexp_forward(
+            x,
+            self.axis,
+            self.keep_dims,
+        )))]
     }
 
     fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
@@ -463,10 +484,13 @@ impl<T: Float> op::Op<T> for Pow<T> {
         "Pow"
     }
 
-    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> op::ComputeResults<'v, T> {
         let x0 = &ctx.grab_inputs()[0];
         let a = self.a;
-        vec![Ok(x0.map(move |x| x.powf(a)))]
+        vec![Ok(crate::ArrRepr::Owned(x0.map(move |x| x.powf(a))))]
     }
 
     fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
@@ -481,9 +505,12 @@ impl<T: Float> op::Op<T> for Sqrt {
         "Sqrt"
     }
 
-    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> op::ComputeResults<'v, T> {
         let x0 = &ctx.grab_inputs()[0];
-        vec![Ok(x0.map(|a| a.sqrt()))]
+        vec![Ok(crate::ArrRepr::Owned(x0.map(|a| a.sqrt())))]
     }
 
     fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
@@ -499,9 +526,12 @@ impl<T: Float> op::Op<T> for Log<T> {
         "Log"
     }
 
-    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> op::ComputeResults<'v, T> {
         let x = &ctx.grab_inputs()[0];
-        vec![Ok(x.map(move |a| a.log(self.a)))]
+        vec![Ok(crate::ArrRepr::Owned(x.map(move |a| a.log(self.a))))]
     }
 
     fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
@@ -514,9 +544,12 @@ impl<T: Float> op::Op<T> for Exp {
         "Exp"
     }
 
-    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> op::ComputeResults<'v, T> {
         let x = &ctx.grab_inputs()[0];
-        vec![Ok(x.map(|a| a.exp()))]
+        vec![Ok(crate::ArrRepr::Owned(x.map(|a| a.exp())))]
     }
 
     fn grad(&self, gy: &Tensor<T>, _: &[&Tensor<T>], output: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
@@ -529,9 +562,12 @@ impl<T: Float> op::Op<T> for Atanh {
         "Atanh"
     }
 
-    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> op::ComputeResults<'v, T> {
         let x = &ctx.grab_inputs()[0];
-        vec![Ok(x.map(|a| a.atanh()))]
+        vec![Ok(crate::ArrRepr::Owned(x.map(|a| a.atanh())))]
     }
 
     fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
@@ -547,9 +583,12 @@ impl<T: Float> op::Op<T> for Acosh {
         "Acosh"
     }
 
-    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> op::ComputeResults<'v, T> {
         let x = &ctx.grab_inputs()[0];
-        vec![Ok(x.map(|a| a.acosh()))]
+        vec![Ok(crate::ArrRepr::Owned(x.map(|a| a.acosh())))]
     }
 
     fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
@@ -565,9 +604,12 @@ impl<T: Float> op::Op<T> for Asinh {
         "Asinh"
     }
 
-    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> op::ComputeResults<'v, T> {
         let x = &ctx.grab_inputs()[0];
-        vec![Ok(x.map(|a| a.asinh()))]
+        vec![Ok(crate::ArrRepr::Owned(x.map(|a| a.asinh())))]
     }
 
     fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
@@ -583,9 +625,12 @@ impl<T: Float> op::Op<T> for Tanh {
         "Tanh"
     }
 
-    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> op::ComputeResults<'v, T> {
         let x = &ctx.grab_inputs()[0];
-        vec![Ok(x.map(|a| a.tanh()))]
+        vec![Ok(crate::ArrRepr::Owned(x.map(|a| a.tanh())))]
     }
 
     fn grad(&self, gy: &Tensor<T>, _: &[&Tensor<T>], y: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
@@ -598,9 +643,12 @@ impl<T: Float> op::Op<T> for Cosh {
         "Cosh"
     }
 
-    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> op::ComputeResults<'v, T> {
         let x = &ctx.grab_inputs()[0];
-        vec![Ok(x.map(|a| a.cosh()))]
+        vec![Ok(crate::ArrRepr::Owned(x.map(|a| a.cosh())))]
     }
 
     fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
@@ -613,9 +661,12 @@ impl<T: Float> op::Op<T> for Sinh {
         "Sinh"
     }
 
-    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> op::ComputeResults<'v, T> {
         let x = &ctx.grab_inputs()[0];
-        vec![Ok(x.map(|a| a.sinh()))]
+        vec![Ok(crate::ArrRepr::Owned(x.map(|a| a.sinh())))]
     }
 
     fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
@@ -628,9 +679,12 @@ impl<T: Float> op::Op<T> for Atan {
         "Atan"
     }
 
-    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> op::ComputeResults<'v, T> {
         let x = &ctx.grab_inputs()[0];
-        vec![Ok(x.map(|a| a.atan()))]
+        vec![Ok(crate::ArrRepr::Owned(x.map(|a| a.atan())))]
     }
 
     fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
@@ -645,9 +699,12 @@ impl<T: Float> op::Op<T> for Acos {
         "Acos"
     }
 
-    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> op::ComputeResults<'v, T> {
         let x = &ctx.grab_inputs()[0];
-        vec![Ok(x.map(|a| a.acos()))]
+        vec![Ok(crate::ArrRepr::Owned(x.map(|a| a.acos())))]
     }
 
     fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
@@ -662,9 +719,12 @@ impl<T: Float> op::Op<T> for Asin {
         "Asin"
     }
 
-    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> op::ComputeResults<'v, T> {
         let x = &ctx.grab_inputs()[0];
-        vec![Ok(x.map(|a| a.asin()))]
+        vec![Ok(crate::ArrRepr::Owned(x.map(|a| a.asin())))]
     }
 
     fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
@@ -679,9 +739,12 @@ impl<T: Float> op::Op<T> for Sin {
         "Sin"
     }
 
-    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> op::ComputeResults<'v, T> {
         let x = &ctx.grab_inputs()[0];
-        vec![Ok(x.map(|a| a.sin()))]
+        vec![Ok(crate::ArrRepr::Owned(x.map(|a| a.sin())))]
     }
 
     fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
@@ -694,9 +757,12 @@ impl<T: Float> op::Op<T> for Cos {
         "Cos"
     }
 
-    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> op::ComputeResults<'v, T> {
         let x = &ctx.grab_inputs()[0];
-        vec![Ok(x.map(|a| a.cos()))]
+        vec![Ok(crate::ArrRepr::Owned(x.map(|a| a.cos())))]
     }
 
     fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
@@ -709,9 +775,12 @@ impl<T: Float> op::Op<T> for Tan {
         "Tan"
     }
 
-    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> op::ComputeResults<'v, T> {
         let x = &ctx.grab_inputs()[0];
-        vec![Ok(x.map(|a| a.tan()))]
+        vec![Ok(crate::ArrRepr::Owned(x.map(|a| a.tan())))]
     }
 
     fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {

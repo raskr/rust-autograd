@@ -1,11 +1,11 @@
 extern crate ndarray;
 
 use crate::ndarray_ext::NdArray;
+use crate::tensor::Tensor;
+use crate::Float;
 use std::cell::Cell;
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
-use crate::tensor::Tensor;
-use crate::Float;
 
 struct AdamOp<T: Float> {
     static_params: StaticParams<T>,
@@ -17,7 +17,10 @@ impl<T: Float> crate::op::Op<T> for AdamOp<T> {
         "Adam"
     }
 
-    fn compute(&self, ctx: crate::runtime::OpComputeContext<T>) -> crate::op::ComputeResults<T> {
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> crate::op::ComputeResults<'v, T> {
         let StaticParams { alpha, eps, b1, b2 } = self.static_params;
         let xs = ctx.grab_inputs();
         let t = self.t.get();

@@ -1,5 +1,5 @@
-use ndarray;
 use crate::Float;
+use ndarray;
 
 pub type NdArray<T> = ndarray::Array<T, ndarray::IxDyn>;
 
@@ -9,6 +9,32 @@ pub type NdArrayViewMut<'a, T> = ndarray::ArrayViewMut<'a, T, ndarray::IxDyn>;
 
 /// exposes array_gen
 pub use crate::array_gen::*;
+
+#[derive(Clone)]
+pub enum ArrRepr<'v, T: Float> {
+    Owned(NdArray<T>),
+    View(NdArrayView<'v, T>),
+}
+
+impl<'v, T: Float> ArrRepr<'v, T> {
+    #[inline]
+    pub fn to_owned(&'v self) -> NdArray<T> {
+        use ArrRepr::*;
+        match self {
+            Owned(v) => v.clone(),
+            View(v) => v.to_owned(),
+        }
+    }
+
+    #[inline]
+    pub fn view(&'v self) -> NdArrayView<'v, T> {
+        use ArrRepr::*;
+        match self {
+            Owned(v) => v.view(),
+            View(v) => v.clone(),
+        }
+    }
+}
 
 #[inline]
 pub fn arr_to_shape<T: Float>(arr: &NdArrayView<T>) -> Vec<usize> {
@@ -85,6 +111,47 @@ pub fn sparse_to_dense<T: Float>(arr: &NdArrayView<T>) -> Vec<usize> {
     axes
 }
 
+#[allow(unused)]
+#[inline]
+// True if even one of the axes is moved
+pub fn is_dims_permuted(strides: &[isize]) -> bool {
+    let mut ret = false;
+    for w in strides.windows(2) {
+        if w[0] < w[1] {
+            ret = true;
+            break;
+        }
+    }
+    ret
+}
+
+#[allow(unused)]
+#[inline]
+pub fn is_fully_transposed(strides: &[ndarray::Ixs]) -> bool {
+    let mut ret = true;
+    for w in strides.windows(2) {
+        if w[0] > w[1] {
+            ret = false;
+            break;
+        }
+    }
+    ret
+}
+
+#[inline]
+pub fn copy_if_dirty<T: Float>(x: &NdArrayView<T>) -> Option<NdArray<T>> {
+    if is_dims_permuted(x.strides()) {
+        Some(deep_copy(x))
+    } else {
+        None
+    }
+}
+
+#[inline]
+pub fn deep_copy<T: Float>(x: &NdArrayView<T>) -> NdArray<T> {
+    NdArray::from_shape_fn(x.shape(), |i| x[i])
+}
+
 #[doc(hidden)]
 #[inline]
 /// This works well only for small arrays
@@ -146,8 +213,7 @@ pub fn into_mat<T: Float>(x: NdArray<T>) -> ndarray::Array<T, ndarray::Ix2> {
 }
 
 #[doc(hidden)]
-pub unsafe fn assign<T: Float>(a: &NdArrayView<T>, b: *const T, b_shape: &[usize])
-{
+pub unsafe fn assign<T: Float>(a: &NdArrayView<T>, b: *const T, b_shape: &[usize]) {
     use std::mem;
     assert_eq!(a.shape(), b_shape);
     let size = a.len() as isize;

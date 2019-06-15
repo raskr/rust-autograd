@@ -9,8 +9,11 @@ impl<T: Float> op::Op<T> for StopGradient {
         "StopGradient"
     }
 
-    fn compute(&self, _: crate::runtime::OpComputeContext<T>) -> op::ComputeResults<T> {
-        vec![Err(crate::op::ComputeException::Delegate { to: 0 })]
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> op::ComputeResults<'v, T> {
+        vec![Ok(crate::ArrRepr::View(ctx.grab_inputs()[0].clone()))]
     }
 
     fn grad(&self, _: &Tensor<T>, _: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {

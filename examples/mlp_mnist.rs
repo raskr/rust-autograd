@@ -44,7 +44,6 @@ fn main() {
     // -- variable tensors (target of optimization) --
     let w = &ag::variable(ag::ndarray_ext::glorot_uniform(&[28 * 28, 10]));
     let b = &ag::variable(ag::ndarray_ext::zeros(&[1, 10]));
-//    let params = &[w, b];
     let params = &ag::gradient_descent_ops::Adam::vars_with_states(&[w, b]);
     let (x, y) = inputs();
     let z = logits(&x, w, b);
@@ -52,9 +51,7 @@ fn main() {
     let mean_loss = ag::reduce_mean(loss, &[0, 1], false);
     let grads = &ag::grad(&[&mean_loss], &[w, b]);
     let adam = ag::gradient_descent_ops::Adam::default();
-//    let sgd = ag::gradient_descent_ops::SGD {lr: 0.1};
     let update_ops: &[Tensor] = &adam.compute_updates(params, grads);
-//    let update_ops: &[Tensor] = &sgd.compute_updates(params, grads);
 
     // -- actual training --
     let max_epoch = 3;

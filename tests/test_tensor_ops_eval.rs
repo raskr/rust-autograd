@@ -37,3 +37,15 @@ fn reduce_grad() {
     let ref g = ag::grad(&[z], &[v])[0];
     assert_eq!(g.eval(&[]).unwrap().shape(), &[3]);
 }
+
+#[test]
+fn transpose_matmul() {
+    let ref x = ag::constant(ndarray::arr2(&[[0., 1.], [2., 3.]]));
+    let ref w = ag::constant(ndarray::arr2(&[[0., 1.], [2., 3.]]));
+    let ref w2 = ag::transpose(w, &[1, 0]);
+    let mm = ag::matmul(x, w2);
+    assert_eq!(
+        mm.eval(&[]).unwrap().as_slice().unwrap(),
+        &[1., 3., 3., 13.]
+    );
+}
