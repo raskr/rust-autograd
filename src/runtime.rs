@@ -28,7 +28,7 @@ pub struct Eval<'k, T: Float> {
     buf: Vec<&'k Tensor<T>>,
 }
 
-impl<'c, 'k: 'c, 'v: 'c, T: Float> Eval<'k, T> {
+impl<'c, 'k, 'v, T: Float> Eval<'k, T> {
     /// Instantiates a new evaluation session.
     pub fn new() -> Self {
         Eval { buf: Vec::new() }
@@ -154,9 +154,9 @@ pub struct Feed<'k, 'f, T: Float>(
 /// assert_eq!(evaluated[1], Some(ndarray::arr1(&[1., 1.]).into_dyn()));
 /// ```
 #[allow(mutable_transmutes, unused_mut)]
-pub fn eval<'c, 'k: 'c, 'f: 'c, K, T>(
-    tensors: &'k [K],
-    feeds: &'c [Feed<'k, 'f, T>],
+pub fn eval<'slice, 'node, 'feed, K, T>(
+    tensors: &'node [K],
+    feeds: &'slice [Feed<'node, 'feed, T>],
 ) -> Vec<Option<NdArray<T>>>
 where
     K: AsRef<Tensor<T>>,
@@ -167,7 +167,7 @@ where
 
     {
         let mut view_storage: Vec<NdArrayView<T>> = Vec::new();
-        let mut feed_store: Vec<NdArrayView<'f, T>> = Vec::new();
+        let mut feed_store: Vec<NdArrayView<'feed, T>> = Vec::new();
 
         let mut dfs_stack: Vec<(&Tensor<T>, bool)> =
             tensors.iter().map(|x| (x.as_ref(), false)).collect();
@@ -193,16 +193,16 @@ where
                 } else {
                     node.resource_lookup_key.set(node_info_storage.len());
                     if !node.has_persistent_array() {
+                        // Aggregate input arrays
                         let mut err = None;
                         let mut xs = Vec::with_capacity(node.inputs.len());
-
                         for (x, &i) in node.inputs.iter().zip(&node.input_indices) {
                             if let Some(per) = x.get_persistent_array() {
                                 xs.push(per.view());
                             } else if x.is_placeholder {
                                 xs.push(feed_store[x.resource_lookup_key.get()].view());
                             } else {
-                                // need computed outputs
+                                // Require computed outputs
                                 let k = x.resource_lookup_key.get();
                                 if node_info_storage[k].contains_no_output {
                                     err = Some(vec![Err(op::ComputeException::NoOutput)]);
@@ -225,6 +225,7 @@ where
                                 }
                             }
                         }
+                        // Call Op::compute
                         let ys: op::ComputeResults<_> = match err {
                             Some(e) => e,
                             _ => node.op.compute(OpComputeContext {
@@ -232,6 +233,7 @@ where
                                 xs,
                             }),
                         };
+                        // Aggregate compute result
                         let mut info_list = Vec::with_capacity(ys.len());
                         let mut contains_no_output = false;
                         for y in ys {
@@ -287,7 +289,7 @@ where
 
     for t in tensors {
         let t = t.as_ref();
-        if !t.has_persistent_array() && !t.is_placeholder {
+        if !t.is_placeholder && !t.has_persistent_array() {
             let info = &node_info_storage[t.resource_lookup_key.get()].info_list[0];
             if let ValueType::Owned = info.ty {
                 node_info_storage[t.resource_lookup_key.get()].info_list[0].value =
@@ -313,7 +315,6 @@ where
             }
             Some(found.expect("Placeholder unfilled.").to_owned())
         } else {
-            // TODO
             mem::replace(
                 &mut node_info_storage[t.resource_lookup_key.get()].info_list[0].value,
                 None,

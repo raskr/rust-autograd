@@ -7,10 +7,10 @@ use std::time::Instant;
 type Tensor = ag::Tensor<f32>;
 
 // This is a toy convolutional network for MNIST.
-// Got 0.985 test accuracy in 300 sec on 2.7GHz Intel Core i5.
+// Got 0.987 test accuracy in 400 sec on 2.7GHz Intel Core i5.
 //
 // First, run "./download_mnist.sh" beforehand if you don't have dataset and then run
-// "cargo run --example cnn_mnist --release" in `examples` directory.
+// "cargo run --example cnn_mnist --release --features mkl" in `examples` directory.
 macro_rules! timeit {
     ($x:expr) => {{
         let start = Instant::now();
@@ -74,8 +74,8 @@ fn main() {
             let perm = ag::ndarray_ext::permutation(num_batches) * batch_size as usize;
             for i in perm.into_iter() {
                 let i = *i as isize;
-                let x_batch = x_train.slice(s![i..i + batch_size, .., .., ..]);
-                let y_batch = y_train.slice(s![i..i + batch_size, ..]);
+                let x_batch = x_train.slice(s![i..i + batch_size, .., .., ..]).into_dyn();
+                let y_batch = y_train.slice(s![i..i + batch_size, ..]).into_dyn();
                 ag::eval(update_ops, &[ag::Feed(&x, x_batch), ag::Feed(&y, y_batch)]);
             }
         });

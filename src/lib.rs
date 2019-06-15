@@ -170,7 +170,7 @@ pub use crate::ndarray_ext::ArrRepr;
 
 #[inline]
 #[doc(hidden)]
-pub fn uninitialized_vec<T: Float>(size: usize) -> Vec<T> {
+pub fn uninitialized_vec<T>(size: usize) -> Vec<T> {
     let mut buf = Vec::with_capacity(size);
     unsafe {
         buf.set_len(size);

@@ -60,7 +60,7 @@ fn test_conv_filter_grad() {
     let w = crate::ndarray_ext::ones(&[ych, xch, kh, kw]);
 
     let ret = op.compute(crate::runtime::OpComputeContext::new(
-        crate::zeros(&[1]), // dummy
+        vec![crate::zeros(&[1])], // dummy
         vec![x.view(), g.view(), w.view()],
     ));
 

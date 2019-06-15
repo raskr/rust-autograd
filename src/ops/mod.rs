@@ -1539,7 +1539,7 @@ where
         preprocess(a.as_ref(), a_axes, false),
         preprocess(b.as_ref(), b_axes, true),
     );
-    let ref mm = matmul(&a_reshaped, &b_reshaped); // x
+    let ref mm = matmul(&a_reshaped, &b_reshaped);
     let final_shape = concat(&[&a_free_dims, &b_free_dims], 0);
     reshape(mm, &final_shape)
 }
@@ -1637,7 +1637,7 @@ pub fn setdiff1d<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>>(a: A, b: B)
 /// assert_eq!(b.eval(&[]).unwrap().shape(), &[5, 3, 4, 1, 2]);
 /// ```
 pub fn transpose<AL: ArrayLike<T>, T: Float, A: AsRef<Tensor<T>>>(x: A, perm: &AL) -> Tensor<T> {
-    let op = math_ops::Transpose { zip: true };
+    let op = math_ops::Transpose { invert_axes: false };
     Tensor::builder()
         .set_inputs(vec![x.as_ref(), &perm.as_tensor()])
         .build(op)

@@ -223,7 +223,7 @@ impl<T: Float> Tensor<T> {
         }
     }
 
-    /// Evaluates this tensor as an ndarray's array object.
+    /// Evaluates this tensor as an ndarray object.
     ///
     /// See [eval](../fn.eval.html).
     pub fn eval<'k, 'v>(

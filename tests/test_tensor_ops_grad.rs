@@ -186,7 +186,7 @@ fn batch_matmul() {
 #[test]
 fn implicit_broadcast() {
     let ref x = ag::constant(ag::ndarray_ext::standard_normal(&[4, 3]));
-    let ref b = ag::variable(ag::ndarray_ext::zeros(&[1, 3]));
+    let ref b = ag::variable(ag::ndarray_ext::standard_normal(&[1, 3]));
     let ref z = x + b;
     let ref g = ag::grad_with_default(&[z], &[b], &[&ag::ones(&z.shape())]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[b], &[], 1e-3, 1e-3);
@@ -196,7 +196,7 @@ fn implicit_broadcast() {
 fn wx_plus_b() {
     let ref x = ag::constant(ag::ndarray_ext::standard_normal(&[4, 2]));
     let ref w = ag::variable(ag::ndarray_ext::standard_normal(&[2, 3]));
-    let ref b = ag::variable(ag::ndarray_ext::zeros(&[1, 3]));
+    let ref b = ag::variable(ag::ndarray_ext::standard_normal(&[1, 3]));
     let ref z = ag::matmul(x, w) + b;
     let ref g = ag::grad_with_default(&[z], &[b], &[&ag::ones(&z.shape())]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[b], &[], 1e-3, 1e-3);
@@ -326,7 +326,7 @@ fn reciprocal() {
 
 #[test]
 fn transpose() {
-    let ref v = ag::variable(ag::ndarray_ext::zeros(&[1, 2, 3, 4]));
+    let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[1, 2, 3, 4]));
     let ref z = ag::transpose(v, &[2, 3, 0, 1]);
     let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&[3, 4, 1, 2])]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -334,9 +334,21 @@ fn transpose() {
 
 #[test]
 fn reshape_after_transpose() {
-    let ref v = ag::variable(ag::ndarray_ext::zeros(&[1, 2, 3, 4, 5]));
+    let v: Vec<_> = (0..2 * 3 * 4).map(|a| a as f32).collect();
+    let ref v = ag::variable(ndarray::Array3::from_shape_vec((2, 3, 4), v).unwrap());
+    let ref z = ag::transpose(v, &[2, 1, 0]);
+    let ref z = ag::reshape(z, &[4, 6]);
+    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
+}
+
+#[test]
+fn transpose_then_reshape_then_mm() {
+    let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[1, 2, 3, 4, 5]));
+    let ref v2 = ag::variable(ag::ndarray_ext::standard_normal(&[8, 2]));
     let ref z = ag::transpose(v, &[4, 2, 3, 0, 1]);
     let ref z = ag::reshape(z, &[15, 8]);
+    let ref z = ag::matmul(z, v2);
     let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
@@ -436,7 +448,7 @@ fn sparse_softmax_cross_entropy() {
 
 #[test]
 fn gather() {
-    let ref v = ag::variable(ag::ndarray_ext::zeros(&[5, 4, 8, 2]));
+    let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[5, 4, 8, 2]));
     let ref x = ag::constant(ndarray::arr2(&[[5., 4., 3.], [2., 1., 0.]]));
     let ref z = ag::gather(v, x, 2);
     let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&[5, 4, 2, 3, 2])]);
@@ -653,7 +665,10 @@ fn primitive_back_propagation_through_time() {
                     .into_dyn()
                     .view(),
             ),
-            ag::Feed(&h_buf[0], ag::ndarray_ext::zeros(&[batch_size, 3]).view()),
+            ag::Feed(
+                &h_buf[0],
+                ag::ndarray_ext::standard_normal(&[batch_size, 3]).view(),
+            ),
         ],
         1e-3,
         1e-3,

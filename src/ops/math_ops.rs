@@ -38,7 +38,7 @@ pub struct LogSumExp {
     pub keep_dims: bool,
 }
 pub struct Transpose {
-    pub zip: bool,
+    pub invert_axes: bool,
 }
 
 #[inline(always)]
@@ -170,12 +170,12 @@ macro_rules! impl_cmp_op {
 
 impl_cmp_op!(Equal, "Equal", equal, none_grad);
 impl_cmp_op!(NotEqual, "NotEqual", not_equal, none_grad);
-impl_cmp_op!(Greater, "", greater, none_grad);
-impl_cmp_op!(Lesser, "", lesser, none_grad);
-impl_cmp_op!(GreaterEqual, "", greater_equal, none_grad);
-impl_cmp_op!(LesserEqual, "", lesser_equal, none_grad);
-impl_cmp_op!(Maximum, "", maximum, min_max_grad);
-impl_cmp_op!(Minimum, "", minimum, min_max_grad);
+impl_cmp_op!(Greater, "Greater", greater, none_grad);
+impl_cmp_op!(Lesser, "Lesser", lesser, none_grad);
+impl_cmp_op!(GreaterEqual, "GreaterEqual", greater_equal, none_grad);
+impl_cmp_op!(LesserEqual, "LesserEqual", lesser_equal, none_grad);
+impl_cmp_op!(Maximum, "Maximum", maximum, min_max_grad);
+impl_cmp_op!(Minimum, "Minimum", minimum, min_max_grad);
 
 fn none_grad<T: Float>(_: &Tensor<T>, _: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
     vec![None]
@@ -340,74 +340,40 @@ impl<T: Float> op::Op<T> for Transpose {
     ) -> op::ComputeResults<'v, T> {
         let xs = ctx.grab_inputs();
         let perm = &xs[1];
-        assert!(perm.len() >= 2);
+        let perm_len = perm.len();
+        assert!(perm_len >= 2);
 
-        //        let ret = if transpose_reversed(perm) {
-        //            crate::ArrRepr::View(xs[0].clone().reversed_axes())
-        //        } else {
-        // preprocess
-        let src_dst = if self.zip {
-            perm.iter()
-                .map(|&a| a.to_usize().unwrap())
-                .zip(0..perm.len())
-                .collect::<Vec<_>>()
-        } else {
-            let mut a = perm
-                .iter()
-                .map(|&a| a.to_usize().unwrap())
-                .enumerate()
-                .collect::<Vec<_>>();
-            a.sort_by_key(|sd| sd.1);
-            a
+        let ret = {
+            let mut dims = crate::uninitialized_vec::<usize>(perm_len);
+            for (i, d) in perm.iter().enumerate() {
+                if self.invert_axes {
+                    dims[d.to_usize().unwrap()] = i;
+                } else {
+                    dims[i] = d.to_usize().unwrap();
+                }
+            }
+            xs[0].clone().permuted_axes(dims.as_slice())
         };
 
-        // permutes dimensions
-        let ret = do_transpose(xs[0].clone(), src_dst);
-        //        };
-        vec![Ok(ret)]
+        if ret.is_standard_layout() {
+            vec![Ok(crate::ArrRepr::View(ret))]
+        } else {
+            // FIXME
+            // vec![Ok(crate::ArrRepr::View(ret))]
+            vec![Ok(crate::ArrRepr::Owned(crate::ndarray_ext::deep_copy(
+                &ret,
+            )))]
+        }
     }
 
     fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
         let gx = Tensor::builder()
             .set_inputs(vec![gy, inputs[1]])
             .set_shape(inputs[0].shape())
-            .build(Transpose { zip: !self.zip });
+            .build(Transpose {
+                invert_axes: !self.invert_axes,
+            });
         vec![Some(gx), None]
-    }
-}
-
-fn do_transpose<T: Float>(
-    mut x: NdArrayView<T>,
-    mut src_dst: Vec<(usize, usize)>,
-) -> crate::ArrRepr<T> {
-    for i in 0..src_dst.len() {
-        let (src, dst) = {
-            let sd = src_dst[i];
-            (sd.0, sd.1)
-        };
-
-        if src <= dst {
-            continue;
-        }
-
-        for j in (dst..src).rev() {
-            // "bigger to smaller" iteration is important
-            x.swap_axes(j, j + 1); // Swaps two axes
-                                   // Increments "src"es I passed by.
-            for sd in src_dst.iter_mut() {
-                if sd.0 == j {
-                    sd.0 += 1;
-                    break;
-                }
-            }
-        }
-
-        src_dst[i].0 = dst;
-    }
-    if x.is_standard_layout() {
-        crate::ArrRepr::View(x)
-    } else {
-        crate::ArrRepr::Owned(crate::ndarray_ext::deep_copy(&x))
     }
 }
 

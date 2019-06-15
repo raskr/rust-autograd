@@ -1,18 +1,11 @@
+use crate::ndarray;
 use crate::ndarray_ext;
 use crate::ndarray_ext::{NdArray, NdArrayView};
 use crate::op;
 use crate::ops;
 use crate::tensor::Tensor;
 use crate::Float;
-use ndarray;
-<<<<<<< HEAD
-=======
 use ndarray::SliceOrIndex;
-use ndarray_ext;
-use ndarray_ext::NdArray;
-use op;
-use ops;
->>>>>>> b2ed71d47e2d0c9284d241e7655f52b0430018fb
 use std::collections::HashSet;
 use std::iter::FromIterator;
 
@@ -21,19 +14,11 @@ pub struct ExpandDims;
 pub struct Squeeze;
 
 pub struct Slice {
-<<<<<<< HEAD
-    pub indices: Vec<ndarray::Si>,
+    pub indices: Vec<ndarray::Slice>,
 }
 
 pub struct SliceGrad {
-    pub indices: Vec<ndarray::Si>,
-=======
-    pub indices: Box<[ndarray::Slice]>,
-}
-
-pub struct SliceGrad {
-    pub indices: Box<[ndarray::Slice]>,
->>>>>>> b2ed71d47e2d0c9284d241e7655f52b0430018fb
+    pub indices: Vec<ndarray::Slice>,
 }
 
 pub struct Split {
@@ -222,7 +207,7 @@ impl<T: Float> op::Op<T> for Reshape {
         ctx: crate::runtime::OpComputeContext<'v, T>,
     ) -> op::ComputeResults<'v, T> {
         let xs = ctx.grab_inputs();
-        let ret = xs[0].clone();
+        let x = &xs[0];
         let shape_arr = &xs[1];
         let target = shape_arr
             .iter()
@@ -231,15 +216,20 @@ impl<T: Float> op::Op<T> for Reshape {
                     dim_size.to_usize().unwrap()
                 } else {
                     let product: T = shape_arr.iter().fold(T::one(), |acc, &x| acc * x);
-                    ret.len() / product.neg().to_usize().unwrap()
+                    x.len() / product.neg().to_usize().unwrap()
                 }
             })
             .collect::<Vec<_>>();
 
-        let ret = if let Ok(a) = ret.into_shape(ndarray::IxDyn(target.as_slice())) {
+        let ret = if let Ok(a) = x.clone().into_shape(ndarray::IxDyn(target.as_slice())) {
             Ok(crate::ArrRepr::View(a))
         } else {
-            panic!("Reshape: shape incompatible");
+            let copy = crate::ndarray_ext::deep_copy(x);
+            if let Ok(a) = copy.into_shape(ndarray::IxDyn(target.as_slice())) {
+                Ok(crate::ArrRepr::Owned(a))
+            } else {
+                panic!("Reshape failed: {:?} vs {:?}", x.shape(), target);
+            }
         };
         vec![ret]
     }
@@ -485,7 +475,7 @@ impl<T: Float> op::Op<T> for GatherGrad {
             );
 
             // squeeze
-            let mut gx_sliced = gx_sliced.remove_axis(ndarray::Axis(axis));
+            let mut gx_sliced = gx_sliced.index_axis_move(ndarray::Axis(axis), 0);
             // assign gy to sliced view
             gx_sliced.zip_mut_with(&gy_sub, |gx, &gy| {
                 *gx += gy;
@@ -679,10 +669,11 @@ impl<T: Float> op::Op<T> for ConcatGrad {
             .collect::<Vec<_>>();
 
         // Clone the *view*
-        let mut gy_ = gy.clone();
-        gy_.islice(ndarray::SliceInfo::new(indices).unwrap().as_ref());
+        let ret = gy
+            .clone()
+            .slice_move(ndarray::SliceInfo::new(indices).unwrap().as_ref());
         // do slice
-        vec![Ok(crate::ArrRepr::View(gy_))]
+        vec![Ok(crate::ArrRepr::View(ret))]
     }
 
     fn grad(&self, _: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
@@ -745,8 +736,9 @@ impl<T: Float> op::Op<T> for Split {
         let start_index = self.sizes[..self.index].iter().cloned().sum::<usize>() as isize;
         let end_index = start_index + self.sizes[self.index] as isize;
         let indices = make_indices_split(x, start_index, end_index, axis);
-        let mut ret = x.clone();
-        ret.islice(ndarray::SliceInfo::new(indices).unwrap().as_ref());
+        let ret = x
+            .clone()
+            .slice_move(ndarray::SliceInfo::new(indices).unwrap().as_ref());
         vec![Ok(crate::ArrRepr::View(ret))]
     }
 
@@ -840,23 +832,21 @@ impl<T: Float> op::Op<T> for Slice {
         &self,
         ctx: crate::runtime::OpComputeContext<'v, T>,
     ) -> op::ComputeResults<'v, T> {
-        let xs = ctx.grab_inputs();
         let mut y = ctx.grab_inputs()[0].clone();
-        y.islice(
+        y = y.slice_move(
             ndarray::SliceInfo::new(
-                self
-                    .indices
+                self.indices
                     .iter()
                     .map(|&si| SliceOrIndex::from(si))
                     .collect::<Vec<_>>(),
             )
             .unwrap()
             .as_ref(),
-        )
+        );
         // TODO: for now, if the size of last axis is 1, removing it.
-        let last_axis = ret.ndim() - 1;
+        let last_axis = y.ndim() - 1;
         let ret = if y.shape()[last_axis] == 1 {
-            y.remove_axis(ndarray::Axis(last_axis))
+            y.index_axis_move(ndarray::Axis(last_axis), 0)
         } else {
             y
         };
@@ -891,11 +881,10 @@ impl<T: Float> op::Op<T> for SliceGrad {
         // sliced view
         gx.slice_mut(
             ndarray::SliceInfo::<_, ndarray::IxDyn>::new(
-            self
-            .indices
-            .iter()
-            .map(|&si| ndarray::SliceOrIndex::from(si))
-            .collect::<Vec<_>>(),
+                self.indices
+                    .iter()
+                    .map(|&si| ndarray::SliceOrIndex::from(si))
+                    .collect::<Vec<_>>(),
             )
             .unwrap()
             .as_ref(),
@@ -935,7 +924,7 @@ impl<T: Float> op::Op<T> for Squeeze {
             let axis = axis - adjust;
             assert_eq!(1, x.shape()[axis], "Can't squeeze a dim whose size != 1");
             // axis making ok
-            x = x.remove_axis(ndarray::Axis(axis));
+            x = x.index_axis_move(ndarray::Axis(axis), 0);
             adjust += 1;
         }
         vec![Ok(crate::ArrRepr::View(x))]

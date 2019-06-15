@@ -554,6 +554,7 @@ impl<T: Float> op::Op<T> for MatMul {
         let x1 = &xs[1];
         let x0_shape = x0.shape();
         let x1_shape = x1.shape();
+
         assert_eq!(
             x0_shape.len(),
             2,
@@ -576,11 +577,9 @@ impl<T: Float> op::Op<T> for MatMul {
         }
         #[cfg(not(feature = "mkl"))]
         {
-            let x0_view = x0.clone();
-            let x1_view = x1.clone();
             // unwrap is always safe
-            let mut a = x0_view.into_shape((x0_shape[0], x0_shape[1])).unwrap();
-            let mut b = x1_view.into_shape((x1_shape[0], x1_shape[1])).unwrap();
+            let mut a = x0.clone().into_dimensionality::<ndarray::Ix2>().unwrap();
+            let mut b = x1.clone().into_dimensionality::<ndarray::Ix2>().unwrap();
             if self.transpose_a {
                 a.swap_axes(0, 1);
             }
@@ -736,11 +735,11 @@ impl<T: Float> op::Op<T> for BatchMatMul {
                 .map(|i| {
                     let x0_mat = x0_flattened
                         .slice(s![i..i + 1, .., ..])
-                        .remove_axis(ndarray::Axis(0))
+                        .index_axis_move(ndarray::Axis(0), 0)
                         .to_owned();
                     let x1_mat = x1_flattened
                         .slice(s![i..i + 1, .., ..])
-                        .remove_axis(ndarray::Axis(0))
+                        .index_axis_move(ndarray::Axis(0), 0)
                         .to_owned();
                     x0_mat.dot(&x1_mat).into_dyn()
                 })

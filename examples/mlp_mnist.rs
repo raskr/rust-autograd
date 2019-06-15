@@ -10,7 +10,7 @@ type Tensor = ag::Tensor<f32>;
 // 0.918 test accuracy after 3 epochs, 0.11 sec/epoch on 2.7GHz Intel Core i5
 //
 // First, run "./download_mnist.sh" beforehand if you don't have dataset and then run
-// "cargo run --example mlp_mnist --release" in `examples` directory.
+// "cargo run --example mlp_mnist --release --features mkl" in `examples` directory.
 //
 // NOTE: This example is written in define-by-run style, so
 // the performance is spoiled little bit.
@@ -64,8 +64,8 @@ fn main() {
             let perm = ag::ndarray_ext::permutation(num_batches) * batch_size as usize;
             for i in perm.into_iter() {
                 let i = *i as isize;
-                let x_batch = x_train.slice(s![i..i + batch_size, ..]);
-                let y_batch = y_train.slice(s![i..i + batch_size, ..]);
+                let x_batch = x_train.slice(s![i..i + batch_size, ..]).into_dyn();
+                let y_batch = y_train.slice(s![i..i + batch_size, ..]).into_dyn();
                 ag::eval(update_ops, &[ag::Feed(&x, x_batch), ag::Feed(&y, y_batch)]);
             }
         });
