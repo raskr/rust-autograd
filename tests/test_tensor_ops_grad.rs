@@ -389,7 +389,7 @@ fn elu() {
 
 #[test]
 fn relu() {
-    let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[2, 2]));
+    let ref v = ag::variable(ag::ndarray::arr1(&[0.2, 0.5]));
     let ref z = ag::relu(v);
     let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);

@@ -1,5 +1,6 @@
 use crate::tensor::Tensor;
 use crate::{Feed, Float};
+use crate::ndarray_ext;
 use std::cmp::Ordering;
 use std::collections::btree_set::BTreeSet;
 
@@ -21,6 +22,17 @@ pub fn check_theoretical_grads<'k, 'v, A, T>(
 
     // for each variable nodes
     for (var_node, th_grad) in variables.iter().zip(theoretical_grads) {
+        let th_copied = if th_grad.as_ref().unwrap().is_standard_layout() {
+            None
+        } else {
+            Some(ndarray_ext::deep_copy(&th_grad.as_ref().unwrap().view()))
+        };
+        let th_ptr = if let Some(ref inner) = th_copied {
+            inner.as_ptr()
+        } else {
+            th_grad.as_ref().unwrap().as_ptr()
+        };
+
         let v_arr = unsafe {
             var_node
                 .get_persistent_array_mut()
@@ -39,7 +51,12 @@ pub fn check_theoretical_grads<'k, 'v, A, T>(
             }
 
             // eval
-            let obj_pos = objective.eval(feeds.clone()).unwrap();
+            let obj_pos_orig = objective.eval(feeds).unwrap();
+            let obj_pos = if obj_pos_orig.is_standard_layout() {
+                obj_pos_orig
+            } else {
+                ndarray_ext::deep_copy(&obj_pos_orig.view())
+            };
 
             // perturbation (-)
             unsafe {
@@ -47,7 +64,12 @@ pub fn check_theoretical_grads<'k, 'v, A, T>(
             }
 
             // eval
-            let obj_neg = objective.eval(feeds.clone()).unwrap();
+            let obj_neg_orig = objective.eval(feeds).unwrap();
+            let obj_neg = if obj_neg_orig.is_standard_layout() {
+                obj_neg_orig
+            } else {
+                ndarray_ext::deep_copy(&obj_neg_orig.view())
+            };
 
             // restore
             unsafe {
@@ -56,13 +78,13 @@ pub fn check_theoretical_grads<'k, 'v, A, T>(
 
             let two = T::one() + T::one();
             let g_num = (obj_pos - obj_neg).scalar_sum() / (two * eps);
-            let g_th = unsafe { *th_grad.as_ref().unwrap().as_ptr().offset(i) };
+            let g_th = unsafe { *th_ptr.offset(i) };
 
             // compare
             let diff = (g_num - g_th).abs();
             if diff > tol {
                 panic!(
-                    "Gradient checking failed with too large error: num={}, bp={}",
+                    "Gradient checking failed with too large error: numerical={}, theoretical={}",
                     g_num, g_th
                 );
             }
