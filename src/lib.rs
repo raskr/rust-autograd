@@ -1,6 +1,30 @@
 //! This library provides differentiable operations and tensors. The current
 //! backend is rust-ndarray.
 //!
+//! # Features
+//! * **Lazy, side-effect-free tensors.**
+//! `autograd::Tensor<T>` itself doesn't have its value basically.
+//! It realizes graphs that are immutable and eagerly executable at any timing,
+//! that is, it supports both *run-by-define* and *define-by-run* naturally
+//! in the context of neural networks.
+//!
+//! * **Reverse-mode automatic differentiation.**
+//! There are a lot of [built-in operations](https://docs.rs/autograd/0.9.2/autograd/ops/index.html)
+//! that support *higher-order* derivatives, and
+//! you can [define your own ops](https://docs.rs/autograd/0.9.2/autograd/op/trait.Op.html) with ndarrays easily.
+//!
+//! * **Pure Rust.**
+//! The graph execution engine is implemented in pure Rust, so it's compilable to WebAssembly.
+//!
+//! ## Installation
+//!
+//! ```toml
+//! [dependencies]
+//! autograd = { version = "0.9.2", features = ["mkl"] }
+//! ```
+//! `mkl` feature is recommended to speedup gemm operations.
+//!
+//!
 //! # Examples
 //!
 //! Here we are computing partial derivatives of `z = 2x^2 + 3y + 1`.
@@ -71,7 +95,6 @@ extern crate num;
 extern crate num_traits;
 extern crate rand;
 extern crate rayon;
-extern crate slab;
 
 #[macro_use]
 #[doc(hidden)]
