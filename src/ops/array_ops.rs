@@ -220,17 +220,25 @@ impl<T: Float> op::Op<T> for Reshape {
                 }
             })
             .collect::<Vec<_>>();
-
-        let ret = if let Ok(a) = x.clone().into_shape(ndarray::IxDyn(target.as_slice())) {
-            Ok(crate::ArrRepr::View(a))
+        let ret = if x.is_standard_layout() {
+            if let Ok(a) = x.clone().into_shape(ndarray::IxDyn(target.as_slice())) {
+                Ok(crate::ArrRepr::View(a))
+            } else {
+                let copy = crate::ndarray_ext::deep_copy(x);
+                if let Ok(a) = copy.into_shape(ndarray::IxDyn(target.as_slice())) {
+                    Ok(crate::ArrRepr::Owned(a))
+                } else {
+                    panic!("Reshape failed: {:?} vs {:?}", x.shape(), target);
+                }
+            }
         } else {
-            let copy = crate::ndarray_ext::deep_copy(x);
-            if let Ok(a) = copy.into_shape(ndarray::IxDyn(target.as_slice())) {
+            if let Ok(a) = ndarray_ext::deep_copy(x).into_shape(ndarray::IxDyn(target.as_slice())) {
                 Ok(crate::ArrRepr::Owned(a))
             } else {
                 panic!("Reshape failed: {:?} vs {:?}", x.shape(), target);
             }
         };
+
         vec![ret]
     }
 

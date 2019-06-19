@@ -149,7 +149,8 @@ pub fn copy_if_dirty<T: Float>(x: &NdArrayView<T>) -> Option<NdArray<T>> {
 
 #[inline]
 pub fn deep_copy<T: Float>(x: &NdArrayView<T>) -> NdArray<T> {
-    NdArray::from_shape_fn(x.shape(), |i| x[i])
+    let vec = x.iter().cloned().collect::<Vec<_>>();
+    NdArray::from_shape_vec(x.shape(), vec).unwrap()
 }
 
 #[doc(hidden)]
@@ -347,6 +348,8 @@ use rand::{self, Rng, XorShiftRng};
 use std::cell::RefCell;
 use std::marker::PhantomData;
 
+
+/// See https://github.com/raskr/rust-autograd/issues/1.
 pub struct ArrRng<T: Float, R = XorShiftRng> {
     phantom: PhantomData<T>,
     rng: RefCell<R>,

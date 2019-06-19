@@ -127,6 +127,20 @@ impl<'k, T: Float> Tensor<T> {
     }
 }
 
+/// An object sent to `ag::Eval`, `ag::eval` or `Tensor::eval` to fill a placeholder tensor
+///
+/// The first argument should be a tensor made from `ag::placeholder`.
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let x = ag::placeholder(&[2]);
+///
+/// // Fills placeholder, then eval
+/// let arr = ndarray::arr1(&[1., 1.]).into_dyn();
+/// x.eval(&[ag::Feed(&x, arr.view())]);
+/// ```
 pub struct Feed<'k, 'f, T: Float>(
     pub &'k Tensor<T>,                             // a placeholder tensor
     pub ndarray::ArrayView<'f, T, ndarray::IxDyn>, // its value
@@ -278,10 +292,9 @@ where
         for t in tensors {
             let t = t.as_ref();
             if !t.is_placeholder && !t.has_persistent_array() {
-                let info = &node_info_storage[t.resource_lookup_key.get()].info_list[0];
+                let info = &mut node_info_storage[t.resource_lookup_key.get()].info_list[0];
                 if let ValueType::View = info.ty {
-                    node_info_storage[t.resource_lookup_key.get()].info_list[0].value =
-                        Some(view_storage[info.key].to_owned());
+                    info.value = Some(view_storage[info.key].to_owned());
                 }
             }
         }
@@ -290,10 +303,9 @@ where
     for t in tensors {
         let t = t.as_ref();
         if !t.is_placeholder && !t.has_persistent_array() {
-            let info = &node_info_storage[t.resource_lookup_key.get()].info_list[0];
+            let info = &mut node_info_storage[t.resource_lookup_key.get()].info_list[0];
             if let ValueType::Owned = info.ty {
-                node_info_storage[t.resource_lookup_key.get()].info_list[0].value =
-                    Some(owned_storage[info.key].to_owned());
+                info.value = Some(owned_storage[info.key].to_owned());
             }
         }
     }

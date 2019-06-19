@@ -1425,6 +1425,8 @@ pub fn sparse_softmax_cross_entropy<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tens
 ///
 /// assert_eq!(c.eval(&[]).unwrap().shape(), &[4, 3]);
 /// ```
+///
+/// This function supports only f32 and f64.
 pub fn matmul<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>>(a: A, b: B) -> Tensor<T> {
     let op = dot_ops::MatMul {
         transpose_a: false,
@@ -1451,6 +1453,8 @@ pub fn matmul<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>>(a: A, b: B) ->
 ///
 /// assert_eq!(c.eval(&[]).unwrap().shape(), &[4, 3]);
 /// ```
+///
+/// This function supports only f32 and f64.
 pub fn matmul_t<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>>(
     a: A,
     b: B,
@@ -1477,6 +1481,8 @@ pub fn matmul_t<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>>(
 /// Note1: length of a_axes and b_axes must match.
 ///
 /// Note2: Each axis number can be negative.
+///
+/// Note3: Supports only f32 and f64.
 ///
 /// ```
 /// extern crate autograd as ag;
@@ -1558,6 +1564,7 @@ where
 /// assert_eq!(c.eval(&[]).unwrap().shape(), &[2, 3, 4, 3]);
 /// ```
 ///
+/// This function supports only f32 and f64.
 /// For detailed description, see https://www.tensorflow.org/api_docs/python/tf/matmul
 pub fn batch_matmul_t<T, A, B>(a: A, b: B, trans_a: bool, trans_b: bool) -> Tensor<T>
 where
@@ -1588,6 +1595,7 @@ where
 /// assert_eq!(c.eval(&[]).unwrap().shape(), &[2, 3, 4, 3]);
 /// ```
 ///
+/// This function supports only f32 and f64.
 /// For detailed description, see https://www.tensorflow.org/api_docs/python/tf/matmul
 pub fn batch_matmul<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>>(a: A, b: B) -> Tensor<T> {
     let op = dot_ops::BatchMatMul {
@@ -1887,6 +1895,8 @@ pub fn random_uniform<T: Float, AL: ArrayLike<T>>(shape: &AL, min: f64, max: f64
 }
 
 /// Outputs values sampled from the uniform distribution.
+///
+/// See https://github.com/raskr/rust-autograd/issues/1.
 pub fn random_uniform_rng<T: Float, AL: ArrayLike<T>, R: Rng + 'static>(
     arr_rng: ArrRng<T, R>,
     shape: &AL,
@@ -1906,6 +1916,8 @@ pub fn standard_normal<T: Float, AL: ArrayLike<T>>(shape: &AL) -> Tensor<T> {
 }
 
 /// Outputs values sampled from the standard normal distribution.
+///
+/// See https://github.com/raskr/rust-autograd/issues/1.
 pub fn standard_normal_rng<T: Float, AL: ArrayLike<T>, R: Rng + 'static>(
     arr_rng: ArrRng<T, R>,
     shape: &AL,
@@ -1923,6 +1935,8 @@ pub fn standard_uniform<T: Float, AL: ArrayLike<T>>(shape: &AL) -> Tensor<T> {
 }
 
 /// Outputs values sampled from the standard uniform distribution.
+///
+/// See https://github.com/raskr/rust-autograd/issues/1.
 pub fn standard_uniform_rng<T: Float, AL: ArrayLike<T>, R: Rng + 'static>(
     arr_rng: ArrRng<T, R>,
     shape: &AL,
@@ -1940,6 +1954,8 @@ pub fn bernoulli<T: Float, AL: ArrayLike<T>>(shape: &AL, p: f64) -> Tensor<T> {
 }
 
 /// Outputs values sampled from the bernoulli distribution.
+///
+/// See https://github.com/raskr/rust-autograd/issues/1.
 pub fn bernoulli_rng<T: Float, AL: ArrayLike<T>, R: Rng + 'static>(
     arr_rng: ArrRng<T, R>,
     shape: &AL,
@@ -1958,6 +1974,8 @@ pub fn random_exp<T: Float, AL: ArrayLike<T>>(shape: &AL, lambda: f64) -> Tensor
 }
 
 /// Outputs values sampled from the exponential distribution.
+///
+/// See https://github.com/raskr/rust-autograd/issues/1.
 pub fn random_exp_rng<T: Float + 'static, AL: ArrayLike<T>, R: Rng + 'static>(
     arr_rng: ArrRng<T, R>,
     shape: &AL,
@@ -1980,6 +1998,8 @@ pub fn random_gamma<T: Float, AL: ArrayLike<T>>(
 }
 
 /// Outputs values sampled from the gamma distribution.
+///
+/// See https://github.com/raskr/rust-autograd/issues/1.
 pub fn random_gamma_rng<T: Float, AL: ArrayLike<T>, R: Rng + 'static>(
     arr_rng: ArrRng<T, R>,
     shape: &AL,
@@ -1999,6 +2019,8 @@ pub fn log_normal<T: Float, AL: ArrayLike<T>>(shape: &AL, mean: f64, stddev: f64
 }
 
 /// Outputs values sampled from the log-normal distribution.
+///
+/// See https://github.com/raskr/rust-autograd/issues/1.
 pub fn log_normal_rng<T: Float, AL: ArrayLike<T>, R: Rng + 'static>(
     arr_rng: ArrRng<T, R>,
     shape: &AL,
@@ -2110,6 +2132,7 @@ pub fn _range<T: Float, AL: ArrayLike<T>>(start: &AL, end: &AL, step: &AL) -> Te
 ///   * `out_h` = `(h + 2 * pad - filter_h) / stride + 1`
 ///   * `out_w` = `(w + 2 * pad - filter_w) / stride + 1`
 ///
+/// This function supports only f32 and f64.
 pub fn conv2d<T, A, B>(x: A, w: B, pad: usize, stride: usize) -> Tensor<T>
 where
     T: Float,
@@ -2137,6 +2160,7 @@ where
 ///   * `out_h` = `(h + 2 * pad - (dilate * (filter - 1) + 1)) / stride + 1`
 ///   * `out_w` = `(w + 2 * pad - (dilate * (filter - 1) + 1)) / stride + 1`
 ///
+/// This function supports only f32 and f64.
 pub fn dilated_conv2d<A, B, T>(x: A, w: B, pad: usize, stride: usize, dilate: usize) -> Tensor<T>
 where
     T: Float,
@@ -2164,6 +2188,7 @@ where
 ///   * `out_h` = `stride * (h - 1) - pad + filter_h`
 ///   * `out_w` = `stride * (w - 1) - pad + filter_w`
 ///
+/// This function supports only f32 and f64.
 pub fn conv2d_transpose<T, A, B>(x: A, w: B, pad: usize, stride: usize) -> Tensor<T>
 where
     T: Float,
@@ -2191,6 +2216,7 @@ where
 ///   * `out_h` = `stride * (h - 1) - pad + (dilate * (filter_h - 1) + 1)`
 ///   * `out_w` = `stride * (w - 1) - pad + (dilate * (filter_w - 1) + 1)`
 ///
+/// This function supports only f32 and f64.
 pub fn dilated_conv2d_transpose<T, A, B>(
     x: A,
     w: B,
@@ -2223,6 +2249,7 @@ where
 ///   * `out_h` = `(h + 2 * pad - pool_size) / stride + 1`
 ///   * `out_w` = `(w + 2 * pad - pool_size) / stride + 1`
 ///
+/// This function supports only f32 and f64.
 pub fn max_pool2d<T: Float, A: AsRef<Tensor<T>>>(
     x: A,
     pool_size: usize,

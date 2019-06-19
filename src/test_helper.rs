@@ -5,7 +5,7 @@ use std::cmp::Ordering;
 use std::collections::btree_set::BTreeSet;
 
 /// Checks the validity of `gradients` with finite difference trick.
-/// For this test only, `variables` must be "shared" variables.
+/// For this test only, `variables` must be *shared* variables.
 pub fn check_theoretical_grads<'k, 'v, A, T>(
     objective: &'k Tensor<T>,
     gradients: &'k [A],

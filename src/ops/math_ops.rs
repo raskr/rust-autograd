@@ -355,15 +355,7 @@ impl<T: Float> op::Op<T> for Transpose {
             xs[0].clone().permuted_axes(dims.as_slice())
         };
 
-        if ret.is_standard_layout() {
-            vec![Ok(crate::ArrRepr::View(ret))]
-        } else {
-            // FIXME
-            // vec![Ok(crate::ArrRepr::View(ret))]
-            vec![Ok(crate::ArrRepr::Owned(crate::ndarray_ext::deep_copy(
-                &ret,
-            )))]
-        }
+        vec![Ok(crate::ArrRepr::View(ret))]
     }
 
     fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {

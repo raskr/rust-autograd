@@ -55,8 +55,6 @@ Another example: softmax regression for MNIST digits classification with Adam.
 
 ```rust
 // This achieves 0.918 test accuracy after 3 epochs, 0.11 sec/epoch on 2.7GHz Intel Core i5
-
-
 let ref w = ag::variable(ag::ndarray_ext::glorot_uniform::<f32>(&[28*28, 10]));
 let ref b = ag::variable(ag::ndarray_ext::zeros::<f32>(&[1, 10]));
 let ref x = ag::placeholder(&[-1, 28*28]);
@@ -81,5 +79,76 @@ for epoch in 0..max_epoch {
 }
 
 ```
+
+## Defining your own differentiable operations
+Many of well-known ops are pre-defined in `ag::ops`, but you can also
+implement custom ops by hand.
+
+```rust
+extern crate ndarray;
+extern crate autograd as ag;
+
+type NdArray<T: ag::Float> = ndarray::Array<T, ndarray::IxDyn>;
+
+// Implements `Op` trait for `Sigmoid`.
+struct Sigmoid;
+
+impl<T: ag::Float> ag::op::Op<T> for Sigmoid {
+
+    fn name(&self) -> &str {
+        "Sigmoid"
+    }
+
+    // In this method, any errors caused by bad user-inputs should results in "panic".
+    // (`ag::op::ComputeException` represents an exception rather than an error.)
+    fn compute<'v>(
+        &self,
+        ctx: ag::runtime::OpComputeContext<'v, T>,
+    ) -> ag::op::ComputeResults<'v, T> {
+        let xs = ctx.grab_inputs();
+        let x = &xs[0];
+        // Use `ndarray::Array::mapv` for element-wise computation.
+        let half = T::from(0.5).unwrap();
+        let y = x.mapv(|a| ((a * half).tanh() * half) + half);
+        vec![Ok(ag::ArrRepr::Owned(y))]
+    }
+
+    fn grad(&self, gy: &ag::Tensor<T>, xs: &[&ag::Tensor<T>], y: &ag::Tensor<T>)
+        -> Vec<Option<ag::Tensor<T>>>
+    {
+        // Symbolic gradient of `x`
+        let gx = gy * (y - ag::square(y));
+        vec![Some(gx)]
+    }
+}
+
+// Symbolic `sigmoid` function for end-user.
+fn sigmoid<T: ag::Float>(x: &ag::Tensor<T>) -> ag::Tensor<T>
+{
+    ag::Tensor::builder()
+        .set_inputs(vec![x])
+        .set_shape(x.shape())
+        .build(Sigmoid)
+}
+```
+
+## Debugging
+You can register hooks on `ag::Tensor` objects.
+```rust
+extern crate autograd as ag;
+
+// `.p()` is a shorthand for `.with(ag::Hook::Print)`.
+let a: ag::Tensor<f32> = ag::zeros(&[4, 2]).p();
+let b: ag::Tensor<f32> = ag::ones(&[2, 3]);
+let c = ag::matmul(a, b);
+
+c.eval(&[]);
+// Zeros:
+// [[0.0, 0.0],
+// [0.0, 0.0],
+// [0.0, 0.0],
+// [0.0, 0.0]] shape=[4, 2], strides=[2, 1], layout=C (0x1)
+```
+
 For more, see [documentation](https://docs.rs/autograd/) or
 [examples](https://github.com/raskr/rust-autograd/tree/master/examples)

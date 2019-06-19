@@ -25,7 +25,7 @@ pub struct TensorCore<T: Float> {
     /// The rank number for topological ordering in a graph.
     pub top_rank: usize,
 
-    /// "Symbolic" shape of this tensor.
+    /// *Symbolic* shape of this tensor.
     pub shape: Option<Tensor<T>>,
 
     /// An optional "persistent" NdArray.
@@ -225,7 +225,16 @@ impl<T: Float> Tensor<T> {
 
     /// Evaluates this tensor as an ndarray object.
     ///
-    /// See [eval](../fn.eval.html).
+    /// ```
+    /// extern crate ndarray;
+    /// extern crate autograd as ag;
+    ///
+    /// let a = ag::zeros(&[2]);
+    ///
+    /// assert_eq!(a.eval(&[]), Some(ndarray::arr1(&[0., 0.]).into_dyn()));
+    /// ```
+    ///
+    /// See also [eval](../fn.eval.html).
     pub fn eval<'k, 'v>(
         &'k self,
         feeds: &'v [crate::runtime::Feed<'k, 'v, T>],
@@ -235,7 +244,16 @@ impl<T: Float> Tensor<T> {
 
     /// Returns the (symbolic) shape of this tensor.
     ///
-    /// See [shape](../ops/fn.shape.html).
+    /// ```
+    /// extern crate autograd as ag;
+    ///
+    /// let ref x: ag::Tensor<f32> = ag::zeros(&[2, 3]);
+    /// let ref s = x.shape();
+    ///
+    /// assert_eq!(&[2., 3.], s.eval(&[]).unwrap().as_slice().unwrap());
+    /// ```
+    ///
+    /// See also [shape](../ops/fn.shape.html).
     #[inline]
     pub fn shape(&self) -> Tensor<T> {
         crate::ops::shape(self)
@@ -243,14 +261,35 @@ impl<T: Float> Tensor<T> {
 
     /// Returns the (symbolic) rank of this tensor.
     ///
-    /// See [rank](../ops/fn.rank.html).
+    /// ```
+    /// extern crate ndarray;
+    /// extern crate autograd as ag;
+    ///
+    /// let ref x: ag::Tensor<f32> = ag::zeros(&[2, 3, 4]);
+    /// let ref r = x.rank();
+    ///
+    /// assert_eq!(3., r.eval(&[]).unwrap()[ndarray::IxDyn(&[])]);
+    /// ```
+    ///
+    /// See also [rank](../ops/fn.rank.html).
     pub fn rank(&self) -> Tensor<T> {
         crate::ops::rank(self)
     }
 
     /// Returns the (symbolic) size of this tensor.
     ///
-    /// See [size](../ops/fn.size.html).
+    ///
+    /// ```
+    /// extern crate ndarray;
+    /// extern crate autograd as ag;
+    ///
+    /// let ref a: ag::Tensor<f32> = ag::zeros(&[4, 3]);
+    /// let ref b = a.size();
+    ///
+    /// assert_eq!(12., b.eval(&[]).unwrap()[ndarray::IxDyn(&[])]);
+    /// ```
+    ///
+    /// See also [size](../ops/fn.size.html).
     pub fn size(&self) -> Tensor<T> {
         crate::ops::size(self)
     }
@@ -304,19 +343,19 @@ impl<T: Float> Tensor<T> {
     /// ```
     /// extern crate autograd as ag;
     ///
-    /// let a: ag::Tensor<f32> = ag::ones(&[4, 2]).with(ag::Hook::Print);
-    /// let b: ag::Tensor<f32> = ag::zeros(&[2, 3]).with(ag::Hook::PrintShape);
+    /// let a: ag::Tensor<f32> = ag::zeros(&[4, 2]).with(ag::Hook::Print);
+    /// let b: ag::Tensor<f32> = ag::ones(&[2, 3]).with(ag::Hook::PrintShape);
     /// let c = ag::matmul(a, b);
     ///
     /// c.eval(&[]);
-    /// // Shape of Ones:
-    /// // [2, 3]
-    /// //
     /// // Zeros:
     /// // [[0.0, 0.0],
     /// // [0.0, 0.0],
     /// // [0.0, 0.0],
     /// // [0.0, 0.0]] shape=[4, 2], strides=[2, 1], layout=C (0x1)
+    ///
+    /// // Shape of Ones:
+    /// // [2, 3]
     /// ```
     #[inline]
     pub fn with(&self, hook: crate::ops::Hook<T>) -> Tensor<T> {
@@ -339,7 +378,6 @@ impl<T: Float> Tensor<T> {
     /// let c = ag::matmul(a, b).with_fn(Box::new(|arr| println!("My shape: {:?}", arr.shape())));
     ///
     /// c.eval(&[]);
-    /// // MatMul:
     /// // My shape: [4, 3]
     /// ```
     #[inline]
@@ -349,7 +387,19 @@ impl<T: Float> Tensor<T> {
 
     /// Shorthand for `Tensor::with(crate::Hook::Print)`
     ///
-    /// See [with_fn](../tensor/fn.with.html)
+    /// See [with](../tensor/struct.Tensor.html#method.with)
+    ///
+    /// ```
+    /// extern crate autograd as ag;
+    ///
+    /// let a: ag::Tensor<f32> = ag::zeros(&[4, 2]).p();
+    /// a.eval(&[]);
+    /// // Zeros:
+    /// // [[0.0, 0.0],
+    /// // [0.0, 0.0],
+    /// // [0.0, 0.0],
+    /// // [0.0, 0.0]] shape=[4, 2], strides=[2, 1], layout=C (0x1)
+    /// ```
     #[inline]
     pub fn p(&self) -> Tensor<T> {
         self.with(crate::Hook::Print)
@@ -357,7 +407,16 @@ impl<T: Float> Tensor<T> {
 
     /// Shorthand for `Tensor::with(crate::Hook::PrintShape)`
     ///
-    /// See [with_fn](../tensor/fn.with.html)
+    /// See [with](../tensor/struct.Tensor.html#method.with)
+    ///
+    /// ```
+    /// extern crate autograd as ag;
+    ///
+    /// let a: ag::Tensor<f32> = ag::zeros(&[2, 3]).ps();
+    /// a.eval(&[]);
+    /// // Shape of Zeros:
+    /// // [2, 3]
+    /// ```
     #[inline]
     pub fn ps(&self) -> Tensor<T> {
         self.with(crate::Hook::PrintShape)
