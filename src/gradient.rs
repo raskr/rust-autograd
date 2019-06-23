@@ -1,4 +1,3 @@
-use crate::ops;
 use crate::tensor::Tensor;
 use crate::Float;
 use std::cmp::Ordering;
@@ -196,33 +195,24 @@ fn test_gradient_path() {
 /// This computes partial derivatives of `ys` with `xs` and returns the
 /// gradients. This is achieved by building a subgraph between `ys` and
 /// `xs` in reverse order from user's graph definition.
-/// `known_gys` are already known gradients of `ys`'s outputs.
+/// `gys` are already known gradients of `ys`'s outputs.
 ///
 /// NOTE: Nodes that do not have gradients won't be included in the subgraph to avoid
 /// unnecessary computation.
 pub fn symbolic_gradients<T: Float>(
     ys: &[&Tensor<T>],
     wrt: &[&Tensor<T>],
-    known_gys: &[Option<&Tensor<T>>],
+    gys: &[&Tensor<T>],
 ) -> Vec<Tensor<T>> {
-    assert_eq!(
-        ys.len(),
-        known_gys.len(),
-        "`ys.len()` must match `gys.len()`"
-    );
+    assert_eq!(ys.len(), gys.len(), "`ys.len()` must match `gys.len()`");
 
     // Setup gradient path.
     let mut path = mark_gradient_path(ys, wrt);
 
     // Set default grads.
-    for (y, gy) in ys.iter().zip(known_gys) {
+    for (y, gy) in ys.iter().zip(gys) {
         let mut y_info = &mut access_grad_info_of!(y, path);
-        if let &Some(gy) = gy {
-            // e.g. gy = ones
-            y_info.default_grad = Some(gy);
-        } else {
-            y_info.computed_grads.push(ops::scalar(T::one()));
-        }
+        y_info.default_grad = Some(gy);
     }
 
     // Prepare a heap with given ys.

@@ -71,17 +71,11 @@ impl<T: Float> Tensor<T> {
 /// Returns gradient tensors wrt input tensors.
 ///
 /// # Arguments
-/// * `ys` - Targets of differentiation.
-/// * `xs` - Tensors with which differentiate `ys`; so its length must be same as `ys`'s.
-///
-/// NOTE: Each of `ys` **must** be a scalar (0-ranked tensor); otherwise it causes **undefined**
-/// behavior.
-/// For multi dimensional objectives, do `reduce_sum`/`reduce_mean` for all dimensionality or
-/// use [grad_with_default](fn.grad_with_default.html).
+/// * `ys` - Targets of differentiation that are arbitrary shapes.
+/// * `xs` - Tensors with which differentiate `ys`.
 ///
 /// # Returns
-/// Symbolic gradient tensors corresponding to `xs` in the same order as `xs`'s.
-///
+/// Symbolic gradient tensors of `xs` in the same order as `xs`'s.
 ///
 /// # Example
 /// Partial derivatives of `z = 2x^2 + 3y + 1`.
@@ -108,37 +102,51 @@ impl<T: Float> Tensor<T> {
 ///
 /// // dz/dx requires to fill the placeholder `x`
 /// assert_eq!(8., gx.eval(&[ag::Feed(x, ndarray::arr0(2.).into_dyn().view())]).unwrap()[ndarray::IxDyn(&[])]);
-///
 /// ```
-pub fn grad<T: Float>(ys: &[&Tensor<T>], xs: &[&Tensor<T>]) -> Vec<Tensor<T>> {
-    crate::gradient::symbolic_gradients(ys, xs, &vec![None; ys.len()])
+///
+/// See also [grad_with_default](fn.grad_with_default.html).
+pub fn grad<T, A, B>(ys: &[A], xs: &[B]) -> Vec<Tensor<T>>
+where
+    T: Float,
+    A: AsRef<Tensor<T>>,
+    B: AsRef<Tensor<T>>,
+{
+    let ys = ys
+        .iter()
+        .map(|y| crate::ops::reduce_sum_to_scalar(y))
+        .collect::<Vec<_>>();
+    let gys = (0..ys.len()).map(|_| scalar(T::one())).collect::<Vec<_>>();
+    unsafe { grad_with_default(&ys, xs, &gys) }
 }
 
-/// Returns gradient tensors wrt input tensors.
+/// Computes gradients with `ys`'s already known gradients.
+///
+/// Almost same spec as [grad](fn.grad.html)'s except that you can pass `ys`s already known gradients.
+/// If `ys_grads` are tensors filled with 1s, this function should be replaced with [grad](fn.grad.html).
+///
+/// NOTE: Please be careful to match `ys_grads[i].shape` and `ys[i].shape`,
+/// otherwise **undefined behavior** would happen.
 ///
 /// # Arguments
 /// * `ys` - Targets of differentiation.
 /// * `xs` - tensors with which differentiate `ys`.
-/// * `output_grads` - Already known gradients of `ys`.
-///
-/// The length must be same as `ys`'s. If **each objective is not a scalar**,
-/// you must pass the "Some" value. In most cases, it is initialized with 1s.
+/// * `ys_grads` - Already known gradients of `ys`.
 ///
 /// # Returns
-/// Symbolic gradient tensors corresponding to `xs` in the same order as `xs`'s.
-///
-/// For detailed, see [grad](fn.grad.html).
-pub fn grad_with_default<T: Float>(
-    ys: &[&Tensor<T>],
-    xs: &[&Tensor<T>],
-    output_grads: &[&Tensor<T>],
-) -> Vec<Tensor<T>> {
+/// Symbolic gradient tensors of `xs` in the same order as `xs`'s.
+pub unsafe fn grad_with_default<T, A, B, C>(ys: &[A], xs: &[B], ys_grads: &[C]) -> Vec<Tensor<T>>
+where
+    T: Float,
+    A: AsRef<Tensor<T>>,
+    B: AsRef<Tensor<T>>,
+    C: AsRef<Tensor<T>>,
+{
     crate::gradient::symbolic_gradients(
-        ys,
-        xs,
-        output_grads
-            .into_iter()
-            .map(|a| Some(a.as_ref()))
+        ys.iter().map(|a| a.as_ref()).collect::<Vec<_>>().as_slice(),
+        xs.iter().map(|a| a.as_ref()).collect::<Vec<_>>().as_slice(),
+        ys_grads
+            .iter()
+            .map(|a| a.as_ref())
             .collect::<Vec<_>>()
             .as_slice(),
     )
@@ -170,11 +178,10 @@ pub fn jacobians<T: Float>(
     xs: &[&Tensor<T>],
     objective_len: usize,
 ) -> Vec<Tensor<T>> {
-    // TODO: remove map
     let vec_vec = (0..objective_len as isize)
         .map(|i| {
             // For each scalar objective, computes gradients for all variables
-            crate::gradient::symbolic_gradients(&[&y.get(i)], xs, &[None])
+            grad(&[&y.get(i)], xs)
         })
         .collect::<Vec<Vec<_>>>();
 
@@ -192,15 +199,12 @@ pub fn jacobians<T: Float>(
 }
 
 /// (Experimental) Computes hessian vector product
-///
-/// `ys` must be scalars.
 pub fn _hessian_vector_product<T: Float>(
     ys: &[&Tensor<T>],
     xs: &[&Tensor<T>],
     vectors: &[&Tensor<T>],
 ) -> Vec<Tensor<T>> {
-    let grads =
-        crate::gradient::symbolic_gradients(ys, xs, &xs.iter().map(|_| None).collect::<Vec<_>>());
+    let grads = grad(ys, xs);
 
     let products = grads
         .iter()
@@ -210,7 +214,7 @@ pub fn _hessian_vector_product<T: Float>(
 
     let products = products.iter().map(|a| a).collect::<Vec<_>>();
 
-    crate::gradient::symbolic_gradients(products.as_slice(), xs, &[None])
+    grad(products.as_slice(), xs)
 }
 
 /// Stops gradient propagation.
@@ -224,9 +228,9 @@ pub fn stop_gradient<A: AsRef<Tensor<T>>, T: Float>(x: A) -> Tensor<T> {
         .build(gradient_ops::StopGradient)
 }
 
-/// Creates a shared variable tensor from an array object.
+/// Creates a shared variable tensor from an ndarray.
 ///
-/// A shared variable can be mutated with in-place ops or gradient descent methods
+/// A shared variable can be mutated with gradient descent methods
 /// implemented in `autograd::gradient_descent_ops`.
 /// For the usages, see https://github.com/perrier1034/rust-autograd/tree/master/examples.
 ///
@@ -249,6 +253,8 @@ pub fn variable<T: Float, D: ndarray::Dimension>(arr: ndarray::Array<T, D>) -> T
 }
 
 /// Creates a placeholder tensor.
+///
+/// Behaves like TensorFlow's placeholder object.
 ///
 /// ```
 /// extern crate ndarray;
@@ -969,6 +975,23 @@ pub fn reduce_min<AL: ArrayLike<T>, T: Float, A: AsRef<Tensor<T>>>(
     Tensor::builder()
         .set_inputs(vec![x.as_ref(), &axes.as_tensor()])
         .build(op)
+}
+
+/// Sum up all the elements to a scalar value (0-D Tensor).
+///
+/// ```
+/// extern crate ndarray;
+/// extern crate autograd as ag;
+///
+/// let ref x = ag::constant(ndarray::arr2(&[[2., 4.], [3., 1.]]));
+/// let ref y = ag::reduce_sum_to_scalar(&x);
+///
+/// assert_eq!(y.eval(&[]), Some(ndarray::arr0(10.).into_dyn()));
+/// ```
+pub fn reduce_sum_to_scalar<T: Float, A: AsRef<Tensor<T>>>(x: A) -> Tensor<T> {
+    Tensor::builder()
+        .set_input(x.as_ref())
+        .build(reduction_ops::ReduceSumToScalar)
 }
 
 /// Takes sum along specified axes.

@@ -23,6 +23,8 @@ pub struct ReduceProd {
     pub sparse_axes: bool,
 }
 
+pub struct ReduceSumToScalar;
+
 pub struct ReduceSum {
     pub keep_dims: bool,
     pub sparse_axes: bool,
@@ -109,6 +111,54 @@ fn preprocess_axes<T: Float>(
         ndarray_ext::sparse_to_dense(axes)
     } else {
         ndarray_ext::normalize_negative_axes(axes, x.ndim())
+    }
+}
+
+impl<T: Float> op::Op<T> for ReduceSumToScalar {
+    fn name(&self) -> &str {
+        "ReduceSumToScalar"
+    }
+
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> op::ComputeResults<'v, T> {
+        let xs = ctx.grab_inputs();
+        let x = &xs[0];
+        vec![Ok(crate::ArrRepr::Owned(ndarray::arr0(x.sum()).into_dyn()))]
+    }
+
+    fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
+        let gx = Tensor::builder()
+            .set_inputs(vec![gy, &inputs[0].shape()])
+            .build(ReduceSumToScalarGrad);
+        vec![Some(gx)]
+    }
+}
+
+struct ReduceSumToScalarGrad;
+
+impl<T: Float> op::Op<T> for ReduceSumToScalarGrad {
+    fn name(&self) -> &str {
+        "ReduceSumToScalarGrad"
+    }
+
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> op::ComputeResults<'v, T> {
+        let xs = ctx.grab_inputs();
+        let shape = ndarray_ext::as_shape(&xs[1]);
+        let ret = unsafe {
+            let x = *xs[0].as_ptr();
+            ndarray::ArrayD::<T>::from_elem(ndarray::IxDyn(shape.as_slice()), x)
+        };
+        vec![Ok(crate::ArrRepr::Owned(ret))]
+    }
+
+    fn grad(&self, gy: &Tensor<T>, _: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
+        let gx = Tensor::builder().set_input(gy).build(ReduceSumToScalar);
+        vec![Some(gx), None]
     }
 }
 
@@ -400,7 +450,7 @@ impl<T: Float> op::Op<T> for ReduceGradCommon {
         let xs = ctx.grab_inputs();
         //  broadcast `gy` into `target_shape`
         let gy = &xs[0];
-        let target_shape = ndarray_ext::vec_as_shape(&xs[1]); // x's shape
+        let target_shape = ndarray_ext::as_shape(&xs[1]); // x's shape
 
         if gy.shape() == target_shape.as_slice() {
             return vec![Ok(crate::ArrRepr::View(gy.clone()))];

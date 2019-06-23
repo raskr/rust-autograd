@@ -16,7 +16,7 @@ fn add_n() {
     let ref v2 = ag::variable(ndarray::arr1(&[1., 2., 3.]));
     let ref v3 = ag::variable(ndarray::arr1(&[1., 2., 3.]));
     let ref z = ag::add_n(&[v1, v2, v3]);
-    let ref g = ag::grad_with_default(&[z], &[v2], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v2]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v2], &[], 1e-3, 1e-3);
 }
 
@@ -24,7 +24,7 @@ fn add_n() {
 fn clip() {
     let ref v = ag::variable(ndarray::arr1(&[1., 2., 3.]));
     let ref z = ag::clip(v, 1.5, 2.5);
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -32,7 +32,7 @@ fn clip() {
 fn asinh() {
     let ref v = ag::variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
     let ref z = ag::asinh(v);
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -40,7 +40,7 @@ fn asinh() {
 fn acosh() {
     let ref v = ag::variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
     let ref z = ag::acosh(v);
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -48,7 +48,7 @@ fn acosh() {
 fn atanh() {
     let ref v = ag::variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
     let ref z = ag::atanh(v);
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -56,7 +56,7 @@ fn atanh() {
 fn sinh() {
     let ref v = ag::variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
     let ref z = ag::sinh(v);
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -64,7 +64,7 @@ fn sinh() {
 fn cosh() {
     let ref v = ag::variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
     let ref z = ag::cosh(v);
-    let ref g = ag::grad_with_default(&[z], &[v], &[&&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -72,7 +72,7 @@ fn cosh() {
 fn tanh() {
     let ref v = ag::variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
     let ref z = ag::tanh(v);
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -80,7 +80,7 @@ fn tanh() {
 fn asin() {
     let ref v = ag::variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
     let ref z = ag::asin(v);
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-2);
 }
 
@@ -88,7 +88,7 @@ fn asin() {
 fn acos() {
     let ref v = ag::variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
     let ref z = ag::acos(v);
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -96,7 +96,7 @@ fn acos() {
 fn atan() {
     let ref v = ag::variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
     let ref z = ag::atan(v);
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -104,7 +104,7 @@ fn atan() {
 fn sin() {
     let ref v = ag::variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
     let ref z = ag::sin(v);
-    let ref g = ag::grad_with_default(&[z], &[v], &[&&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -112,7 +112,7 @@ fn sin() {
 fn cos() {
     let ref v = ag::variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
     let ref z = ag::cos(v);
-    let ref g = ag::grad_with_default(&[z], &[v], &[&&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -120,7 +120,7 @@ fn cos() {
 fn tan() {
     let ref v = ag::variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
     let ref z = ag::tan(v);
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-2);
 }
 
@@ -128,7 +128,7 @@ fn tan() {
 fn pow() {
     let ref v = ag::variable(ag::ndarray_ext::random_uniform(&[3], 0.9, 1.1));
     let ref z = ag::pow(v, 1.1);
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -136,7 +136,7 @@ fn pow() {
 fn exp() {
     let ref v = ag::variable(ag::ndarray_ext::random_uniform(&[3], 0.9, 1.1));
     let ref z = ag::exp(v);
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-2);
 }
 
@@ -145,7 +145,7 @@ fn log() {
     use std::f32;
     let ref v = ag::variable(ag::ndarray_ext::random_uniform(&[3], 1., 1.1));
     let ref z = ag::log(v, f32::consts::E);
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-2);
 }
 
@@ -153,7 +153,7 @@ fn log() {
 fn expand_dims() {
     let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[3]));
     let ref z = ag::expand_dims(v, &[0, 2]);
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -161,7 +161,7 @@ fn expand_dims() {
 fn squeeze() {
     let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[3, 1, 2, 1]));
     let ref z = ag::squeeze(v, &[3, 1]);
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -170,7 +170,7 @@ fn matmul() {
     let ref a = ag::constant(ag::ndarray_ext::standard_normal::<f32>(&[4, 2]));
     let ref v = ag::variable(ag::ndarray_ext::standard_normal::<f32>(&[2, 3]));
     let ref z = ag::matmul(a, v);
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -179,7 +179,7 @@ fn batch_matmul() {
     let ref a = ag::constant(ag::ndarray_ext::standard_normal(&[2, 4, 2]));
     let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[2, 2, 3]));
     let ref z = ag::batch_matmul(a, v);
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -188,7 +188,7 @@ fn implicit_broadcast() {
     let ref x = ag::constant(ag::ndarray_ext::standard_normal(&[4, 3]));
     let ref b = ag::variable(ag::ndarray_ext::standard_normal(&[1, 3]));
     let ref z = x + b;
-    let ref g = ag::grad_with_default(&[z], &[b], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[b]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[b], &[], 1e-3, 1e-3);
 }
 
@@ -198,7 +198,7 @@ fn wx_plus_b() {
     let ref w = ag::variable(ag::ndarray_ext::standard_normal(&[2, 3]));
     let ref b = ag::variable(ag::ndarray_ext::standard_normal(&[1, 3]));
     let ref z = ag::matmul(x, w) + b;
-    let ref g = ag::grad_with_default(&[z], &[b], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[b]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[b], &[], 1e-3, 1e-3);
 }
 
@@ -206,7 +206,7 @@ fn wx_plus_b() {
 fn reduce_min() {
     let ref v = ag::variable(ndarray::arr2(&[[0., 1.], [3., 2.]]));
     let ref z = ag::reduce_min(v, &[1], false); // keep_dims=false
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -214,7 +214,7 @@ fn reduce_min() {
 fn reduce_min_keep() {
     let ref v = ag::variable(ndarray::arr2(&[[0., 1.], [3., 2.]]));
     let ref z = ag::reduce_min(v, &[1], true); // keep_dims=true
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -222,7 +222,7 @@ fn reduce_min_keep() {
 fn reduce_max() {
     let ref v = ag::variable(ndarray::arr2(&[[0., 1.], [3., 2.]]));
     let ref z = ag::reduce_max(v, &[1], false); // keep_dims=false
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -230,7 +230,7 @@ fn reduce_max() {
 fn reduce_max_keep() {
     let ref v = ag::variable(ndarray::arr2(&[[0., 1.], [3., 2.]]));
     let ref z = ag::reduce_max(v, &[1], true); // keep_dims=true
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -238,7 +238,7 @@ fn reduce_max_keep() {
 fn reduce_mean() {
     let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[3, 2, 2]));
     let ref z = ag::reduce_mean(v, &[1], false); // keep_dims=false
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -246,7 +246,7 @@ fn reduce_mean() {
 fn reduce_mean_keep() {
     let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[3, 2, 2]));
     let ref z = ag::reduce_mean(v, &[1], true); // keep_dims=true
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -254,7 +254,7 @@ fn reduce_mean_keep() {
 fn reduce_sum() {
     let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[3, 2, 2]));
     let ref z = ag::reduce_sum(v, &[1], false); // keep_dims=false
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -262,7 +262,7 @@ fn reduce_sum() {
 fn reduce_sum_keep() {
     let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[3, 2, 2]));
     let ref z = ag::reduce_sum(v, &[1], true); // keep_dims=true
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -270,7 +270,7 @@ fn reduce_sum_keep() {
 fn reduce_prod() {
     let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[3, 2, 2]));
     let ref z = ag::reduce_prod(v, &[1], false); // keep_dims=false
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -279,7 +279,7 @@ fn maximum() {
     let ref v1 = ag::variable(ndarray::arr1(&[1., 2., 3.]));
     let ref v2 = ag::variable(ndarray::arr1(&[4., 5., 6.]));
     let ref z = ag::maximum(v1, v2);
-    let ref g = ag::grad_with_default(&[z], &[v1, v2], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v1, v2]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v1, v2], &[], 1e-3, 1e-3);
 }
 
@@ -288,7 +288,7 @@ fn minimum() {
     let ref v1 = ag::variable(ndarray::arr1(&[1., 2., 3.]));
     let ref v2 = ag::variable(ndarray::arr1(&[4., 5., 6.]));
     let ref z = ag::minimum(v1, v2);
-    let ref g = ag::grad_with_default(&[z], &[v1, v2], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v1, v2]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v1, v2], &[], 1e-3, 1e-3);
 }
 
@@ -296,7 +296,7 @@ fn minimum() {
 fn abs() {
     let ref v = ag::variable(ndarray::arr1(&[1., 2., 3.]));
     let ref z = ag::abs(v);
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -304,7 +304,7 @@ fn abs() {
 fn neg() {
     let ref v = ag::variable(ag::ndarray_ext::standard_uniform(&[2, 3]));
     let ref z = ag::neg(v);
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -312,7 +312,7 @@ fn neg() {
 fn square() {
     let ref v = ag::variable(ag::ndarray_ext::standard_uniform(&[2, 3]));
     let ref z = ag::square(v);
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -320,7 +320,7 @@ fn square() {
 fn reciprocal() {
     let ref v = ag::variable(ag::ndarray_ext::random_uniform(&[2, 3], 1., 1.01));
     let ref z = ag::reciprocal(v);
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -328,17 +328,16 @@ fn reciprocal() {
 fn transpose() {
     let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[1, 2, 3, 4]));
     let ref z = ag::transpose(v, &[2, 3, 0, 1]);
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&[3, 4, 1, 2])]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
 #[test]
 fn reshape_after_transpose() {
-    let v: Vec<_> = (0..2 * 3 * 4).map(|a| a as f32).collect();
-    let ref v = ag::variable(ndarray::Array3::from_shape_vec((2, 3, 4), v).unwrap());
+    let ref v = ag::variable(ag::ndarray_ext::standard_uniform(&[2, 3, 4]));
     let ref z = ag::transpose(v, &[2, 1, 0]);
     let ref z = ag::reshape(z, &[4, 6]);
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -349,7 +348,7 @@ fn transpose_then_reshape_then_mm() {
     let ref z = ag::transpose(v, &[4, 2, 3, 0, 1]);
     let ref z = ag::reshape(z, &[15, 8]);
     let ref z = ag::matmul(z, v2);
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -358,7 +357,7 @@ fn add() {
     let ref a = ag::variable(ag::ndarray_ext::standard_normal(&[2, 2]));
     let ref b = ag::variable(ag::ndarray_ext::standard_normal(&[2, 2]));
     let ref z = a + b;
-    let ref g = ag::grad_with_default(&[z], &[a, b], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[a, b]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[a], &[], 1e-3, 1e-3);
 }
 
@@ -367,7 +366,7 @@ fn mul() {
     let ref a = ag::variable(ag::ndarray_ext::standard_normal(&[2, 2]));
     let ref b = ag::variable(ag::ndarray_ext::standard_normal(&[2, 2]));
     let ref z = a * b;
-    let ref g = ag::grad_with_default(&[z], &[a, b], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[a, b]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[a], &[], 1e-3, 1e-3);
 }
 
@@ -375,7 +374,7 @@ fn mul() {
 fn sigmoid() {
     let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[2, 2]));
     let ref z = ag::sigmoid(v);
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -383,7 +382,7 @@ fn sigmoid() {
 fn elu() {
     let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[2, 2]));
     let ref z = ag::elu(v, 1.);
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -391,7 +390,7 @@ fn elu() {
 fn relu() {
     let ref v = ag::variable(ag::ndarray::arr1(&[0.2, 0.5]));
     let ref z = ag::relu(v);
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -399,7 +398,7 @@ fn relu() {
 fn softplus() {
     let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[2, 2]));
     let ref z = ag::softplus(v);
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -407,7 +406,7 @@ fn softplus() {
 fn logsumexp() {
     let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[1, 3]));
     let ref z = ag::reduce_logsumexp(v, 1, true);
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&[1, 3])]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -415,7 +414,7 @@ fn logsumexp() {
 fn log_softmax() {
     let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[1, 3]));
     let ref z = ag::log_softmax(v, 1);
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -451,7 +450,7 @@ fn gather() {
     let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[5, 4, 8, 2]));
     let ref x = ag::constant(ndarray::arr2(&[[5., 4., 3.], [2., 1., 0.]]));
     let ref z = ag::gather(v, x, 2);
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&[5, 4, 2, 3, 2])]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -460,7 +459,7 @@ fn concat() {
     let ref v1 = ag::variable(ag::ndarray_ext::standard_normal(&[1, 2]));
     let ref v2 = ag::variable(ag::ndarray_ext::standard_normal(&[1, 2]));
     let ref z = ag::concat(&[v1, v2], 1);
-    let ref g = ag::grad_with_default(&[z], &[v1], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v1]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v1, v2], &[], 1e-3, 1e-3);
 }
 
@@ -468,7 +467,7 @@ fn concat() {
 fn slice() {
     let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[4, 4]));
     let ref z = ag::slice(v, &[0, 0], &[-1, 2]); // numpy equivalent is v[:, 0:2]
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -476,7 +475,7 @@ fn slice() {
 fn split() {
     let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[3, 7, 5]));
     let ref z = ag::split(v, &[2, 3, 2], 1);
-    let ref g = ag::grad_with_default(&[&z[1]], &[v], &[&ag::ones(&z[1].shape())]);
+    let ref g = ag::grad(&[&z[1]], &[v]);
     ag::test_helper::check_theoretical_grads(&z[1], g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -484,7 +483,7 @@ fn split() {
 fn flatten() {
     let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[4, 4]));
     let ref z = ag::flatten(v);
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -492,7 +491,7 @@ fn flatten() {
 fn reshape() {
     let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[4, 4]));
     let ref z = ag::reshape(v, &[4, 2, 2]);
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())]);
+    let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -501,8 +500,8 @@ fn reshape() {
 fn reshape_grad() {
     let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[4, 4]));
     let ref z = ag::reshape(&(v), &[4, 2, 2]);
-    let ref g = ag::grad_with_default(&[z], &[v], &[&ag::ones(&z.shape())])[0];
-    let ref gg = ag::grad_with_default(&[g], &[v], &[&ag::ones(&g.shape())]);
+    let ref g = ag::grad(&[z], &[v])[0];
+    let ref gg = ag::grad(&[g], &[v]);
     ag::test_helper::check_theoretical_grads(g, gg.as_slice(), &[v], &[], 1e-3, 1e-3);
 }
 
@@ -511,7 +510,7 @@ fn conv2d_transpose() {
     let ref x = ag::variable(ag::ndarray_ext::standard_normal(&[2, 2, 2, 2]));
     let ref w = ag::variable(ag::ndarray_ext::standard_normal(&[2, 3, 2, 2]));
     let ref y = ag::conv2d_transpose(x, w, 0, 1);
-    let ref g = ag::grad_with_default(&[y], &[w], &[&ag::ones(&y.shape())]);
+    let ref g = ag::grad(&[y], &[w]);
     ag::test_helper::check_theoretical_grads(y, g, &[w], &[], 1e-3, 1e-2);
 }
 
@@ -521,8 +520,8 @@ fn conv2d_transpose_filter_grad() {
     let ref x = ag::variable(ag::ndarray_ext::standard_normal(&[2, 2, 2, 2]));
     let ref w = ag::variable(ag::ndarray_ext::standard_normal(&[2, 3, 2, 2]));
     let ref y = ag::conv2d_transpose(x, w, 0, 1);
-    let ref g = ag::grad_with_default(&[y], &[w], &[&ag::ones(&y.shape())])[0];
-    let ref gg = ag::grad_with_default(&[g], &[w], &[&ag::ones(&g.shape())]);
+    let ref g = ag::grad(&[y], &[w])[0];
+    let ref gg = ag::grad(&[g], &[w]);
     ag::test_helper::check_theoretical_grads(g, gg, &[w], &[], 1e-3, 1e-2);
 }
 
@@ -532,8 +531,8 @@ fn conv2d_filter_grad() {
     let ref x = ag::variable(ag::ndarray_ext::standard_normal(&[2, 3, 5, 5]));
     let ref w = ag::variable(ag::ndarray_ext::standard_normal(&[2, 3, 2, 2]));
     let ref y = ag::conv2d(x, w, 0, 1);
-    let ref g = ag::grad_with_default(&[y], &[w], &[&ag::ones(&y.shape())])[0];
-    let ref gg = ag::grad_with_default(&[g], &[w], &[&ag::ones(&g.shape())]);
+    let ref g = ag::grad(&[y], &[w])[0];
+    let ref gg = ag::grad(&[g], &[w]);
     ag::test_helper::check_theoretical_grads(g, gg, &[w], &[], 1e-3, 1e-2);
 }
 
@@ -543,9 +542,11 @@ fn conv2d_grad() {
     let ref w = ag::variable(ag::ndarray_ext::standard_normal(&[2, 3, 2, 2]));
     let ref y = ag::conv2d(x, w, 0, 1);
     let ref gy = ag::variable(ag::ndarray_ext::ones(&[2, 2, 2, 2]));
-    let ref g = ag::grad_with_default(&[y], &[x], &[gy])[0];
-    let ref gg = ag::grad_with_default(&[g], &[gy], &[&ag::ones(&g.shape())])[0];
-    ag::test_helper::check_theoretical_grads(g, &[gg], &[gy], &[], 1e-3, 1e-2);
+    unsafe {
+        let ref g = ag::grad_with_default(&[y], &[x], &[gy])[0];
+        let ref gg = ag::grad(&[g], &[gy])[0];
+        ag::test_helper::check_theoretical_grads(g, &[gg], &[gy], &[], 1e-3, 1e-2);
+    }
 }
 
 #[test]
@@ -553,8 +554,8 @@ fn conv2d_xw_grad() {
     let ref x = ag::variable(ag::ndarray_ext::standard_normal(&[2, 3, 5, 5]));
     let ref w = ag::variable(ag::ndarray_ext::standard_normal(&[2, 3, 2, 2]));
     let ref y = ag::conv2d(x, w, 0, 1);
-    let ref g = ag::grad_with_default(&[y], &[w], &[&ag::ones(&y.shape())])[0];
-    let ref gg = ag::grad_with_default(&[g], &[x], &[&ag::ones(&g.shape())]);
+    let ref g = ag::grad(&[y], &[w])[0];
+    let ref gg = ag::grad(&[g], &[x]);
     ag::test_helper::check_theoretical_grads(g, gg, &[x], &[], 1e-3, 1e-2);
 }
 
@@ -564,8 +565,8 @@ fn conv2d_x_grad() {
     let ref x = ag::variable(ag::ndarray_ext::standard_normal(&[2, 3, 5, 5]));
     let ref w = ag::variable(ag::ndarray_ext::standard_normal(&[2, 3, 2, 2]));
     let ref y = ag::conv2d(x, w, 0, 1);
-    let ref g = ag::grad_with_default(&[y], &[x], &[&ag::ones(&y.shape())])[0];
-    let ref gg = ag::grad_with_default(&[g], &[x], &[&ag::ones(&g.shape())]);
+    let ref g = ag::grad(&[y], &[x])[0];
+    let ref gg = ag::grad(&[g], &[x]); // can't differentiate with x twice
     ag::test_helper::check_theoretical_grads(y, gg, &[x], &[], 1e-3, 1e-2);
 }
 
@@ -574,18 +575,15 @@ fn conv2d() {
     let ref x = ag::variable(ag::ndarray_ext::standard_normal(&[2, 3, 5, 5]));
     let ref w = ag::variable(ag::ndarray_ext::standard_normal(&[2, 3, 3, 3]));
     let ref y = ag::conv2d(x, w, 1, 2);
-    let ref g = ag::grad_with_default(&[y], &[x, w], &[&ag::ones(&y.shape())]);
+    let ref g = ag::grad(&[y], &[x, w]);
     ag::test_helper::check_theoretical_grads(y, g, &[x, w], &[], 1e-3, 1e-2);
 }
 
 #[test]
 fn max_pool2d() {
-    let arr_x = ndarray::Array::from_iter(0..2 * 2 * 3 * 3)
-        .into_shape(ndarray::IxDyn(&[2, 2, 3, 3]))
-        .unwrap();
-    let ref x = ag::variable(arr_x.map(|a| *a as f64));
+    let ref x = ag::variable(ag::ndarray_ext::standard_uniform(&[2, 2, 3, 3]));
     let ref y = ag::max_pool2d(x, 2, 0, 1);
-    let ref g = ag::grad_with_default(&[y], &[x], &[&ag::ones(&y.shape())]);
+    let ref g = ag::grad(&[y], &[x]);
     ag::test_helper::check_theoretical_grads(y, g, &[x], &[], 1e-3, 1e-2);
 }
 
@@ -600,9 +598,11 @@ fn max_pool2d_grad() {
         .into_shape(ndarray::IxDyn(&[2, 2, 2, 2]))
         .unwrap();
     let ref gy = ag::variable(arr_gx.map(|a| *a as f32));
-    let ref g = ag::grad_with_default(&[y], &[x], &[gy])[0];
-    let ref gg = ag::grad_with_default(&[g], &[gy], &[&ag::ones(&g.shape())])[0];
-    ag::test_helper::check_theoretical_grads(g, &[gg], &[gy], &[], 1e-3, 1e-2);
+    unsafe {
+        let ref g = ag::grad_with_default(&[y], &[x], &[gy])[0];
+        let ref gg = ag::grad(&[g], &[gy])[0];
+        ag::test_helper::check_theoretical_grads(g, &[gg], &[gy], &[], 1e-3, 1e-2);
+    }
 }
 
 #[test]
@@ -610,7 +610,7 @@ fn tensordot() {
     let ref a = ag::variable(ag::ndarray_ext::standard_normal(&[3, 4, 5]));
     let ref b = ag::constant(ag::ndarray_ext::standard_normal(&[4, 3, 2]));
     let ref c = ag::tensordot(a, b, &[1, 0], &[0, 1]);
-    let ref g = ag::grad_with_default(&[c], &[a], &[&ag::ones(&c.shape())]);
+    let ref g = ag::grad(&[c], &[a]);
     ag::test_helper::check_theoretical_grads(c, g, &[a], &[], 1e-3, 1e-2);
 }
 
@@ -653,7 +653,7 @@ fn primitive_back_propagation_through_time() {
 
     // inputs (batch_size=2, sentence_len=4)
     let params = &[lookup_table, wo, wh];
-    let ref g = ag::grad_with_default(&[loss], params, &[&ag::ones(&loss.shape())]);
+    let ref g = ag::grad(&[loss], params);
     ag::test_helper::check_theoretical_grads(
         loss,
         g.as_slice(),

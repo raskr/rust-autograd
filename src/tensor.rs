@@ -235,10 +235,7 @@ impl<T: Float> Tensor<T> {
     /// ```
     ///
     /// See also [eval](../fn.eval.html).
-    pub fn eval<'k, 'v>(
-        &'k self,
-        feeds: &'v [crate::runtime::Feed<'k, 'v, T>],
-    ) -> Option<NdArray<T>> {
+    pub fn eval<'k, 'v>(&self, feeds: &'v [crate::runtime::Feed<'k, 'v, T>]) -> Option<NdArray<T>> {
         crate::runtime::eval(&[self], feeds).remove(0)
     }
 

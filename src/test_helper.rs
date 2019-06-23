@@ -1,6 +1,6 @@
+use crate::ndarray_ext;
 use crate::tensor::Tensor;
 use crate::{Feed, Float};
-use crate::ndarray_ext;
 use std::cmp::Ordering;
 use std::collections::btree_set::BTreeSet;
 
@@ -17,6 +17,7 @@ pub fn check_theoretical_grads<'k, 'v, A, T>(
     A: AsRef<Tensor<T>>,
     T: Float,
 {
+    let objective = crate::ops::reduce_sum_to_scalar(objective);
     // backprop
     let theoretical_grads = crate::runtime::eval(gradients, feeds.clone());
 
