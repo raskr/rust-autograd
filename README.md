@@ -6,9 +6,9 @@
 Provides differentiable operations and tensors.
 
 ## Features
-* **Lazy, side-effect-free tensors.**
-`autograd::Tensor<T>` itself doesn't have its value basically.
-It realizes graphs that are immutable and eagerly executable at any timing, 
+* **Lazy, zero-copy and side-effect-free tensors.**
+`autograd::Tensor<T>` itself doesn't have its value basically (except for persistent tensors).
+It realizes graphs that are eagerly executable at any timing, 
 that is, it supports both *run-by-define* and *define-by-run* naturally
 in the context of neural networks.
 
@@ -99,17 +99,19 @@ impl<T: ag::Float> ag::op::Op<T> for Sigmoid {
         "Sigmoid"
     }
 
-    // In this method, any errors caused by bad user-inputs should results in "panic".
-    // (`ag::op::ComputeException` represents an exception rather than an error.)
+    // Core function to run this op.
+    // Any errors in this function must be reported by *panic*.
     fn compute<'v>(
         &self,
         ctx: ag::runtime::OpComputeContext<'v, T>,
     ) -> ag::op::ComputeResults<'v, T> {
         let xs = ctx.grab_inputs();
         let x = &xs[0];
-        // Use `ndarray::Array::mapv` for element-wise computation.
+        // Using `ndarray::Array::mapv` for element-wise computation.
         let half = T::from(0.5).unwrap();
         let y = x.mapv(|a| ((a * half).tanh() * half) + half);
+        // In some cases, you can return `ag::ArrRepr::View` for input arrays
+        // to reduce unnecessary copies.
         vec![Ok(ag::ArrRepr::Owned(y))]
     }
 

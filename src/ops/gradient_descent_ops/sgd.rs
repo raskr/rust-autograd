@@ -18,7 +18,9 @@ impl<T: Float> crate::op::Op<T> for SGDOp<T> {
         let xs = ctx.grab_inputs();
         let grad = &xs[1];
         unsafe {
-            crate::ndarray_ext::axpy(&xs[0], -self.lr, grad.as_ptr(), grad.shape());
+            if let Some(arr) = ctx.node(0).get_persistent_array_mut() {
+                arr.scaled_add(-self.lr, grad);
+            }
         }
         vec![Err(crate::op::ComputeException::NoOutput)]
     }

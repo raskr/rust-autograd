@@ -10,6 +10,7 @@ pub type NdArrayViewMut<'a, T> = ndarray::ArrayViewMut<'a, T, ndarray::IxDyn>;
 /// exposes array_gen
 pub use crate::array_gen::*;
 
+/// Op::compute's output
 #[derive(Clone)]
 pub enum ArrRepr<'v, T: Float> {
     Owned(NdArray<T>),
@@ -36,11 +37,15 @@ impl<'v, T: Float> ArrRepr<'v, T> {
     }
 }
 
+#[doc(hidden)]
 #[inline]
-pub fn arr_to_shape<T: Float>(arr: &NdArrayView<T>) -> Vec<usize> {
-    arr.iter()
-        .map(|&a| a.to_usize().unwrap())
-        .collect::<Vec<_>>()
+/// This works well only for small arrays
+pub fn as_shape<T: Float>(x: &NdArrayView<T>) -> Vec<usize> {
+    let mut target = Vec::with_capacity(x.len());
+    for &a in x.iter() {
+        target.push(a.to_usize().unwrap());
+    }
+    target
 }
 
 #[doc(hidden)]
@@ -155,17 +160,6 @@ pub fn deep_copy<T: Float>(x: &NdArrayView<T>) -> NdArray<T> {
 
 #[doc(hidden)]
 #[inline]
-/// This works well only for small arrays
-pub fn vec_as_shape<T: Float>(x: &NdArrayView<T>) -> Vec<usize> {
-    let mut target = Vec::with_capacity(x.len());
-    for &a in x.iter() {
-        target.push(a.to_usize().unwrap());
-    }
-    target
-}
-
-#[doc(hidden)]
-#[inline]
 pub fn scalar_shape<T: Float>() -> NdArray<T> {
     // safe unwrap
     NdArray::from_shape_vec(ndarray::IxDyn(&[0]), vec![]).unwrap()
@@ -211,28 +205,6 @@ pub fn into_mat<T: Float>(x: NdArray<T>) -> ndarray::Array<T, ndarray::Ix2> {
         (shape[0], shape[1])
     };
     x.into_shape(ndarray::Ix2(a, b)).unwrap()
-}
-
-#[doc(hidden)]
-pub unsafe fn assign<T: Float>(a: &NdArrayView<T>, b: *const T, b_shape: &[usize]) {
-    use std::mem;
-    assert_eq!(a.shape(), b_shape);
-    let size = a.len() as isize;
-    let c: *mut T = mem::transmute(a.as_ptr());
-    for i in 0..size {
-        *c.offset(i) = *b.offset(i);
-    }
-}
-
-#[doc(hidden)]
-pub unsafe fn axpy<T: Float>(a: &NdArrayView<T>, alpha: T, b: *const T, b_shape: &[usize]) {
-    use std::mem;
-    assert_eq!(a.shape(), b_shape);
-    let size = a.len() as isize;
-    let c: *mut T = mem::transmute(a.as_ptr());
-    for i in 0..size {
-        *c.offset(i) += alpha * *b.offset(i);
-    }
 }
 
 /// Generates ndarrays which can be fed to `autograd::variable()` etc.
@@ -347,7 +319,6 @@ use rand::distributions::IndependentSample;
 use rand::{self, Rng, XorShiftRng};
 use std::cell::RefCell;
 use std::marker::PhantomData;
-
 
 /// See https://github.com/raskr/rust-autograd/issues/1.
 pub struct ArrRng<T: Float, R = XorShiftRng> {

@@ -34,7 +34,7 @@ impl<T: Float> op::Op<T> for PreprocessBinOpGrad {
     ) -> op::ComputeResults<'v, T> {
         let xs = ctx.grab_inputs();
         let gy = &xs[0];
-        let x_shape_ = crate::ndarray_ext::vec_as_shape(&xs[1]);
+        let x_shape_ = crate::ndarray_ext::as_shape(&xs[1]);
         let x_shape = x_shape_.as_slice();
         let gy_shape = gy.shape();
 
@@ -111,7 +111,7 @@ impl<T: Float> op::Op<T> for PreprocessBinOpGradGrad {
         let xs = ctx.grab_inputs();
         let gy = xs[0].clone();
         let target_shape_ = &xs[1];
-        let target_shape_ = crate::ndarray_ext::vec_as_shape(target_shape_);
+        let target_shape_ = crate::ndarray_ext::as_shape(target_shape_);
         let target_shape = target_shape_.as_slice();
 
         if gy.shape() == target_shape {

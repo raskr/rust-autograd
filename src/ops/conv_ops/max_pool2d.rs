@@ -264,7 +264,7 @@ fn test_max_pool2d() {
 
 impl<T: Float> crate::op::Op<T> for MaxPool2DGrad {
     fn name(&self) -> &str {
-        "MaxPoolGrad"
+        "MaxPool2DGrad"
     }
 
     fn compute<'v>(

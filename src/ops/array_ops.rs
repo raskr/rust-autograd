@@ -220,6 +220,8 @@ impl<T: Float> op::Op<T> for Reshape {
                 }
             })
             .collect::<Vec<_>>();
+        // If x is *not* a c-contiguous, just copying it for now
+        // due to current state of ndarray: https://github.com/rust-ndarray/ndarray/issues/390
         let ret = if x.is_standard_layout() {
             if let Ok(a) = x.clone().into_shape(ndarray::IxDyn(target.as_slice())) {
                 Ok(crate::ArrRepr::View(a))
