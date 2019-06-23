@@ -109,7 +109,7 @@ pub struct TensorBuilder<T: Float> {
 pub struct KnownShape {
     shape: Vec<isize>,
     #[allow(dead_code)]
-    is_fully_defined: bool
+    is_fully_defined: bool,
 }
 
 impl KnownShape {
@@ -123,7 +123,10 @@ impl KnownShape {
                 panic!("Given shape ({:?}) contains invalid dim size(s)", &shape);
             }
         }
-        Self { shape, is_fully_defined }
+        Self {
+            shape,
+            is_fully_defined,
+        }
     }
 
     #[inline]
@@ -137,7 +140,7 @@ impl KnownShape {
             return false;
         }
         for (&i, &u) in self.shape.iter().zip(target) {
-            if i > 0 && i as usize != u{
+            if i > 0 && i as usize != u {
                 return false;
             }
         }

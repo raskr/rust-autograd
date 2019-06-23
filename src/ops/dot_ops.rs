@@ -794,3 +794,91 @@ impl<T: Float> op::Op<T> for BatchMatMul {
         vec![Some(opa), Some(opb)]
     }
 }
+
+pub struct TensordotPreprocess;
+
+#[inline]
+fn tensordot_preprocess<T: Float>(
+    shape: &[usize],
+    axes: &[usize],
+    flip: bool,
+) -> (Vec<T>, Vec<T>, Vec<T>) {
+    let free = (0..shape.len())
+        .filter(|i| !axes.contains(i))
+        .collect::<Vec<usize>>();
+    let mut free_dims = Vec::with_capacity(free.len());
+    let mut prod_free_dims = 1;
+    {
+        for &i in &free {
+            prod_free_dims *= shape[i];
+            free_dims.push(T::from(shape[i]).unwrap());
+        }
+    }
+    let prod_axes_dims = axes.iter().map(|&i| shape[i]).product::<usize>();
+
+    // make perm
+    let first = if flip { axes } else { &free };
+    let second = if flip { &free } else { axes };
+    let mut perm = Vec::with_capacity(first.len() + second.len());
+    for &a in first {
+        perm.push(T::from(a).unwrap());
+    }
+    for &a in second {
+        perm.push(T::from(a).unwrap());
+    }
+
+    // make new shape
+    let new_shape = if flip {
+        vec![
+            T::from(prod_axes_dims).unwrap(),
+            T::from(prod_free_dims).unwrap(),
+        ]
+    } else {
+        vec![
+            T::from(prod_free_dims).unwrap(),
+            T::from(prod_axes_dims).unwrap(),
+        ]
+    };
+
+    (perm, new_shape, free_dims)
+}
+
+impl<T: Float> op::Op<T> for TensordotPreprocess {
+    fn name(&self) -> &str {
+        "TensordotPreprocess"
+    }
+
+    fn compute<'v>(
+        &self,
+        ctx: crate::runtime::OpComputeContext<'v, T>,
+    ) -> op::ComputeResults<'v, T> {
+        let xs = ctx.grab_inputs();
+        let x0 = &xs[0];
+        let x1 = &xs[1];
+        let axes0 = crate::ndarray_ext::normalize_negative_axes(&xs[2], x0.ndim());
+        let axes1 = crate::ndarray_ext::normalize_negative_axes(&xs[3], x1.ndim());
+
+        let (perm0, new_shape0, mut free_dims0) = tensordot_preprocess(x0.shape(), &axes0, false);
+        let (perm1, new_shape1, free_dims1) = tensordot_preprocess(x1.shape(), &axes1, true);
+        free_dims0.extend(free_dims1);
+
+        let r0 =
+            NdArray::from_shape_vec(ndarray::IxDyn(&[free_dims0.len()]), free_dims0).unwrap();
+        let r1 = NdArray::from_shape_vec(ndarray::IxDyn(&[perm0.len()]), perm0).unwrap();
+        let r2 = NdArray::from_shape_vec(ndarray::IxDyn(&[perm1.len()]), perm1).unwrap();
+        let r3 = NdArray::from_shape_vec(ndarray::IxDyn(&[new_shape0.len()]), new_shape0).unwrap();
+        let r4 = NdArray::from_shape_vec(ndarray::IxDyn(&[new_shape1.len()]), new_shape1).unwrap();
+
+        vec![
+            Ok(crate::ArrRepr::Owned(r0)),
+            Ok(crate::ArrRepr::Owned(r1)),
+            Ok(crate::ArrRepr::Owned(r2)),
+            Ok(crate::ArrRepr::Owned(r3)),
+            Ok(crate::ArrRepr::Owned(r4)),
+        ]
+    }
+
+    fn grad(&self, _: &Tensor<T>, _: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
+        vec![None; 4]
+    }
+}

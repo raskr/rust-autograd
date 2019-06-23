@@ -1498,20 +1498,19 @@ pub fn matmul_t<T: Float, A: AsRef<Tensor<T>>, B: AsRef<Tensor<T>>>(
 /// Computes tensor-dot-product (tensor contraction) along specified axes.
 ///
 /// # Arguments
-/// * `a` - Input tensor
-/// * `b` - Input tensor
-/// * `a_axes` - Contraction axes
-/// * `b_axes` - Contraction axes
+/// * `a` - First input tensor
+/// * `b` - Second input tensor
+/// * `a_axes` - `a`'s Contraction axes
+/// * `b_axes` - `b`'s Contraction axes
 ///
-/// Note1: length of a_axes and b_axes must match.
+/// NOTE:
 ///
-/// Note2: Each axis number can be negative.
-///
-/// Note3: Supports only f32 and f64.
+/// * length of `a_axes` and `b_axes` must match.
+/// * Each axis number can be negative.
+/// * Supports only f32 and f64.
 ///
 /// ```
 /// extern crate autograd as ag;
-///
 ///
 /// let ref a: ag::Tensor<f32> = ag::zeros(&[3, 4, 5]);
 /// let ref b: ag::Tensor<f32> = ag::zeros(&[4, 3, 2]);
@@ -1528,50 +1527,22 @@ where
     B: AsRef<Tensor<T>>,
     AL: ArrayLike<T>,
 {
-    fn normalize_negative_axes<T: Float>(axes: &Tensor<T>, x_rank: &Tensor<T>) -> Tensor<T> {
-        let ref zero = zeros(&axes.shape());
-        let ge = greater_equal(axes, zero);
-        let lt = lesser(axes, zero);
-        add(mul(ge, axes), &mul(lt, &(axes + x_rank)))
-    }
+    // Preprocess
+    let pre = Tensor::builder()
+        .set_inputs(vec![a.as_ref(), b.as_ref(), &a_axes.as_tensor(), &b_axes.as_tensor()])
+        .build(dot_ops::TensordotPreprocess);
 
-    fn preprocess<T: Float, AL: ArrayLike<T>>(
-        x: &Tensor<T>,
-        axes: &AL,
-        flip: bool,
-    ) -> (Tensor<T>, Tensor<T>) {
-        let ref x_shape = x.shape();
-        let ref x_rank = x.rank();
-        let ref axes = normalize_negative_axes(&axes.as_tensor(), x_rank);
-        let ref free = setdiff1d(&_range(&scalar(T::zero()), x_rank, &scalar(T::one())), axes);
+    let final_shape = nth_tensor(&pre, 0);
+    let perm_a = nth_tensor(&pre, 1);
+    let perm_b = nth_tensor(&pre, 2);
+    let new_shape_a = nth_tensor(&pre, 3);
+    let new_shape_b = nth_tensor(&pre, 4);
 
-        let free_dims = gather(x_shape, free, 0);
-        let ref axes_dims = gather(x_shape, axes, 0);
-        let ref prod_free_dims = reduce_prod(&free_dims, &[0], true);
-        let ref prod_axes_dims = reduce_prod(axes_dims, &[0], true);
+    let a_reshaped = reshape(&transpose(a, &perm_a), &new_shape_a);
+    let b_reshaped = reshape(&transpose(b, &perm_b), &new_shape_b);
 
-        let (perm, new_shape) = if flip {
-            (
-                concat(&[axes, free], 0),
-                concat(&[prod_axes_dims, prod_free_dims], 0),
-            )
-        } else {
-            (
-                concat(&[free, axes], 0),
-                concat(&[prod_free_dims, prod_axes_dims], 0),
-            )
-        };
-
-        (reshape(&transpose(x, &perm), &new_shape), free_dims)
-    }
-
-    // main procedure
-    let ((a_reshaped, a_free_dims), (b_reshaped, b_free_dims)) = (
-        preprocess(a.as_ref(), a_axes, false),
-        preprocess(b.as_ref(), b_axes, true),
-    );
-    let ref mm = matmul(&a_reshaped, &b_reshaped);
-    let final_shape = concat(&[&a_free_dims, &b_free_dims], 0);
+    // matmul
+    let mm = matmul(&a_reshaped, &b_reshaped);
     reshape(mm, &final_shape)
 }
 
@@ -1680,7 +1651,7 @@ pub fn transpose<AL: ArrayLike<T>, T: Float, A: AsRef<Tensor<T>>>(x: A, perm: &A
 ///
 /// Splits `x` into `sizes.len()` parts along `axis`.
 ///
-/// The size of dimension of each part is `sizes[i]` on `axis`, but
+/// The size of dimension of each part is `sizes[i]` on `axis`, but is
 /// `x.shape[i]` on other axis (similar to TensorFlow's `split`).
 ///
 /// ```
@@ -1814,10 +1785,10 @@ pub fn gather_common<AL: ArrayLike<T>, T: Float, A: AsRef<Tensor<T>>>(
 /// extern crate autograd as ag;
 ///
 /// let ref param = ag::constant(ag::ndarray_ext::zeros::<f32>(&[5, 4, 8, 2]));
-/// let ref indices = ag::constant(ndarray::arr2(&[[5., 4., 3.], [2., 1., 0.]]));
+/// let ref indices = ag::constant(ndarray::arr2(&[[5., 4., 3.], [2., 1., 0.]]));  // shape: (2, 3)
 /// let ref y = ag::gather(param, indices, 2);
 ///
-/// assert_eq!(y.eval(&[]).unwrap().shape(), &[5, 4, 2, 3, 2])
+/// assert_eq!(y.eval(&[]).unwrap().shape(), &[5, 4, 2, 3, 2])  // [5, 4] + [2, 3] + [2g
 /// ```
 pub fn gather<AL, T, A>(param: A, indices: &AL, axis: isize) -> Tensor<T>
 where
