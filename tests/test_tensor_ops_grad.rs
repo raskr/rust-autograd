@@ -661,7 +661,7 @@ fn primitive_back_propagation_through_time() {
         &[
             ag::Feed(
                 sentences,
-                ndarray::arr2(&[[2., 3., 1., 3.], [0., 2., 0., 1.]])
+                ndarray::arr2(&[[2., 3., 1.], [0., 2., 0.]])
                     .into_dyn()
                     .view(),
             ),

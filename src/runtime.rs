@@ -196,7 +196,16 @@ where
                     let mut found = None;
                     for feed in feeds {
                         if Rc::ptr_eq(feed.0, node) {
-                            found = Some(feed.1.clone());
+                            let clone = feed.1.clone();
+                            if !node.known_shape.as_ref().unwrap().validate(clone.shape()) {
+                                panic!(
+                                    "Shape error: placeholder required {:?}, but got {:?}",
+                                    node.known_shape.as_ref().unwrap().get(),
+                                    clone.shape()
+                                );
+                            }
+                            found = Some(clone);
+
                             break;
                         }
                     }

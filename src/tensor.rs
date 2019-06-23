@@ -28,7 +28,7 @@ pub struct TensorCore<T: Float> {
     /// *Symbolic* shape of this tensor.
     pub shape: Option<Tensor<T>>,
 
-    /// An optional "persistent" NdArray.
+    /// An optional *persistent* NdArray.
     ///
     /// This is `Some` if this tensor is made from `ag::variable` or `ag::constant`.
     persistent_array: Option<PersistentArray<T>>,
@@ -49,6 +49,10 @@ pub struct TensorCore<T: Float> {
     ///
     /// This is same as `inputs` in most cases.
     pub inputs_on_backprop: Option<Vec<Tensor<T>>>,
+
+    /// Static shape of this tensor.
+    /// Each dim size is *signed* for placeholders.
+    pub known_shape: Option<KnownShape>,
 }
 
 enum PersistentArray<T: Float> {
@@ -99,6 +103,51 @@ pub struct TensorBuilder<T: Float> {
     persistent_array: Option<PersistentArray<T>>,
     input_indices: Option<Vec<usize>>,
     inputs_on_backprop: Option<Vec<Tensor<T>>>,
+    known_shape: Option<KnownShape>,
+}
+
+pub struct KnownShape {
+    shape: Vec<isize>,
+    #[allow(dead_code)]
+    is_fully_defined: bool
+}
+
+impl KnownShape {
+    #[inline]
+    pub fn new(shape: Vec<isize>) -> Self {
+        let mut is_fully_defined = true;
+        for &a in &shape {
+            if a == -1 {
+                is_fully_defined = false;
+            } else if a <= -1 || a == 0 {
+                panic!("Given shape ({:?}) contains invalid dim size(s)", &shape);
+            }
+        }
+        Self { shape, is_fully_defined }
+    }
+
+    #[inline]
+    pub fn get(&self) -> &[isize] {
+        self.shape.as_slice()
+    }
+
+    #[inline]
+    pub fn validate(&self, target: &[usize]) -> bool {
+        if self.shape.len() != target.len() {
+            return false;
+        }
+        for (&i, &u) in self.shape.iter().zip(target) {
+            if i > 0 && i as usize != u{
+                return false;
+            }
+        }
+        true
+    }
+
+    #[inline]
+    pub fn is_fully_defined(&self) -> bool {
+        self.is_fully_defined
+    }
 }
 
 #[test]
@@ -114,6 +163,12 @@ fn test_build() {
 }
 
 impl<T: Float> TensorBuilder<T> {
+    #[inline]
+    pub fn set_known_shape(mut self, s: KnownShape) -> TensorBuilder<T> {
+        self.known_shape = Some(s);
+        self
+    }
+
     #[inline]
     pub fn set_shape(mut self, s: Tensor<T>) -> TensorBuilder<T> {
         self.shape = Some(s);
@@ -205,6 +260,7 @@ impl<T: Float> TensorBuilder<T> {
             is_differentiable: self.can_have_gradient,
             input_indices,
             inputs_on_backprop: self.inputs_on_backprop,
+            known_shape: self.known_shape,
         }))
     }
 }
@@ -220,6 +276,7 @@ impl<T: Float> Tensor<T> {
             is_placeholder: false,
             input_indices: None,
             inputs_on_backprop: None,
+            known_shape: None,
         }
     }
 

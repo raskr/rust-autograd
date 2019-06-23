@@ -255,6 +255,7 @@ pub fn variable<T: Float, D: ndarray::Dimension>(arr: ndarray::Array<T, D>) -> T
 /// Creates a placeholder tensor.
 ///
 /// Behaves like TensorFlow's placeholder object.
+/// `shape_[i]` must be positive value, or -1 which means dynamic dim.
 ///
 /// ```
 /// extern crate ndarray;
@@ -284,6 +285,7 @@ pub fn placeholder<T: Float>(shape_: &[isize]) -> Tensor<T> {
     } else {
         b
     };
+    let b = b.set_known_shape(crate::tensor::KnownShape::new(shape_.to_vec()));
     b.build(basic_source_ops::Placeholder)
 }
 
