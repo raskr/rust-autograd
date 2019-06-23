@@ -5,7 +5,6 @@ use crate::op;
 use crate::ops;
 use crate::tensor::Tensor;
 use crate::Float;
-use ndarray::SliceOrIndex;
 use std::collections::HashSet;
 use std::iter::FromIterator;
 
@@ -14,23 +13,23 @@ pub struct ExpandDims;
 pub struct Squeeze;
 
 pub struct Slice {
-    pub indices: Vec<ndarray::Slice>,
+    pub indices: Vec<ndarray::SliceOrIndex>,
 }
 
 pub struct SliceGrad {
-    pub indices: Vec<ndarray::Slice>,
+    pub indices: Vec<ndarray::SliceOrIndex>,
 }
 
 pub struct Split {
     pub axis: isize,
-    pub sizes: Vec<usize>,
-    pub index: usize,
+    pub start_index: isize,
+    pub end_index: isize,
 }
 
 pub struct SplitGrad {
     pub axis: isize,
-    pub sizes: Vec<usize>,
-    pub index: usize,
+    pub start_index: isize,
+    pub end_index: isize,
 }
 
 pub struct Tile {
@@ -702,17 +701,8 @@ impl<T: Float> op::Op<T> for Tile {
     ) -> op::ComputeResults<'v, T> {
         let xs = ctx.grab_inputs();
         let x = &xs[0];
-
-        let axis = if self.axis >= 0 {
-            self.axis as usize
-        } else {
-            x.ndim() - 1
-        };
-
-        let mut views = vec![];
-        for _ in 0..self.num {
-            views.push(x.clone());
-        }
+        let axis = ndarray_ext::normalize_negative_axis(self.axis, x.ndim());
+        let views = (0..self.num).map(|_| x.clone()).collect::<Vec<_>>();
         let ret = if let Ok(ret) = ndarray::stack(ndarray::Axis(axis), views.as_slice()) {
             Ok(crate::ArrRepr::Owned(ret))
         } else {
@@ -736,27 +726,18 @@ impl<T: Float> op::Op<T> for Split {
         ctx: crate::runtime::OpComputeContext<'v, T>,
     ) -> op::ComputeResults<'v, T> {
         let x = &ctx.grab_inputs()[0];
-
-        let axis = if self.axis < 0 {
-            (x.ndim() as isize + self.axis) as usize
-        } else {
-            self.axis as usize
-        };
-
-        let start_index = self.sizes[..self.index].iter().cloned().sum::<usize>() as isize;
-        let end_index = start_index + self.sizes[self.index] as isize;
-        let indices = make_indices_split(x, start_index, end_index, axis);
-        let ret = x
-            .clone()
-            .slice_move(ndarray::SliceInfo::new(indices).unwrap().as_ref());
+        let axis = ndarray_ext::normalize_negative_axis(self.axis, x.ndim());
+        let mut ret = x.clone();
+        let indices = make_indices_for_split(x, self.start_index, self.end_index, axis);
+        ret.slice_collapse(&indices);
         vec![Ok(crate::ArrRepr::View(ret))]
     }
 
     fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
         let op = SplitGrad {
             axis: self.axis,
-            sizes: self.sizes.clone(),
-            index: self.index,
+            start_index: self.start_index,
+            end_index: self.end_index,
         };
         let gx = Tensor::builder()
             .set_inputs(vec![inputs[0], gy])
@@ -780,15 +761,8 @@ impl<T: Float> op::Op<T> for SplitGrad {
         let gy = &xs[1];
         let mut gx = NdArray::zeros(x.shape());
 
-        let axis = if self.axis < 0 {
-            (x.ndim() as isize + self.axis) as usize
-        } else {
-            self.axis as usize
-        };
-
-        let start_index = self.sizes[..self.index].iter().cloned().sum::<usize>() as isize;
-        let end_index = start_index + self.sizes[self.index] as isize;
-        let indices = make_indices_split(&x, start_index, end_index, axis);
+        let axis = ndarray_ext::normalize_negative_axis(self.axis, x.ndim());
+        let indices = make_indices_for_split(&x, self.start_index, self.end_index, axis);
 
         gx.slice_mut(
             ndarray::SliceInfo::<_, ndarray::IxDyn>::new(indices)
@@ -805,7 +779,7 @@ impl<T: Float> op::Op<T> for SplitGrad {
 }
 
 #[inline]
-fn make_indices_split<T: Float>(
+fn make_indices_for_split<T: Float>(
     x: &NdArrayView<T>,
     start_index: isize,
     end_index: isize,
@@ -843,24 +817,8 @@ impl<T: Float> op::Op<T> for Slice {
         ctx: crate::runtime::OpComputeContext<'v, T>,
     ) -> op::ComputeResults<'v, T> {
         let mut y = ctx.grab_inputs()[0].clone();
-        y = y.slice_move(
-            ndarray::SliceInfo::new(
-                self.indices
-                    .iter()
-                    .map(|&si| SliceOrIndex::from(si))
-                    .collect::<Vec<_>>(),
-            )
-            .unwrap()
-            .as_ref(),
-        );
-        // TODO: for now, if the size of last axis is 1, removing it.
-        let last_axis = y.ndim() - 1;
-        let ret = if y.shape()[last_axis] == 1 {
-            y.index_axis_move(ndarray::Axis(last_axis), 0)
-        } else {
-            y
-        };
-        vec![Ok(crate::ArrRepr::View(ret))]
+        y.slice_collapse(&self.indices);
+        vec![Ok(crate::ArrRepr::View(y))]
     }
 
     fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
@@ -890,14 +848,9 @@ impl<T: Float> op::Op<T> for SliceGrad {
         let mut gx = NdArray::zeros(x.shape());
         // sliced view
         gx.slice_mut(
-            ndarray::SliceInfo::<_, ndarray::IxDyn>::new(
-                self.indices
-                    .iter()
-                    .map(|&si| ndarray::SliceOrIndex::from(si))
-                    .collect::<Vec<_>>(),
-            )
-            .unwrap()
-            .as_ref(),
+            ndarray::SliceInfo::<_, ndarray::IxDyn>::new(&self.indices)
+                .unwrap()
+                .as_ref(),
         )
         .zip_mut_with(&gy, |a, &g| *a = g);
         vec![Ok(crate::ArrRepr::Owned(gx))]

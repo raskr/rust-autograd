@@ -632,7 +632,7 @@ fn primitive_back_propagation_through_time() {
 
     for i in 0..max_sent {
         // pick new word id
-        let id = ag::slice(sentences, &[0, i], &[-1, i + 1]);
+        let id = ag::squeeze(ag::slice(sentences, &[0, i], &[-1, i + 1]), &[-1]);
 
         let new_h = {
             // recall last h

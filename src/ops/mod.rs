@@ -1701,9 +1701,11 @@ pub fn transpose<AL: ArrayLike<T>, T: Float, A: AsRef<Tensor<T>>>(x: A, perm: &A
 pub fn split<T: Float, A: AsRef<Tensor<T>>>(x: A, sizes: &[usize], axis: isize) -> Vec<Tensor<T>> {
     (0..sizes.len())
         .map(|i| {
+            let start_index = sizes[..i].iter().cloned().sum::<usize>() as isize;
+            let end_index = start_index + sizes[i] as isize;
             let op = array_ops::Split {
-                sizes: sizes.to_vec(),
-                index: i,
+                start_index,
+                end_index,
                 axis,
             };
             Tensor::builder().set_input(x.as_ref()).build(op)
@@ -1733,11 +1735,17 @@ pub fn slice<T: Float, A: AsRef<Tensor<T>>>(x: A, starts: &[isize], ends: &[isiz
     let starts_ends = starts.iter().zip(ends.iter());
 
     let indices = starts_ends
-        .map(|(s, e)| ndarray::Slice::new(*s, if *e == -1 { None } else { Some(*e) }, 1))
-        .collect::<Vec<ndarray::Slice>>();
+        .map(|(s, e)| {
+            let slice = ndarray::Slice::new(*s, if *e == -1 { None } else { Some(*e) }, 1);
+            ndarray::SliceOrIndex::from(slice)
+        })
+        .collect::<Vec<ndarray::SliceOrIndex>>();
 
-    let op = array_ops::Slice { indices };
-    Tensor::builder().set_input(x.as_ref()).build(op)
+    //    let info = crate::ndarray::SliceInfo::new(indices).unwrap();
+
+    Tensor::builder()
+        .set_input(x.as_ref())
+        .build(array_ops::Slice { indices })
 }
 
 /// Concatenates input tensors along specified axis.
