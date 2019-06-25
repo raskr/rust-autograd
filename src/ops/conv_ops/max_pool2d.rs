@@ -320,6 +320,8 @@ impl<T: Float> crate::op::Op<T> for MaxPool2DGradGrad {
         let xs = ctx.grab_inputs();
         let ggx = &xs[0];
         let x_shape = ggx.shape();
+        let copied_ggx = ndarray_ext::copy_if_dirty(ggx);
+        let ggx = copied_ggx.map(|inner| inner.as_ptr()).unwrap_or(ggx.as_ptr());
         let batch = x_shape[0];
         let c = x_shape[1];
         let xh = x_shape[2];
@@ -329,7 +331,7 @@ impl<T: Float> crate::op::Op<T> for MaxPool2DGradGrad {
         let argmax = &xs[1];
         let ggy = if same_type::<T, f32>() {
             max_pool_grad_grad_f32(
-                ggx.as_ptr(),
+                ggx,
                 yh,
                 yw,
                 c,
@@ -338,7 +340,7 @@ impl<T: Float> crate::op::Op<T> for MaxPool2DGradGrad {
             )
         } else if same_type::<T, f64>() {
             max_pool_grad_grad_f64(
-                ggx.as_ptr(),
+                ggx,
                 yh,
                 yw,
                 c,
