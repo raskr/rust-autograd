@@ -13,9 +13,9 @@ that is, it supports both *run-by-define* and *define-by-run* naturally
 in the context of neural networks.
 
 * **Reverse-mode automatic differentiation.**
-There are a lot of [built-in operations](https://docs.rs/autograd/0.9.2/autograd/ops/index.html)
+There are a lot of [built-in operations](https://docs.rs/autograd/0.9.3/autograd/ops/index.html)
 that support *higher-order* derivatives, and
-you can [define your own ops](https://docs.rs/autograd/0.9.2/autograd/op/trait.Op.html) with ndarrays easily.
+you can [define your own ops](https://docs.rs/autograd/0.9.3/autograd/op/trait.Op.html) with ndarrays easily.
 
 * **Pure Rust.**
 The graph execution engine is implemented in pure Rust, so it's compilable to WebAssembly.
@@ -23,7 +23,7 @@ The graph execution engine is implemented in pure Rust, so it's compilable to We
 ## Installation
 ```
 [dependencies]
-autograd = { version = "0.9.2", features = ["mkl"] }
+autograd = { version = "0.9.3", features = ["mkl"] }
 ```
 `mkl` feature is recommended to speedup gemm operations.
 
