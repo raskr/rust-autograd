@@ -4,7 +4,7 @@ extern crate ndarray;
 #[test]
 fn get() {
     let ref v = ag::variable(ndarray::arr1(&[1., 2., 3.]));
-    let ref a: ag::Tensor<f32> = 2. * v;
+    let ref a: ag::Tensor<f64> = 2. * v;
     let ref z = a.get(1);
     let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -142,9 +142,9 @@ fn exp() {
 
 #[test]
 fn log() {
-    use std::f32;
+    use std::f64;
     let ref v = ag::variable(ag::ndarray_ext::random_uniform(&[3], 1., 1.1));
-    let ref z = ag::log(v, f32::consts::E);
+    let ref z = ag::log(v, f64::consts::E);
     let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-2);
 }
@@ -167,11 +167,11 @@ fn squeeze() {
 
 #[test]
 fn matmul() {
-    let ref a = ag::constant(ag::ndarray_ext::standard_normal::<f32>(&[4, 2]));
-    let ref v = ag::variable(ag::ndarray_ext::standard_normal::<f32>(&[2, 3]));
+    let ref a = ag::constant(ag::ndarray_ext::standard_normal::<f64>(&[4, 2]));
+    let ref v = ag::variable(ag::ndarray_ext::standard_normal::<f64>(&[2, 3]));
     let ref z = ag::matmul(a, v);
     let ref g = ag::grad(&[z], &[v]);
-    ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
+    ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 0.005);
 }
 
 #[test]
@@ -302,7 +302,7 @@ fn abs() {
 
 #[test]
 fn neg() {
-    let ref v = ag::variable(ag::ndarray_ext::standard_uniform(&[2, 3]));
+    let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[2, 3]));
     let ref z = ag::neg(v);
     let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -310,7 +310,7 @@ fn neg() {
 
 #[test]
 fn square() {
-    let ref v = ag::variable(ag::ndarray_ext::standard_uniform(&[2, 3]));
+    let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[2, 3]));
     let ref z = ag::square(v);
     let ref g = ag::grad(&[z], &[v]);
     ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -334,7 +334,7 @@ fn transpose() {
 
 #[test]
 fn reshape_after_transpose() {
-    let ref v = ag::variable(ag::ndarray_ext::standard_uniform(&[2, 3, 4]));
+    let ref v = ag::variable(ag::ndarray_ext::standard_normal(&[2, 3, 4]));
     let ref z = ag::transpose(v, &[2, 1, 0]);
     let ref z = ag::reshape(z, &[4, 6]);
     let ref g = ag::grad(&[z], &[v]);
@@ -581,7 +581,7 @@ fn conv2d() {
 
 #[test]
 fn max_pool2d() {
-    let ref x = ag::variable(ag::ndarray_ext::standard_uniform(&[2, 2, 3, 3]));
+    let ref x = ag::variable(ag::ndarray_ext::standard_normal(&[2, 2, 3, 3]));
     let ref y = ag::max_pool2d(x, 2, 0, 1);
     let ref g = ag::grad(&[y], &[x]);
     ag::test_helper::check_theoretical_grads(y, g, &[x], &[], 1e-3, 1e-2);
@@ -589,15 +589,11 @@ fn max_pool2d() {
 
 #[test]
 fn max_pool2d_grad() {
-    let arr_x = ndarray::Array::from_iter(0..2 * 2 * 3 * 3)
-        .into_shape(ndarray::IxDyn(&[2, 2, 3, 3]))
-        .unwrap();
-    let ref x = ag::variable(arr_x.map(|a| *a as f32));
+    let arr_x = ag::ndarray_ext::standard_normal::<f64>(&[2, 2, 3, 3]);
+    let arr_gx = ag::ndarray_ext::standard_normal::<f64>(&[2, 2, 2, 2]);
+    let ref x = ag::variable(arr_x);
     let ref y = ag::max_pool2d(x, 2, 0, 1);
-    let arr_gx = ndarray::Array::from_iter(0..2 * 2 * 2 * 2)
-        .into_shape(ndarray::IxDyn(&[2, 2, 2, 2]))
-        .unwrap();
-    let ref gy = ag::variable(arr_gx.map(|a| *a as f32));
+    let ref gy = ag::variable(arr_gx);
     unsafe {
         let ref g = ag::grad_with_default(&[y], &[x], &[gy])[0];
         let ref gg = ag::grad(&[g], &[gy])[0];

@@ -115,7 +115,7 @@ where
         .iter()
         .map(|y| crate::ops::reduce_sum_to_scalar(y))
         .collect::<Vec<_>>();
-    let gys = (0..ys.len()).map(|_| scalar(T::one())).collect::<Vec<_>>();
+    let gys = vec![scalar(T::one()); ys.len()];
     unsafe { grad_with_default(&ys, xs, &gys) }
 }
 
