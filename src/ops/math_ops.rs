@@ -98,13 +98,13 @@ macro_rules! impl_cmp_op {
 
                 let ret = if x0_is_scalar && x1_is_scalar {
                     let x1_elem = x1[ndarray::IxDyn(&[])];
-                    x0.map(move |a| $assign(a.clone(), x1_elem))
+                    x0.mapv(move |a| $assign(a, x1_elem))
                 } else if x0_is_scalar && !x1_is_scalar {
                     let x0_elem = x0[ndarray::IxDyn(&[])];
-                    x1.map(move |a| $assign(x0_elem, a.clone()))
+                    x1.mapv(move |a| $assign(x0_elem, a))
                 } else if !x0_is_scalar && x1_is_scalar {
                     let x1_elem = x1[ndarray::IxDyn(&[])];
-                    x0.map(move |a| $assign(a.clone(), x1_elem))
+                    x0.mapv(move |a| $assign(a, x1_elem))
                 } else {
                     // case that scalar is not involved
                     // Check the input ranks.

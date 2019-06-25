@@ -1546,16 +1546,16 @@ where
     reshape(mm, &final_shape)
 }
 
-/// Batched matrix multiplication.
+/// Batched matrix multiplication with inputs's transposition.
 ///
 /// The rank of `a` and `b` must be equals.
 ///
 /// ```
 /// extern crate autograd as ag;
 ///
-/// let ref a: ag::Tensor<f32> = ag::zeros(&[2, 3, 4, 2]);
+/// let ref a: ag::Tensor<f32> = ag::zeros(&[2, 3, 2, 4]);
 /// let ref b: ag::Tensor<f32> = ag::zeros(&[2, 3, 2, 3]);
-/// let ref c = ag::batch_matmul(a, b);
+/// let ref c = ag::batch_matmul_t(a, b, true, false);
 ///
 /// assert_eq!(c.eval(&[]).unwrap().shape(), &[2, 3, 4, 3]);
 /// ```

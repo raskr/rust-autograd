@@ -55,7 +55,7 @@ impl<T: Float> op::Op<T> for SigmoidCrossEntropy {
         let e = T::from(f64::consts::E).unwrap();
         let max_fn = T::max;
         let mut tmp: NdArray<T> =
-            x.map(move |a| ((-a.abs()).exp() + T::one()).log(e) + max_fn(T::zero(), *a));
+            x.mapv(move |a| ((-a.abs()).exp() + T::one()).log(e) + max_fn(T::zero(), a));
         tmp -= &(t * x);
         vec![Ok(crate::ArrRepr::Owned(tmp))]
     }

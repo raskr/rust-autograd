@@ -90,7 +90,7 @@ impl<T: Float> op::Op<T> for Softplus {
         use std::f64;
         let e = T::from(f64::consts::E).unwrap();
         vec![Ok(crate::ArrRepr::Owned(
-            xs[0].mapv(move |a| (a.exp() + T::one()).log(e)),
+            xs[0].map(move |a| (a.exp() + T::one()).log(e)),
         ))]
     }
 

@@ -100,10 +100,10 @@ impl<T: Float> op::Op<T> for InferBinOpShape {
         let a_shape_float = &xs[0];
         let b_shape_float = &xs[1];
         let a_shape = a_shape_float
-            .map(|x| x.clone().to_usize().unwrap())
+            .map(|x| x.to_usize().unwrap())
             .into_raw_vec();
         let b_shape = b_shape_float
-            .map(|x| x.clone().to_usize().unwrap())
+            .map(|x| x.to_usize().unwrap())
             .into_raw_vec();
         let a_is_scalar = ndarray_ext::is_scalar_shape(a_shape.as_slice());
         let b_is_scalar = ndarray_ext::is_scalar_shape(b_shape.as_slice());
@@ -404,7 +404,7 @@ impl<T: Float> op::Op<T> for Gather {
         let flat_indices = if self.should_normalize_negative_indices {
             ndarray_ext::normalize_negative_axes(indices, param_shape[axis])
         } else {
-            indices.mapv(|a| a.to_usize().unwrap()).into_raw_vec()
+            indices.map(|a| a.to_usize().unwrap()).into_raw_vec()
         };
         let selected = param.select(ndarray::Axis(axis), flat_indices.as_slice());
         vec![Ok(crate::ArrRepr::Owned(
@@ -526,9 +526,7 @@ impl<T: Float> op::Op<T> for AddN {
     }
 
     fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
-        (0..inputs.len())
-            .map(|_| Some(gy.clone()))
-            .collect::<Vec<Option<_>>>()
+        vec![Some(gy.clone()); inputs.len()]
     }
 }
 
@@ -543,7 +541,7 @@ impl<T: Float> op::Op<T> for Clip<T> {
     ) -> op::ComputeResults<'v, T> {
         let xs = ctx.grab_inputs();
         vec![Ok(crate::ArrRepr::Owned(
-            xs[0].mapv(move |a| a.min(self.max).max(self.min)),
+            xs[0].map(move |a| a.min(self.max).max(self.min)),
         ))]
     }
 
@@ -686,7 +684,7 @@ impl<T: Float> op::Op<T> for ConcatGrad {
     }
 
     fn grad(&self, _: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
-        (0..inputs.len()).map(|_| None).collect::<Vec<_>>()
+        vec![None; inputs.len()]
     }
 }
 
@@ -702,7 +700,7 @@ impl<T: Float> op::Op<T> for Tile {
         let xs = ctx.grab_inputs();
         let x = &xs[0];
         let axis = ndarray_ext::normalize_negative_axis(self.axis, x.ndim());
-        let views = (0..self.num).map(|_| x.clone()).collect::<Vec<_>>();
+        let views = vec![x.clone(); self.num];
         let ret = if let Ok(ret) = ndarray::stack(ndarray::Axis(axis), views.as_slice()) {
             Ok(crate::ArrRepr::Owned(ret))
         } else {
@@ -874,7 +872,7 @@ impl<T: Float> op::Op<T> for Squeeze {
         let mut x = xs[0].clone();
         let mut axes = xs[1]
             .iter()
-            .map(|&a| a.to_isize().unwrap())
+            .map(|a| a.to_isize().unwrap())
             .collect::<Vec<_>>();
         axes.sort();
         let mut adjust = 0;
@@ -911,7 +909,7 @@ impl<T: Float> op::Op<T> for ExpandDims {
         let ret = xs[0].clone();
         let mut axes = xs[1]
             .iter()
-            .map(|&a| a.to_isize().unwrap())
+            .map(|a| a.to_isize().unwrap())
             .collect::<Vec<_>>();
         axes.sort();
         let mut output_shape = ret.shape().to_vec();
