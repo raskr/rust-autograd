@@ -48,8 +48,7 @@ fn main() {
     let (x, y) = inputs();
     let z = logits(&x, w, b);
     let loss = ag::sparse_softmax_cross_entropy(z, &y);
-    let mean_loss = ag::reduce_mean(loss, &[0, 1], false);
-    let grads = &ag::grad(&[&mean_loss], &[w, b]);
+    let grads = &ag::grad(&[&loss], &[w, b]);
     let adam = ag::gradient_descent_ops::Adam::default();
     let update_ops: &[Tensor] = &adam.compute_updates(params, grads);
 
