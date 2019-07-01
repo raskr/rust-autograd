@@ -1,3 +1,4 @@
+//! Module defining Adam optimizer
 extern crate ndarray;
 
 use crate::ndarray_ext::NdArray;
@@ -9,6 +10,7 @@ use std::collections::BTreeMap;
 
 struct AdamOp<T: Float> {
     static_params: StaticParams<T>,
+    // `t` param in the original paper
     t: Cell<T>,
 }
 
@@ -79,6 +81,8 @@ impl<T: Float> crate::op::Op<T> for AdamOp<T> {
     }
 }
 
+/// Use `Adam::vars_with_states` to instantiate this.
+#[doc(hidden)]
 pub struct StatefulVariable<'a, T: Float + 'a> {
     pub var: &'a Tensor<T>,
     pub state: StatefulParams<T>,
@@ -86,7 +90,23 @@ pub struct StatefulVariable<'a, T: Float + 'a> {
 
 /// Adam optimizer
 ///
-/// The implementation is based on http://arxiv.org/abs/1412.6980v8
+/// The implementation is based on http://arxiv.org/abs/1412.6980v8.
+/// Please create state objects by use of `Adam::vars_with_states` beforehand.
+///
+/// ```
+/// extern crate autograd as ag;
+///
+/// // Define parameters to optimize.
+/// let w: ag::Tensor<f32> = ag::variable(ag::ndarray_ext::glorot_uniform(&[28 * 28, 10]));
+/// let b: ag::Tensor<f32> = ag::variable(ag::ndarray_ext::zeros(&[1, 10]));
+/// let params = ag::gradient_descent_ops::Adam::vars_with_states(&[&w, &b]);
+///
+/// // Create update ops.
+/// let adam = ag::gradient_descent_ops::Adam::<f32>::default();
+/// // let update_ops: &[Tensor<f32>] = &adam.compute_updates(&params, grads);
+/// ```
+///
+/// See also https://github.com/raskr/rust-autograd/blob/master/examples/mlp_mnist.rs
 pub struct Adam<T: Float> {
     pub alpha: T,
     pub eps: T,
@@ -95,6 +115,7 @@ pub struct Adam<T: Float> {
 }
 
 impl<T: Float> Default for Adam<T> {
+    /// Instantiates `Adam` optimizer with the recommended parameters in the original paper.
     fn default() -> Adam<T> {
         Adam {
             alpha: T::from(0.001).unwrap(),
@@ -137,7 +158,9 @@ impl<T: Float> Adam<T> {
             .collect()
     }
 
-    // Resolves states
+    /// Creates ops to optimize `params` with Adam.
+    ///
+    /// Evaluated results of the return values will be `None`.
     pub fn compute_updates<A: AsRef<Tensor<T>>>(
         &self,
         params: &[StatefulVariable<T>],
@@ -164,7 +187,9 @@ impl<T: Float> Adam<T> {
     }
 }
 
+/// Holds Adam's static parameters (`alpha`, `eps`, `b1`, `b2`)
 #[derive(Copy, Clone)]
+#[doc(hidden)]
 pub struct StaticParams<T: Float> {
     pub alpha: T,
     pub eps: T,
@@ -172,7 +197,9 @@ pub struct StaticParams<T: Float> {
     pub b2: T,
 }
 
+/// Wrapper of state objects in Adam's computation (`m` and `v`)
 #[derive(Clone)]
+#[doc(hidden)]
 pub struct StatefulParams<T: Float> {
     pub m: Tensor<T>,
     pub v: Tensor<T>,

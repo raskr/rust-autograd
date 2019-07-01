@@ -1,3 +1,6 @@
+//! A small extension of rust-ndarray
+//!
+//! Mainly provides `array_gen`, which is a collection of array generator functions.
 use crate::Float;
 use ndarray;
 
@@ -5,15 +8,16 @@ pub type NdArray<T> = ndarray::Array<T, ndarray::IxDyn>;
 
 pub type NdArrayView<'a, T> = ndarray::ArrayView<'a, T, ndarray::IxDyn>;
 
-pub type NdArrayViewMut<'a, T> = ndarray::ArrayViewMut<'a, T, ndarray::IxDyn>;
-
-/// exposes array_gen
+// expose array_gen
 pub use crate::array_gen::*;
 
 /// Op::compute's output
 #[derive(Clone)]
 pub enum ArrRepr<'v, T: Float> {
+    /// Represents `ndarray::Array<T: Float, ndarray::IxDyn>`
     Owned(NdArray<T>),
+
+    /// Represents `ndarray::ArrayView<'a, T: Float, ndarray::IxDyn>`
     View(NdArrayView<'v, T>),
 }
 
@@ -83,6 +87,7 @@ pub fn roll_axis<T: Float>(arg: &mut NdArray<T>, to: ndarray::Axis, from: ndarra
 }
 
 #[inline]
+#[doc(hidden)]
 pub fn normalize_negative_axis(axis: isize, ndim: usize) -> usize {
     if axis < 0 {
         (ndim as isize + axis) as usize
@@ -92,6 +97,7 @@ pub fn normalize_negative_axis(axis: isize, ndim: usize) -> usize {
 }
 
 #[inline]
+#[doc(hidden)]
 pub fn normalize_negative_axes<T: Float>(axes: &NdArrayView<T>, ndim: usize) -> Vec<usize> {
     let mut axes_ret: Vec<usize> = Vec::with_capacity(axes.len());
     for &axis in axes.iter() {
@@ -106,6 +112,7 @@ pub fn normalize_negative_axes<T: Float>(axes: &NdArrayView<T>, ndim: usize) -> 
 }
 
 #[inline]
+#[doc(hidden)]
 pub fn sparse_to_dense<T: Float>(arr: &NdArrayView<T>) -> Vec<usize> {
     let mut axes: Vec<usize> = vec![];
     for (i, &a) in arr.iter().enumerate() {
@@ -118,6 +125,7 @@ pub fn sparse_to_dense<T: Float>(arr: &NdArrayView<T>) -> Vec<usize> {
 
 #[allow(unused)]
 #[inline]
+#[doc(hidden)]
 // True if even one of the axes is moved
 pub fn is_dims_permuted(strides: &[isize]) -> bool {
     let mut ret = false;
@@ -131,6 +139,7 @@ pub fn is_dims_permuted(strides: &[isize]) -> bool {
 }
 
 #[allow(unused)]
+#[doc(hidden)]
 #[inline]
 pub fn is_fully_transposed(strides: &[ndarray::Ixs]) -> bool {
     let mut ret = true;
@@ -144,6 +153,7 @@ pub fn is_fully_transposed(strides: &[ndarray::Ixs]) -> bool {
 }
 
 #[inline]
+#[doc(hidden)]
 pub fn copy_if_dirty<T: Float>(x: &NdArrayView<T>) -> Option<NdArray<T>> {
     if is_dims_permuted(x.strides()) {
         Some(deep_copy(x))
@@ -197,19 +207,161 @@ pub fn shape_of<T: Float>(x: &NdArray<T>) -> NdArray<T> {
     NdArray::from_shape_vec(ndarray::IxDyn(&[rank]), shape).unwrap()
 }
 
-#[doc(hidden)]
-#[inline]
-pub fn into_mat<T: Float>(x: NdArray<T>) -> ndarray::Array<T, ndarray::Ix2> {
-    let (a, b) = {
-        let shape = x.shape();
-        (shape[0], shape[1])
-    };
-    x.into_shape(ndarray::Ix2(a, b)).unwrap()
-}
-
-/// Generates ndarrays which can be fed to `autograd::variable()` etc.
+/// Provides a collection of array generator functions.
 pub mod array_gen {
     use super::*;
+    use rand::distributions::IndependentSample;
+    use rand::{self, Rng, XorShiftRng};
+    use std::cell::RefCell;
+    use std::marker::PhantomData;
+
+    /// Internal object to create ndarrays whose elements are random numbers.
+    ///
+    /// This is actually a wrapper of an arbitrary `rand::Rng`.
+    /// You can use custom `Rng` with `new` function, whereas `default` function is provided;
+    /// see https://github.com/raskr/rust-autograd/issues/1.
+    pub struct ArrRng<T: Float, R = XorShiftRng> {
+        phantom: PhantomData<T>,
+        rng: RefCell<R>,
+    }
+
+    impl<T: Float> Default for ArrRng<T, XorShiftRng> {
+        fn default() -> Self {
+            ArrRng {
+                phantom: PhantomData,
+                rng: RefCell::new(rand::weak_rng()),
+            }
+        }
+    }
+
+    impl<T: Float, R: Rng> ArrRng<T, R> {
+        /// Creates `ArrRng` object with `Rng` object.
+        pub fn new(rng: R) -> Self {
+            ArrRng {
+                phantom: PhantomData,
+                rng: RefCell::new(rng),
+            }
+        }
+
+        #[inline]
+        unsafe fn alloc(size: usize) -> Vec<T> {
+            let mut buf: Vec<T> = Vec::with_capacity(size);
+            buf.set_len(size);
+            buf
+        }
+
+        /// Generates `ndarray::Array<T, ndarray::IxDyn>` whose elements are random numbers.
+        pub fn gen_random_array<I>(&self, shape: &[usize], dist: I) -> NdArray<T>
+        where
+            I: IndependentSample<f64>,
+        {
+            let size: usize = shape.into_iter().cloned().product();
+            let mut rng = self.rng.borrow_mut();
+            unsafe {
+                let mut buf = Self::alloc(size);
+                for i in 0..size {
+                    *buf.get_unchecked_mut(i) = T::from(dist.ind_sample(&mut *rng)).unwrap();
+                }
+                NdArray::from_shape_vec(shape, buf).unwrap()
+            }
+        }
+
+        pub fn permutation(&mut self, size: usize) -> ndarray::Array1<usize> {
+            let mut data: Vec<usize> = (0..size).collect();
+            let slice = data.as_mut_slice();
+
+            let mut rng = self.rng.borrow_mut();
+            rng.shuffle(slice);
+            ndarray::Array1::<usize>::from_vec(slice.to_vec())
+        }
+
+        pub fn random_normal(
+            &self,
+            shape: &[usize],
+            mean: f64,
+            stddev: f64,
+        ) -> ndarray::Array<T, ndarray::IxDyn> {
+            let normal = rand::distributions::Normal::new(mean, stddev);
+            self.gen_random_array(shape, normal)
+        }
+
+        pub fn random_uniform(
+            &self,
+            shape: &[usize],
+            min: f64,
+            max: f64,
+        ) -> ndarray::Array<T, ndarray::IxDyn> {
+            let range = rand::distributions::Range::new(min, max);
+            self.gen_random_array(shape, range)
+        }
+
+        pub fn standard_normal(&self, shape: &[usize]) -> ndarray::Array<T, ndarray::IxDyn> {
+            let normal = rand::distributions::Normal::new(0., 1.);
+            self.gen_random_array(shape, normal)
+        }
+
+        pub fn standard_uniform(&self, shape: &[usize]) -> ndarray::Array<T, ndarray::IxDyn> {
+            let dist = rand::distributions::Range::new(0., 1.);
+            self.gen_random_array(shape, dist)
+        }
+
+        pub fn glorot_normal(&self, shape: &[usize]) -> ndarray::Array<T, ndarray::IxDyn> {
+            assert_eq!(shape.len(), 2);
+            let s = 1. / (shape[0] as f64).sqrt();
+            let normal = rand::distributions::Normal::new(0., s);
+            self.gen_random_array(shape, normal)
+        }
+
+        pub fn glorot_uniform(&self, shape: &[usize]) -> ndarray::Array<T, ndarray::IxDyn> {
+            assert_eq!(shape.len(), 2);
+            let s = (6. / shape[0] as f64).sqrt();
+            let uniform = rand::distributions::Range::new(-s, s);
+            self.gen_random_array(shape, uniform)
+        }
+
+        pub fn bernoulli(&self, shape: &[usize], p: f64) -> ndarray::Array<T, ndarray::IxDyn> {
+            let dist = rand::distributions::Range::new(0., 1.);
+            let mut rng = self.rng.borrow_mut();
+            let size: usize = shape.into_iter().cloned().product();
+            unsafe {
+                let mut buf = Self::alloc(size);
+                for i in 0..size {
+                    let val = dist.ind_sample(&mut *rng);
+                    *buf.get_unchecked_mut(i) = T::from(i32::from(val < p)).unwrap();
+                }
+                NdArray::from_shape_vec(shape, buf).unwrap()
+            }
+        }
+
+        pub fn exponential(
+            &self,
+            shape: &[usize],
+            lambda: f64,
+        ) -> ndarray::Array<T, ndarray::IxDyn> {
+            let dist = rand::distributions::Exp::new(lambda);
+            self.gen_random_array(shape, dist)
+        }
+
+        pub fn log_normal(
+            &self,
+            shape: &[usize],
+            mean: f64,
+            stddev: f64,
+        ) -> ndarray::Array<T, ndarray::IxDyn> {
+            let dist = rand::distributions::LogNormal::new(mean, stddev);
+            self.gen_random_array(shape, dist)
+        }
+
+        pub fn gamma(
+            &self,
+            shape: &[usize],
+            shape_param: f64,
+            scale: f64,
+        ) -> ndarray::Array<T, ndarray::IxDyn> {
+            let dist = rand::distributions::Gamma::new(shape_param, scale);
+            self.gen_random_array(shape, dist)
+        }
+    }
 
     #[inline]
     /// Zeros.
@@ -312,152 +464,5 @@ pub mod array_gen {
         scale: f64,
     ) -> ndarray::Array<T, ndarray::IxDyn> {
         ArrRng::default().gamma(shape, shape_param, scale)
-    }
-}
-
-use rand::distributions::IndependentSample;
-use rand::{self, Rng, XorShiftRng};
-use std::cell::RefCell;
-use std::marker::PhantomData;
-
-/// See https://github.com/raskr/rust-autograd/issues/1.
-pub struct ArrRng<T: Float, R = XorShiftRng> {
-    phantom: PhantomData<T>,
-    rng: RefCell<R>,
-}
-
-impl<T: Float> Default for ArrRng<T, XorShiftRng> {
-    fn default() -> Self {
-        ArrRng {
-            phantom: PhantomData,
-            rng: RefCell::new(rand::weak_rng()),
-        }
-    }
-}
-
-impl<T: Float, R: Rng> ArrRng<T, R> {
-    pub fn new(rng: R) -> Self {
-        ArrRng {
-            phantom: PhantomData,
-            rng: RefCell::new(rng),
-        }
-    }
-
-    #[inline]
-    fn alloc(size: usize) -> Vec<T> {
-        let mut buf: Vec<T> = Vec::with_capacity(size);
-        unsafe { buf.set_len(size) }
-        buf
-    }
-
-    fn gen_random_array<I>(&self, shape: &[usize], dist: I) -> NdArray<T>
-    where
-        I: IndependentSample<f64>,
-    {
-        let size: usize = shape.into_iter().cloned().product();
-        let mut buf = Self::alloc(size);
-        let p = buf.as_mut_ptr();
-        let mut rng = self.rng.borrow_mut();
-        unsafe {
-            for i in 0..size as isize {
-                *p.offset(i) = T::from(dist.ind_sample(&mut *rng)).unwrap();
-            }
-        }
-        NdArray::from_shape_vec(shape, buf).unwrap()
-    }
-
-    pub fn permutation(&mut self, size: usize) -> ndarray::Array1<usize> {
-        let mut data: Vec<usize> = (0..size).collect();
-        let slice = data.as_mut_slice();
-
-        let mut rng = self.rng.borrow_mut();
-        rng.shuffle(slice);
-        ndarray::Array1::<usize>::from_vec(slice.to_vec())
-    }
-
-    pub fn random_normal(
-        &self,
-        shape: &[usize],
-        mean: f64,
-        stddev: f64,
-    ) -> ndarray::Array<T, ndarray::IxDyn> {
-        let normal = rand::distributions::Normal::new(mean, stddev);
-        self.gen_random_array(shape, normal)
-    }
-
-    pub fn random_uniform(
-        &self,
-        shape: &[usize],
-        min: f64,
-        max: f64,
-    ) -> ndarray::Array<T, ndarray::IxDyn> {
-        let range = rand::distributions::Range::new(min, max);
-        self.gen_random_array(shape, range)
-    }
-
-    pub fn standard_normal(&self, shape: &[usize]) -> ndarray::Array<T, ndarray::IxDyn> {
-        let normal = rand::distributions::Normal::new(0., 1.);
-        self.gen_random_array(shape, normal)
-    }
-
-    pub fn standard_uniform(&self, shape: &[usize]) -> ndarray::Array<T, ndarray::IxDyn> {
-        let dist = rand::distributions::Range::new(0., 1.);
-        self.gen_random_array(shape, dist)
-    }
-
-    pub fn glorot_normal(&self, shape: &[usize]) -> ndarray::Array<T, ndarray::IxDyn> {
-        assert_eq!(shape.len(), 2);
-        let s = 1. / (shape[0] as f64).sqrt();
-        let normal = rand::distributions::Normal::new(0., s);
-        self.gen_random_array(shape, normal)
-    }
-
-    pub fn glorot_uniform(&self, shape: &[usize]) -> ndarray::Array<T, ndarray::IxDyn> {
-        assert_eq!(shape.len(), 2);
-        let s = (6. / shape[0] as f64).sqrt();
-        let uniform = rand::distributions::Range::new(-s, s);
-        self.gen_random_array(shape, uniform)
-    }
-
-    pub fn bernoulli(&self, shape: &[usize], p: f64) -> ndarray::Array<T, ndarray::IxDyn> {
-        let dist = rand::distributions::Range::new(0., 1.);
-        let mut rng = self.rng.borrow_mut();
-        let size: usize = shape.into_iter().cloned().product();
-        let mut buf = Self::alloc(size);
-        unsafe { buf.set_len(size) }
-        let ptr = buf.as_mut_ptr();
-        unsafe {
-            for i in 0..size as isize {
-                let val = dist.ind_sample(&mut *rng);
-                *ptr.offset(i) = T::from(i32::from(val < p)).unwrap();
-            }
-        }
-        i32::from(true);
-        NdArray::from_shape_vec(shape, buf).unwrap()
-    }
-
-    pub fn exponential(&self, shape: &[usize], lambda: f64) -> ndarray::Array<T, ndarray::IxDyn> {
-        let dist = rand::distributions::Exp::new(lambda);
-        self.gen_random_array(shape, dist)
-    }
-
-    pub fn log_normal(
-        &self,
-        shape: &[usize],
-        mean: f64,
-        stddev: f64,
-    ) -> ndarray::Array<T, ndarray::IxDyn> {
-        let dist = rand::distributions::LogNormal::new(mean, stddev);
-        self.gen_random_array(shape, dist)
-    }
-
-    pub fn gamma(
-        &self,
-        shape: &[usize],
-        shape_param: f64,
-        scale: f64,
-    ) -> ndarray::Array<T, ndarray::IxDyn> {
-        let dist = rand::distributions::Gamma::new(shape_param, scale);
-        self.gen_random_array(shape, dist)
     }
 }

@@ -1,3 +1,4 @@
+//! Provides gradient descent optimizers.
 extern crate ndarray;
 
 pub mod adam;
@@ -11,6 +12,7 @@ use crate::tensor::Tensor;
 use crate::Float;
 use std::cmp::{Eq, Ordering, PartialEq};
 
+#[doc(hidden)]
 /// Key to access a state tensor.
 /// Stateful optimizers use this.
 pub struct StateKey<'a, T: Float + 'a>(pub &'a Tensor<T>);

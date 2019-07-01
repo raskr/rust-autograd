@@ -1,3 +1,5 @@
+//! Defining things related to `ag::op::Op`.
+//!
 use crate::tensor::Tensor;
 use crate::Float;
 

@@ -1,3 +1,4 @@
+//! Defining things related to `ag::Tensor`.
 use crate::binary_ops::{AddOp, DivOp, MulOp, SubOp};
 use crate::op;
 use crate::ops;
@@ -15,6 +16,7 @@ use std::rc::Rc;
 /// Symbolic multi-dimensional array.
 pub struct Tensor<T: Float>(pub Rc<TensorCore<T>>);
 
+#[doc(hidden)]
 pub struct TensorCore<T: Float> {
     /// An operation to evaluate this tensor.
     pub op: Box<op::Op<T>>,
@@ -95,6 +97,7 @@ impl<T: Float> Tensor<T> {
     }
 }
 
+/// Builder for `ag::Tensor`
 pub struct TensorBuilder<T: Float> {
     shape: Option<Tensor<T>>,
     inputs: Vec<Tensor<T>>,
@@ -106,6 +109,7 @@ pub struct TensorBuilder<T: Float> {
     known_shape: Option<KnownShape>,
 }
 
+#[doc(hidden)]
 pub struct KnownShape {
     shape: Vec<isize>,
     #[allow(dead_code)]
@@ -415,8 +419,8 @@ impl<T: Float> Tensor<T> {
     /// // [2, 3]
     /// ```
     #[inline]
-    pub fn with(&self, hook: crate::ops::Hook<T>) -> Tensor<T> {
-        crate::ops::hook(hook, self)
+    pub fn with(&self, hook: crate::Hook<T>) -> Tensor<T> {
+        crate::hook(hook, self)
     }
 
     /// Registers a hook for a `Tensor` computation.
@@ -439,7 +443,7 @@ impl<T: Float> Tensor<T> {
     /// ```
     #[inline]
     pub fn with_fn(&self, hook: Box<Fn(&crate::ndarray::ArrayViewD<T>) -> ()>) -> Tensor<T> {
-        crate::ops::hook(crate::Hook::Raw(hook), self)
+        crate::hook(crate::Hook::Raw(hook), self)
     }
 
     /// Shorthand for `Tensor::with(crate::Hook::Print)`

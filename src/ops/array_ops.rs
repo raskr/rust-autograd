@@ -99,12 +99,8 @@ impl<T: Float> op::Op<T> for InferBinOpShape {
         let xs = ctx.grab_inputs();
         let a_shape_float = &xs[0];
         let b_shape_float = &xs[1];
-        let a_shape = a_shape_float
-            .map(|x| x.to_usize().unwrap())
-            .into_raw_vec();
-        let b_shape = b_shape_float
-            .map(|x| x.to_usize().unwrap())
-            .into_raw_vec();
+        let a_shape = a_shape_float.map(|x| x.to_usize().unwrap()).into_raw_vec();
+        let b_shape = b_shape_float.map(|x| x.to_usize().unwrap()).into_raw_vec();
         let a_is_scalar = ndarray_ext::is_scalar_shape(a_shape.as_slice());
         let b_is_scalar = ndarray_ext::is_scalar_shape(b_shape.as_slice());
 

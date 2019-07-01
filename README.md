@@ -3,33 +3,35 @@
 [![Build Status](https://travis-ci.org/raskr/rust-autograd.svg?branch=master)](https://travis-ci.org/raskr/rust-autograd)
 [![](http://meritbadge.herokuapp.com/autograd)](https://crates.io/crates/autograd)
 
-Provides differentiable operations and tensors.
-
-## Features
-* **Lazy, zero-copy and side-effect-free tensors.**
-`autograd::Tensor<T>` itself doesn't have its value basically (except for persistent tensors).
-It realizes graphs that are eagerly executable at any timing, 
-that is, it supports both *run-by-define* and *define-by-run* naturally
-in the context of neural networks.
-
-* **Reverse-mode automatic differentiation.**
-There are a lot of [built-in operations](https://docs.rs/autograd/0.9.3/autograd/ops/index.html)
-that support *higher-order* derivatives, and
-you can [define your own ops](https://docs.rs/autograd/0.9.3/autograd/op/trait.Op.html) with ndarrays easily.
-
-* **Pure Rust.**
-The graph execution engine is implemented in pure Rust, so it's compilable to WebAssembly.
+Differentiable operations and tensors backed by [ndarray](https://github.com/rust-ndarray/ndarray).
 
 ## Installation
 ```
 [dependencies]
 autograd = { version = "0.9.3", features = ["mkl"] }
 ```
-`mkl` feature is recommended to speedup gemm operations.
+`mkl` feature is recommended to speedup gemm operations using [Intel MKL](https://software.intel.com/en-us/mkl).
 
+## Features
+### Lazy, zero-copy tensor evaluation
+Computation graphs are created on the fly (a.k.a define-by-run), but is not evaluated until `Tensor::eval` or `ag::eval` is called.
+This mechanism balances better performance and flexibility.
+```rust
+extern crate autograd as ag;
 
-## Examples
-Here we are computing partial derivatives of `z = 2x^2 + 3y + 1`.
+let a: ag::Tensor<f32> = ag::ones(&[3, 4, 5]);
+let b: ag::Tensor<f32> = ag::ones(&[4, 6]);
+let c: ag::Tensor<f32> = ag::reshape(&b, &[4, 3, 2]);
+let d: ag::Tensor<f32> = ag::tensordot(a, c, &[1, 0], &[0, 1]);
+d.eval(&[]);  // Getting `ndarray::Array` here.
+```
+
+### Reverse-mode automatic differentiation
+There are a lot of [built-in operations](https://docs.rs/autograd/0.9.3/autograd/ops/index.html)
+that support *higher-order* derivatives, but
+you can also [define your own differentiable ops](https://docs.rs/autograd/0.9.3/autograd/op/trait.Op.html) with ndarrays easily.
+
+Here we are just computing partial derivatives of `z = 2x^2 + 3y + 1`.
 
 ```rust
 extern crate autograd as ag;
@@ -51,10 +53,11 @@ let ggx = &ag::grad(&[gx], &[x])[0];
 println!("{:?}", ggx.eval(&[]));  // => Some(4.)
 ```
 
-Another example: softmax regression for MNIST digits classification with Adam.
-
+### Neural networks
+This crate has various low-level features inspired by tensorflow/theano to train neural networks.
 ```rust
-// This achieves 0.918 test accuracy after 3 epochs, 0.11 sec/epoch on 2.7GHz Intel Core i5
+// This is a softmax regression for MNIST digits classification with Adam.
+// This achieves 0.918 test accuracy after 3 epochs (0.11 sec/epoch on 2.7GHz Intel Core i5).
 let ref w = ag::variable(ag::ndarray_ext::glorot_uniform::<f32>(&[28*28, 10]));
 let ref b = ag::variable(ag::ndarray_ext::zeros::<f32>(&[1, 10]));
 let ref x = ag::placeholder(&[-1, 28*28]);
@@ -77,65 +80,12 @@ for epoch in 0..max_epoch {
     ...
     ag::eval(update_ops, &[(x, &x_batch), (y, &y_batch)]);
 }
-
 ```
 
-## Defining your own differentiable operations
-Many of well-known ops are pre-defined in `ag::ops`, but you can also
-implement custom ops by hand.
+ConvNet, LSTM example can be found in [examples](https://github.com/raskr/rust-autograd/tree/master/examples)
 
-```rust
-extern crate ndarray;
-extern crate autograd as ag;
-
-type NdArray<T: ag::Float> = ndarray::Array<T, ndarray::IxDyn>;
-
-// Implements `Op` trait for `Sigmoid`.
-struct Sigmoid;
-
-impl<T: ag::Float> ag::op::Op<T> for Sigmoid {
-
-    fn name(&self) -> &str {
-        "Sigmoid"
-    }
-
-    // Core function to run this op.
-    // Any errors in this function must be reported by *panic*.
-    fn compute<'v>(
-        &self,
-        ctx: ag::runtime::OpComputeContext<'v, T>,
-    ) -> ag::op::ComputeResults<'v, T> {
-        let xs = ctx.grab_inputs();
-        let x = &xs[0];
-        // Using `ndarray::Array::mapv` for element-wise computation.
-        let half = T::from(0.5).unwrap();
-        let y = x.mapv(|a| ((a * half).tanh() * half) + half);
-        // In some cases, you can return `ag::ArrRepr::View` for input arrays
-        // to reduce unnecessary copies.
-        vec![Ok(ag::ArrRepr::Owned(y))]
-    }
-
-    fn grad(&self, gy: &ag::Tensor<T>, xs: &[&ag::Tensor<T>], y: &ag::Tensor<T>)
-        -> Vec<Option<ag::Tensor<T>>>
-    {
-        // Symbolic gradient of `x`
-        let gx = gy * (y - ag::square(y));
-        vec![Some(gx)]
-    }
-}
-
-// Symbolic `sigmoid` function for end-user.
-fn sigmoid<T: ag::Float>(x: &ag::Tensor<T>) -> ag::Tensor<T>
-{
-    ag::Tensor::builder()
-        .set_inputs(vec![x])
-        .set_shape(x.shape())
-        .build(Sigmoid)
-}
-```
-
-## Debugging
-You can register hooks on `ag::Tensor` objects.
+### Hooks
+You can register hooks on `ag::Tensor` objects for debugging.
 ```rust
 extern crate autograd as ag;
 
@@ -151,6 +101,14 @@ c.eval(&[]);
 // [0.0, 0.0],
 // [0.0, 0.0]] shape=[4, 2], strides=[2, 1], layout=C (0x1)
 ```
+
+## Why Rust?
+
+- **No need for bridges for fast languages.**
+The entire logic including hotspots (kernels etc) is implemented in pure Rust, 
+without compromising performance.
+
+- **Memory safety.** For example, Rust's lifetime checker makes it possible to implement zero-copy computation graphs without GC.
 
 For more, see [documentation](https://docs.rs/autograd/) or
 [examples](https://github.com/raskr/rust-autograd/tree/master/examples)

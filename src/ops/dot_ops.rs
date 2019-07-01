@@ -862,8 +862,7 @@ impl<T: Float> op::Op<T> for TensordotPreprocess {
         let (perm1, new_shape1, free_dims1) = tensordot_preprocess(x1.shape(), &axes1, true);
         free_dims0.extend(free_dims1);
 
-        let r0 =
-            NdArray::from_shape_vec(ndarray::IxDyn(&[free_dims0.len()]), free_dims0).unwrap();
+        let r0 = NdArray::from_shape_vec(ndarray::IxDyn(&[free_dims0.len()]), free_dims0).unwrap();
         let r1 = NdArray::from_shape_vec(ndarray::IxDyn(&[perm0.len()]), perm0).unwrap();
         let r2 = NdArray::from_shape_vec(ndarray::IxDyn(&[perm1.len()]), perm1).unwrap();
         let r3 = NdArray::from_shape_vec(ndarray::IxDyn(&[new_shape0.len()]), new_shape0).unwrap();

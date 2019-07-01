@@ -1,3 +1,4 @@
+//! A collection of functions to manipulate `ag::Tensor` objects
 extern crate ndarray;
 
 use crate::ndarray_ext::{ArrRng, NdArray};
@@ -15,34 +16,11 @@ mod conv_ops;
 pub mod dot_ops;
 pub mod gradient_descent_ops;
 mod gradient_ops;
-mod hook_ops;
+pub mod hook_ops;
 mod math_ops;
 mod random_ops;
 mod reduction_ops;
 mod xent_ops;
-
-pub enum Hook<T: Float> {
-    Raw(Box<Fn(&crate::ndarray_ext::NdArrayView<T>) -> ()>),
-    Print,
-    PrintShape,
-}
-
-/// Use `Tensor::with`.
-#[inline]
-pub fn hook<T: Float>(hook: Hook<T>, node: &Tensor<T>) -> Tensor<T> {
-    let op = match hook {
-        Hook::Raw(func) => crate::ops::hook_ops::Hook { func, name: None },
-        Hook::PrintShape => crate::ops::hook_ops::Hook {
-            func: Box::new(|arr| println!("{:?}\n", arr.shape())),
-            name: Some(format!("Shape of {}", node.op.name())),
-        },
-        Hook::Print => crate::ops::hook_ops::Hook {
-            func: Box::new(|arr| println!("{:?}\n", arr)),
-            name: Some(node.op.name().to_owned()),
-        },
-    };
-    Tensor::builder().set_input(node).build(op)
-}
 
 // ---------------------------------------
 // -- Ops to manipulate `Tensor` object --
@@ -1529,7 +1507,12 @@ where
 {
     // Preprocess
     let pre = Tensor::builder()
-        .set_inputs(vec![a.as_ref(), b.as_ref(), &a_axes.as_tensor(), &b_axes.as_tensor()])
+        .set_inputs(vec![
+            a.as_ref(),
+            b.as_ref(),
+            &a_axes.as_tensor(),
+            &b_axes.as_tensor(),
+        ])
         .build(dot_ops::TensordotPreprocess);
 
     let final_shape = nth_tensor(&pre, 0);

@@ -321,7 +321,9 @@ impl<T: Float> crate::op::Op<T> for MaxPool2DGradGrad {
         let ggx = &xs[0];
         let x_shape = ggx.shape();
         let copied_ggx = ndarray_ext::copy_if_dirty(ggx);
-        let ggx = copied_ggx.map(|inner| inner.as_ptr()).unwrap_or(ggx.as_ptr());
+        let ggx = copied_ggx
+            .map(|inner| inner.as_ptr())
+            .unwrap_or(ggx.as_ptr());
         let batch = x_shape[0];
         let c = x_shape[1];
         let xh = x_shape[2];
@@ -330,23 +332,9 @@ impl<T: Float> crate::op::Op<T> for MaxPool2DGradGrad {
         let yw = (xw + 2 * self.pad - self.size) / self.stride + 1;
         let argmax = &xs[1];
         let ggy = if same_type::<T, f32>() {
-            max_pool_grad_grad_f32(
-                ggx,
-                yh,
-                yw,
-                c,
-                batch,
-                argmax.as_ptr() as *const f32,
-            )
+            max_pool_grad_grad_f32(ggx, yh, yw, c, batch, argmax.as_ptr() as *const f32)
         } else if same_type::<T, f64>() {
-            max_pool_grad_grad_f64(
-                ggx,
-                yh,
-                yw,
-                c,
-                batch,
-                argmax.as_ptr() as *const f64,
-            )
+            max_pool_grad_grad_f64(ggx, yh, yw, c, batch, argmax.as_ptr() as *const f64)
         } else {
             panic!("MaxPoolGradGrad supports only f32 and f64");
         };
