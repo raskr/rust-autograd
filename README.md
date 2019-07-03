@@ -14,21 +14,22 @@ autograd = { version = "0.9.4", features = ["mkl"] }
 
 ## Features
 ### Lazy, zero-copy tensor evaluation
-Computation graphs are created on the fly (a.k.a define-by-run), but is not evaluated until `Tensor::eval` or `ag::eval` is called.
+Computation graphs are created on the fly (a.k.a define-by-run), but are not evaluated until `Tensor::eval` or `ag::eval` is called.
 This mechanism balances better performance and flexibility.
 ```rust
 extern crate autograd as ag;
 
-let a: ag::Tensor<f32> = ag::ones(&[3, 4, 5]);
-let b: ag::Tensor<f32> = ag::ones(&[4, 6]);
-let c: ag::Tensor<f32> = ag::reshape(&b, &[4, 3, 2]);
-let d: ag::Tensor<f32> = ag::tensordot(a, c, &[1, 0], &[0, 1]);
-d.eval(&[]);  // Getting `ndarray::Array` here.
+let a: ag::Tensor<f32> = ag::ones(&[60]);
+let b: ag::Tensor<f32> = ag::ones(&[24]);
+let c: ag::Tensor<f32> = ag::reshape(a, &[3, 4, 5]);
+let d: ag::Tensor<f32> = ag::reshape(b, &[4, 6]);
+let e: ag::Tensor<f32> = ag::tensordot(c, d, &[1, 0], &[0, 1]);
+e.eval(&[]);  // Getting `ndarray::Array` here.
 ```
 
 ### Reverse-mode automatic differentiation
 There are a lot of [built-in operations](https://docs.rs/autograd/0.9.4/autograd/ops/index.html)
-that support *higher-order* derivatives, but
+that support *higher-order* derivatives, and
 you can also [define your own differentiable ops](https://docs.rs/autograd/0.9.4/autograd/op/trait.Op.html) with ndarrays easily.
 
 Here we are just computing partial derivatives of `z = 2x^2 + 3y + 1`.

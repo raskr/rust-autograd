@@ -138,9 +138,8 @@ fn im2col_batch<T: Float>(
     let channel_size = (xh * xw) as usize;
     let size_per_batch_y = (xch * kw * kh * yh * yw) as usize;
 
-    let ret = uninitialized_vec::<T>(batch_size * size_per_batch_y);
-
     unsafe {
+        let ret = uninitialized_vec::<T>(batch_size * size_per_batch_y);
         // parallelize outer loop
         (0..batch_size).into_par_iter().for_each(|i| {
             let mut x: *const T = x.get_unchecked(i * xch as usize * channel_size) as *const _;
@@ -212,8 +211,8 @@ fn im2col_batch<T: Float>(
                 x = x.offset(channel_size as isize);
             }
         });
+        ret
     }
-    ret
 }
 
 fn col2im_batch<T: Float>(

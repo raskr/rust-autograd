@@ -140,20 +140,3 @@ impl<'a, T: Float> PartialOrd for &'a Tensor<T> {
         Some(self.cmp(&other))
     }
 }
-
-#[doc(hidden)]
-#[macro_export]
-macro_rules! eval_with_time {
-    ($x:expr) => {{
-        use std::time::{Duration, Instant};
-        let start = Instant::now();
-        let result = $x;
-        let end = start.elapsed();
-        println!(
-            "{}.{:03} sec",
-            end.as_secs(),
-            end.subsec_nanos() / 1_000_000
-        );
-        result
-    }};
-}

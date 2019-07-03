@@ -64,91 +64,92 @@ impl<T: Float> crate::op::Op<T> for Conv2DTranspose {
 
         let size_per_batch_col = xch * kh * kw * yh * yw;
 
-        let mut col = uninitialized_vec(batch_size * size_per_batch_col);
-
         let copied_gy = ndarray_ext::copy_if_dirty(gy);
         let copied_w = ndarray_ext::copy_if_dirty(w);
         let gy_ptr = copied_gy.map(|inner| inner.as_ptr()).unwrap_or(gy.as_ptr());
         let w_ptr = copied_w.map(|inner| inner.as_ptr()).unwrap_or(w.as_ptr());
 
-        #[cfg(feature = "mkl")]
-        {
-            if same_type::<T, f32>() {
-                crate::ops::dot_ops::cblas_sgemm_batch_wrapper(
-                    true,
-                    false,
-                    m,
-                    n,
-                    k,
-                    &[1.],
-                    vec![w_ptr as *const f32; batch_size],
-                    crate::dot_ops::get_region_heads(batch_size, gy_ptr, gy.len()),
-                    &[0.],
-                    crate::dot_ops::get_region_heads(batch_size, col.as_ptr(), col.len()),
-                    1,
-                    batch_size,
-                );
-            } else if same_type::<T, f64>() {
-                crate::ops::dot_ops::cblas_dgemm_batch_wrapper(
-                    true,
-                    false,
-                    m,
-                    n,
-                    k,
-                    &[1.],
-                    vec![w_ptr as *const f64; batch_size],
-                    crate::dot_ops::get_region_heads(batch_size, gy_ptr, gy.len()),
-                    &[0.],
-                    crate::dot_ops::get_region_heads(batch_size, col.as_ptr(), col.len()),
-                    1,
-                    batch_size,
-                );
-            } else {
-                panic!("gemm supports only f32 and f64.")
+        let gx = unsafe {
+            let mut col = uninitialized_vec(batch_size * size_per_batch_col);
+
+            #[cfg(feature = "mkl")]
+            {
+                if same_type::<T, f32>() {
+                    crate::ops::dot_ops::cblas_sgemm_batch_wrapper(
+                        true,
+                        false,
+                        m,
+                        n,
+                        k,
+                        &[1.],
+                        vec![w_ptr as *const f32; batch_size],
+                        crate::dot_ops::get_region_heads(batch_size, gy_ptr, gy.len()),
+                        &[0.],
+                        crate::dot_ops::get_region_heads(batch_size, col.as_ptr(), col.len()),
+                        1,
+                        batch_size,
+                    );
+                } else if same_type::<T, f64>() {
+                    crate::ops::dot_ops::cblas_dgemm_batch_wrapper(
+                        true,
+                        false,
+                        m,
+                        n,
+                        k,
+                        &[1.],
+                        vec![w_ptr as *const f64; batch_size],
+                        crate::dot_ops::get_region_heads(batch_size, gy_ptr, gy.len()),
+                        &[0.],
+                        crate::dot_ops::get_region_heads(batch_size, col.as_ptr(), col.len()),
+                        1,
+                        batch_size,
+                    );
+                } else {
+                    panic!("gemm supports only f32 and f64.")
+                }
             }
-        }
-        #[cfg(not(feature = "mkl"))]
-        {
-            let w_slice = unsafe { slice::from_raw_parts(w_ptr, w.len()) };
-            let gy_slice = unsafe { slice::from_raw_parts(gy_ptr, gy.len()) };
-            let col_ref = &col[0];
-            let size_per_batch_gy = ych * yh * yw;
-            (0..batch_size).into_par_iter().for_each(|i| unsafe {
-                let w = w_slice.as_ptr();
-                let gy_region_head = gy_slice.as_ptr().offset((i * size_per_batch_gy) as isize);
-                let col_region_head: *mut T = mem::transmute(col_ref);
-                let col_region_head = col_region_head.offset((i * size_per_batch_col) as isize);
-                slow_gemm!(
-                    true,
-                    false,
-                    w as *const f32,
-                    gy_region_head as *const f32,
-                    col_region_head as *mut f32,
-                    m,
-                    n,
-                    k,
-                    1.,
-                    0.
-                );
-            });
-        }
+            #[cfg(not(feature = "mkl"))]
+            {
+                let w_slice = slice::from_raw_parts(w_ptr, w.len());
+                let gy_slice = slice::from_raw_parts(gy_ptr, gy.len());
+                let col_ref = &col[0];
+                let size_per_batch_gy = ych * yh * yw;
+                (0..batch_size).into_par_iter().for_each(|i| {
+                    let w = w_slice.as_ptr();
+                    let gy_region_head = gy_slice.as_ptr().offset((i * size_per_batch_gy) as isize);
+                    let col_region_head: *mut T = mem::transmute(col_ref);
+                    let col_region_head = col_region_head.offset((i * size_per_batch_col) as isize);
+                    slow_gemm!(
+                        true,
+                        false,
+                        w as *const f32,
+                        gy_region_head as *const f32,
+                        col_region_head as *mut f32,
+                        m,
+                        n,
+                        k,
+                        1.,
+                        0.
+                    );
+                });
+            }
 
-        let gx = col2im_batch(
-            col.as_slice(),
-            batch_size,
-            xch as isize,
-            xh as isize,
-            xw as isize,
-            kh as isize,
-            kw as isize,
-            self.pad as isize,
-            self.pad as isize,
-            self.stride as isize,
-            self.stride as isize,
-            self.dilation as isize,
-            self.dilation as isize,
-        );
-
+            col2im_batch(
+                col.as_slice(),
+                batch_size,
+                xch as isize,
+                xh as isize,
+                xw as isize,
+                kh as isize,
+                kw as isize,
+                self.pad as isize,
+                self.pad as isize,
+                self.stride as isize,
+                self.stride as isize,
+                self.dilation as isize,
+                self.dilation as isize,
+            )
+        };
         let gx = NdArray::from_shape_vec(ndarray::IxDyn(&[batch_size, xch, xh, xw]), gx);
         vec![Ok(crate::ArrRepr::Owned(gx.unwrap()))]
     }
@@ -209,8 +210,6 @@ impl<T: Float> crate::op::Op<T> for Conv2DTransposeFilterGrad {
 
         let x = unsafe { slice::from_raw_parts(x.as_ptr(), x.len()) };
         let gy = unsafe { slice::from_raw_parts(gy.as_ptr(), gy.len()) };
-        let mut gw = uninitialized_vec(k_shape[0] * k_shape[1] * k_shape[2] * k_shape[3]);
-        let gw_head = gw.as_mut_ptr();
 
         let cols = im2col_batch(
             gy,
@@ -228,42 +227,45 @@ impl<T: Float> crate::op::Op<T> for Conv2DTransposeFilterGrad {
             self.dilation as isize,
         );
 
-        for i in 0..batch_size {
-            let x_region_head = &x[i * size_per_batch_x] as *const T;
-            let c_region_head = &cols[i * size_per_batch_c] as *const T;
-            #[cfg(feature = "mkl")]
-            {
-                if same_type::<T, f32>() {
-                    crate::ops::dot_ops::cblas_sgemm_wrapper(
-                        false,
-                        true,
-                        m,
-                        n,
-                        k,
-                        1.,
-                        x_region_head as *const f32,
-                        c_region_head as *const f32,
-                        if i == 1 { 1. } else { 0. },
-                        gw_head as *mut f32,
-                    )
-                } else if same_type::<T, f64>() {
-                    crate::ops::dot_ops::cblas_dgemm_wrapper(
-                        false,
-                        true,
-                        m,
-                        n,
-                        k,
-                        1.,
-                        x_region_head as *const f64,
-                        c_region_head as *const f64,
-                        if i == 1 { 1. } else { 0. },
-                        gw_head as *mut f64,
-                    )
+        let gw = unsafe {
+            let mut gw = uninitialized_vec(k_shape[0] * k_shape[1] * k_shape[2] * k_shape[3]);
+            let gw_head = gw.as_mut_ptr();
+
+            for i in 0..batch_size {
+                let x_region_head = &x[i * size_per_batch_x] as *const T;
+                let c_region_head = &cols[i * size_per_batch_c] as *const T;
+                #[cfg(feature = "mkl")]
+                {
+                    if same_type::<T, f32>() {
+                        crate::ops::dot_ops::cblas_sgemm_wrapper(
+                            false,
+                            true,
+                            m,
+                            n,
+                            k,
+                            1.,
+                            x_region_head as *const f32,
+                            c_region_head as *const f32,
+                            if i == 1 { 1. } else { 0. },
+                            gw_head as *mut f32,
+                        )
+                    } else if same_type::<T, f64>() {
+                        crate::ops::dot_ops::cblas_dgemm_wrapper(
+                            false,
+                            true,
+                            m,
+                            n,
+                            k,
+                            1.,
+                            x_region_head as *const f64,
+                            c_region_head as *const f64,
+                            if i == 1 { 1. } else { 0. },
+                            gw_head as *mut f64,
+                        )
+                    }
                 }
-            }
-            #[cfg(not(feature = "mkl"))]
-            {
-                unsafe {
+                #[cfg(not(feature = "mkl"))]
+                {
                     slow_gemm!(
                         false,
                         true,
@@ -278,7 +280,8 @@ impl<T: Float> crate::op::Op<T> for Conv2DTransposeFilterGrad {
                     );
                 }
             }
-        }
+            gw
+        };
 
         vec![Ok(crate::ArrRepr::Owned(
             NdArray::from_shape_vec(k_shape, gw).unwrap(),

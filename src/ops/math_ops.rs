@@ -343,7 +343,7 @@ impl<T: Float> op::Op<T> for Transpose {
         let perm_len = perm.len();
         assert!(perm_len >= 2);
 
-        let ret = {
+        let ret = unsafe {
             let mut dims = crate::uninitialized_vec::<usize>(perm_len);
             for (i, d) in perm.iter().enumerate() {
                 if self.invert_axes {

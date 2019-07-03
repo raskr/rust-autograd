@@ -12,8 +12,6 @@ type Tensor = ag::Tensor<f32>;
 // First, run "./download_mnist.sh" beforehand if you don't have dataset and then run
 // "cargo run --example mlp_mnist --release --features mkl" in `examples` directory.
 //
-// NOTE: This example is written in define-by-run style, so
-// the performance is spoiled little bit.
 macro_rules! timeit {
     ($x:expr) => {{
         let start = Instant::now();

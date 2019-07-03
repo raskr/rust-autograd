@@ -110,26 +110,19 @@ pub use crate::ndarray_ext::ArrRepr;
 
 #[inline]
 #[doc(hidden)]
-pub fn uninitialized_vec<T>(size: usize) -> Vec<T> {
+pub unsafe fn uninitialized_vec<T>(size: usize) -> Vec<T> {
     let mut buf = Vec::with_capacity(size);
-    unsafe {
-        buf.set_len(size);
-    }
+    buf.set_len(size);
     buf
 }
 
-/// Registers a simple hook for a `Tensor` computation.
+/// Registers a hook on a `Tensor`.
 ///
 /// Pre-defined hooks are
 ///
-/// * Print - prints the evaluation result of this tensor.
-/// * PrintShape - prints the evaluated shape of this tensor.
-///
-/// See also
-///
-/// * [with_fn](../tensor/struct.Tensor.html#method.with_fn)
-/// * [p](../tensor/struct.Tensor.html#method.p)
-/// * [ps](../tensor/struct.Tensor.html#method.ps)
+/// * Print - prints the evaluation result of this tensor. (See also [p](tensor/struct.Tensor.html#method.p))
+/// * PrintShape - prints the evaluated shape of this tensor. (See also [ps](tensor/struct.Tensor.html#method.ps))
+/// * Raw - executes a given closure (See also [with_fn](tensor/struct.Tensor.html#method.with_fn))
 ///
 /// ```
 /// extern crate autograd as ag;

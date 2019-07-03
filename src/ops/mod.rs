@@ -9,13 +9,16 @@ use rand::Rng;
 mod activation_ops;
 mod array_ops;
 mod basic_source_ops;
+#[doc(hidden)]
 pub mod binary_ops;
 mod const_gen_ops;
 mod conv_ops;
 #[macro_use]
+#[doc(hidden)]
 pub mod dot_ops;
 pub mod gradient_descent_ops;
 mod gradient_ops;
+#[doc(hidden)]
 pub mod hook_ops;
 mod math_ops;
 mod random_ops;

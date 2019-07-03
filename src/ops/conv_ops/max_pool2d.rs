@@ -136,7 +136,7 @@ macro_rules! impl_max_pool_grad {
 
 macro_rules! impl_max_pool_grad_grad {
     ($t:ty, $i:ident) => {
-        fn $i<T: Float>(
+        unsafe fn $i<T: Float>(
             ggx: *const T,
             yh: usize,
             yw: usize,
@@ -148,11 +148,9 @@ macro_rules! impl_max_pool_grad_grad {
             let mut ggy = ret.as_mut_ptr();
             let until = yh * yw * c * batch;
             for _ in 0..until {
-                unsafe {
-                    *ggy = *ggx.offset(*argmax as isize);
-                    ggy = ggy.offset(1);
-                    argmax = argmax.offset(1);
-                }
+                *ggy = *ggx.offset(*argmax as isize);
+                ggy = ggy.offset(1);
+                argmax = argmax.offset(1);
             }
             ret
         }
@@ -331,14 +329,16 @@ impl<T: Float> crate::op::Op<T> for MaxPool2DGradGrad {
         let yh = (xh + 2 * self.pad - self.size) / self.stride + 1;
         let yw = (xw + 2 * self.pad - self.size) / self.stride + 1;
         let argmax = &xs[1];
-        let ggy = if same_type::<T, f32>() {
-            max_pool_grad_grad_f32(ggx, yh, yw, c, batch, argmax.as_ptr() as *const f32)
-        } else if same_type::<T, f64>() {
-            max_pool_grad_grad_f64(ggx, yh, yw, c, batch, argmax.as_ptr() as *const f64)
-        } else {
-            panic!("MaxPoolGradGrad supports only f32 and f64");
+        let ggy = unsafe {
+            let ggy = if same_type::<T, f32>() {
+                max_pool_grad_grad_f32(ggx, yh, yw, c, batch, argmax.as_ptr() as *const f32)
+            } else if same_type::<T, f64>() {
+                max_pool_grad_grad_f64(ggx, yh, yw, c, batch, argmax.as_ptr() as *const f64)
+            } else {
+                panic!("MaxPoolGradGrad supports only f32 and f64");
+            };
+            NdArray::from_shape_vec(ndarray::IxDyn(&[batch, c, yh, yw]), ggy).unwrap()
         };
-        let ggy = NdArray::from_shape_vec(ndarray::IxDyn(&[batch, c, yh, yw]), ggy).unwrap();
         vec![Ok(crate::ArrRepr::Owned(ggy))]
     }
 

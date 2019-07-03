@@ -388,18 +388,13 @@ impl<T: Float> Tensor<T> {
             .collect::<Vec<_>>()
     }
 
-    /// Registers a simple hook for a `Tensor` computation.
+    /// Registers a hook on a `Tensor`.
     ///
     /// Pre-defined hooks are
     ///
-    /// * Print - prints the evaluation result of this tensor.
-    /// * PrintShape - prints the evaluated shape of this tensor.
-    ///
-    /// See also
-    ///
-    /// * [with_fn](../tensor/struct.Tensor.html#method.with_fn)
-    /// * [p](../tensor/struct.Tensor.html#method.p)
-    /// * [ps](../tensor/struct.Tensor.html#method.ps)
+    /// * Print - prints the evaluation result of this tensor. (See also [p](../tensor/struct.Tensor.html#method.p))
+    /// * PrintShape - prints the evaluated shape of this tensor. (See also [ps](../tensor/struct.Tensor.html#method.ps))
+    /// * Raw - executes a given closure (See also [with_fn](../tensor/struct.Tensor.html#method.with_fn))
     ///
     /// ```
     /// extern crate autograd as ag;
@@ -423,13 +418,9 @@ impl<T: Float> Tensor<T> {
         crate::hook(hook, self)
     }
 
-    /// Registers a hook for a `Tensor` computation.
+    /// Registers a hook using closure on a `Tensor`.
     ///
-    /// See also
-    ///
-    /// * [with](../tensor/struct.Tensor.html#method.with)
-    /// * [p](../tensor/struct.Tensor.html#method.p)
-    /// * [ps](../tensor/struct.Tensor.html#method.ps)
+    /// See also [with](../tensor/struct.Tensor.html#method.with)
     ///
     /// ```
     /// extern crate autograd as ag;
@@ -446,7 +437,7 @@ impl<T: Float> Tensor<T> {
         crate::hook(crate::Hook::Raw(hook), self)
     }
 
-    /// Shorthand for `Tensor::with(crate::Hook::Print)`
+    /// Shorthand for `Tensor::with(ag::Hook::Print)`
     ///
     /// See [with](../tensor/struct.Tensor.html#method.with)
     ///
@@ -466,7 +457,7 @@ impl<T: Float> Tensor<T> {
         self.with(crate::Hook::Print)
     }
 
-    /// Shorthand for `Tensor::with(crate::Hook::PrintShape)`
+    /// Shorthand for `Tensor::with(ag::Hook::PrintShape)`
     ///
     /// See [with](../tensor/struct.Tensor.html#method.with)
     ///
