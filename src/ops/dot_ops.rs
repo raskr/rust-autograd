@@ -155,21 +155,23 @@ pub fn cblas_sgemm_wrapper(
 fn test_sgemm() {
     let x = vec![1., 2., 3., 4.]; // (2, 2)
     let y = vec![1., 2., 3., 4.]; // (2, 2)
-    let mut z = crate::uninitialized_vec::<f32>(4); // (2, 2, 2)
+    unsafe {
+        let mut z = crate::uninitialized_vec::<f32>(4); // (2, 2, 2)
 
-    cblas_sgemm_wrapper(
-        false,
-        false,
-        2,  // m
-        2,  // n
-        2,  // k
-        1., // alpha
-        x.as_ptr(),
-        y.as_ptr(), // b
-        0.,         // beta
-        z.as_mut_ptr(),
-    );
-    assert_eq!(z, vec![7., 10., 15., 22.]);
+        cblas_sgemm_wrapper(
+            false,
+            false,
+            2,  // m
+            2,  // n
+            2,  // k
+            1., // alpha
+            x.as_ptr(),
+            y.as_ptr(), // b
+            0.,         // beta
+            z.as_mut_ptr(),
+        );
+        assert_eq!(z, vec![7., 10., 15., 22.]);
+    }
 }
 
 #[inline]
@@ -336,28 +338,30 @@ fn test_dgemm_batch_trans_a() {
     let batch = 2;
     let w = vec![0., 1., 2., 3., 4., 5.]; // (2, 3)
     let x = vec![0., 1., 2., 3., 4., 5., 6., 7.]; // (2, 2, 2)
-    let z = crate::uninitialized_vec::<f64>(12); // (2, 2, 2)
-    let m = 3; // row of op(a)
-    let n = 2; // col of op(b)
-    let k = 2; // col of op(a)
-    cblas_dgemm_batch_wrapper(
-        true,
-        false,
-        m,
-        n,
-        k,
-        &[1.],              // alpha
-        vec![&w[0], &w[0]], // a
-        get_region_heads(batch, x.as_ptr(), x.len()),
-        &[0.], // beta
-        get_region_heads(batch, z.as_ptr(), z.len()),
-        1,
-        batch,
-    );
-    assert_eq!(
-        z,
-        vec![6., 9., 8., 13., 10., 17., 18., 21., 28., 33., 38., 45.]
-    );
+    unsafe {
+        let z = crate::uninitialized_vec::<f64>(12); // (2, 2, 2)
+        let m = 3; // row of op(a)
+        let n = 2; // col of op(b)
+        let k = 2; // col of op(a)
+        cblas_dgemm_batch_wrapper(
+            true,
+            false,
+            m,
+            n,
+            k,
+            &[1.],              // alpha
+            vec![&w[0], &w[0]], // a
+            get_region_heads(batch, x.as_ptr(), x.len()),
+            &[0.], // beta
+            get_region_heads(batch, z.as_ptr(), z.len()),
+            1,
+            batch,
+        );
+        assert_eq!(
+            z,
+            vec![6., 9., 8., 13., 10., 17., 18., 21., 28., 33., 38., 45.]
+        );
+    }
 }
 
 #[test]
@@ -366,24 +370,26 @@ fn test_dgemm_batch() {
     let batch = 2;
     let x = vec![0., 1., 2., 3.]; // (2, 2)
     let y = vec![0., 1., 2., 3., 4., 5., 6., 7.]; // (2, 2, 2)
-    let z = crate::uninitialized_vec::<f64>(8); // (2, 2, 2)
+    unsafe {
+        let z = crate::uninitialized_vec::<f64>(8); // (2, 2, 2)
 
-    cblas_dgemm_batch_wrapper(
-        false,
-        false,
-        2,                                            // m
-        2,                                            // n
-        2,                                            // k
-        &[1.],                                        // alpha
-        vec![&x[0], &x[0]],                           // a
-        get_region_heads(batch, y.as_ptr(), y.len()), // b
-        &[0.],                                        // beta
-        get_region_heads(batch, z.as_ptr(), z.len()), // c
-        1,
-        batch,
-    );
-    assert_eq!(z, vec![2., 3., 6., 11., 6., 7., 26., 31.]);
-}
+        cblas_dgemm_batch_wrapper(
+            false,
+            false,
+            2,                                            // m
+            2,                                            // n
+            2,                                            // k
+            &[1.],                                        // alpha
+            vec![&x[0], &x[0]],                           // a
+            get_region_heads(batch, y.as_ptr(), y.len()), // b
+            &[0.],                                        // beta
+            get_region_heads(batch, z.as_ptr(), z.len()), // c
+            1,
+            batch,
+        );
+        assert_eq!(z, vec![2., 3., 6., 11., 6., 7., 26., 31.]);
+    }
+    }
 
 // `Tensordot` is implemented in `ops/mod.rs`.
 
@@ -422,22 +428,24 @@ macro_rules! mkl_mm {
         let ret_row = if $self.transpose_a { col0 } else { row0 }; //
         let ret_col = if $self.transpose_b { row1 } else { col1 };
 
-        let mut c = crate::uninitialized_vec::<T>(ret_row * ret_col);
-        $f(
-            transpose_a,
-            transpose_b,
-            m,
-            n,
-            k,
-            1.,
-            $x0.as_ptr() as *const $typ,
-            $x1.as_ptr() as *const $typ,
-            0.,
-            c.as_mut_ptr() as *mut $typ,
-        );
-        vec![Ok(crate::ArrRepr::Owned(
-            NdArray::from_shape_vec(ndarray::IxDyn(&[ret_row, ret_col]), c).unwrap(),
-        ))]
+        unsafe {
+            let mut c = crate::uninitialized_vec::<T>(ret_row * ret_col);
+            $f(
+                transpose_a,
+                transpose_b,
+                m,
+                n,
+                k,
+                1.,
+                $x0.as_ptr() as *const $typ,
+                $x1.as_ptr() as *const $typ,
+                0.,
+                c.as_mut_ptr() as *mut $typ,
+            );
+            vec![Ok(crate::ArrRepr::Owned(
+                NdArray::from_shape_vec(ndarray::IxDyn(&[ret_row, ret_col]), c).unwrap(),
+            ))]
+        }
     }};
 }
 
@@ -502,41 +510,43 @@ macro_rules! mkl_batch_mm {
         let n = if transpose_b { $row1 } else { $col1 }; // cols of b
         let k = if transpose_a { $row0 } else { $col0 }; // cols of a
 
-        let ret = crate::uninitialized_vec($ret_shape.iter().product());
+        unsafe {
+            let ret = crate::uninitialized_vec($ret_shape.iter().product());
 
-        $f(
-            transpose_a,
-            transpose_b,
-            m,
-            n,
-            k,
-            &[1.],
-            get_region_heads(
+            $f(
+                transpose_a,
+                transpose_b,
+                m,
+                n,
+                k,
+                &[1.],
+                get_region_heads(
+                    $batch_size,
+                    if let Some(v) = copied0 {
+                        v.as_ptr()
+                    } else {
+                        $x0.as_ptr()
+                    },
+                    $x0.len(),
+                ), // a array
+                get_region_heads(
+                    $batch_size,
+                    if let Some(v) = copied1 {
+                        v.as_ptr()
+                    } else {
+                        $x1.as_ptr()
+                    },
+                    $x1.len(),
+                ), // b array
+                &[0.],
+                get_region_heads($batch_size, ret.as_ptr(), ret.len()), // c array
+                1,
                 $batch_size,
-                if let Some(v) = copied0 {
-                    v.as_ptr()
-                } else {
-                    $x0.as_ptr()
-                },
-                $x0.len(),
-            ), // a array
-            get_region_heads(
-                $batch_size,
-                if let Some(v) = copied1 {
-                    v.as_ptr()
-                } else {
-                    $x1.as_ptr()
-                },
-                $x1.len(),
-            ), // b array
-            &[0.],
-            get_region_heads($batch_size, ret.as_ptr(), ret.len()), // c array
-            1,
-            $batch_size,
-        );
-        vec![Ok(crate::ArrRepr::Owned(
-            NdArray::from_shape_vec(ndarray::IxDyn($ret_shape.as_slice()), ret).unwrap(),
-        ))]
+            );
+            vec![Ok(crate::ArrRepr::Owned(
+                NdArray::from_shape_vec(ndarray::IxDyn($ret_shape.as_slice()), ret).unwrap(),
+            ))]
+        }
     }};
 }
 
