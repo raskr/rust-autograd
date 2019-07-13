@@ -41,10 +41,9 @@ impl<'v, T: Float> ArrRepr<'v, T> {
     }
 }
 
-#[doc(hidden)]
 #[inline]
 /// This works well only for small arrays
-pub fn as_shape<T: Float>(x: &NdArrayView<T>) -> Vec<usize> {
+pub(crate) fn as_shape<T: Float>(x: &NdArrayView<T>) -> Vec<usize> {
     let mut target = Vec::with_capacity(x.len());
     for &a in x.iter() {
         target.push(a.to_usize().unwrap());
@@ -52,25 +51,22 @@ pub fn as_shape<T: Float>(x: &NdArrayView<T>) -> Vec<usize> {
     target
 }
 
-#[doc(hidden)]
 #[inline]
-pub fn expand_dims_view<T: Float>(x: NdArrayView<T>, axis: usize) -> NdArrayView<T> {
+pub(crate) fn expand_dims_view<T: Float>(x: NdArrayView<T>, axis: usize) -> NdArrayView<T> {
     let mut shape = x.shape().to_vec();
     shape.insert(axis, 1);
     x.into_shape(shape).unwrap()
 }
 
-#[doc(hidden)]
 #[inline]
-pub fn expand_dims<T: Float>(x: NdArray<T>, axis: usize) -> NdArray<T> {
+pub(crate) fn expand_dims<T: Float>(x: NdArray<T>, axis: usize) -> NdArray<T> {
     let mut shape = x.shape().to_vec();
     shape.insert(axis, 1);
     x.into_shape(shape).unwrap()
 }
 
-#[doc(hidden)]
 #[inline]
-pub fn roll_axis<T: Float>(arg: &mut NdArray<T>, to: ndarray::Axis, from: ndarray::Axis) {
+pub(crate) fn roll_axis<T: Float>(arg: &mut NdArray<T>, to: ndarray::Axis, from: ndarray::Axis) {
     let i = to.index();
     let mut j = from.index();
     if j > i {
@@ -87,8 +83,7 @@ pub fn roll_axis<T: Float>(arg: &mut NdArray<T>, to: ndarray::Axis, from: ndarra
 }
 
 #[inline]
-#[doc(hidden)]
-pub fn normalize_negative_axis(axis: isize, ndim: usize) -> usize {
+pub(crate) fn normalize_negative_axis(axis: isize, ndim: usize) -> usize {
     if axis < 0 {
         (ndim as isize + axis) as usize
     } else {
@@ -97,8 +92,7 @@ pub fn normalize_negative_axis(axis: isize, ndim: usize) -> usize {
 }
 
 #[inline]
-#[doc(hidden)]
-pub fn normalize_negative_axes<T: Float>(axes: &NdArrayView<T>, ndim: usize) -> Vec<usize> {
+pub(crate) fn normalize_negative_axes<T: Float>(axes: &NdArrayView<T>, ndim: usize) -> Vec<usize> {
     let mut axes_ret: Vec<usize> = Vec::with_capacity(axes.len());
     for &axis in axes.iter() {
         let axis = if axis < T::zero() {
@@ -112,8 +106,7 @@ pub fn normalize_negative_axes<T: Float>(axes: &NdArrayView<T>, ndim: usize) -> 
 }
 
 #[inline]
-#[doc(hidden)]
-pub fn sparse_to_dense<T: Float>(arr: &NdArrayView<T>) -> Vec<usize> {
+pub(crate) fn sparse_to_dense<T: Float>(arr: &NdArrayView<T>) -> Vec<usize> {
     let mut axes: Vec<usize> = vec![];
     for (i, &a) in arr.iter().enumerate() {
         if a == T::one() {
@@ -125,9 +118,8 @@ pub fn sparse_to_dense<T: Float>(arr: &NdArrayView<T>) -> Vec<usize> {
 
 #[allow(unused)]
 #[inline]
-#[doc(hidden)]
 // True if even one of the axes is moved
-pub fn is_dims_permuted(strides: &[isize]) -> bool {
+pub(crate) fn is_dims_permuted(strides: &[isize]) -> bool {
     let mut ret = false;
     for w in strides.windows(2) {
         if w[0] < w[1] {
@@ -139,9 +131,8 @@ pub fn is_dims_permuted(strides: &[isize]) -> bool {
 }
 
 #[allow(unused)]
-#[doc(hidden)]
 #[inline]
-pub fn is_fully_transposed(strides: &[ndarray::Ixs]) -> bool {
+pub(crate) fn is_fully_transposed(strides: &[ndarray::Ixs]) -> bool {
     let mut ret = true;
     for w in strides.windows(2) {
         if w[0] > w[1] {
@@ -153,8 +144,7 @@ pub fn is_fully_transposed(strides: &[ndarray::Ixs]) -> bool {
 }
 
 #[inline]
-#[doc(hidden)]
-pub fn copy_if_dirty<T: Float>(x: &NdArrayView<T>) -> Option<NdArray<T>> {
+pub(crate) fn copy_if_dirty<T: Float>(x: &NdArrayView<T>) -> Option<NdArray<T>> {
     if is_dims_permuted(x.strides()) {
         Some(deep_copy(x))
     } else {
@@ -168,22 +158,19 @@ pub fn deep_copy<T: Float>(x: &NdArrayView<T>) -> NdArray<T> {
     NdArray::from_shape_vec(x.shape(), vec).unwrap()
 }
 
-#[doc(hidden)]
 #[inline]
-pub fn scalar_shape<T: Float>() -> NdArray<T> {
+pub(crate) fn scalar_shape<T: Float>() -> NdArray<T> {
     // safe unwrap
     NdArray::from_shape_vec(ndarray::IxDyn(&[0]), vec![]).unwrap()
 }
 
-#[doc(hidden)]
 #[inline]
-pub fn is_scalar_shape(shape: &[usize]) -> bool {
+pub(crate) fn is_scalar_shape(shape: &[usize]) -> bool {
     shape == &[] || shape == &[0]
 }
 
-#[doc(hidden)]
 #[inline]
-pub fn shape_of_view<T: Float>(x: &NdArrayView<T>) -> NdArray<T> {
+pub(crate) fn shape_of_view<T: Float>(x: &NdArrayView<T>) -> NdArray<T> {
     let shape = x
         .shape()
         .iter()
@@ -194,9 +181,8 @@ pub fn shape_of_view<T: Float>(x: &NdArrayView<T>) -> NdArray<T> {
     NdArray::from_shape_vec(ndarray::IxDyn(&[rank]), shape).unwrap()
 }
 
-#[doc(hidden)]
 #[inline]
-pub fn shape_of<T: Float>(x: &NdArray<T>) -> NdArray<T> {
+pub(crate) fn shape_of<T: Float>(x: &NdArray<T>) -> NdArray<T> {
     let shape = x
         .shape()
         .iter()
