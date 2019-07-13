@@ -93,17 +93,17 @@ fn test_im2col_batch() {
     let ret = im2col_batch(
         x.as_slice(),
         batch_size,
-        xch as isize,
-        xh as isize,
-        xw as isize,
-        kh as isize,
-        kw as isize,
-        op.pad as isize,
-        op.pad as isize,
-        op.stride as isize,
-        op.stride as isize,
-        op.dilation as isize,
-        op.dilation as isize,
+        xch as i32,
+        xh as i32,
+        xw as i32,
+        kh as i32,
+        kw as i32,
+        op.pad as i32,
+        op.pad as i32,
+        op.stride as i32,
+        op.stride as i32,
+        op.dilation as i32,
+        op.dilation as i32,
     );
 
     assert_eq!(
@@ -121,18 +121,20 @@ fn test_im2col_batch() {
 fn im2col_batch<T: Float>(
     x: &[T],           // 4-dimensional
     batch_size: usize, // x.shape[0]
-    xch: isize,        // number of channels of x
-    xh: isize,
-    xw: isize, // x (input) height, width
-    kh: isize,
-    kw: isize, // kernel height, width
-    ph: isize,
-    pw: isize, // padding height, width
-    sh: isize,
-    sw: isize, // stride height, width
-    dh: isize,
-    dw: isize, // dilation height, width
+    xch: i32,        // number of channels of x
+    xh: i32,
+    xw: i32, // x (input) height, width
+    kh: i32,
+    kw: i32, // kernel height, width
+    ph: i32,
+    pw: i32, // padding height, width
+    sh: i32,
+    sw: i32, // stride height, width
+    dh: i32,
+    dw: i32, // dilation height, width
 ) -> Vec<T> {
+    use std::ptr;
+
     let yh = (xh + 2 * ph - (dh * (kh - 1) + 1)) / sh + 1;
     let yw = (xw + 2 * pw - (dw * (kw - 1) + 1)) / sw + 1;
     let channel_size = (xh * xw) as usize;
@@ -146,65 +148,26 @@ fn im2col_batch<T: Float>(
             let mut ret: *mut T = mem::transmute(ret.get_unchecked(i * size_per_batch_y));
             for _ in 0..xch {
                 for cur_kh in 0..kh {
-                    let y_start = cur_kh * dh - ph;
-                    let edge1 = if y_start >= 0 {
-                        0
-                    } else {
-                        yh.min((-y_start / sh) + ((y_start % sh) != 0) as isize)
-                    };
-                    let edge2 = yh.min((xh - y_start) / sh + ((xh - y_start) % sh != 0) as isize);
-
+                    let y_start: i32 = cur_kh * dh - ph;
                     for cur_kw in 0..kw {
-                        let x_start = cur_kw * dw - pw;
-
-                        let edge3 = if x_start >= 0 {
-                            0
-                        } else {
-                            yw.min((-x_start / sw) + ((x_start % sw) != 0) as isize)
-                        };
-                        let edge4 =
-                            yw.min((xw - x_start) / sw + ((xw - x_start) % sw != 0) as isize);
-
-                        let mut cur_y = y_start;
-
-                        for _ in 0..edge1 {
-                            // pad
-                            for _ in 0..yw {
-                                *ret = T::zero();
-                                ret = ret.offset(1);
+                        let x_start = cur_kw * dw - ph;
+                        let mut y_offset = y_start;
+                        for _ in 0..yh {
+                            if (y_offset as u32) < (xh as u32) {
+                                let mut x_offset = x_start;
+                                for j in 0..yw {
+                                    if (x_offset as u32) < (xw as u32) {
+                                        *ret.offset(j as isize) = *x.offset((y_offset * xw + x_offset) as isize);
+                                    } else {
+                                        *ret.offset(j as isize) = T::zero();
+                                    }
+                                    x_offset += sw;
+                                }
+                            } else {
+                                ptr::write_bytes(ret, 0, yw as usize);
                             }
-                            cur_y += sh;
-                        }
-
-                        for _ in edge1..edge2 {
-                            let mut cur_x = x_start;
-                            for _ in 0..edge3 {
-                                // pad
-                                *ret = T::zero();
-                                ret = ret.offset(1);
-                                cur_x += sw;
-                            }
-                            for _ in edge3..edge4 {
-                                *ret = *x.offset((cur_y * xw + cur_x) as isize);
-                                ret = ret.offset(1);
-                                cur_x += sw;
-                            }
-                            for _ in edge4..yw {
-                                // pad
-                                *ret = T::zero();
-                                ret = ret.offset(1);
-                                cur_x += sw;
-                            }
-                            cur_y += sh;
-                        }
-
-                        for _ in edge2..yh {
-                            // pad
-                            for _ in 0..yw {
-                                *ret = T::zero();
-                                ret = ret.offset(1);
-                            }
-                            cur_y += sh;
+                            ret = ret.offset(yw as isize);
+                            y_offset += sh;
                         }
                     }
                 }
@@ -218,17 +181,17 @@ fn im2col_batch<T: Float>(
 fn col2im_batch<T: Float>(
     x: &[T],           // 6-dimensional cols
     batch_size: usize, // x.shape[0]
-    xch: isize,        // number of channels of x
-    xh: isize,
-    xw: isize, // x (input) height, width
-    kh: isize,
-    kw: isize, // kernel height, width
-    ph: isize,
-    pw: isize, // padding height, width
-    sh: isize,
-    sw: isize, // stride height, width
-    dh: isize,
-    dw: isize, // dilation height, width
+    xch: i32,        // number of channels of x
+    xh: i32,
+    xw: i32, // x (input) height, width
+    kh: i32,
+    kw: i32, // kernel height, width
+    ph: i32,
+    pw: i32, // padding height, width
+    sh: i32,
+    sw: i32, // stride height, width
+    dh: i32,
+    dw: i32, // dilation height, width
 ) -> Vec<T> {
     let yh = (xh + 2 * ph - (dh * (kh - 1) + 1)) / sh + 1;
     let yw = (xw + 2 * pw - (dw * (kw - 1) + 1)) / sw + 1;
@@ -242,41 +205,26 @@ fn col2im_batch<T: Float>(
     (0..batch_size).into_par_iter().for_each(|i| unsafe {
         let mut x: *const T = x.get_unchecked(i * size_per_batch_x as usize) as *const T;
         let mut ret: *mut T = mem::transmute(ret.get_unchecked(i * (xch * xh * xw) as usize));
-
         for _ in 0..xch {
             for ky in 0..kh {
                 let y_start = ky * dh - ph;
-                let edge1 = if y_start >= 0 {
-                    0
-                } else {
-                    yh.min((-y_start / sh) + ((y_start % sh) != 0) as isize)
-                };
-                let edge2 = yh.min((xh - y_start) / sh + ((xh - y_start) % sh != 0) as isize);
-
                 for kx in 0..kw {
                     let x_start = kx * dw - pw;
-                    let edge3 = if x_start >= 0 {
-                        0
-                    } else {
-                        yh.min((-x_start / sw) + ((x_start % sw) != 0) as isize)
-                    };
-                    let edge4 = yw.min((xw - x_start) / sw + ((xw - x_start) % sw != 0) as isize);
-                    let mut cur_y = y_start + sh * edge1;
-                    x = x.offset(yw * edge1);
-
-                    for _ in edge1..edge2 {
-                        x = x.offset(edge3);
-                        let mut cur_x = x_start + sw * edge3;
-                        for _ in edge3..edge4 {
-                            *ret.offset(cur_y * xw + cur_x) += *x;
-                            x = x.offset(1);
-                            cur_x += sw;
+                    let mut y_offset = y_start;
+                    for _ in 0..yh {
+                        if (y_offset as u32) < (xh as u32) {
+                           let mut x_offset = x_start;
+                            for j in 0..yw as isize {
+                                if (x_offset as u32) < (xw as u32) {
+                                    *ret.offset((y_offset * xw + x_offset) as isize) += *x.offset(j);
+                                }
+                                x_offset += sw;
+                            }
                         }
-                        x = x.offset(yw - edge4);
-                        cur_y += sh;
+                        x = x.offset(yw as isize);
+                        y_offset += sh;
                     }
 
-                    x = x.offset(yw * (yh - edge2));
                 }
             }
             ret = ret.offset(channel_size as isize);

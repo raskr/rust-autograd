@@ -138,17 +138,17 @@ impl<T: Float> crate::op::Op<T> for Conv2D {
             let c = im2col_batch(
                 x_p,
                 batch_size,
-                xch as isize,
-                xh as isize,
-                xw as isize,
-                kh as isize,
-                kw as isize,
-                self.pad as isize,
-                self.pad as isize,
-                self.stride as isize,
-                self.stride as isize,
-                self.dilation as isize,
-                self.dilation as isize,
+                xch as i32,
+                xh as i32,
+                xw as i32,
+                kh as i32,
+                kw as i32,
+                self.pad as i32,
+                self.pad as i32,
+                self.stride as i32,
+                self.stride as i32,
+                self.dilation as i32,
+                self.dilation as i32,
             );
 
             #[cfg(feature = "mkl")]
