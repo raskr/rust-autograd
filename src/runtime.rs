@@ -214,6 +214,9 @@ where
                             .push(found.expect("Placeholder unfilled."))
                     }
                 } else {
+                    if visited(node, &node_info_storage) {
+                        continue;
+                    }
                     node.resource_lookup_key.set(node_info_storage.len());
                     if !node.has_persistent_array() {
                         // Aggregate input arrays

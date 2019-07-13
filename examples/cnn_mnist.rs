@@ -7,7 +7,7 @@ use std::time::Instant;
 type Tensor = ag::Tensor<f32>;
 
 // This is a toy convolutional network for MNIST.
-// Got 0.987 test accuracy in 400 sec on 2.7GHz Intel Core i5.
+// Got 0.987 test accuracy in 350 sec on 2.7GHz Intel Core i5.
 //
 // First, run "./download_mnist.sh" beforehand if you don't have dataset and then run
 // "cargo run --example cnn_mnist --release --features mkl" in `examples` directory.
