@@ -389,7 +389,7 @@ fn test_dgemm_batch() {
         );
         assert_eq!(z, vec![2., 3., 6., 11., 6., 7., 26., 31.]);
     }
-    }
+}
 
 // `Tensordot` is implemented in `ops/mod.rs`.
 

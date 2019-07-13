@@ -121,7 +121,7 @@ fn test_im2col_batch() {
 fn im2col_batch<T: Float>(
     x: &[T],           // 4-dimensional
     batch_size: usize, // x.shape[0]
-    xch: i32,        // number of channels of x
+    xch: i32,          // number of channels of x
     xh: i32,
     xw: i32, // x (input) height, width
     kh: i32,
@@ -157,7 +157,8 @@ fn im2col_batch<T: Float>(
                                 let mut x_offset = x_start;
                                 for j in 0..yw {
                                     if (x_offset as u32) < (xw as u32) {
-                                        *ret.offset(j as isize) = *x.offset((y_offset * xw + x_offset) as isize);
+                                        *ret.offset(j as isize) =
+                                            *x.offset((y_offset * xw + x_offset) as isize);
                                     } else {
                                         *ret.offset(j as isize) = T::zero();
                                     }
@@ -181,7 +182,7 @@ fn im2col_batch<T: Float>(
 fn col2im_batch<T: Float>(
     x: &[T],           // 6-dimensional cols
     batch_size: usize, // x.shape[0]
-    xch: i32,        // number of channels of x
+    xch: i32,          // number of channels of x
     xh: i32,
     xw: i32, // x (input) height, width
     kh: i32,
@@ -213,10 +214,11 @@ fn col2im_batch<T: Float>(
                     let mut y_offset = y_start;
                     for _ in 0..yh {
                         if (y_offset as u32) < (xh as u32) {
-                           let mut x_offset = x_start;
+                            let mut x_offset = x_start;
                             for j in 0..yw as isize {
                                 if (x_offset as u32) < (xw as u32) {
-                                    *ret.offset((y_offset * xw + x_offset) as isize) += *x.offset(j);
+                                    *ret.offset((y_offset * xw + x_offset) as isize) +=
+                                        *x.offset(j);
                                 }
                                 x_offset += sw;
                             }
@@ -224,7 +226,6 @@ fn col2im_batch<T: Float>(
                         x = x.offset(yw as isize);
                         y_offset += sh;
                     }
-
                 }
             }
             ret = ret.offset(channel_size as isize);

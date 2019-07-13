@@ -183,7 +183,7 @@ where
         let mut view_storage: Vec<NdArrayView<T>> = Vec::new();
         let mut feed_store: Vec<NdArrayView<'feed, T>> = Vec::new();
 
-        let mut dfs_stack  = Vec::<(&Tensor<T>, bool)>::with_capacity(100);
+        let mut dfs_stack = Vec::<(&Tensor<T>, bool)>::with_capacity(100);
         for t in tensors.iter() {
             dfs_stack.push((t.as_ref(), false));
         }
