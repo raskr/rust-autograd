@@ -581,7 +581,7 @@ fn conv2d() {
 
 #[test]
 fn max_pool2d() {
-    let ref x = ag::variable(ag::ndarray_ext::standard_normal(&[2, 2, 3, 3]));
+    let ref x = ag::variable(ag::ndarray_ext::range(&[2, 2, 3, 3]));
     let ref y = ag::max_pool2d(x, 2, 0, 1);
     let ref g = ag::grad(&[y], &[x]);
     ag::test_helper::check_theoretical_grads(y, g, &[x], &[], 1e-3, 1e-2);
@@ -589,8 +589,8 @@ fn max_pool2d() {
 
 #[test]
 fn max_pool2d_grad() {
-    let arr_x = ag::ndarray_ext::standard_normal::<f64>(&[2, 2, 3, 3]);
-    let arr_gx = ag::ndarray_ext::standard_normal::<f64>(&[2, 2, 2, 2]);
+    let arr_x = ag::ndarray_ext::range(&[2, 2, 3, 3]);
+    let arr_gx = ag::ndarray_ext::range(&[2, 2, 2, 2]);
     let ref x = ag::variable(arr_x);
     let ref y = ag::max_pool2d(x, 2, 0, 1);
     let ref gy = ag::variable(arr_gx);
