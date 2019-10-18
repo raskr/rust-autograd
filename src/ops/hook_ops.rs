@@ -5,7 +5,7 @@ use crate::Float;
 
 pub struct Hook<T: Float> {
     pub name: Option<String>,
-    pub func: Box<Fn(&NdArrayView<T>) -> ()>,
+    pub func: Box<dyn Fn(&NdArrayView<T>) -> ()>,
 }
 
 impl<T: Float> op::Op<T> for Hook<T> {
