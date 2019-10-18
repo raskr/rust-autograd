@@ -94,7 +94,7 @@ where
 {
     let ys = ys
         .iter()
-        .map(|y| crate::ops::reduce_sum_to_scalar(y))
+        .map(crate::ops::reduce_sum_to_scalar)
         .collect::<Vec<_>>();
     let gys = vec![scalar(T::one()); ys.len()];
     unsafe { grad_with_default(&ys, xs, &gys) }

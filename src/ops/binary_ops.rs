@@ -58,12 +58,8 @@ impl<T: Float> op::Op<T> for PreprocessBinOpGrad {
                         // `fold_axis` squashes the axis automatically.
                         let axis = ndarray::Axis(if x_is_scalar { 0 } else { i });
                         let ret = match folded {
-                            Some(ref a) => {
-                                a.fold_axis(axis.clone(), T::zero(), |a, b| a.clone() + b.clone())
-                            }
-                            None => {
-                                gy.fold_axis(axis.clone(), T::zero(), |a, b| a.clone() + b.clone())
-                            }
+                            Some(ref a) => a.fold_axis(axis, T::zero(), |a, b| *a + *b),
+                            None => gy.fold_axis(axis, T::zero(), |a, b| *a + *b),
                         };
                         if x_is_scalar {
                             mem::swap(&mut folded, &mut Some(ret));
@@ -177,7 +173,7 @@ impl<T: Float> op::Op<T> for SubOp {
         let x0 = &xs[0];
         let x1 = &xs[1];
         let shape0: &[usize] = x0.shape();
-        let ret = if shape0 == &[] {
+        let ret = if shape0 == [] {
             // is scalar
             let x0_elem = x0[ndarray::IxDyn(&[])];
             crate::ArrRepr::Owned(x1.map(move |&a| x0_elem - a))
@@ -228,8 +224,8 @@ impl<T: Float> op::Op<T> for DivOp {
         let x1 = &xs[1];
         let shape0: &[usize] = x0.shape();
         let shape1: &[usize] = x1.shape();
-        let is_scalar0 = shape0 == &[] || shape0 == &[0];
-        let is_scalar1 = shape1 == &[] || shape1 == &[1];
+        let is_scalar0 = shape0 == [] || shape0 == [0];
+        let is_scalar1 = shape1 == [] || shape1 == [1];
         let ret = if is_scalar0 {
             // a is a scalar
             let x0_elem = x0[ndarray::IxDyn(&[])];

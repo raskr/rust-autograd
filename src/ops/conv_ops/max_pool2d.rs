@@ -63,7 +63,7 @@ macro_rules! impl_max_pool {
                                 let rows = xw * (h + c_base);
                                 for w in w_start..w_end {
                                     let index = w + rows;
-                                    let val = *input.offset(index as isize);
+                                    let val = *input.add(index);
                                     if val > max {
                                         max_i = index;
                                         max = val;

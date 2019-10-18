@@ -172,7 +172,7 @@ fn im2col_batch<T: Float>(
                         }
                     }
                 }
-                x = x.offset(channel_size as isize);
+                x = x.add(channel_size);
             }
         });
         ret

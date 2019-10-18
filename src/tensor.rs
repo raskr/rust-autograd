@@ -238,7 +238,7 @@ impl<T: Float> TensorBuilder<T> {
 
     #[inline]
     pub fn build<O: op::Op<T> + 'static>(self, op: O) -> Tensor<T> {
-        let rank = if self.inputs.len() == 0 {
+        let rank = if self.inputs.is_empty() {
             0
         } else {
             self.inputs

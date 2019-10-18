@@ -111,7 +111,7 @@ impl<T: Float> op::Op<T> for InferBinOpShape {
             let max = a_shape
                 .iter()
                 .zip(b_shape)
-                .map(|(a, b)| T::from(a.clone().max(b.clone())).unwrap())
+                .map(|(a, b)| T::from(a.clone().max(b)).unwrap())
                 .collect::<Vec<T>>();
             Ok(crate::ArrRepr::Owned(
                 NdArray::from_shape_vec(ndarray::IxDyn(&[a_rank]), max).unwrap(),
@@ -228,12 +228,12 @@ impl<T: Float> op::Op<T> for Reshape {
                     panic!("Reshape failed: {:?} vs {:?}", x.shape(), target);
                 }
             }
+        } else if let Ok(a) =
+            ndarray_ext::deep_copy(x).into_shape(ndarray::IxDyn(target.as_slice()))
+        {
+            Ok(crate::ArrRepr::Owned(a))
         } else {
-            if let Ok(a) = ndarray_ext::deep_copy(x).into_shape(ndarray::IxDyn(target.as_slice())) {
-                Ok(crate::ArrRepr::Owned(a))
-            } else {
-                panic!("Reshape failed: {:?} vs {:?}", x.shape(), target);
-            }
+            panic!("Reshape failed: {:?} vs {:?}", x.shape(), target);
         };
 
         vec![ret]
@@ -390,7 +390,7 @@ impl<T: Float> op::Op<T> for Gather {
             let latter: &[usize] = &param_shape[axis + 1..];
             // doing former + indices.shape() + latter
             former
-                .into_iter()
+                .iter()
                 .chain(indices_shape)
                 .chain(latter)
                 .cloned()
@@ -442,7 +442,7 @@ impl<T: Float> op::Op<T> for GatherGrad {
             let former = &param_shape[..axis];
             let latter = &param_shape[axis + 1..];
             let shape: Vec<usize> = former
-                .into_iter()
+                .iter()
                 .chain(&[indices.len()])
                 .chain(latter)
                 .cloned()
@@ -505,7 +505,7 @@ impl<T: Float> op::Op<T> for AddN {
         ctx: crate::runtime::OpComputeContext<'v, T>,
     ) -> op::ComputeResults<'v, T> {
         let xs = ctx.grab_inputs();
-        let ret = if 0 == xs.len() {
+        let ret = if xs.is_empty() {
             unreachable!()
         } else if 1 == xs.len() {
             Ok(crate::ArrRepr::View(xs[0].clone()))
@@ -610,7 +610,7 @@ impl<T: Float> op::Op<T> for Concat {
         merged_inputs.insert(0, gy);
         let merged_inputs = merged_inputs.as_slice();
 
-        let gxs = (0..inputs.len())
+        (0..inputs.len())
             .map(move |i| {
                 let gx = Tensor::builder()
                     .set_shape(inputs[0].shape())
@@ -621,8 +621,7 @@ impl<T: Float> op::Op<T> for Concat {
                     });
                 Some(gx)
             })
-            .collect::<Vec<Option<Tensor<T>>>>();
-        gxs
+            .collect::<Vec<Option<Tensor<T>>>>()
     }
 }
 
