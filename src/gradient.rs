@@ -175,7 +175,7 @@ fn test_gradient_path() {
     use std::collections::btree_set::BTreeSet;
     let all = (0..10).collect::<BTreeSet<usize>>();
     let should_be_has_gradient = [ix1, ix2, ia, ic, ib, id, iy]
-        .into_iter()
+        .iter()
         .cloned()
         .collect::<BTreeSet<usize>>();
     for &id in should_be_has_gradient.iter() {
