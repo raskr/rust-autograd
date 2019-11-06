@@ -1,3 +1,8 @@
+// Disable lint caused by a workaround in ndarray caused by a known issue in the Rust compiler
+// see also: https://github.com/rust-ndarray/ndarray/issues/474
+// and https://github.com/rust-lang/rust/issues/23014
+#![allow(clippy::deref_addrof)]
+
 use crate::ndarray_ext::NdArray;
 use crate::op;
 #[cfg(feature = "mkl")]
@@ -630,7 +635,7 @@ pub fn get_region_heads<A: Float, B>(
     let mut ret = Vec::with_capacity(batch_size);
     for i in 0..batch_size {
         unsafe {
-            ret.push(head.offset((i * size_per_sample) as isize) as *const B);
+            ret.push(head.add(i * size_per_sample) as *const B);
         }
     }
     ret
@@ -744,11 +749,11 @@ impl<T: Float> op::Op<T> for BatchMatMul {
                 .into_par_iter()
                 .map(|i| {
                     let x0_mat = x0_flattened
-                        .slice(s![i..i + 1, .., ..])
+                        .slice(s![i..=i, .., ..])
                         .index_axis_move(ndarray::Axis(0), 0)
                         .to_owned();
                     let x1_mat = x1_flattened
-                        .slice(s![i..i + 1, .., ..])
+                        .slice(s![i..=i, .., ..])
                         .index_axis_move(ndarray::Axis(0), 0)
                         .to_owned();
                     x0_mat.dot(&x1_mat).into_dyn()
@@ -757,8 +762,7 @@ impl<T: Float> op::Op<T> for BatchMatMul {
 
             // owned to ref
             let mut dot_view = Vec::with_capacity(dot.len());
-            for i in 0..dot.len() {
-                let dot_i: &NdArray<T> = &dot[i];
+            for dot_i in &dot {
                 // insert new dim
                 let mut shape = dot_i.shape().to_vec();
                 shape.insert(0, 1);
@@ -771,7 +775,7 @@ impl<T: Float> op::Op<T> for BatchMatMul {
             let dst_shape = {
                 let stacked_shape = stacked.shape();
                 shape0[..rank0 - 2]
-                    .into_iter()
+                    .iter()
                     .chain(&[stacked_shape[1], stacked_shape[2]])
                     .cloned()
                     .collect::<Vec<usize>>()

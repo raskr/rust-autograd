@@ -166,7 +166,7 @@ pub(crate) fn scalar_shape<T: Float>() -> NdArray<T> {
 
 #[inline]
 pub(crate) fn is_scalar_shape(shape: &[usize]) -> bool {
-    shape == &[] || shape == &[0]
+    shape == [] || shape == [0]
 }
 
 #[inline]
@@ -201,14 +201,14 @@ pub mod array_gen {
     use std::cell::RefCell;
     use std::marker::PhantomData;
 
-
     /// Range.
     pub fn range<T: Float>(shape: &[usize]) -> NdArray<T> {
         let prod: usize = shape.iter().product();
         NdArray::<T>::from_shape_vec(
             ndarray::IxDyn(shape),
             (0..prod).map(|a| T::from(a).unwrap()).collect::<Vec<_>>(),
-        ).unwrap()
+        )
+        .unwrap()
     }
 
     /// Internal object to create ndarrays whose elements are random numbers.
@@ -251,7 +251,7 @@ pub mod array_gen {
         where
             I: IndependentSample<f64>,
         {
-            let size: usize = shape.into_iter().cloned().product();
+            let size: usize = shape.iter().cloned().product();
             let mut rng = self.rng.borrow_mut();
             unsafe {
                 let mut buf = Self::alloc(size);
@@ -318,7 +318,7 @@ pub mod array_gen {
         pub fn bernoulli(&self, shape: &[usize], p: f64) -> ndarray::Array<T, ndarray::IxDyn> {
             let dist = rand::distributions::Range::new(0., 1.);
             let mut rng = self.rng.borrow_mut();
-            let size: usize = shape.into_iter().cloned().product();
+            let size: usize = shape.iter().cloned().product();
             unsafe {
                 let mut buf = Self::alloc(size);
                 for i in 0..size {

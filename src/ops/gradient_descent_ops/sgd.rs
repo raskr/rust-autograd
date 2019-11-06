@@ -56,7 +56,7 @@ impl<'a, T: Float> SGD<T> {
         grads: &[A],
     ) -> Vec<Tensor<T>> {
         params
-            .into_iter()
+            .iter()
             .zip(grads)
             .map(|(param, grad)| {
                 Tensor::builder()

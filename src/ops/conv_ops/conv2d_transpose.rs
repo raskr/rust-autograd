@@ -116,9 +116,9 @@ impl<T: Float> crate::op::Op<T> for Conv2DTranspose {
                 let size_per_batch_gy = ych * yh * yw;
                 (0..batch_size).into_par_iter().for_each(|i| {
                     let w = w_slice.as_ptr();
-                    let gy_region_head = gy_slice.as_ptr().offset((i * size_per_batch_gy) as isize);
+                    let gy_region_head = gy_slice.as_ptr().add(i * size_per_batch_gy);
                     let col_region_head: *mut T = mem::transmute(col_ref);
-                    let col_region_head = col_region_head.offset((i * size_per_batch_col) as isize);
+                    let col_region_head = col_region_head.add(i * size_per_batch_col);
                     slow_gemm!(
                         true,
                         false,

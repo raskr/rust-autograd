@@ -361,8 +361,7 @@ impl<T: Float> crate::op::Op<T> for Conv2DWithCols {
                 };
                 // fallback: parallel sgemm using rayon
                 (0..batch_size).into_par_iter().for_each(|i| {
-                    let c_region_head =
-                        c_slice.as_ptr().offset((i * size_per_batch_c) as isize) as *const T;
+                    let c_region_head = c_slice.as_ptr().add(i * size_per_batch_c) as *const T;
                     let y_region_head: *mut T = mem::transmute(&y[i * size_per_batch_y]);
                     slow_gemm!(
                         false,
@@ -487,8 +486,8 @@ impl<T: Float> crate::op::Op<T> for Conv2DFilterGrad {
                     slow_gemm!(
                         false,
                         true,
-                        gy.offset((i * size_per_batch_g) as isize) as *const f32,
-                        cols.offset((i * size_per_batch_c) as isize) as *const f32,
+                        gy.add(i * size_per_batch_g) as *const f32,
+                        cols.add(i * size_per_batch_c) as *const f32,
                         gw_head as *mut f32,
                         m,
                         n,

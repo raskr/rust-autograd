@@ -57,8 +57,8 @@ macro_rules! access_grad_info_of {
 
 #[inline]
 fn has_marked_child<T: Float>(parent: &Tensor<T>, path: &Vec<GradInfo<T>>) -> bool {
-    let mut it = parent.get_backprop_inputs().iter();
-    while let Some(child) = it.next() {
+    let it = parent.get_backprop_inputs().iter();
+    for child in it {
         if access_grad_info_of!(child, path).has_gradient {
             return true;
         }
@@ -217,7 +217,7 @@ pub fn symbolic_gradients<T: Float>(
 
     // Prepare a heap with given ys.
     let mut heap = ys
-        .into_iter()
+        .iter()
         .map(|y| y.wrapped())
         .collect::<BinaryHeap<TensorWrapper<T>>>();
 

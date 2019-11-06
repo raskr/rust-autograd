@@ -131,7 +131,7 @@ impl<T: Float> Adam<T> {
     pub fn vars_with_states<'a>(tensors: &[&'a Tensor<T>]) -> Vec<StatefulVariable<'a, T>> {
         let mut var2state = BTreeMap::<super::StateKey<'a, T>, StatefulParams<T>>::new();
         tensors
-            .into_iter()
+            .iter()
             .map(|var| {
                 // let var = var.as_ref();
                 if let Some(var_arr) = var.get_persistent_array() {
@@ -167,7 +167,7 @@ impl<T: Float> Adam<T> {
         grads: &[A],
     ) -> Vec<Tensor<T>> {
         params
-            .into_iter()
+            .iter()
             .zip(grads)
             .map(|(param, grad)| {
                 let StatefulParams { ref m, ref v } = param.state;

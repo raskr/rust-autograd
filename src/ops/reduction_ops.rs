@@ -221,7 +221,7 @@ impl<T: Float> op::Op<T> for ReduceMean {
                 arr.mapv_inplace(move |elem| elem * reduction_len_inv);
                 crate::ArrRepr::Owned(arr)
             }
-            view @ _ => view,
+            view => view,
         };
 
         vec![Ok(ret)]
