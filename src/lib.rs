@@ -142,7 +142,7 @@ pub unsafe fn uninitialized_vec<T>(size: usize) -> Vec<T> {
 /// // [2, 3]
 /// ```
 pub enum Hook<T: Float> {
-    Raw(Box<Fn(&crate::ndarray_ext::NdArrayView<T>) -> ()>),
+    Raw(Box<dyn Fn(&crate::ndarray_ext::NdArrayView<T>) -> ()>),
     Print,
     PrintShape,
 }

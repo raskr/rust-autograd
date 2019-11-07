@@ -24,7 +24,7 @@ pub enum ArrRepr<'v, T: Float> {
 impl<'v, T: Float> ArrRepr<'v, T> {
     #[inline]
     pub fn to_owned(&'v self) -> NdArray<T> {
-        use ArrRepr::*;
+        use crate::ArrRepr::*;
         match self {
             Owned(v) => v.clone(),
             View(v) => v.to_owned(),
@@ -33,7 +33,7 @@ impl<'v, T: Float> ArrRepr<'v, T> {
 
     #[inline]
     pub fn view(&'v self) -> NdArrayView<'v, T> {
-        use ArrRepr::*;
+        use crate::ArrRepr::*;
         match self {
             Owned(v) => v.view(),
             View(v) => v.clone(),

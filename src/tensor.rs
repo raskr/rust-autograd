@@ -19,7 +19,7 @@ pub struct Tensor<T: Float>(pub Rc<TensorCore<T>>);
 #[doc(hidden)]
 pub struct TensorCore<T: Float> {
     /// An operation to evaluate this tensor.
-    pub op: Box<op::Op<T>>,
+    pub op: Box<dyn op::Op<T>>,
 
     /// References to immediate predecessors.
     pub inputs: Vec<Tensor<T>>,
@@ -433,7 +433,7 @@ impl<T: Float> Tensor<T> {
     /// // My shape: [4, 3]
     /// ```
     #[inline]
-    pub fn with_fn(&self, hook: Box<Fn(&crate::ndarray::ArrayViewD<T>) -> ()>) -> Tensor<T> {
+    pub fn with_fn(&self, hook: Box<dyn Fn(&crate::ndarray::ArrayViewD<T>) -> ()>) -> Tensor<T> {
         crate::hook(crate::Hook::Raw(hook), self)
     }
 
