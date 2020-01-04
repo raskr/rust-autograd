@@ -82,11 +82,11 @@ pub fn main() {
     ));
 
     // Compute cross entropy losses for each LSTM step
-    let losses: Vec<Tensor> = (0..max_sent)
+    let losses: Vec<Tensor> = (0..max_sent-1)
         .map(|i| {
             let cur_id = ag::slice(sentences, &[0, i], &[-1, i + 1]);
             let next_id = ag::slice(sentences, &[0, i + 1], &[-1, i + 2]);
-            let x = ag::gather(lookup_table, &cur_id, 0);
+            let x = ag::squeeze(ag::gather(lookup_table, &cur_id, 0), &[1]);
             let h = rnn.step(&x);
             let prediction = ag::matmul(h, w_pred);
             ag::sparse_softmax_cross_entropy(prediction, next_id)
