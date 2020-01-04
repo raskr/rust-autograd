@@ -49,3 +49,12 @@ fn transpose_matmul() {
         &[1., 3., 3., 13.]
     );
 }
+
+#[test]
+fn vertical_vec_matmul() {
+    let a: ag::Tensor<f32> = ag::ones(&[2, 5]);
+    let b = ag::ones(&[5, 1]);
+    let c = ag::matmul(&a, &b);
+    let d = c.eval(&[]).unwrap();
+    assert_eq!(d.as_slice().unwrap(), &[5., 5.]);
+}

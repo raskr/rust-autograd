@@ -413,24 +413,24 @@ macro_rules! mkl_mm {
     ($f:expr, $x0:expr, $x1:expr, $x0_shape:expr, $x1_shape:expr, $self:expr, $typ:ty) => {{
         let s0l = $x0.strides()[0];
         let s0r = $x1.strides()[0];
-        let transpose_a = if s0l == 1 {
-            !$self.transpose_a
-        } else {
-            $self.transpose_a
-        };
-        let transpose_b = if s0r == 1 {
-            !$self.transpose_b
-        } else {
-            $self.transpose_b
-        };
         let row0 = $x0_shape[0]; // rows of a
         let col0 = $x0_shape[1]; // cols of a
         let row1 = $x1_shape[0]; // rows of b
         let col1 = $x1_shape[1]; // cols of b
+        let transpose_a = if s0l == 1 && row0 == 1 {
+            !$self.transpose_a
+        } else {
+            $self.transpose_a
+        };
+        let transpose_b = if s0r == 1 && row1 == 1 {
+            !$self.transpose_b
+        } else {
+            $self.transpose_b
+        };
         let m = if transpose_a { col0 } else { row0 };
         let n = if transpose_b { row1 } else { col1 };
         let k = if transpose_a { row0 } else { col0 };
-        let ret_row = if $self.transpose_a { col0 } else { row0 }; //
+        let ret_row = if $self.transpose_a { col0 } else { row0 };
         let ret_col = if $self.transpose_b { row1 } else { col1 };
 
         unsafe {
