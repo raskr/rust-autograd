@@ -64,7 +64,7 @@ impl LSTM {
 // TODO: Write in define-by-run style
 pub fn main() {
     let vec_dim = 4;
-    let max_sent = 2;
+    let max_sent = 3;
     let vocab_size = 5;
 
     let ref sentences = ag::placeholder(&[-1, max_sent]);
