@@ -1,6 +1,6 @@
 [package]
 name = "autograd"
-version = "0.9.5"
+version = "0.9.6"
 authors = ["raskr <janne.dc.ib.sa@gmail.com>"]
 edition = "2018"
 

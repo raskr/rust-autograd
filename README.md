@@ -8,7 +8,7 @@ Differentiable operations and tensors backed by [ndarray](https://github.com/rus
 ## Installation
 ```
 [dependencies]
-autograd = { version = "0.9.5", features = ["mkl"] }
+autograd = { version = "0.9.6", features = ["mkl"] }
 ```
 `mkl` feature is recommended to speedup gemm operations using [Intel MKL](https://software.intel.com/en-us/mkl).
 
@@ -28,9 +28,9 @@ e.eval(&[]);  // Getting `ndarray::Array` here.
 ```
 
 ### Reverse-mode automatic differentiation
-There are a lot of [built-in operations](https://docs.rs/autograd/0.9.5/autograd/ops/index.html)
+There are a lot of [built-in operations](https://docs.rs/autograd/0.9.6/autograd/ops/index.html)
 that support *higher-order* derivatives, and
-you can also [define your own differentiable ops](https://docs.rs/autograd/0.9.5/autograd/op/trait.Op.html) with ndarrays easily.
+you can also [define your own differentiable ops](https://docs.rs/autograd/0.9.6/autograd/op/trait.Op.html) with ndarrays easily.
 
 Here we are just computing partial derivatives of `z = 2x^2 + 3y + 1`.
 
@@ -106,7 +106,7 @@ c.eval(&[]);
 ## Why Rust?
 
 - **No need for bridges for fast languages.**
-The entire logic including hotspots (kernels etc) is implemented in pure Rust, 
+The entire logic including hotspots (kernels etc) is implemented in pure Rust,
 without compromising performance.
 
 - **Memory safety.** For example, Rust's lifetime checker makes it possible to implement zero-copy computation graphs without GC.
