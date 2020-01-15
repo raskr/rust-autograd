@@ -1,5 +1,5 @@
 use crate::ndarray_ext;
-use crate::ndarray_ext::NdArray;
+use crate::ndarray_ext::{NdArray, NdArrayView};
 use crate::same_type;
 use crate::tensor::Tensor;
 use crate::uninitialized_vec;
@@ -11,35 +11,18 @@ use std::f32;
 use std::mem;
 use std::slice;
 
-macro_rules! get_xw {
-    ($op:expr, $yw:expr, $kw:expr) => {
-        $op.stride * ($yw - 1) - 2 * $op.pad + ($op.dilation * ($kw - 1) + 1)
-    };
-}
-
-macro_rules! get_xh {
-    ($op:expr, $yh:expr, $kh:expr) => {
-        $op.stride * ($yh - 1) - 2 * $op.pad + ($op.dilation * ($kh - 1) + 1)
-    };
-}
-
-macro_rules! get_yw {
-    ($op:expr, $xw:expr, $kw:expr) => {
-        ($xw + 2 * $op.pad - ($op.dilation * ($kw - 1) + 1)) / $op.stride + 1
-    };
-}
-
-macro_rules! get_yh {
-    ($op:expr, $xh:expr, $kh:expr) => {
-        ($xh + 2 * $op.pad - ($op.dilation * ($kh - 1) + 1)) / $op.stride + 1
-    };
-}
-
 #[macro_use]
 pub mod conv2d;
 #[macro_use]
 pub mod conv2d_transpose;
 pub mod max_pool2d;
+#[cfg(feature = "mkl")]
+use crate::ndarray_ext::{get_batch_ptrs, get_batch_ptrs_mut};
+#[cfg(feature = "mkl")]
+use crate::ops::mkl_ffi::{
+    CBLAS_ROW_MAJOR, CblasTranspose::CblasTrans, CblasTranspose::CblasNoTrans,
+    MklInt, cblas_sgemm, cblas_dgemm, cblas_dgemm_batch, cblas_sgemm_batch
+};
 
 #[test]
 fn test_conv_filter_grad() {

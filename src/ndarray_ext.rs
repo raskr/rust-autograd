@@ -8,6 +8,8 @@ pub type NdArray<T> = ndarray::Array<T, ndarray::IxDyn>;
 
 pub type NdArrayView<'a, T> = ndarray::ArrayView<'a, T, ndarray::IxDyn>;
 
+pub type NdArrayViewMut<'a, T> = ndarray::ArrayViewMut<'a, T, ndarray::IxDyn>;
+
 // expose array_gen
 pub use crate::array_gen::*;
 
@@ -191,6 +193,40 @@ pub(crate) fn shape_of<T: Float>(x: &NdArray<T>) -> NdArray<T> {
     let rank = shape.len();
     // safe unwrap
     NdArray::from_shape_vec(ndarray::IxDyn(&[rank]), shape).unwrap()
+}
+
+#[cfg(feature = "mkl")]
+#[inline]
+pub(crate) fn get_batch_ptrs_mut<A: Float, B>(
+    batch_size: usize,
+    head: *mut A,
+    whole_size: usize,
+) -> Vec<*mut B> {
+    let size_per_sample = whole_size / batch_size;
+    let mut ret = Vec::with_capacity(batch_size);
+    for i in 0..batch_size {
+        unsafe {
+            ret.push(head.offset((i * size_per_sample) as isize) as *mut B);
+        }
+    }
+    ret
+}
+
+#[cfg(feature = "mkl")]
+#[inline]
+pub(crate) fn get_batch_ptrs<A: Float, B>(
+    batch_size: usize,
+    head: *const A,
+    whole_size: usize,
+) -> Vec<*const B> {
+    let size_per_sample = whole_size / batch_size;
+    let mut ret = Vec::with_capacity(batch_size);
+    for i in 0..batch_size {
+        unsafe {
+            ret.push(head.offset((i * size_per_sample) as isize) as *const B);
+        }
+    }
+    ret
 }
 
 /// Provides a collection of array generator functions.

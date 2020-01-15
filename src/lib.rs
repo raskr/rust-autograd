@@ -164,3 +164,12 @@ pub fn hook<T: Float>(hook: Hook<T>, node: &Tensor<T>) -> Tensor<T> {
     };
     Tensor::builder().set_input(node).build(op)
 }
+
+// Read pointer to type `A` as type `B`.
+//
+// **Panics** if `A` and `B` are not the same type
+#[inline]
+pub(crate) fn cast_as<A: 'static + Copy, B: 'static + Copy>(a: &A) -> B {
+    unsafe { ::std::ptr::read(a as *const _ as *const B) }
+}
+

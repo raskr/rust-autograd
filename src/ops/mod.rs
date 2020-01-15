@@ -24,6 +24,7 @@ mod math_ops;
 mod random_ops;
 mod reduction_ops;
 mod xent_ops;
+mod mkl_ffi;
 
 // ---------------------------------------
 // -- Ops to manipulate `Tensor` object --
