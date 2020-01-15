@@ -341,18 +341,20 @@ impl<T: Float> op::Op<T> for Transpose {
         let xs = ctx.grab_inputs();
         let perm = &xs[1];
         let perm_len = perm.len();
-        assert!(perm_len >= 2);
+        let x = &xs[0];
+        assert_eq!(x.ndim(), perm_len, "autograd::transpose: inputs's ndim and axes's length must match");
 
         let ret = unsafe {
             let mut dims = crate::uninitialized_vec::<usize>(perm_len);
             for (i, d) in perm.iter().enumerate() {
+                let d = d.to_usize().unwrap();
                 if self.invert_axes {
-                    dims[d.to_usize().unwrap()] = i;
+                    *dims.get_unchecked_mut(d) = i;
                 } else {
-                    dims[i] = d.to_usize().unwrap();
+                    *dims.get_unchecked_mut(i) = d;
                 }
             }
-            xs[0].clone().permuted_axes(dims.as_slice())
+            x.clone().permuted_axes(dims.as_slice())
         };
 
         vec![Ok(crate::ArrRepr::View(ret))]
