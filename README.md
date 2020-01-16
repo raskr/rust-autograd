@@ -22,7 +22,7 @@ extern crate autograd as ag;
 let a: ag::Tensor<f32> = ag::ones(&[60]);
 let b: ag::Tensor<f32> = ag::ones(&[24]);
 let c: ag::Tensor<f32> = ag::reshape(a, &[3, 4, 5]);
-let d: ag::Tensor<f32> = ag::reshape(b, &[4, 6]);
+let d: ag::Tensor<f32> = ag::reshape(b, &[4, 3, 2]);
 let e: ag::Tensor<f32> = ag::tensordot(c, d, &[1, 0], &[0, 1]);
 e.eval(&[]);  // Getting `ndarray::Array` here.
 ```
@@ -47,7 +47,7 @@ println!("{:?}", gy.eval(&[]));   // => Some(3.)
 
 // dz/dx (requires to fill the placeholder `x`)
 let gx = &ag::grad(&[z], &[x])[0];
-println!("{:?}", gx.eval(&[(x, &ag::ndarray::arr0(2.).into_dyn())]));  // => Some(8.)
+println!("{:?}", gx.eval(&[ag::Feed(x, ag::ndarray::arr0(2.).into_dyn().view())]));  // => Some(8.)
 
 // ddz/dx (differentiates `z` again)
 let ggx = &ag::grad(&[gx], &[x])[0];
@@ -79,7 +79,7 @@ let ((x_train, y_train), (x_test, y_test)) = dataset::load();
 // -- training loop --
 for epoch in 0..max_epoch {
     ...
-    ag::eval(update_ops, &[(x, &x_batch), (y, &y_batch)]);
+    ag::eval(update_ops, &[ag::Feed(x, x_batch), ag::Feed(y, y_batch)]);
 }
 ```
 
