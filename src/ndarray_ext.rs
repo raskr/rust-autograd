@@ -460,7 +460,7 @@ pub mod array_gen {
     #[inline]
     /// Glorot uniform initialization. (a.k.a. Xavier uniform initialization)
     pub fn glorot_uniform<T: Float>(shape: &[usize]) -> ndarray::Array<T, ndarray::IxDyn> {
-        ArrRng::default().glorot_normal(shape)
+        ArrRng::default().glorot_uniform(shape)
     }
 
     /// Creates an ndarray sampled from a bernoulli distribution with given params.
