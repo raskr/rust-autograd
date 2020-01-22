@@ -1,6 +1,5 @@
 use crate::ndarray_ext::{NdArray, NdArrayView};
 use crate::op;
-use crate::ops;
 use crate::tensor::Tensor;
 use crate::Float;
 use ndarray;
@@ -57,151 +56,117 @@ pub fn softmax_forward<T: Float>(x: &NdArrayView<T>, axis: isize) -> NdArray<T> 
 }
 
 impl<T: Float> op::Op<T> for Softmax {
-    fn name(&self) -> &str {
-        "Softmax"
-    }
-
-    fn compute<'v>(
-        &self,
-        ctx: crate::runtime::OpComputeContext<'v, T>,
-    ) -> op::ComputeResults<'v, T> {
-        vec![Ok(crate::ArrRepr::Owned(softmax_forward(
-            &ctx.grab_inputs()[0],
+    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
+        let ret = Ok(crate::ArrRepr::Owned(softmax_forward(
+            &ctx.input(0),
             self.axis,
-        )))]
+        )));
+        ctx.append_output(ret)
     }
 
-    fn grad(&self, gy: &Tensor<T>, _: &[&Tensor<T>], output: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
-        let sum = ops::reduce_sum(&(output * gy), &[self.axis], true);
-        vec![Some((gy - sum) * output)]
+    fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
+        let s = ctx.graph();
+        let y = ctx.output();
+        let gy = ctx.output_grad();
+        let sum = s.reduce_sum(y * gy, &[self.axis], true);
+        ctx.set_input_grads(vec![Some((gy - sum) * y)]);
     }
 }
 
 impl<T: Float> op::Op<T> for Softplus {
-    fn name(&self) -> &str {
-        "Softplus"
-    }
-
-    fn compute<'v>(
-        &self,
-        ctx: crate::runtime::OpComputeContext<'v, T>,
-    ) -> op::ComputeResults<'v, T> {
-        let xs = ctx.grab_inputs();
+    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         use std::f64;
         let e = T::from(f64::consts::E).unwrap();
-        vec![Ok(crate::ArrRepr::Owned(
-            xs[0].map(move |a| (a.exp() + T::one()).log(e)),
-        ))]
+        let ret = Ok(crate::ArrRepr::Owned(
+            ctx.input(0).map(move |a| (a.exp() + T::one()).log(e)),
+        ));
+        ctx.append_output(ret)
     }
 
-    fn grad(&self, gy: &Tensor<T>, xs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
-        let a = &ops::exp(xs[0]);
-        let b = a + ops::scalar(T::one());
+    fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
+        let gy = ctx.output_grad();
+        let s = ctx.graph();
+        let a = s.exp(ctx.input(0));
+        let b = a + s.scalar(T::one());
         let gx = gy * (a / b);
-        vec![Some(gx)]
+        ctx.set_input_grads(vec![Some(gx)]);
     }
 }
 
 impl<T: Float> op::Op<T> for Sigmoid {
-    fn name(&self) -> &str {
-        "Sigmoid"
-    }
-
-    fn compute<'v>(
-        &self,
-        ctx: crate::runtime::OpComputeContext<'v, T>,
-    ) -> op::ComputeResults<'v, T> {
-        let x = &ctx.grab_inputs()[0];
+    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         let half = T::from(0.5).unwrap();
-        vec![Ok(crate::ArrRepr::Owned(
-            x.mapv(move |a| ((a * half).tanh() * half) + half),
-        ))]
+        let ret = Ok(crate::ArrRepr::Owned(
+            ctx.input(0)
+                .mapv(move |a| ((a * half).tanh() * half) + half),
+        ));
+        ctx.append_output(ret)
     }
 
-    fn grad(&self, gy: &Tensor<T>, _: &[&Tensor<T>], y: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
-        vec![Some(gy * (y - ops::square(y)))]
+    fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
+        let gy = ctx.output_grad();
+        let y = ctx.output();
+        let s = ctx.graph();
+        ctx.set_input_grads(vec![Some(gy * (y - s.square(y)))]);
     }
 }
 
 impl<T: Float> op::Op<T> for ReLU {
-    fn name(&self) -> &str {
-        "ReLU"
+    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
+        let ret = Ok(crate::ArrRepr::Owned(
+            ctx.input(0).map(|a| a.max(T::zero())),
+        ));
+        ctx.append_output(ret);
     }
 
-    fn compute<'v>(
-        &self,
-        ctx: crate::runtime::OpComputeContext<'v, T>,
-    ) -> op::ComputeResults<'v, T> {
-        let x = &ctx.grab_inputs()[0];
-        vec![Ok(crate::ArrRepr::Owned(x.map(|a| a.max(T::zero()))))]
-    }
-
-    fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
-        let bin = ops::greater(inputs[0], &ops::scalar(T::zero()));
-        vec![Some(ops::mul(bin, gy))]
+    fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
+        let s = ctx.graph();
+        let gy = ctx.output_grad();
+        let bin = s.greater(ctx.input(0), s.scalar(T::zero()));
+        ctx.set_input_grads(vec![Some(s.mul(bin.tensor, gy.tensor))]);
     }
 }
 
 impl<T: Float> op::Op<T> for Identity {
-    fn name(&self) -> &str {
-        "Identity"
-    }
-
-    fn compute<'v>(
-        &self,
-        ctx: crate::runtime::OpComputeContext<'v, T>,
-    ) -> op::ComputeResults<'v, T> {
+    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         // do nothing
-        vec![Ok(crate::ArrRepr::View(ctx.grab_inputs()[0].clone()))]
+        let ret = Ok(crate::ArrRepr::View(ctx.input(0)));
+        ctx.append_output(ret)
     }
 
-    fn grad(&self, gy: &Tensor<T>, _: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
+    fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
+        let gy = ctx.output_grad();
         // use gy's array with rc increment.
-        vec![Some(gy.clone())]
+        ctx.set_input_grads(vec![Some(gy)]);
     }
 }
 
 impl<T: Float> op::Op<T> for ELU<T> {
-    fn name(&self) -> &str {
-        "ELU"
-    }
-
-    fn compute<'v>(
-        &self,
-        ctx: crate::runtime::OpComputeContext<'v, T>,
-    ) -> op::ComputeResults<'v, T> {
-        let x = &ctx.grab_inputs()[0];
-        let ret = x.mapv(move |a| {
+    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
+        let ret = ctx.input(0).mapv(move |a| {
             if a > T::zero() {
                 a
             } else {
                 self.alpha * (a.exp() - T::one())
             }
         });
-        vec![Ok(crate::ArrRepr::Owned(ret))]
+        let ret = Ok(crate::ArrRepr::Owned(ret));
+        ctx.append_output(ret)
     }
 
-    fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
+    fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
+        let gy = &ctx.output_grad();
         let gx = Tensor::builder()
-            .set_inputs(vec![inputs[0], gy])
-            .set_shape(gy.shape())
-            .build(ELUGrad { alpha: self.alpha });
-        vec![Some(gx)]
+            .set_inputs(&[&ctx.input(0), gy])
+            .set_shape(&ctx.graph().shape(gy))
+            .build(ctx.graph(), ELUGrad { alpha: self.alpha });
+        ctx.set_input_grads(vec![Some(gx)]);
     }
 }
 
 impl<T: Float> op::Op<T> for ELUGrad<T> {
-    fn name(&self) -> &str {
-        "ELUGrad"
-    }
-
-    fn compute<'v>(
-        &self,
-        ctx: crate::runtime::OpComputeContext<'v, T>,
-    ) -> op::ComputeResults<'v, T> {
-        let xs = ctx.grab_inputs();
-        let x = &xs[0];
-        let gy = &xs[1];
+    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
+        let x = &ctx.input(0);
         let a = x.mapv(move |a| {
             if a > T::zero() {
                 T::one()
@@ -209,10 +174,11 @@ impl<T: Float> op::Op<T> for ELUGrad<T> {
                 self.alpha * (a.exp() - T::one()) + self.alpha
             }
         });
-        vec![Ok(crate::ArrRepr::Owned(a * gy))]
+        let ret = Ok(crate::ArrRepr::Owned(a * &ctx.input(1)));
+        ctx.append_output(ret)
     }
 
-    fn grad(&self, _: &Tensor<T>, _: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
-        vec![None, None]
+    fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
+        ctx.set_input_grads(vec![None, None]);
     }
 }

@@ -1,31 +1,30 @@
-use crate::ndarray_ext::NdArrayView;
 use crate::op;
-use crate::tensor::Tensor;
 use crate::Float;
+use std::marker::PhantomData;
 
-pub struct Hook<T: Float> {
-    pub name: Option<String>,
-    pub func: Box<dyn Fn(&NdArrayView<T>) -> ()>,
+pub(crate) struct HookOp<T: Float, H: crate::hook::Hook<T>> {
+    phantom: PhantomData<T>,
+    pub hook: H,
 }
 
-impl<T: Float> op::Op<T> for Hook<T> {
-    fn name(&self) -> &str {
-        "Hook"
-    }
-
-    fn compute<'v>(
-        &self,
-        ctx: crate::runtime::OpComputeContext<'v, T>,
-    ) -> op::ComputeResults<'v, T> {
-        let ret = ctx.grab_inputs()[0].clone();
-        if let Some(ref a) = self.name {
-            println!("{}:", a);
+impl<T: Float, H: crate::hook::Hook<T>> HookOp<T, H> {
+    #[inline]
+    pub fn new(hook: H) -> Self {
+        HookOp {
+            phantom: PhantomData,
+            hook,
         }
-        (self.func)(&ret);
-        vec![Ok(crate::ArrRepr::View(ret))]
+    }
+}
+
+impl<T: Float, H: crate::hook::Hook<T>> op::Op<T> for HookOp<T, H> {
+    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
+        let ret = ctx.input(0);
+        self.hook.call(&ret);
+        ctx.append_output(Ok(crate::ArrRepr::View(ret)));
     }
 
-    fn grad(&self, gy: &Tensor<T>, _: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
-        vec![Some(gy.clone())]
+    fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
+        ctx.set_input_grads(vec![Some(ctx.output_grad())])
     }
 }

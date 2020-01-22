@@ -8,37 +8,51 @@ impl ag::op::Op<f32> for MultiOutputOp {
         "MultiOutputOp"
     }
 
-    fn compute<'v>(
-        &self,
-        _: ag::runtime::OpComputeContext<'v, f32>,
-    ) -> ag::op::ComputeResults<'v, f32> {
+    fn compute(&self, ctx: &mut ag::op::ComputeContext<f32>) {
         let a = ag::ndarray_ext::zeros(&[2, 3]);
         let b = ag::ndarray_ext::zeros(&[1, 3]);
-        vec![Ok(ag::ArrRepr::Owned(a)), Ok(ag::ArrRepr::Owned(b))]
+        ctx.append_output(Ok(ag::ArrRepr::Owned(a)));
+        ctx.append_output(Ok(ag::ArrRepr::Owned(b)));
     }
 
-    fn grad(
-        &self,
-        _: &ag::Tensor<f32>,
-        _: &[&ag::Tensor<f32>],
-        _: &ag::Tensor<f32>,
-    ) -> Vec<Option<ag::Tensor<f32>>> {
-        vec![None; 2]
+    fn grad(&self, ctx: &mut ag::op::GradientContext<f32>) {
+        ctx.set_input_grads(vec![None; 2])
     }
 }
 
 #[test]
 fn test_nth_tensor() {
-    let ref a = ag::Tensor::builder().build(MultiOutputOp);
-    let ref b = ag::nth_tensor(a, 1);
-    let ref c = ag::exp(b);
-    ag::eval(&[c], &[]);
+    ag::with(|g| {
+        let a = ag::Tensor::builder().build(g, MultiOutputOp);
+        let b = g.nth_tensor(a, 1);
+        let c = g.exp(b);
+        g.eval(&[c], &[]);
+    });
 }
 
 #[test]
 fn test_hook() {
-    let a: ag::Tensor<f32> = ag::ones(&[4, 2]).p();
-    let b: ag::Tensor<f32> = ag::zeros(&[2, 3]).ps();
-    let c = ag::matmul(a, b).with_fn(Box::new(|arr| println!("My shape: {:?}", arr.shape())));
-    ag::eval(&[c], &[]);
+    ag::with(|g| {
+        let a: ag::Tensor<f32> = g.ones(&[4, 2]).show();
+        let b: ag::Tensor<f32> = g.zeros(&[2, 3]).show_shape();
+        let c = g.matmul(a, b).print("aaa");
+        g.eval(&[c], &[]);
+    });
+    ag::with(|g: &mut ag::Graph<_>| {
+        let x = g.placeholder(&[]);
+        let y = g.placeholder(&[]);
+        let z = 2. * x * x + 3. * y + 1.;
+
+        // dz/dy
+        let gy = &g.grad(&[z], &[y])[0];
+        println!("{:?}", gy.eval(&[])); // => Some(3.)
+
+        // dz/dx (requires to fill the placeholder `x`)
+        let gx = &g.grad(&[z], &[x])[0];
+        println!("{:?}", gx.eval(&[x.given(ag::ndarray::arr0(2.).view())])); // => Some(8.)
+
+        // ddz/dx (differentiates `z` again)
+        let ggx = &g.grad(&[gx], &[x])[0];
+        println!("{:?}", ggx.eval(&[])); // => Some(4.)
+    });
 }

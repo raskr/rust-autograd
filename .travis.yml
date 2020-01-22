@@ -24,3 +24,4 @@ install:
 
 script:
   - cargo test -v
+  - cargo test -v --features mkl

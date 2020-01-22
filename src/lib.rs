@@ -2,6 +2,9 @@
 // Expose to prevent version conflict
 #[macro_use(s)]
 pub extern crate ndarray;
+pub extern crate arrayvec;
+extern crate crossbeam;
+extern crate hashbrown;
 #[cfg(feature = "mkl")]
 extern crate intel_mkl_src;
 extern crate libc;
@@ -11,27 +14,26 @@ extern crate num;
 extern crate num_traits;
 extern crate rand;
 extern crate rayon;
+extern crate rustc_hash;
 
-#[macro_use]
-#[doc(hidden)]
+mod gradient;
+pub(crate) mod graph;
+mod hook;
+pub mod ndarray_ext;
+pub mod op;
+mod ops;
+pub mod optimizers;
+mod runtime;
+pub mod tensor;
 pub mod test_helper;
 
-pub mod tensor;
-
-#[doc(hidden)]
-pub mod runtime;
-
-#[doc(hidden)]
-pub mod gradient;
-
-pub mod ops;
-
-pub mod ndarray_ext;
-
-pub mod op;
-
+use rustc_hash::FxHasher;
 use std::any::TypeId;
 use std::fmt;
+use std::hash::BuildHasherDefault;
+
+pub(crate) type FxHashMap<K, V> = hashbrown::HashMap<K, V, BuildHasherDefault<FxHasher>>;
+pub(crate) type FxHashSet<V> = hashbrown::HashSet<V, BuildHasherDefault<FxHasher>>;
 
 /// Primitive type in this crate, which is actually a decorated `num_traits::Float`.
 pub trait Float:
@@ -87,82 +89,42 @@ impl<T> Int for T where
 {
 }
 
-#[doc(hidden)]
 #[inline(always)]
 /// Return `true` if `A` and `B` are the same type
-pub fn same_type<A: 'static, B: 'static>() -> bool {
+pub(crate) fn same_type<A: 'static, B: 'static>() -> bool {
     TypeId::of::<A>() == TypeId::of::<B>()
 }
 
 pub use crate::ndarray_ext::array_gen;
 
-pub use crate::ops::*;
+pub use crate::ndarray_ext as array;
 
-pub use crate::ops::gradient_descent_ops;
+pub use crate::op::Op;
 
-pub use crate::ndarray_ext::NdArray;
+pub use crate::ndarray_ext::{NdArray, NdArrayView, NdArrayViewMut};
 
-pub use crate::runtime::{eval, Eval, Feed};
+pub use crate::runtime::{Eval, Feed};
 
 pub use crate::tensor::Tensor;
 
 pub use crate::ndarray_ext::ArrRepr;
 
+pub use crate::graph::{with, Graph};
+
 #[inline]
-#[doc(hidden)]
-pub unsafe fn uninitialized_vec<T>(size: usize) -> Vec<T> {
+pub(crate) unsafe fn uninitialized_vec<T>(size: usize) -> Vec<T> {
     let mut buf = Vec::with_capacity(size);
     buf.set_len(size);
     buf
 }
 
-/// Registers a hook on a `Tensor`.
-///
-/// Pre-defined hooks are
-///
-/// * Print - prints the evaluation result of this tensor. (See also [p](tensor/struct.Tensor.html#method.p))
-/// * PrintShape - prints the evaluated shape of this tensor. (See also [ps](tensor/struct.Tensor.html#method.ps))
-/// * Raw - executes a given closure (See also [with_fn](tensor/struct.Tensor.html#method.with_fn))
-///
-/// ```
-/// extern crate autograd as ag;
-///
-/// let a: ag::Tensor<f32> = ag::zeros(&[4, 2]).with(ag::Hook::Print);
-/// let b: ag::Tensor<f32> = ag::ones(&[2, 3]).with(ag::Hook::PrintShape);
-/// let c = ag::matmul(a, b);
-///
-/// c.eval(&[]);
-/// // Zeros:
-/// // [[0.0, 0.0],
-/// // [0.0, 0.0],
-/// // [0.0, 0.0],
-/// // [0.0, 0.0]] shape=[4, 2], strides=[2, 1], layout=C (0x1)
-///
-/// // Shape of Ones:
-/// // [2, 3]
-/// ```
-pub enum Hook<T: Float> {
-    Raw(Box<dyn Fn(&crate::ndarray_ext::NdArrayView<T>) -> ()>),
-    Print,
-    PrintShape,
-}
-
-// Use `Tensor::with`.
 #[inline]
-#[doc(hidden)]
-pub fn hook<T: Float>(hook: Hook<T>, node: &Tensor<T>) -> Tensor<T> {
-    let op = match hook {
-        Hook::Raw(func) => crate::ops::hook_ops::Hook { func, name: None },
-        Hook::PrintShape => crate::ops::hook_ops::Hook {
-            func: Box::new(|arr| println!("{:?}\n", arr.shape())),
-            name: Some(format!("Shape of {}", node.op.name())),
-        },
-        Hook::Print => crate::ops::hook_ops::Hook {
-            func: Box::new(|arr| println!("{:?}\n", arr)),
-            name: Some(node.op.name().to_owned()),
-        },
-    };
-    Tensor::builder().set_input(node).build(op)
+pub(crate) fn none_vec<T>(len: usize) -> Vec<Option<T>> {
+    let mut vec = Vec::with_capacity(len);
+    for _ in 0..len {
+        vec.push(None);
+    }
+    vec
 }
 
 // Read pointer to type `A` as type `B`.
@@ -172,4 +134,3 @@ pub fn hook<T: Float>(hook: Hook<T>, node: &Tensor<T>) -> Tensor<T> {
 pub(crate) fn cast_as<A: 'static + Copy, B: 'static + Copy>(a: &A) -> B {
     unsafe { ::std::ptr::read(a as *const _ as *const B) }
 }
-

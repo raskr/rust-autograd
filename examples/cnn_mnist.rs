@@ -1,10 +1,14 @@
 extern crate autograd as ag;
-#[macro_use(s)]
 extern crate ndarray;
 
+use ag::array;
+use ag::optimizers::adam;
+use ag::tensor::Variable;
+use ag::Graph;
+use ndarray::s;
 use std::time::Instant;
 
-type Tensor = ag::Tensor<f32>;
+type Tensor<'t, 's> = ag::Tensor<'t, 's, f32>;
 
 // This is a toy convolutional network for MNIST.
 // Got 0.987 test accuracy in 350 sec on 2.7GHz Intel Core i5.
@@ -25,69 +29,82 @@ macro_rules! timeit {
     }};
 }
 
-fn conv_pool(x: &Tensor, w: &Tensor, b: &Tensor) -> Tensor {
-    let y1 = ag::conv2d(x, w, 1, 1) + b;
-    let y2 = ag::relu(y1);
-    ag::max_pool2d(y2, 2, 0, 2)
+fn conv_pool<'t, 's: 't>(
+    x: Tensor<'t, 's>,
+    w: Tensor<'t, 's>,
+    b: Tensor<'t, 's>,
+) -> Tensor<'t, 's> {
+    let g = x.graph;
+    let y1 = g.conv2d(x, w, 1, 1) + b;
+    let y2 = g.relu(y1);
+    g.max_pool2d(y2, 2, 0, 2)
 }
 
-fn logits(x: &Tensor, w: &Tensor, b: &Tensor) -> Tensor {
-    ag::matmul(x, w) + b
+fn logits<'t, 's: 't>(x: Tensor<'t, 's>, w: Tensor<'t, 's>, b: Tensor<'t, 's>) -> Tensor<'t, 's> {
+    x.graph.matmul(x, w) + b
 }
 
-fn inputs() -> (Tensor, Tensor) {
-    let x = ag::placeholder(&[-1, 1, 28, 28]);
-    let y = ag::placeholder(&[-1, 1]);
+fn inputs(g: &Graph<f32>) -> (Tensor, Tensor) {
+    let x = g.placeholder(&[-1, 1, 28, 28]);
+    let y = g.placeholder(&[-1, 1]);
     (x, y)
 }
 
 fn main() {
     let ((x_train, y_train), (x_test, y_test)) = dataset::load();
 
-    let ref w1 = ag::variable(ag::ndarray_ext::random_normal(&[32, 1, 3, 3], 0., 0.1));
-    let ref w2 = ag::variable(ag::ndarray_ext::random_normal(&[64, 32, 3, 3], 0., 0.1));
-    let ref w3 = ag::variable(ag::ndarray_ext::glorot_uniform(&[64 * 7 * 7, 10]));
-    let ref b1 = ag::variable(ag::ndarray_ext::zeros(&[1, 32, 28, 28]));
-    let ref b2 = ag::variable(ag::ndarray_ext::zeros(&[1, 64, 14, 14]));
-    let ref b3 = ag::variable(ag::ndarray_ext::zeros(&[1, 10]));
-    let params = &[w1, w2, w3, b1, b2, b3];
-    let ref params_adam = ag::gradient_descent_ops::Adam::vars_with_states(params);
-    let (x, y) = inputs();
-    let z1 = conv_pool(&x, w1, b1); // map to 32 channel
-    let z2 = conv_pool(&z1, w2, b2); // map to 64 channel
-    let z3 = ag::reshape(z2, &[-1, 64 * 7 * 7]); // flatten
-    let logits = logits(&z3, w3, b3); // linear
-    let loss = ag::sparse_softmax_cross_entropy(&logits, &y);
-    let grads = &ag::grad(&[&loss], params);
-    let adam = ag::gradient_descent_ops::Adam::default();
-    let update_ops: &[Tensor] = &adam.compute_updates(params_adam, grads);
-
-    // -- actual training --
     let max_epoch = 5;
     let batch_size = 200isize;
     let num_samples = x_train.shape()[0];
     let num_batches = num_samples / batch_size as usize;
 
-    for epoch in 0..max_epoch {
-        timeit!({
-            let perm = ag::ndarray_ext::permutation(num_batches) * batch_size as usize;
-            for i in perm.into_iter() {
-                let i = *i as isize;
-                let x_batch = x_train.slice(s![i..i + batch_size, .., .., ..]).into_dyn();
-                let y_batch = y_train.slice(s![i..i + batch_size, ..]).into_dyn();
-                ag::eval(update_ops, &[ag::Feed(&x, x_batch), ag::Feed(&y, y_batch)]);
-            }
-        });
-        println!("finish epoch {}", epoch);
-    }
+    let w1_ = array::shared(array::random_normal(&[32, 1, 3, 3], 0., 0.1));
+    let w2_ = array::shared(array::random_normal(&[64, 32, 3, 3], 0., 0.1));
+    let w3_ = array::shared(array::glorot_uniform(&[64 * 7 * 7, 10]));
+    let b1_ = array::shared(array::zeros(&[1, 32, 28, 28]));
+    let b2_ = array::shared(array::zeros(&[1, 64, 14, 14]));
+    let b3_ = array::shared(array::zeros(&[1, 10]));
+    let adam_state = adam::AdamState::new(&[&w1_, &w2_, &w3_, &b1_, &b2_, &b3_]);
 
-    // -- test --
-    let predictions = ag::argmax(logits, -1, true);
-    let accuracy = ag::reduce_mean(&ag::equal(predictions, &y), &[0, 1], false);
-    println!(
-        "test accuracy: {:?}",
-        accuracy.eval(&[ag::Feed(&x, x_test.view()), ag::Feed(&y, y_test.view())])
-    );
+    ag::with(|g| {
+        let w1 = g.variable(w1_);
+        let w2 = g.variable(w2_);
+        let w3 = g.variable(w3_);
+        let b1 = g.variable(b1_);
+        let b2 = g.variable(b2_);
+        let b3 = g.variable(b3_);
+        let params = &[w1, w2, w3, b1, b2, b3];
+        let (x, y) = inputs(g);
+        let z1 = conv_pool(x, w1, b1); // map to 32 channel
+        let z2 = conv_pool(z1, w2, b2); // map to 64 channel
+        let z3 = g.reshape(z2, &[-1, 64 * 7 * 7]); // flatten
+        let logits = logits(z3, w3, b3); // linear
+        let loss = g.sparse_softmax_cross_entropy(&logits, &y);
+        let grads = &g.grad(&[&loss], params);
+        let update_ops: &[Tensor] =
+            &adam::Adam::default().compute_updates(params, grads, &adam_state, g);
+
+        for epoch in 0..max_epoch {
+            timeit!({
+                let perm = ag::ndarray_ext::permutation(num_batches) * batch_size as usize;
+                for i in perm.into_iter() {
+                    let i = *i as isize;
+                    let x_batch = x_train.slice(s![i..i + batch_size, .., .., ..]).into_dyn();
+                    let y_batch = y_train.slice(s![i..i + batch_size, ..]).into_dyn();
+                    g.eval(update_ops, &[x.given(x_batch), y.given(y_batch)]);
+                }
+            });
+            println!("finish epoch {}", epoch);
+        }
+
+        // -- test --
+        let predictions = g.argmax(logits, -1, true);
+        let accuracy = g.reduce_mean(&g.equal(predictions, &y), &[0, 1], false);
+        println!(
+            "test accuracy: {:?}",
+            accuracy.eval(&[x.given(x_test.view()), y.given(y_test.view())])
+        );
+    });
 }
 
 pub mod dataset {

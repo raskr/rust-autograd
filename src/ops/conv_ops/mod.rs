@@ -1,9 +1,9 @@
 use crate::ndarray_ext;
 use crate::ndarray_ext::{NdArray, NdArrayView};
 use crate::same_type;
-use crate::tensor::Tensor;
 use crate::uninitialized_vec;
 use crate::Float;
+use crate::Tensor;
 use ndarray;
 #[allow(unused_imports)]
 use rayon::iter::*;
@@ -23,36 +23,6 @@ use crate::ops::mkl_ffi::{
     CBLAS_ROW_MAJOR, CblasTranspose::CblasTrans, CblasTranspose::CblasNoTrans,
     MklInt, cblas_sgemm, cblas_dgemm, cblas_dgemm_batch, cblas_sgemm_batch
 };
-
-#[test]
-fn test_conv_filter_grad() {
-    use crate::op::Op;
-    let op = conv2d::Conv2DFilterGrad {
-        pad: 0,
-        stride: 1,
-        dilation: 1,
-    };
-
-    let (kh, kw) = (2, 2);
-    let (xch, ych) = (3, 2);
-    let (yh, yw) = (2, 2);
-    let batch_size = 2;
-
-    let x = crate::ndarray_ext::ones::<f32>(&[batch_size, yh, yw, kh, kw, xch]);
-    let g = crate::ndarray_ext::ones(&[batch_size, ych, yh, yw]);
-    let w = crate::ndarray_ext::ones(&[ych, xch, kh, kw]);
-
-    let ret = op.compute(crate::runtime::OpComputeContext::new(
-        vec![crate::zeros(&[1])], // dummy
-        vec![x.view(), g.view(), w.view()],
-    ));
-
-    assert_eq!(w.shape(), ret[0].as_ref().unwrap().to_owned().shape()); // (2, 3, 2, 2)
-    assert_eq!(
-        ret[0].as_ref().unwrap().to_owned().into_raw_vec(),
-        vec![8.; 24]
-    );
-}
 
 #[test]
 fn test_im2col_batch() {
@@ -101,6 +71,7 @@ fn test_im2col_batch() {
     )
 }
 
+#[allow(unused_mut)]
 fn im2col_batch<T: Float>(
     x: &[T],           // 4-dimensional
     batch_size: usize, // x.shape[0]
@@ -124,7 +95,7 @@ fn im2col_batch<T: Float>(
     let size_per_batch_y = (xch * kw * kh * yh * yw) as usize;
 
     unsafe {
-        let ret = uninitialized_vec::<T>(batch_size * size_per_batch_y);
+        let mut ret = uninitialized_vec::<T>(batch_size * size_per_batch_y);
         // parallelize outer loop
         (0..batch_size).into_par_iter().for_each(|i| {
             let mut x: *const T = x.get_unchecked(i * xch as usize * channel_size) as *const _;
@@ -138,10 +109,11 @@ fn im2col_batch<T: Float>(
                         for _ in 0..yh {
                             if (y_offset as u32) < (xh as u32) {
                                 let mut x_offset = x_start;
+                                let cache = y_offset * xw;
                                 for j in 0..yw {
                                     if (x_offset as u32) < (xw as u32) {
                                         *ret.offset(j as isize) =
-                                            *x.offset((y_offset * xw + x_offset) as isize);
+                                            *x.offset((cache + x_offset) as isize);
                                     } else {
                                         *ret.offset(j as isize) = T::zero();
                                     }
@@ -198,10 +170,10 @@ fn col2im_batch<T: Float>(
                     for _ in 0..yh {
                         if (y_offset as u32) < (xh as u32) {
                             let mut x_offset = x_start;
+                            let cache = y_offset * xw;
                             for j in 0..yw as isize {
                                 if (x_offset as u32) < (xw as u32) {
-                                    *ret.offset((y_offset * xw + x_offset) as isize) +=
-                                        *x.offset(j);
+                                    *ret.offset((cache + x_offset) as isize) += *x.offset(j);
                                 }
                                 x_offset += sw;
                             }

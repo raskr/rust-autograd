@@ -1,21 +1,15 @@
-// Disable lint caused by a workaround in ndarray caused by a known issue in the Rust compiler
-// see also: https://github.com/rust-ndarray/ndarray/issues/474
-// and https://github.com/rust-lang/rust/issues/23014
-//
-// Some gemm kernel usages are ported from ndarray
-#![allow(clippy::deref_addrof)]
-
-use crate::ndarray_ext::{NdArray, NdArrayView, NdArrayViewMut};
-use crate::op;
+/// Some gemm kernel usages are ported from ndarray
+use crate::ndarray_ext::NdArray;
+use crate::{op, NdArrayViewMut};
 #[cfg(feature = "mkl")]
 use crate::same_type;
 use crate::tensor::Tensor;
+use crate::NdArrayView;
 use crate::Float;
 use ndarray;
-#[cfg(feature = "mkl")]
-use ndarray::{ArrayView2, ArrayViewMut2, Dimension};
-#[cfg(not(feature = "mkl"))]
 use ndarray::{ArrayView2, ArrayViewMut2};
+#[cfg(feature = "mkl")]
+use ndarray::Dimension;
 #[cfg(feature = "mkl")]
 use std::cmp;
 #[cfg(feature = "mkl")]
@@ -25,9 +19,10 @@ use crate::ops::mkl_ffi::*;
 #[cfg(feature = "mkl")]
 use crate::ndarray_ext::{get_batch_ptrs, get_batch_ptrs_mut};
 
+
 #[cfg(feature = "mkl")]
 #[inline]
-fn blas_row_major_2d<T: 'static, F>(a: &ArrayView2<F>) -> bool
+fn blas_row_major_2d<T: 'static, F>(a: &ndarray::ArrayView2<F>) -> bool
     where
         F: Float,
 {
@@ -54,8 +49,8 @@ fn blas_row_major_nd<T: 'static, F>(a: &NdArrayView<F>) -> bool
 #[cfg(feature = "mkl")]
 #[inline]
 fn blas_row_major_2d_mut<T: 'static, F>(a: &ndarray::ArrayViewMut2<F>) -> bool
-    where
-        F: Float,
+where
+    F: Float,
 {
     if !same_type::<F, T>() {
         return false;
@@ -128,9 +123,6 @@ fn is_blas_2d(dim: &ndarray::Ix2, stride: &[isize], order: MemoryOrder) -> bool 
 }
 
 
-#[cfg(feature = "mkl")]
-const GEMM_BLAS_CUTOFF: usize = 1;
-
 // mkl version of ndarray's mat_mul_impl
 #[cfg(feature = "mkl")]
 fn mat_mul_impl_blas<F: Float>(
@@ -141,6 +133,8 @@ fn mat_mul_impl_blas<F: Float>(
     c: &mut ArrayViewMut2<'_, F>,
 )
 {
+    const GEMM_BLAS_CUTOFF: usize = 7;
+
     // size cutoff for using BLAS
     let cut = GEMM_BLAS_CUTOFF;
     let ((mut m, a), (_, mut n)) = (lhs.dim(), rhs.dim());
@@ -392,6 +386,7 @@ fn mat_mul_impl_slow<F: Float>(
 
 /// C ← α A B + β C
 #[allow(unused_assignments)]
+#[allow(unused)]
 fn batch_mat_mul_impl_slow<F: Float>(
     alpha: F,
     lhs: &NdArrayView<'_, F>,
@@ -506,7 +501,6 @@ fn dot_shape_error(m: usize, k: usize, k2: usize, n: usize) -> ! {
 
 
 // ========= Op impls =========
-// `Tensordot` is implemented in `ops/mod.rs`.
 
 use ndarray::ShapeBuilder;
 
@@ -521,24 +515,15 @@ pub struct BatchMatMul {
 }
 
 impl<T: Float> op::Op<T> for MatMul {
-    fn name(&self) -> &str {
-        "MatMul"
-    }
-
-    fn compute<'v>(
-        &self,
-        ctx: crate::runtime::OpComputeContext<'v, T>,
-    ) -> op::ComputeResults<'v, T> {
-        let xs = ctx.grab_inputs();
-        let mut a = xs[0].clone().into_dimensionality::<ndarray::Ix2>().expect("lhs input for MatMul must be 2D");
-        let mut b = xs[1].clone().into_dimensionality::<ndarray::Ix2>().expect("rhs input for MatMul must be 2D");
+    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
+        let mut a = ctx.input(0).into_dimensionality::<ndarray::Ix2>().expect("lhs input for MatMul must be 2D");
+        let mut b = ctx.input(1).into_dimensionality::<ndarray::Ix2>().expect("rhs input for MatMul must be 2D");
         if self.transpose_a {
             a.swap_axes(0, 1);
         }
         if self.transpose_b {
             b.swap_axes(0, 1);
         }
-        // mkl version of ndarray's dot
         let ((m, k), (k2, n)) = (a.dim(), b.dim());
         if k != k2 || m.checked_mul(n).is_none() {
             dot_shape_error(m, k, k2, n);
@@ -561,56 +546,30 @@ impl<T: Float> op::Op<T> for MatMul {
         #[cfg(not(feature = "mkl"))] {
             mat_mul_impl_slow(T::one(), &a, &b, T::zero(), &mut c.view_mut());
         }
-        vec![Ok(crate::ArrRepr::Owned(c.into_dyn()))]
+        ctx.append_output(Ok(crate::ArrRepr::Owned(c.into_dyn())));
     }
 
-    fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
-        let opa = Tensor::builder()
-            .set_inputs(vec![gy, inputs[1]])
-            .build(MatMul {
-                transpose_a: false,
-                transpose_b: true,
-            });
+    fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
+        let s = ctx.graph();
+        let gy = &ctx.output_grad();
+        let opa = Tensor::builder().set_inputs(&[gy, &ctx.input(1)]).build(
+            s,
+            MatMul {transpose_a: false, transpose_b: true},
+        );
 
-        let opb = Tensor::builder()
-            .set_inputs(vec![inputs[0], gy])
-            .build(MatMul {
-                transpose_a: true,
-                transpose_b: false,
-            });
+        let opb = Tensor::builder().set_inputs(&[&ctx.input(0), gy]).build(
+            s,
+            MatMul {transpose_a: true, transpose_b: false},
+        );
 
-        vec![Some(opa), Some(opb)]
+        ctx.set_input_grads(vec![Some(opa), Some(opb)]);
     }
-}
-
-#[inline]
-pub fn get_region_heads<A: Float, B>(
-    batch_size: usize,
-    head: *const A,
-    whole_size: usize,
-) -> Vec<*const B> {
-    let size_per_sample = whole_size / batch_size;
-    let mut ret = Vec::with_capacity(batch_size);
-    for i in 0..batch_size {
-        unsafe {
-            ret.push(head.add(i * size_per_sample) as *const B);
-        }
-    }
-    ret
 }
 
 impl<T: Float> op::Op<T> for BatchMatMul {
-    fn name(&self) -> &str {
-        "BatchMatMul"
-    }
-
-    fn compute<'v>(
-        &self,
-        ctx: crate::runtime::OpComputeContext<'v, T>,
-    ) -> op::ComputeResults<'v, T> {
-        let xs = ctx.grab_inputs();
-        let mut x0 = xs[0].clone();
-        let mut x1 = xs[1].clone();
+    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
+        let mut x0 = ctx.input(0);
+        let mut x1 = ctx.input(1);
         let rank0 = x0.ndim();
         let rank1 = x1.ndim();
 
@@ -660,25 +619,30 @@ impl<T: Float> op::Op<T> for BatchMatMul {
         #[cfg(not(feature = "mkl"))] {
             batch_mat_mul_impl_slow(T::one(), &x0, &x1, T::zero(), &mut c.view_mut())
         }
-        vec![Ok(crate::ArrRepr::Owned(c))]
+
+        // reshape to dst shape with safe unwrapping
+        ctx.append_output(Ok(crate::ArrRepr::Owned(c)));
     }
 
-    fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
-        let opa = Tensor::builder()
-            .set_inputs(vec![gy, inputs[1]])
-            .build(BatchMatMul {
+    fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
+        let gy = &ctx.output_grad();
+        let opa = Tensor::builder().set_inputs(&[gy, &ctx.input(1)]).build(
+            ctx.graph(),
+            BatchMatMul {
                 transpose_a: false,
                 transpose_b: true,
-            });
+            },
+        );
 
-        let opb = Tensor::builder()
-            .set_inputs(vec![inputs[0], gy])
-            .build(BatchMatMul {
+        let opb = Tensor::builder().set_inputs(&[&ctx.input(0), gy]).build(
+            ctx.graph(),
+            BatchMatMul {
                 transpose_a: true,
                 transpose_b: false,
-            });
+            },
+        );
 
-        vec![Some(opa), Some(opb)]
+        ctx.set_input_grads(vec![Some(opa), Some(opb)]);
     }
 }
 
@@ -731,19 +695,11 @@ fn tensordot_preprocess<T: Float>(
 }
 
 impl<T: Float> op::Op<T> for TensordotPreprocess {
-    fn name(&self) -> &str {
-        "TensordotPreprocess"
-    }
-
-    fn compute<'v>(
-        &self,
-        ctx: crate::runtime::OpComputeContext<'v, T>,
-    ) -> op::ComputeResults<'v, T> {
-        let xs = ctx.grab_inputs();
-        let x0 = &xs[0];
-        let x1 = &xs[1];
-        let axes0 = crate::ndarray_ext::normalize_negative_axes(&xs[2], x0.ndim());
-        let axes1 = crate::ndarray_ext::normalize_negative_axes(&xs[3], x1.ndim());
+    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
+        let x0 = ctx.input(0);
+        let x1 = &ctx.input(1);
+        let axes0 = crate::ndarray_ext::normalize_negative_axes(&ctx.input(2), x0.ndim());
+        let axes1 = crate::ndarray_ext::normalize_negative_axes(&ctx.input(3), x1.ndim());
 
         let (perm0, new_shape0, mut free_dims0) = tensordot_preprocess(x0.shape(), &axes0, false);
         let (perm1, new_shape1, free_dims1) = tensordot_preprocess(x1.shape(), &axes1, true);
@@ -755,16 +711,14 @@ impl<T: Float> op::Op<T> for TensordotPreprocess {
         let r3 = NdArray::from_shape_vec(ndarray::IxDyn(&[new_shape0.len()]), new_shape0).unwrap();
         let r4 = NdArray::from_shape_vec(ndarray::IxDyn(&[new_shape1.len()]), new_shape1).unwrap();
 
-        vec![
-            Ok(crate::ArrRepr::Owned(r0)),
-            Ok(crate::ArrRepr::Owned(r1)),
-            Ok(crate::ArrRepr::Owned(r2)),
-            Ok(crate::ArrRepr::Owned(r3)),
-            Ok(crate::ArrRepr::Owned(r4)),
-        ]
+        ctx.append_output(Ok(crate::ArrRepr::Owned(r0)));
+        ctx.append_output(Ok(crate::ArrRepr::Owned(r1)));
+        ctx.append_output(Ok(crate::ArrRepr::Owned(r2)));
+        ctx.append_output(Ok(crate::ArrRepr::Owned(r3)));
+        ctx.append_output(Ok(crate::ArrRepr::Owned(r4)));
     }
 
-    fn grad(&self, _: &Tensor<T>, _: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
-        vec![None; 4]
+    fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
+        ctx.set_input_grads(vec![None; 4]);
     }
 }

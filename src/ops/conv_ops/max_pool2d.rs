@@ -1,5 +1,4 @@
 use super::*;
-use crate::tensor::Tensor;
 
 pub struct MaxPool2D {
     pub pad: usize,
@@ -163,16 +162,8 @@ impl_max_pool_grad_grad!(f32, max_pool_grad_grad_f32);
 impl_max_pool_grad_grad!(f64, max_pool_grad_grad_f64);
 
 impl<T: Float> crate::op::Op<T> for MaxPool2D {
-    fn name(&self) -> &str {
-        "MaxPool"
-    }
-
-    fn compute<'v>(
-        &self,
-        ctx: crate::runtime::OpComputeContext<'v, T>,
-    ) -> crate::op::ComputeResults<'v, T> {
-        let xs = ctx.grab_inputs();
-        let x = &xs[0];
+    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
+        let x = &ctx.input(0);
         let x_shape = x.shape();
         let batch = x_shape[0];
         let c = x_shape[1];
@@ -216,62 +207,31 @@ impl<T: Float> crate::op::Op<T> for MaxPool2D {
         };
         let output = NdArray::from_shape_vec(ndarray::IxDyn(&[batch, c, yh, yw]), output);
         let indices = NdArray::from_shape_vec(ndarray::IxDyn(&[batch, c, yh, yw]), indices);
-        vec![
-            Ok(crate::ArrRepr::Owned(output.unwrap())),
-            Ok(crate::ArrRepr::Owned(indices.unwrap())),
-        ]
+        ctx.append_output(Ok(crate::ArrRepr::Owned(output.unwrap())));
+        ctx.append_output(Ok(crate::ArrRepr::Owned(indices.unwrap())));
     }
 
-    fn grad(&self, gy: &Tensor<T>, _: &[&Tensor<T>], y: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
-        let indices = crate::ops::nth_tensor(y, 1);
-        let gx = Tensor::builder()
-            .set_inputs(vec![&gy, &indices])
-            .build(MaxPool2DGrad {
+    fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
+        let s = ctx.graph();
+        let gy = &ctx.output_grad();
+        let y = &ctx.output();
+        let indices = s.nth_tensor(y, 1);
+        let gx = Tensor::builder().set_inputs(&[gy, &indices]).build(
+            s,
+            MaxPool2DGrad {
                 pad: self.pad,
                 stride: self.stride,
                 size: self.size,
-            });
-        vec![Some(gx)]
+            },
+        );
+        ctx.set_input_grads(vec![Some(gx)]);
     }
-}
-
-#[test]
-fn test_max_pool2d() {
-    use crate::op::Op;
-
-    let op = MaxPool2D {
-        pad: 0,
-        stride: 1,
-        size: 2,
-    };
-    let x = vec![0., 1., 2., 5., 4., 3., 6., 7., 8.];
-    let arr = NdArray::from_shape_vec(ndarray::IxDyn(&[1, 1, 3, 3]), x).unwrap();
-    let y = op.compute(crate::runtime::OpComputeContext::new(
-        vec![crate::zeros(&[1])], // dummy
-        vec![arr.view()],
-    ));
-    assert_eq!(
-        vec![5., 4., 7., 8.],
-        y[0].as_ref().unwrap().view().to_owned().as_slice().unwrap()
-    );
-    assert_eq!(
-        vec![3., 4., 7., 8.],
-        y[1].as_ref().unwrap().view().to_owned().as_slice().unwrap()
-    );
 }
 
 impl<T: Float> crate::op::Op<T> for MaxPool2DGrad {
-    fn name(&self) -> &str {
-        "MaxPool2DGrad"
-    }
-
-    fn compute<'v>(
-        &self,
-        ctx: crate::runtime::OpComputeContext<'v, T>,
-    ) -> crate::op::ComputeResults<'v, T> {
-        let xs = ctx.grab_inputs();
-        let gy = &xs[0];
-        let argmax = &xs[1];
+    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
+        let gy = &ctx.input(0);
+        let argmax = &ctx.input(1);
         let gy_shape = gy.shape();
         let batch = gy_shape[0];
         let c = gy_shape[1];
@@ -290,33 +250,28 @@ impl<T: Float> crate::op::Op<T> for MaxPool2DGrad {
             panic!("MaxPoolGrad supports only f32 and f64");
         };
         let gx = NdArray::from_shape_vec(ndarray::IxDyn(&[batch, c, xh, xw]), gx);
-        vec![Ok(crate::ArrRepr::Owned(gx.unwrap()))]
+        ctx.append_output(Ok(crate::ArrRepr::Owned(gx.unwrap())));
     }
 
-    fn grad(&self, ggx: &Tensor<T>, xs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
-        let argmax = xs[1];
-        let ggy = Tensor::builder()
-            .set_inputs(vec![ggx, argmax])
-            .build(MaxPool2DGradGrad {
+    fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
+        let ggx = &ctx.output_grad();
+        let s = ctx.graph();
+        let argmax = &ctx.input(1);
+        let ggy = Tensor::builder().set_inputs(&[&ggx, argmax]).build(
+            s,
+            MaxPool2DGradGrad {
                 pad: self.pad,
                 stride: self.stride,
                 size: self.size,
-            });
-        vec![Some(ggy), None]
+            },
+        );
+        ctx.set_input_grads(vec![Some(ggy), None]);
     }
 }
 
 impl<T: Float> crate::op::Op<T> for MaxPool2DGradGrad {
-    fn name(&self) -> &str {
-        "MaxPoolGradGrad"
-    }
-
-    fn compute<'v>(
-        &self,
-        ctx: crate::runtime::OpComputeContext<'v, T>,
-    ) -> crate::op::ComputeResults<'v, T> {
-        let xs = ctx.grab_inputs();
-        let ggx = &xs[0];
+    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
+        let ggx = &ctx.input(0);
         let x_shape = ggx.shape();
         let copied_ggx = ndarray_ext::copy_if_dirty(ggx);
         let ggx = copied_ggx
@@ -328,7 +283,7 @@ impl<T: Float> crate::op::Op<T> for MaxPool2DGradGrad {
         let xw = x_shape[3];
         let yh = (xh + 2 * self.pad - self.size) / self.stride + 1;
         let yw = (xw + 2 * self.pad - self.size) / self.stride + 1;
-        let argmax = &xs[1];
+        let argmax = &ctx.input(1);
         let ggy = unsafe {
             let ggy = if same_type::<T, f32>() {
                 max_pool_grad_grad_f32(ggx, yh, yw, c, batch, argmax.as_ptr() as *const f32)
@@ -339,10 +294,10 @@ impl<T: Float> crate::op::Op<T> for MaxPool2DGradGrad {
             };
             NdArray::from_shape_vec(ndarray::IxDyn(&[batch, c, yh, yw]), ggy).unwrap()
         };
-        vec![Ok(crate::ArrRepr::Owned(ggy))]
+        ctx.append_output(Ok(crate::ArrRepr::Owned(ggy)));
     }
 
-    fn grad(&self, _: &Tensor<T>, _: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
-        vec![None, None]
+    fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
+        ctx.set_input_grads(vec![None, None]);
     }
 }

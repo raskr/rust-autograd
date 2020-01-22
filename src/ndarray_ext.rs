@@ -3,17 +3,21 @@
 //! Mainly provides `array_gen`, which is a collection of array generator functions.
 use crate::Float;
 use ndarray;
+use std::sync::{Arc, RwLock};
 
+/// alias for `ndarray::Array<T, IxDyn>`
 pub type NdArray<T> = ndarray::Array<T, ndarray::IxDyn>;
 
+/// alias for `ndarray::ArrayView<T, IxDyn>`
 pub type NdArrayView<'a, T> = ndarray::ArrayView<'a, T, ndarray::IxDyn>;
 
+/// alias for `ndarray::ArrayViewMut<T, IxDyn>`
 pub type NdArrayViewMut<'a, T> = ndarray::ArrayViewMut<'a, T, ndarray::IxDyn>;
 
 // expose array_gen
 pub use crate::array_gen::*;
 
-/// Op::compute's output
+/// `Op::compute`'s output
 #[derive(Clone)]
 pub enum ArrRepr<'v, T: Float> {
     /// Represents `ndarray::Array<T: Float, ndarray::IxDyn>`
@@ -41,6 +45,33 @@ impl<'v, T: Float> ArrRepr<'v, T> {
             View(v) => v.clone(),
         }
     }
+}
+
+/// Helper to use ndarrays for variable tensors.
+///
+/// Converts the input array into `ndarray::Array<F, ndarray::IxDyn>`
+/// and then simply wraps it with `Arc<RwLock<...>>`.
+///
+/// ```
+/// use autograd as ag;
+/// use ag::array;
+/// use ag::tensor::Variable;
+/// use ndarray;
+/// use std::sync::{Arc, RwLock};
+///
+/// type NdArray = ndarray::Array<f32, ndarray::IxDyn>;
+///
+/// let w_arr: Arc<RwLock<NdArray>> = array::shared(array::glorot_uniform(&[28 * 28, 10]));
+/// ag::with(|g| {
+///     let w = g.variable(w_arr.clone());
+/// });
+///
+/// ```
+#[inline]
+pub fn shared<F: Float, D: ndarray::Dimension>(
+    arr: ndarray::Array<F, D>,
+) -> Arc<RwLock<NdArray<F>>> {
+    Arc::new(RwLock::new(arr.into_dyn()))
 }
 
 #[inline]
@@ -120,20 +151,6 @@ pub(crate) fn sparse_to_dense<T: Float>(arr: &NdArrayView<T>) -> Vec<usize> {
 
 #[allow(unused)]
 #[inline]
-// True if even one of the axes is moved
-pub(crate) fn is_dims_permuted(strides: &[isize]) -> bool {
-    let mut ret = false;
-    for w in strides.windows(2) {
-        if w[0] < w[1] {
-            ret = true;
-            break;
-        }
-    }
-    ret
-}
-
-#[allow(unused)]
-#[inline]
 pub(crate) fn is_fully_transposed(strides: &[ndarray::Ixs]) -> bool {
     let mut ret = true;
     for w in strides.windows(2) {
@@ -147,7 +164,7 @@ pub(crate) fn is_fully_transposed(strides: &[ndarray::Ixs]) -> bool {
 
 #[inline]
 pub(crate) fn copy_if_dirty<T: Float>(x: &NdArrayView<T>) -> Option<NdArray<T>> {
-    if is_dims_permuted(x.strides()) {
+    if !x.is_standard_layout() {
         Some(deep_copy(x))
     } else {
         None
@@ -155,7 +172,7 @@ pub(crate) fn copy_if_dirty<T: Float>(x: &NdArrayView<T>) -> Option<NdArray<T>> 
 }
 
 #[inline]
-pub fn deep_copy<T: Float>(x: &NdArrayView<T>) -> NdArray<T> {
+pub(crate) fn deep_copy<T: Float>(x: &NdArrayView<T>) -> NdArray<T> {
     let vec = x.iter().cloned().collect::<Vec<_>>();
     NdArray::from_shape_vec(x.shape(), vec).unwrap()
 }
@@ -229,13 +246,13 @@ pub(crate) fn get_batch_ptrs<A: Float, B>(
     ret
 }
 
-/// Provides a collection of array generator functions.
+/// A collection of array generator functions.
 pub mod array_gen {
     use super::*;
     use rand::distributions::IndependentSample;
     use rand::{self, Rng, XorShiftRng};
-    use std::cell::RefCell;
     use std::marker::PhantomData;
+    use std::sync::Mutex;
 
     /// Range.
     pub fn range<T: Float>(shape: &[usize]) -> NdArray<T> {
@@ -252,26 +269,26 @@ pub mod array_gen {
     /// This is actually a wrapper of an arbitrary `rand::Rng`.
     /// You can use custom `Rng` with `new` function, whereas `default` function is provided;
     /// see https://github.com/raskr/rust-autograd/issues/1.
-    pub struct ArrRng<T: Float, R = XorShiftRng> {
+    pub struct ArrRng<T: Float, R: Rng + Send = XorShiftRng> {
         phantom: PhantomData<T>,
-        rng: RefCell<R>,
+        rng: Mutex<R>,
     }
 
     impl<T: Float> Default for ArrRng<T, XorShiftRng> {
         fn default() -> Self {
             ArrRng {
                 phantom: PhantomData,
-                rng: RefCell::new(rand::weak_rng()),
+                rng: Mutex::new(rand::weak_rng()),
             }
         }
     }
 
-    impl<T: Float, R: Rng> ArrRng<T, R> {
+    impl<T: Float, R: Rng + Send> ArrRng<T, R> {
         /// Creates `ArrRng` object with `Rng` object.
         pub fn new(rng: R) -> Self {
             ArrRng {
                 phantom: PhantomData,
-                rng: RefCell::new(rng),
+                rng: Mutex::new(rng),
             }
         }
 
@@ -287,8 +304,8 @@ pub mod array_gen {
         where
             I: IndependentSample<f64>,
         {
-            let size: usize = shape.iter().cloned().product();
-            let mut rng = self.rng.borrow_mut();
+            let size: usize = shape.into_iter().cloned().product();
+            let mut rng = self.rng.lock().unwrap();
             unsafe {
                 let mut buf = Self::alloc(size);
                 for i in 0..size {
@@ -302,7 +319,7 @@ pub mod array_gen {
             let mut data: Vec<usize> = (0..size).collect();
             let slice = data.as_mut_slice();
 
-            let mut rng = self.rng.borrow_mut();
+            let mut rng = self.rng.lock().unwrap();
             rng.shuffle(slice);
             ndarray::Array1::<usize>::from_vec(slice.to_vec())
         }
@@ -353,8 +370,8 @@ pub mod array_gen {
 
         pub fn bernoulli(&self, shape: &[usize], p: f64) -> ndarray::Array<T, ndarray::IxDyn> {
             let dist = rand::distributions::Range::new(0., 1.);
-            let mut rng = self.rng.borrow_mut();
-            let size: usize = shape.iter().cloned().product();
+            let mut rng = self.rng.lock().unwrap();
+            let size: usize = shape.into_iter().cloned().product();
             unsafe {
                 let mut buf = Self::alloc(size);
                 for i in 0..size {
@@ -469,7 +486,7 @@ pub mod array_gen {
         ArrRng::default().bernoulli(shape, p)
     }
 
-    /// Creates an ndarray sampled from a exponential distribution with given params.
+    /// Creates an ndarray sampled from an exponential distribution with given params.
     #[inline]
     pub fn exponential<T: Float>(
         shape: &[usize],

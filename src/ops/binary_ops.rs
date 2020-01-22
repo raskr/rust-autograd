@@ -1,10 +1,10 @@
 use crate::ndarray_ext::{NdArray, NdArrayView};
 use crate::op;
-use crate::ops;
 use crate::tensor::Tensor;
 use crate::Float;
+use crate::Graph;
 /// Implement +, -, *, / operators for Tensor
-/// +=, -=, *=, /= are provided as methods of ops::inplace_*.
+/// +=, -=, *=, /= are provided as methods of c.inplace_*.
 /// *=, /= don't propagate gradients.
 use ndarray;
 use std::mem;
@@ -13,28 +13,16 @@ pub struct AddOp;
 pub struct SubOp;
 pub struct MulOp;
 pub struct DivOp;
-pub struct InplaceAddOp;
-pub struct InplaceSubOp;
-pub struct InplaceMulOp;
-pub struct InplaceDivOp;
 pub struct PreprocessBinOpGrad;
 pub struct PreprocessBinOpGradGrad;
 
 impl<T: Float> op::Op<T> for PreprocessBinOpGrad {
-    fn name(&self) -> &str {
-        "PreprocessBinOpGrad"
-    }
-
     // Computes x's gradient.
     // Involves reduction as necessary.
     // Inputs: [gy, target_shape]
-    fn compute<'v>(
-        &self,
-        ctx: crate::runtime::OpComputeContext<'v, T>,
-    ) -> op::ComputeResults<'v, T> {
-        let xs = ctx.grab_inputs();
-        let gy = &xs[0];
-        let x_shape_ = crate::ndarray_ext::as_shape(&xs[1]);
+    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
+        let gy = ctx.input(0);
+        let x_shape_ = crate::ndarray_ext::as_shape(&ctx.input(1));
         let x_shape = x_shape_.as_slice();
         let gy_shape = gy.shape();
 
@@ -58,8 +46,8 @@ impl<T: Float> op::Op<T> for PreprocessBinOpGrad {
                         // `fold_axis` squashes the axis automatically.
                         let axis = ndarray::Axis(if x_is_scalar { 0 } else { i });
                         let ret = match folded {
-                            Some(ref a) => a.fold_axis(axis, T::zero(), |a, b| *a + *b),
-                            None => gy.fold_axis(axis, T::zero(), |a, b| *a + *b),
+                            Some(ref a) => a.fold_axis(axis.clone(), T::zero(), |&a, &b| a + b),
+                            None => gy.fold_axis(axis.clone(), T::zero(), |&a, &b| a + b),
                         };
                         if x_is_scalar {
                             mem::swap(&mut folded, &mut Some(ret));
@@ -80,38 +68,29 @@ impl<T: Float> op::Op<T> for PreprocessBinOpGrad {
             // TODO
             Ok(crate::ArrRepr::Owned(folded.unwrap()))
         };
-        vec![ret]
+        ctx.append_output(ret);
     }
 
-    // Do broadcast
-    fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
-        let x_shape = inputs[1];
+    fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
         let gx = Tensor::builder()
-            .set_inputs(vec![gy, x_shape])
-            .build(PreprocessBinOpGradGrad);
-        vec![Some(gx), None]
+            .set_inputs(&[&ctx.output_grad(), &ctx.input(1)])
+            .build(ctx.graph(), PreprocessBinOpGradGrad);
+        ctx.set_input_grads(vec![Some(gx), None]);
     }
 }
 
 // Do broadcast if necessary.
 // Inputs: [gy, target_shape]
 impl<T: Float> op::Op<T> for PreprocessBinOpGradGrad {
-    fn name(&self) -> &str {
-        "PreprocessBinOpGradGrad"
-    }
-
-    fn compute<'v>(
-        &self,
-        ctx: crate::runtime::OpComputeContext<'v, T>,
-    ) -> op::ComputeResults<'v, T> {
-        let xs = ctx.grab_inputs();
-        let gy = xs[0].clone();
-        let target_shape_ = &xs[1];
-        let target_shape_ = crate::ndarray_ext::as_shape(target_shape_);
+    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
+        let target_shape_ = ctx.input(1);
+        let target_shape_ = crate::ndarray_ext::as_shape(&target_shape_);
         let target_shape = target_shape_.as_slice();
 
+        let gy = ctx.input(0);
         if gy.shape() == target_shape {
-            return vec![Ok(crate::ArrRepr::View(gy))];
+            ctx.append_output(Ok(crate::ArrRepr::View(gy)));
+            return;
         }
 
         let gy_is_scalar = crate::ndarray_ext::is_scalar_shape(gy.shape());
@@ -127,101 +106,81 @@ impl<T: Float> op::Op<T> for PreprocessBinOpGradGrad {
 
         // do broadcast
         if let Some(ret) = gy.broadcast(target_shape) {
-            vec![Ok(crate::ArrRepr::Owned(ret.to_owned()))]
+            ctx.append_output(Ok(crate::ArrRepr::Owned(ret.to_owned())));
         } else {
             panic!("Cant't broadcast.");
         }
     }
 
-    fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
+    fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
         let gx = Tensor::builder()
-            .set_inputs(vec![inputs[0], gy])
-            .build(PreprocessBinOpGrad);
-        vec![Some(gx), None]
+            .set_inputs(&[&ctx.input(0), &ctx.output_grad()])
+            .build(ctx.graph(), PreprocessBinOpGrad);
+        ctx.set_input_grads(vec![Some(gx), None]);
     }
 }
 
 impl<T: Float> op::Op<T> for AddOp {
-    fn name(&self) -> &str {
-        "Add"
+    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
+        let ret = add_forward(&ctx.input(0), &ctx.input(1));
+        ctx.append_output(Ok(ret));
     }
 
-    fn compute<'v>(
-        &self,
-        ctx: crate::runtime::OpComputeContext<'v, T>,
-    ) -> op::ComputeResults<'v, T> {
-        let xs = ctx.grab_inputs();
-        vec![Ok(add_forward(&xs[0], &xs[1]))]
-    }
-
-    fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
-        let (gy1, gy2) = preprocess_gy(inputs[0], inputs[1], gy);
-        vec![Some(gy1), Some(gy2)]
+    fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
+        let x0 = ctx.input(0);
+        let x1 = ctx.input(1);
+        let shape0 = &ctx.graph().shape(x0);
+        let shape1 = &ctx.graph().shape(x1);
+        let (gy1, gy2) = preprocess_gy(shape0, shape1, &ctx.output_grad(), ctx.graph());
+        ctx.set_input_grads(vec![Some(gy1), Some(gy2)]);
     }
 }
 
 impl<T: Float> op::Op<T> for SubOp {
-    fn name(&self) -> &str {
-        "Sub"
-    }
-
-    fn compute<'v>(
-        &self,
-        ctx: crate::runtime::OpComputeContext<'v, T>,
-    ) -> op::ComputeResults<'v, T> {
-        let xs = ctx.grab_inputs();
-        let x0 = &xs[0];
-        let x1 = &xs[1];
+    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
+        let x0 = ctx.input(0);
+        let x1 = ctx.input(1);
         let shape0: &[usize] = x0.shape();
         let ret = if shape0 == [] {
             // is scalar
             let x0_elem = x0[ndarray::IxDyn(&[])];
             crate::ArrRepr::Owned(x1.map(move |&a| x0_elem - a))
         } else {
-            crate::ArrRepr::Owned(x0 - x1)
+            crate::ArrRepr::Owned(&x0 - &x1)
         };
-        vec![Ok(ret)]
+        ctx.append_output(Ok(ret));
     }
 
-    fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
-        let (gy1, gy2) = preprocess_gy(inputs[0], inputs[1], gy);
-        vec![Some(gy1), Some(ops::neg(&gy2))]
+    fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
+        let x0 = ctx.input(0);
+        let x1 = ctx.input(1);
+        let shape0 = &ctx.graph().shape(x0);
+        let shape1 = &ctx.graph().shape(x1);
+        let (gy1, gy2) = preprocess_gy(shape0, shape1, &ctx.output_grad(), ctx.graph());
+        ctx.set_input_grads(vec![Some(gy1), Some(ctx.graph().neg(&gy2))]);
     }
 }
 
 impl<T: Float> op::Op<T> for MulOp {
-    fn name(&self) -> &str {
-        "Mul"
+    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
+        let ret = mul_forward(&ctx.input(0), &ctx.input(1));
+        ctx.append_output(Ok(ret));
     }
 
-    fn compute<'v>(
-        &self,
-        ctx: crate::runtime::OpComputeContext<'v, T>,
-    ) -> op::ComputeResults<'v, T> {
-        let xs = ctx.grab_inputs();
-        vec![Ok(mul_forward(&xs[0], &xs[1]))]
-    }
-
-    fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
-        let x0 = inputs[0];
-        let x1 = inputs[1];
-        let (gy1, gy2) = preprocess_gy(x0, x1, gy);
-        vec![Some(gy1 * x1), Some(gy2 * x0)]
+    fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
+        let x0 = ctx.input(0);
+        let x1 = ctx.input(1);
+        let shape0 = &ctx.graph().shape(x0);
+        let shape1 = &ctx.graph().shape(x1);
+        let (gy1, gy2) = preprocess_gy(shape0, shape1, &ctx.output_grad(), ctx.graph());
+        ctx.set_input_grads(vec![Some(gy1 * x1), Some(gy2 * x0)]);
     }
 }
 
 impl<T: Float> op::Op<T> for DivOp {
-    fn name(&self) -> &str {
-        "Div"
-    }
-
-    fn compute<'v>(
-        &self,
-        ctx: crate::runtime::OpComputeContext<'v, T>,
-    ) -> op::ComputeResults<'v, T> {
-        let xs = ctx.grab_inputs();
-        let x0 = &xs[0];
-        let x1 = &xs[1];
+    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
+        let x0 = &ctx.input(0);
+        let x1 = &ctx.input(1);
         let shape0: &[usize] = x0.shape();
         let shape1: &[usize] = x1.shape();
         let is_scalar0 = shape0 == [] || shape0 == [0];
@@ -238,36 +197,38 @@ impl<T: Float> op::Op<T> for DivOp {
         } else {
             x0 / x1
         };
-        vec![Ok(crate::ArrRepr::Owned(ret))]
+        ctx.append_output(Ok(crate::ArrRepr::Owned(ret)));
     }
 
-    fn grad(&self, gy: &Tensor<T>, inputs: &[&Tensor<T>], _: &Tensor<T>) -> Vec<Option<Tensor<T>>> {
-        let x0 = inputs[0];
-        let x1 = inputs[1];
-        let (gy1, gy2) = preprocess_gy(x0, x1, gy);
-        vec![
+    fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
+        let scope = ctx.graph();
+        let x0 = ctx.input(0);
+        let x1 = ctx.input(1);
+        let shape0 = &scope.shape(x0);
+        let shape1 = &scope.shape(x1);
+        let (gy1, gy2) = preprocess_gy(shape0, shape1, &ctx.output_grad(), scope);
+        ctx.set_input_grads(vec![
             Some(gy1 / x1),
-            Some(ops::neg(x0) * ops::pow(x1, T::from(-2.).unwrap()) * gy2),
-        ]
+            Some(scope.neg(x0) * scope.pow(x1, T::from(-2.).unwrap()) * gy2),
+        ]);
     }
 }
 
 // Reduce gy if broadcast occurred in the forward path.
-fn preprocess_gy<T: Float>(
-    x0: &Tensor<T>,
-    x1: &Tensor<T>,
-    gy: &Tensor<T>,
-) -> (Tensor<T>, Tensor<T>) {
-    let shape0 = x0.shape();
-    let shape1 = x1.shape();
+fn preprocess_gy<'a, 'b: 'a, 'c, T: Float>(
+    shape0: &Tensor<'a, 'b, T>,
+    shape1: &Tensor<'a, 'b, T>,
+    gy: &Tensor<'a, 'b, T>,
+    c: &'b Graph<T>,
+) -> (Tensor<'a, 'b, T>, Tensor<'a, 'b, T>) {
     let gy0 = Tensor::builder()
-        .set_inputs(vec![gy, &shape0])
+        .set_inputs(&[gy, shape0])
         .set_shape(shape0)
-        .build(PreprocessBinOpGrad);
+        .build(c, PreprocessBinOpGrad);
     let gy1 = Tensor::builder()
-        .set_inputs(vec![gy, &shape1])
+        .set_inputs(&[gy, shape1])
         .set_shape(shape1)
-        .build(PreprocessBinOpGrad);
+        .build(c, PreprocessBinOpGrad);
     (gy0, gy1)
 }
 

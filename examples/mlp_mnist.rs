@@ -1,10 +1,14 @@
 extern crate autograd as ag;
-#[macro_use(s)]
 extern crate ndarray;
 
+use ag::array;
+use ag::optimizers::adam;
+use ag::tensor::Variable;
+use ag::Graph;
+use ndarray::s;
 use std::time::Instant;
 
-type Tensor = ag::Tensor<f32>;
+type Tensor<'tensor, 'scope> = ag::Tensor<'tensor, 'scope, f32>;
 
 // This is a softmax regression with Adam optimizer for mnist.
 // 0.918 test accuracy after 3 epochs, 0.11 sec/epoch on 2.7GHz Intel Core i5
@@ -26,31 +30,20 @@ macro_rules! timeit {
     }};
 }
 
-fn logits(x: &Tensor, w: &Tensor, b: &Tensor) -> Tensor {
-    ag::matmul(x, w) + b
-}
-
-fn inputs() -> (Tensor, Tensor) {
-    let x = ag::placeholder(&[-1, 28 * 28]);
-    let y = ag::placeholder(&[-1, 1]);
+fn inputs(g: &Graph<f32>) -> (Tensor, Tensor) {
+    let x = g.placeholder(&[-1, 28 * 28]);
+    let y = g.placeholder(&[-1, 1]);
     (x, y)
 }
 
+// Writing in define-by-run style for fun.
 fn main() {
     let ((x_train, y_train), (x_test, y_test)) = dataset::load();
 
-    // -- variable tensors (target of optimization) --
-    let w = &ag::variable(ag::ndarray_ext::glorot_uniform(&[28 * 28, 10]));
-    let b = &ag::variable(ag::ndarray_ext::zeros(&[1, 10]));
-    let params = &ag::gradient_descent_ops::Adam::vars_with_states(&[w, b]);
-    let (x, y) = inputs();
-    let z = logits(&x, w, b);
-    let loss = ag::sparse_softmax_cross_entropy(z, &y);
-    let grads = &ag::grad(&[&loss], &[w, b]);
-    let adam = ag::gradient_descent_ops::Adam::default();
-    let update_ops: &[Tensor] = &adam.compute_updates(params, grads);
+    let w_arr = array::shared(array::glorot_uniform(&[28 * 28, 10]));
+    let b_arr = array::shared(array::zeros(&[1, 10]));
+    let adam_state = adam::AdamState::new(&[&w_arr, &b_arr]);
 
-    // -- actual training --
     let max_epoch = 3;
     let batch_size = 200isize;
     let num_samples = x_train.shape()[0];
@@ -58,26 +51,42 @@ fn main() {
 
     for epoch in 0..max_epoch {
         timeit!({
-            let perm = ag::ndarray_ext::permutation(num_batches) * batch_size as usize;
-            for i in perm.into_iter() {
-                let i = *i as isize;
-                let x_batch = x_train.slice(s![i..i + batch_size, ..]).into_dyn();
-                let y_batch = y_train.slice(s![i..i + batch_size, ..]).into_dyn();
-                ag::eval(update_ops, &[ag::Feed(&x, x_batch), ag::Feed(&y, y_batch)]);
-            }
+            ag::with(|g| {
+                let w = g.variable(w_arr.clone());
+                let b = g.variable(b_arr.clone());
+                let (x, y) = inputs(g);
+                let z = g.matmul(x, w) + b;
+                let loss = g.sparse_softmax_cross_entropy(z, &y);
+                let grads = &g.grad(&[&loss], &[w, b]);
+                let update_ops: &[Tensor] =
+                    &adam::Adam::default().compute_updates(&[w, b], grads, &adam_state, g);
+
+                let perm = ag::ndarray_ext::permutation(num_batches) * batch_size as usize;
+                for i in perm.into_iter() {
+                    let i = *i as isize;
+                    let x_batch = x_train.slice(s![i..i + batch_size, ..]).into_dyn();
+                    let y_batch = y_train.slice(s![i..i + batch_size, ..]).into_dyn();
+                    g.eval(update_ops, &[x.given(x_batch), y.given(y_batch)]);
+                }
+                println!("finish epoch {}", epoch);
+            });
         });
-        println!("finish epoch {}", epoch);
     }
 
-    // -- test --
-    let (x, y) = inputs();
-    let z = logits(&x, w, b);
-    let predictions = ag::argmax(z, -1, true);
-    let accuracy = ag::reduce_mean(&ag::equal(predictions, &y), &[0, 1], false);
-    println!(
-        "test accuracy: {:?}",
-        accuracy.eval(&[ag::Feed(&x, x_test.view()), ag::Feed(&y, y_test.view())])
-    );
+    ag::with(|g| {
+        let w = g.variable(w_arr.clone());
+        let b = g.variable(b_arr.clone());
+        let (x, y) = inputs(g);
+
+        // -- test --
+        let z = g.matmul(x, w) + b;
+        let predictions = g.argmax(z, -1, true);
+        let accuracy = g.reduce_mean(&g.equal(predictions, &y), &[0, 1], false);
+        println!(
+            "test accuracy: {:?}",
+            accuracy.eval(&[x.given(x_test.view()), y.given(y_test.view())])
+        );
+    })
 }
 
 pub mod dataset {
