@@ -1,7 +1,8 @@
 # autograd
 
 [![Build Status](https://travis-ci.org/raskr/rust-autograd.svg?branch=master)](https://travis-ci.org/raskr/rust-autograd)
-[![](http://meritbadge.herokuapp.com/autograd)](https://crates.io/crates/autograd)
+[![Crates.io version](http://meritbadge.herokuapp.com/autograd)](https://crates.io/crates/autograd)
+[![docs.rs](https://docs.rs/autograd/badge.svg)](https://docs.rs/autograd/)
 
 Differentiable operations and tensors backed by [ndarray](https://github.com/rust-ndarray/ndarray).
 
