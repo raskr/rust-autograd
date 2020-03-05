@@ -5,7 +5,6 @@ env: TYPE=default RUST_BACKTRACE=1
 rust:
   - "1.33.0"
   - stable
-  - nightly
 
 jobs:
   allow_failures:

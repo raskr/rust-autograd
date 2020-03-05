@@ -1,14 +1,15 @@
 # autograd
 
 [![Build Status](https://travis-ci.org/raskr/rust-autograd.svg?branch=master)](https://travis-ci.org/raskr/rust-autograd)
-[![](http://meritbadge.herokuapp.com/autograd)](https://crates.io/crates/autograd)
+[![Crates.io version](http://meritbadge.herokuapp.com/autograd)](https://crates.io/crates/autograd)
+[![docs.rs](https://docs.rs/autograd/badge.svg)](https://docs.rs/autograd/)
 
 Differentiable operations and tensors backed by [ndarray](https://github.com/rust-ndarray/ndarray).
 
 ## Installation
 ```
 [dependencies]
-autograd = { version = "0.9.7", features = ["mkl"] }
+autograd = { version = "0.9.8", features = ["mkl"] }
 ```
 `mkl` feature is recommended to speedup gemm operations using [Intel MKL](https://software.intel.com/en-us/mkl).
 
@@ -31,9 +32,9 @@ ag::with(|g: &mut ag::Graph<_>| {
 ```
 
 ### Reverse-mode automatic differentiation
-There are a lot of [built-in operations](https://docs.rs/autograd/0.9.7/autograd/ops/index.html)
+There are a lot of [built-in operations](https://docs.rs/autograd/0.9.8/autograd/ops/index.html)
 that support *higher-order* derivatives, and
-you can also [define your own differentiable ops](https://docs.rs/autograd/0.9.7/autograd/op/trait.Op.html) with ndarrays easily.
+you can also [define your own differentiable ops](https://docs.rs/autograd/0.9.8/autograd/op/trait.Op.html) with ndarrays easily.
 
 Here we are just computing partial derivatives of `z = 2x^2 + 3y + 1`.
 
