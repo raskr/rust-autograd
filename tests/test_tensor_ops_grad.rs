@@ -41,7 +41,7 @@ fn clip() {
 #[test]
 fn asinh() {
     with(|graph| {
-        let v = graph.variable(ag::array::random_uniform(&[3], 0., 0.2));
+        let v = graph.variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
         let z = graph.asinh(v);
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -51,7 +51,7 @@ fn asinh() {
 #[test]
 fn acosh() {
     with(|graph| {
-        let v = graph.variable(ag::array::random_uniform(&[3], 0., 0.2));
+        let v = graph.variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
         let z = graph.acosh(v);
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -61,7 +61,7 @@ fn acosh() {
 #[test]
 fn atanh() {
     with(|graph| {
-        let v = graph.variable(ag::array::random_uniform(&[3], 0., 0.2));
+        let v = graph.variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
         let z = graph.atanh(v);
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -71,7 +71,7 @@ fn atanh() {
 #[test]
 fn sinh() {
     with(|graph| {
-        let v = graph.variable(ag::array::random_uniform(&[3], 0., 0.2));
+        let v = graph.variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
         let z = graph.sinh(v);
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -81,7 +81,7 @@ fn sinh() {
 #[test]
 fn cosh() {
     with(|graph| {
-        let v = graph.variable(ag::array::random_uniform(&[3], 0., 0.2));
+        let v = graph.variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
         let z = graph.cosh(v);
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -91,7 +91,7 @@ fn cosh() {
 #[test]
 fn tanh() {
     with(|graph| {
-        let v = graph.variable(ag::array::random_uniform(&[3], 0., 0.2));
+        let v = graph.variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
         let z = graph.tanh(v);
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -101,7 +101,7 @@ fn tanh() {
 #[test]
 fn asin() {
     with(|graph| {
-        let v = graph.variable(ag::array::random_uniform(&[3], 0., 0.2));
+        let v = graph.variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
         let z = graph.asin(v);
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-2);
@@ -111,7 +111,7 @@ fn asin() {
 #[test]
 fn acos() {
     with(|graph| {
-        let v = graph.variable(ag::array::random_uniform(&[3], 0., 0.2));
+        let v = graph.variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
         let z = graph.acos(v);
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -121,7 +121,7 @@ fn acos() {
 #[test]
 fn atan() {
     with(|graph| {
-        let v = graph.variable(ag::array::random_uniform(&[3], 0., 0.2));
+        let v = graph.variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
         let z = graph.atan(v);
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -131,7 +131,7 @@ fn atan() {
 #[test]
 fn sin() {
     with(|graph| {
-        let v = graph.variable(ag::array::random_uniform(&[3], 0., 0.2));
+        let v = graph.variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
         let z = graph.sin(v);
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -141,7 +141,7 @@ fn sin() {
 #[test]
 fn cos() {
     with(|graph| {
-        let v = graph.variable(ag::array::random_uniform(&[3], 0., 0.2));
+        let v = graph.variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
         let z = graph.cos(v);
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -151,7 +151,7 @@ fn cos() {
 #[test]
 fn tan() {
     with(|graph| {
-        let v = graph.variable(ag::array::random_uniform(&[3], 0., 0.2));
+        let v = graph.variable(ag::ndarray_ext::random_uniform(&[3], 0., 0.2));
         let z = graph.tan(v);
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-2);
@@ -161,7 +161,7 @@ fn tan() {
 #[test]
 fn pow() {
     with(|graph| {
-        let v = graph.variable(ag::array::random_uniform(&[3], 0.9, 1.1));
+        let v = graph.variable(ag::ndarray_ext::random_uniform(&[3], 0.9, 1.1));
         let z = graph.pow(v, 1.1);
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -171,7 +171,7 @@ fn pow() {
 #[test]
 fn exp() {
     with(|graph| {
-        let v = graph.variable(ag::array::random_uniform(&[3], 0.9, 1.1));
+        let v = graph.variable(ag::ndarray_ext::random_uniform(&[3], 0.9, 1.1));
         let z = graph.exp(v);
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-2);
@@ -182,7 +182,7 @@ fn exp() {
 fn log() {
     with(|graph| {
         use std::f64;
-        let v = graph.variable(ag::array::random_uniform(&[3], 1., 1.1));
+        let v = graph.variable(ag::ndarray_ext::random_uniform(&[3], 1., 1.1));
         let z = graph.log(v, f64::consts::E);
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-2);
@@ -192,7 +192,7 @@ fn log() {
 #[test]
 fn expand_dims() {
     with(|graph| {
-        let v = graph.variable(ag::array::standard_normal(&[3]));
+        let v = graph.variable(ag::ndarray_ext::standard_normal(&[3]));
         let z = graph.expand_dims(v, &[0, 2]);
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -202,7 +202,7 @@ fn expand_dims() {
 #[test]
 fn squeeze() {
     with(|graph| {
-        let v = graph.variable(ag::array::standard_normal(&[3, 1, 2, 1]));
+        let v = graph.variable(ag::ndarray_ext::standard_normal(&[3, 1, 2, 1]));
         let z = graph.squeeze(v, &[3, 1]);
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -212,8 +212,8 @@ fn squeeze() {
 #[test]
 fn g_matmul() {
     with(|graph| {
-        let a = graph.constant(ag::array::standard_normal::<f64>(&[4, 2]));
-        let v = graph.variable(ag::array::standard_normal::<f64>(&[2, 3]));
+        let a = graph.constant(ag::ndarray_ext::standard_normal::<f64>(&[4, 2]));
+        let v = graph.variable(ag::ndarray_ext::standard_normal::<f64>(&[2, 3]));
         let z = graph.matmul(a, v);
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 0.005);
@@ -223,8 +223,8 @@ fn g_matmul() {
 #[test]
 fn batch_matmul() {
     with(|graph| {
-        let a = graph.constant(ag::array::standard_normal(&[2, 4, 2]));
-        let v = graph.variable(ag::array::standard_normal(&[2, 2, 3]));
+        let a = graph.constant(ag::ndarray_ext::standard_normal(&[2, 4, 2]));
+        let v = graph.variable(ag::ndarray_ext::standard_normal(&[2, 2, 3]));
         let z = graph.batch_matmul(a, v);
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -234,8 +234,8 @@ fn batch_matmul() {
 #[test]
 fn implicit_broadcast() {
     with(|graph| {
-        let x = graph.constant(ag::array::standard_normal(&[4, 3]));
-        let b = graph.variable(ag::array::standard_normal(&[1, 3]));
+        let x = graph.constant(ag::ndarray_ext::standard_normal(&[4, 3]));
+        let b = graph.variable(ag::ndarray_ext::standard_normal(&[1, 3]));
         let z = x + b;
         let g = graph.grad(&[z], &[b]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[b], &[], 1e-3, 1e-3);
@@ -245,9 +245,9 @@ fn implicit_broadcast() {
 #[test]
 fn wx_plus_b() {
     with(|graph| {
-        let x = graph.constant(ag::array::standard_normal(&[4, 2]));
-        let w = graph.variable(ag::array::standard_normal(&[2, 3]));
-        let b = graph.variable(ag::array::standard_normal(&[1, 3]));
+        let x = graph.constant(ag::ndarray_ext::standard_normal(&[4, 2]));
+        let w = graph.variable(ag::ndarray_ext::standard_normal(&[2, 3]));
+        let b = graph.variable(ag::ndarray_ext::standard_normal(&[1, 3]));
         let z = graph.matmul(x, w) + b;
         let g = graph.grad(&[z], &[b]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[b], &[], 1e-3, 1e-3);
@@ -297,7 +297,7 @@ fn reduce_max_keep() {
 #[test]
 fn reduce_mean() {
     with(|graph| {
-        let v = graph.variable(ag::array::standard_normal(&[3, 2, 2]));
+        let v = graph.variable(ag::ndarray_ext::standard_normal(&[3, 2, 2]));
         let z = graph.reduce_mean(v, &[1], false); // keep_dims=false
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -307,7 +307,7 @@ fn reduce_mean() {
 #[test]
 fn reduce_mean_keep() {
     with(|graph| {
-        let v = graph.variable(ag::array::standard_normal(&[3, 2, 2]));
+        let v = graph.variable(ag::ndarray_ext::standard_normal(&[3, 2, 2]));
         let z = graph.reduce_mean(v, &[1], true); // keep_dims=true
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -317,7 +317,7 @@ fn reduce_mean_keep() {
 #[test]
 fn reduce_sum() {
     with(|graph| {
-        let v = graph.variable(ag::array::standard_normal(&[3, 2, 2]));
+        let v = graph.variable(ag::ndarray_ext::standard_normal(&[3, 2, 2]));
         let z = graph.reduce_sum(v, &[1], false); // keep_dims=false
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -327,7 +327,7 @@ fn reduce_sum() {
 #[test]
 fn reduce_sum_keep() {
     with(|graph| {
-        let v = graph.variable(ag::array::standard_normal(&[3, 2, 2]));
+        let v = graph.variable(ag::ndarray_ext::standard_normal(&[3, 2, 2]));
         let z = graph.reduce_sum(v, &[1], true); // keep_dims=true
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -337,7 +337,7 @@ fn reduce_sum_keep() {
 #[test]
 fn reduce_prod() {
     with(|graph| {
-        let v = graph.variable(ag::array::standard_normal(&[3, 2, 2]));
+        let v = graph.variable(ag::ndarray_ext::standard_normal(&[3, 2, 2]));
         let z = graph.reduce_prod(v, &[1], false); // keep_dims=false
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -379,7 +379,7 @@ fn abs() {
 #[test]
 fn neg() {
     with(|graph| {
-        let v = graph.variable(ag::array::standard_normal(&[2, 3]));
+        let v = graph.variable(ag::ndarray_ext::standard_normal(&[2, 3]));
         let z = graph.neg(v);
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -389,7 +389,7 @@ fn neg() {
 #[test]
 fn square() {
     with(|graph| {
-        let v = graph.variable(ag::array::standard_normal(&[2, 3]));
+        let v = graph.variable(ag::ndarray_ext::standard_normal(&[2, 3]));
         let z = graph.square(v);
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -399,7 +399,7 @@ fn square() {
 #[test]
 fn reciprocal() {
     with(|graph| {
-        let v = graph.variable(ag::array::random_uniform(&[2, 3], 1., 1.01));
+        let v = graph.variable(ag::ndarray_ext::random_uniform(&[2, 3], 1., 1.01));
         let z = graph.reciprocal(v);
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -409,7 +409,7 @@ fn reciprocal() {
 #[test]
 fn transpose() {
     with(|graph| {
-        let v = graph.variable(ag::array::standard_normal(&[1, 2, 3, 4]));
+        let v = graph.variable(ag::ndarray_ext::standard_normal(&[1, 2, 3, 4]));
         let z = graph.transpose(v, &[2, 3, 0, 1]);
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -419,7 +419,7 @@ fn transpose() {
 #[test]
 fn reshape_after_transpose() {
     with(|graph| {
-        let v = graph.variable(ag::array::standard_normal(&[2, 3, 4]));
+        let v = graph.variable(ag::ndarray_ext::standard_normal(&[2, 3, 4]));
         let z = graph.transpose(v, &[2, 1, 0]);
         let z = graph.reshape(z, &[4, 6]);
         let g = graph.grad(&[z], &[v]);
@@ -430,8 +430,8 @@ fn reshape_after_transpose() {
 #[test]
 fn transpose_then_reshape_then_mm() {
     with(|graph| {
-        let v = graph.variable(ag::array::standard_normal(&[1, 2, 3, 4, 5]));
-        let v2 = graph.variable(ag::array::standard_normal(&[8, 2]));
+        let v = graph.variable(ag::ndarray_ext::standard_normal(&[1, 2, 3, 4, 5]));
+        let v2 = graph.variable(ag::ndarray_ext::standard_normal(&[8, 2]));
         let z = graph.transpose(v, &[4, 2, 3, 0, 1]);
         let z = graph.reshape(z, &[15, 8]);
         let z = graph.matmul(z, v2);
@@ -443,8 +443,8 @@ fn transpose_then_reshape_then_mm() {
 #[test]
 fn add() {
     with(|graph| {
-        let a = graph.variable(ag::array::standard_normal(&[2, 2]));
-        let b = graph.variable(ag::array::standard_normal(&[2, 2]));
+        let a = graph.variable(ag::ndarray_ext::standard_normal(&[2, 2]));
+        let b = graph.variable(ag::ndarray_ext::standard_normal(&[2, 2]));
         let z = a + b;
         let g = graph.grad(&[z], &[a, b]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[a], &[], 1e-3, 1e-3);
@@ -454,8 +454,8 @@ fn add() {
 #[test]
 fn mul() {
     with(|graph| {
-        let a = graph.variable(ag::array::standard_normal(&[2, 2]));
-        let b = graph.variable(ag::array::standard_normal(&[2, 2]));
+        let a = graph.variable(ag::ndarray_ext::standard_normal(&[2, 2]));
+        let b = graph.variable(ag::ndarray_ext::standard_normal(&[2, 2]));
         let z = a * b;
         let g = graph.grad(&[z], &[a, b]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[a], &[], 1e-3, 1e-3);
@@ -465,7 +465,7 @@ fn mul() {
 #[test]
 fn sigmoid() {
     with(|graph| {
-        let v = graph.variable(ag::array::standard_normal(&[2, 2]));
+        let v = graph.variable(ag::ndarray_ext::standard_normal(&[2, 2]));
         let z = graph.sigmoid(v);
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -475,7 +475,7 @@ fn sigmoid() {
 #[test]
 fn elu() {
     with(|graph| {
-        let v = graph.variable(ag::array::standard_normal(&[2, 2]));
+        let v = graph.variable(ag::ndarray_ext::standard_normal(&[2, 2]));
         let z = graph.elu(v, 1.);
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -495,7 +495,7 @@ fn relu() {
 #[test]
 fn softplus() {
     with(|graph| {
-        let v = graph.variable(ag::array::standard_normal(&[2, 2]));
+        let v = graph.variable(ag::ndarray_ext::standard_normal(&[2, 2]));
         let z = graph.softplus(v);
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -505,7 +505,7 @@ fn softplus() {
 #[test]
 fn logsumexp() {
     with(|graph| {
-        let v = graph.variable(ag::array::standard_normal(&[1, 3]));
+        let v = graph.variable(ag::ndarray_ext::standard_normal(&[1, 3]));
         let z = graph.reduce_logsumexp(v, 1, true);
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -515,7 +515,7 @@ fn logsumexp() {
 #[test]
 fn log_softmax() {
     with(|graph| {
-        let v = graph.variable(ag::array::standard_normal(&[1, 3]));
+        let v = graph.variable(ag::ndarray_ext::standard_normal(&[1, 3]));
         let z = graph.log_softmax(v, 1);
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -526,7 +526,7 @@ fn log_softmax() {
 fn softmax_cross_entropy() {
     with(|graph| {
         let t = graph.constant(ndarray::arr2(&[[1., 0., 0.]]));
-        let v = graph.variable(ag::array::standard_normal(&[1, 3]));
+        let v = graph.variable(ag::ndarray_ext::standard_normal(&[1, 3]));
         let z = graph.softmax_cross_entropy(v, t);
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -536,8 +536,8 @@ fn softmax_cross_entropy() {
 #[test]
 fn sigmoid_cross_entropy() {
     with(|graph| {
-        let t = graph.constant(ag::array::standard_normal(&[1, 3]));
-        let v = graph.variable(ag::array::standard_normal(&[1, 3]));
+        let t = graph.constant(ag::ndarray_ext::standard_normal(&[1, 3]));
+        let v = graph.variable(ag::ndarray_ext::standard_normal(&[1, 3]));
         let z = graph.sigmoid_cross_entropy(v, t);
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -548,7 +548,7 @@ fn sigmoid_cross_entropy() {
 fn sparse_softmax_cross_entropy() {
     with(|graph| {
         let t = graph.constant(ndarray::arr1(&[1., 0.]));
-        let v = graph.variable(ag::array::standard_normal(&[2, 3]));
+        let v = graph.variable(ag::ndarray_ext::standard_normal(&[2, 3]));
         let z = graph.sparse_softmax_cross_entropy(v, t);
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -558,7 +558,7 @@ fn sparse_softmax_cross_entropy() {
 #[test]
 fn gather() {
     with(|graph| {
-        let v = graph.variable(ag::array::standard_normal(&[5, 4, 8, 2]));
+        let v = graph.variable(ag::ndarray_ext::standard_normal(&[5, 4, 8, 2]));
         let x = graph.constant(ndarray::arr2(&[[5., 4., 3.], [2., 1., 0.]]));
         let z = graph.gather(v, x, 2);
         let g = graph.grad(&[z], &[v]);
@@ -569,8 +569,8 @@ fn gather() {
 #[test]
 fn concat() {
     with(|graph| {
-        let v1 = graph.variable(ag::array::standard_normal(&[1, 2]));
-        let v2 = graph.variable(ag::array::standard_normal(&[1, 2]));
+        let v1 = graph.variable(ag::ndarray_ext::standard_normal(&[1, 2]));
+        let v2 = graph.variable(ag::ndarray_ext::standard_normal(&[1, 2]));
         let z = graph.concat(&[v1, v2], 1);
         let g = graph.grad(&[z], &[v1]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v1, v2], &[], 1e-3, 1e-3);
@@ -580,7 +580,7 @@ fn concat() {
 #[test]
 fn slice() {
     with(|graph| {
-        let v = graph.variable(ag::array::standard_normal(&[4, 4]));
+        let v = graph.variable(ag::ndarray_ext::standard_normal(&[4, 4]));
         let z = graph.slice(v, &[0, 0], &[-1, 2]); // numpy equivalent is v[:, 0:2]
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -590,7 +590,7 @@ fn slice() {
 #[test]
 fn split() {
     with(|graph| {
-        let v = graph.variable(ag::array::standard_normal(&[3, 7, 5]));
+        let v = graph.variable(ag::ndarray_ext::standard_normal(&[3, 7, 5]));
         let z = graph.split(v, &[2, 3, 2], 1);
         let g = graph.grad(&[&z[1]], &[v]);
         ag::test_helper::check_theoretical_grads(z[1], g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -600,7 +600,7 @@ fn split() {
 #[test]
 fn flatten() {
     with(|graph| {
-        let v = graph.variable(ag::array::standard_normal(&[4, 4]));
+        let v = graph.variable(ag::ndarray_ext::standard_normal(&[4, 4]));
         let z = graph.flatten(v);
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -610,7 +610,7 @@ fn flatten() {
 #[test]
 fn reshape() {
     with(|graph| {
-        let v = graph.variable(ag::array::standard_normal(&[4, 4]));
+        let v = graph.variable(ag::ndarray_ext::standard_normal(&[4, 4]));
         let z = graph.reshape(v, &[4, 2, 2]);
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
@@ -621,7 +621,7 @@ fn reshape() {
 #[should_panic]
 fn reshape_grad() {
     with(|graph| {
-        let v = graph.variable(ag::array::standard_normal(&[4, 4]));
+        let v = graph.variable(ag::ndarray_ext::standard_normal(&[4, 4]));
         let z = graph.reshape(&(v), &[4, 2, 2]);
         let g = graph.grad(&[z], &[v])[0];
         let gg = graph.grad(&[g], &[v]);
@@ -632,8 +632,8 @@ fn reshape_grad() {
 #[test]
 fn conv2d_transposea() {
     with(|graph| {
-        let x = graph.variable(ag::array::standard_normal(&[3, 2, 2, 2]));
-        let w = graph.variable(ag::array::standard_normal(&[2, 3, 2, 2]));
+        let x = graph.variable(ag::ndarray_ext::standard_normal(&[3, 2, 2, 2]));
+        let w = graph.variable(ag::ndarray_ext::standard_normal(&[2, 3, 2, 2]));
         let y = graph.conv2d_transpose(x, w, 0, 1);
         let g = graph.grad(&[y], &[w]);
         ag::test_helper::check_theoretical_grads(y, &g, &[w], &[], 1e-3, 1e-2);
@@ -644,8 +644,8 @@ fn conv2d_transposea() {
 #[should_panic]
 fn conv2d_transpose_filter_grad() {
     with(|graph| {
-        let x = graph.variable(ag::array::standard_normal(&[2, 2, 2, 2]));
-        let w = graph.variable(ag::array::standard_normal(&[2, 3, 2, 2]));
+        let x = graph.variable(ag::ndarray_ext::standard_normal(&[2, 2, 2, 2]));
+        let w = graph.variable(ag::ndarray_ext::standard_normal(&[2, 3, 2, 2]));
         let y = graph.conv2d_transpose(x, w, 0, 1);
         let g = graph.grad(&[y], &[w])[0];
         let gg = graph.grad(&[g], &[w]);
@@ -657,8 +657,8 @@ fn conv2d_transpose_filter_grad() {
 #[should_panic]
 fn conv2d_filter_grad() {
     with(|graph| {
-        let x = graph.variable(ag::array::standard_normal(&[2, 3, 5, 5]));
-        let w = graph.variable(ag::array::standard_normal(&[2, 3, 2, 2]));
+        let x = graph.variable(ag::ndarray_ext::standard_normal(&[2, 3, 5, 5]));
+        let w = graph.variable(ag::ndarray_ext::standard_normal(&[2, 3, 2, 2]));
         let y = graph.conv2d(x, w, 0, 1);
         let g = graph.grad(&[y], &[w])[0];
         let gg = graph.grad(&[g], &[w]);
@@ -669,10 +669,10 @@ fn conv2d_filter_grad() {
 #[test]
 fn conv2d_grad() {
     with(|graph| {
-        let x = graph.variable(ag::array::standard_normal(&[2, 3, 5, 5]));
-        let w = graph.variable(ag::array::standard_normal(&[2, 3, 2, 2]));
+        let x = graph.variable(ag::ndarray_ext::standard_normal(&[2, 3, 5, 5]));
+        let w = graph.variable(ag::ndarray_ext::standard_normal(&[2, 3, 2, 2]));
         let y = graph.conv2d(x, w, 0, 1);
-        let gy = graph.variable(ag::array::ones(&[2, 2, 2, 2]));
+        let gy = graph.variable(ag::ndarray_ext::ones(&[2, 2, 2, 2]));
         unsafe {
             let g = graph.grad_with_default(&[y], &[x], &[gy])[0];
             let gg = graph.grad(&[g], &[gy])[0];
@@ -684,8 +684,8 @@ fn conv2d_grad() {
 #[test]
 fn conv2d_xw_grad() {
     with(|graph| {
-        let x = graph.variable(ag::array::standard_normal(&[2, 3, 5, 5]));
-        let w = graph.variable(ag::array::standard_normal(&[2, 3, 2, 2]));
+        let x = graph.variable(ag::ndarray_ext::standard_normal(&[2, 3, 5, 5]));
+        let w = graph.variable(ag::ndarray_ext::standard_normal(&[2, 3, 2, 2]));
         let y = graph.conv2d(x, w, 0, 1);
         let g = graph.grad(&[y], &[w])[0];
         let gg = graph.grad(&[g], &[x]);
@@ -697,8 +697,8 @@ fn conv2d_xw_grad() {
 #[should_panic]
 fn conv2d_x_grad() {
     with(|graph| {
-        let x = graph.variable(ag::array::standard_normal(&[2, 3, 5, 5]));
-        let w = graph.variable(ag::array::standard_normal(&[2, 3, 2, 2]));
+        let x = graph.variable(ag::ndarray_ext::standard_normal(&[2, 3, 5, 5]));
+        let w = graph.variable(ag::ndarray_ext::standard_normal(&[2, 3, 2, 2]));
         let y = graph.conv2d(x, w, 0, 1);
         let g = graph.grad(&[y], &[x])[0];
         let gg = graph.grad(&[g], &[x]); // can't differentiate with x twice
@@ -709,8 +709,8 @@ fn conv2d_x_grad() {
 #[test]
 fn conv2d() {
     with(|graph| {
-        let x = graph.variable(ag::array::standard_normal(&[2, 3, 5, 5]));
-        let w = graph.variable(ag::array::standard_normal(&[2, 3, 3, 3]));
+        let x = graph.variable(ag::ndarray_ext::standard_normal(&[2, 3, 5, 5]));
+        let w = graph.variable(ag::ndarray_ext::standard_normal(&[2, 3, 3, 3]));
         let y = graph.conv2d(x, w, 1, 2);
         let g = graph.grad(&[y], &[x, w]);
         ag::test_helper::check_theoretical_grads(y, &g, &[x, w], &[], 1e-3, 1e-2);
@@ -720,7 +720,7 @@ fn conv2d() {
 #[test]
 fn max_pool2d() {
     with(|graph| {
-        let x = graph.variable(ag::array::range(&[2, 2, 3, 3]));
+        let x = graph.variable(ag::ndarray_ext::range(&[2, 2, 3, 3]));
         let y = graph.max_pool2d(x, 2, 0, 1);
         let g = graph.grad(&[y], &[x]);
         ag::test_helper::check_theoretical_grads(y, &g, &[x], &[], 1e-3, 1e-2);
@@ -730,8 +730,8 @@ fn max_pool2d() {
 #[test]
 fn max_pool2d_grad() {
     with(|graph| {
-        let arr_x = ag::array::range(&[2, 2, 3, 3]);
-        let arr_gx = ag::array::range(&[2, 2, 2, 2]);
+        let arr_x = ag::ndarray_ext::range(&[2, 2, 3, 3]);
+        let arr_gx = ag::ndarray_ext::range(&[2, 2, 2, 2]);
         let x = graph.variable(arr_x);
         let y = graph.max_pool2d(x, 2, 0, 1);
         let gy = graph.variable(arr_gx);
@@ -746,8 +746,8 @@ fn max_pool2d_grad() {
 #[test]
 fn tensordot() {
     with(|graph| {
-        let a = graph.variable(ag::array::standard_normal(&[3, 4, 5]));
-        let b = graph.constant(ag::array::standard_normal(&[4, 3, 2]));
+        let a = graph.variable(ag::ndarray_ext::standard_normal(&[3, 4, 5]));
+        let b = graph.constant(ag::ndarray_ext::standard_normal(&[4, 3, 2]));
         let c = graph.tensordot(a, b, &[1, 0], &[0, 1]);
         let g = graph.grad(&[c], &[a]);
         ag::test_helper::check_theoretical_grads(c, &g, &[a], &[], 1e-3, 1e-2);
@@ -760,11 +760,11 @@ fn primitive_back_propagation_through_time() {
         let max_sent = 3;
         let batch_size = 2;
 
-        let lookup_table = graph.variable(ag::array::standard_normal(&[5, 3]));
+        let lookup_table = graph.variable(ag::ndarray_ext::standard_normal(&[5, 3]));
         // (vector_dim -> vocab)
-        let wo = graph.variable(ag::array::standard_normal(&[3, 5]));
+        let wo = graph.variable(ag::ndarray_ext::standard_normal(&[3, 5]));
         // (vector_dim -> vector_dim)
-        let wh = graph.variable(ag::array::standard_normal(&[3, 3]));
+        let wh = graph.variable(ag::ndarray_ext::standard_normal(&[3, 3]));
 
         // -- build graph for BPTT --
         let mut loss_buf = vec![];
@@ -802,7 +802,7 @@ fn primitive_back_propagation_through_time() {
                         .into_dyn()
                         .view(),
                 ),
-                h_buf[0].given(ag::array::standard_normal(&[batch_size, 3]).view()),
+                h_buf[0].given(ag::ndarray_ext::standard_normal(&[batch_size, 3]).view()),
             ],
             1e-3,
             1e-3,

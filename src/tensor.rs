@@ -7,9 +7,9 @@ use crate::graph::Graph;
 use crate::op::GradientContext;
 use std::fmt;
 use std::hash::{Hash, Hasher};
+use std::marker::PhantomData;
 use std::ops::{Add, Div, Mul, Sub};
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
-use std::marker::PhantomData;
 
 /// Lazy N-dimensional array.
 ///
@@ -17,7 +17,7 @@ use std::marker::PhantomData;
 ///
 /// - created by operations of a `Graph`.
 /// - not evaluated until `Graph::eval` or `Tensor::eval` is called.
-/// - cheap to copy since it contains only refs to the owned internal objects.
+/// - cheap to `Copy` since it contains only refs to the owned internal objects.
 ///
 /// The builtin operations for tensors are provided as [Graph's methods](../graph/struct.Graph.html)
 #[derive(Clone, Copy)]
@@ -27,7 +27,7 @@ pub struct Tensor<'tensor, 'graph, F: Float> {
 }
 
 impl<'graph, 'tensor, F: Float> Tensor<'tensor, 'graph, F> {
-    /// Evaluates this tensor as an `ndarray::Array`.
+    /// Evaluates this tensor as an `ndarray::Array<F, ndarray::IxDyn>`.
     ///
     /// ```
     /// use ndarray::array;
@@ -65,8 +65,8 @@ impl<'graph, 'tensor, F: Float> Tensor<'tensor, 'graph, F> {
     /// });
     /// ```
     pub fn given<D>(self, value: ndarray::ArrayView<F, D>) -> crate::runtime::Feed<F>
-        where
-            D: ndarray::Dimension,
+    where
+        D: ndarray::Dimension,
     {
         assert!(
             self.is_placeholder(),
@@ -76,7 +76,7 @@ impl<'graph, 'tensor, F: Float> Tensor<'tensor, 'graph, F> {
     }
 
     #[inline]
-    /// Creates a new `TensorBuilder`.
+    /// Creates a new [TensorBuilder](struct.TensorBuilder.html)
     pub fn builder() -> TensorBuilder<F> {
         // Starts with default values
         TensorBuilder {
@@ -221,8 +221,14 @@ impl<'graph, 'tensor, F: Float> Tensor<'tensor, 'graph, F> {
     /// });
     /// ```
     #[inline]
-    pub fn raw_hook<FUN: Fn(&NdArrayView<F>) -> () + 'static + Send + Sync>(self, f: FUN) -> Tensor<'tensor, 'graph, F> {
-        self.register_hook(crate::hook::Raw { raw: f, phantom: PhantomData })
+    pub fn raw_hook<FUN: Fn(&NdArrayView<F>) -> () + 'static + Send + Sync>(
+        self,
+        f: FUN,
+    ) -> Tensor<'tensor, 'graph, F> {
+        self.register_hook(crate::hook::Raw {
+            raw: f,
+            phantom: PhantomData,
+        })
     }
 
     /// Returns the id of this tensor.
@@ -296,7 +302,7 @@ pub(crate) struct TensorInternal<T: Float> {
     pub(crate) id: usize,
 
     // Operation to evaluate this tensor.
-//    pub(crate) op: Arc<dyn op::Op<T> + Send + Sync>,
+    //    pub(crate) op: Arc<dyn op::Op<T> + Send + Sync>,
     pub(crate) op: Box<dyn op::Op<T> + Send + Sync>,
 
     // References to immediate predecessors.
@@ -344,7 +350,7 @@ pub(crate) struct TensorInternal<T: Float> {
 pub(crate) enum PersistentArray<'t, F: Float> {
     Variable(&'t RwLock<NdArray<F>>),
     Constant(&'t NdArray<F>),
-    None
+    None,
 }
 
 impl<T: Float> TensorInternal<T> {
@@ -519,37 +525,38 @@ impl<T: Float> fmt::Display for TensorInternal<T> {
     }
 }
 
-/// An input to a `Tensor`, which is actually a decorated tensor id.
+/// A decorated `Tensor` passed to `TensorBuilder::set_inputs`.
 ///
-///
-/// Each of `Tensor` holds its inputs as `Vec<Input>`.
+/// Use `new` to create an immutable input, or `new_mut` to create a modifiable one.
 #[derive(Clone, Debug)]
 pub struct Input {
     pub(crate) id: usize,
     pub(crate) mut_usage: bool,
-    pub(crate) is_placeholder: bool
+    pub(crate) is_placeholder: bool,
 }
 
 impl<'tensor, 'graph> Input {
     /// Instantiates a new immutable `Input` object.
+    ///
+    /// Run-time value of `val` is passed as an `ndarray::ArrayView` in `Op::compute`.
     #[inline]
     pub fn new<T: Float>(val: &Tensor<'tensor, 'graph, T>) -> Input {
         Input {
             id: val.id(),
             mut_usage: false,
-            is_placeholder: val.is_placeholder()
+            is_placeholder: val.is_placeholder(),
         }
     }
 
     /// Instantiates a new mutable `Input` object.
     ///
-    /// Mutable sign denotes that optimizers can modify the tensor.
+    /// Run-time value of `val` is passed as an `ArrayViewMut` in `Op::compute`.
     #[inline]
     pub fn new_mut<T: Float>(val: &Tensor<'tensor, 'graph, T>) -> Input {
         Input {
             id: val.id(),
             mut_usage: true,
-            is_placeholder: val.is_placeholder()
+            is_placeholder: val.is_placeholder(),
         }
     }
 
@@ -567,7 +574,33 @@ impl<'tensor, 'graph> Input {
     }
 }
 
-/// Builder for `ag::Tensor`
+/// Builder structure for `ag::Tensor` to play with custom ops.
+///
+/// Use [Tensor::builder](struct.Tensor.html#method.builder) to instanciate this.
+///
+/// ```
+/// use autograd as ag;
+/// use ag::tensor::Input;
+///
+/// struct DummyOp {
+///    a: f32
+/// }
+///
+/// impl ag::op::Op<f32> for DummyOp {
+///     fn compute(&self, _: &mut ag::op::ComputeContext<f32>) {}
+///     fn grad(&self, _: &mut ag::op::GradientContext<f32>) {}
+/// }
+///
+/// ag::with(|g: &mut ag::Graph<f32>| {
+///     let input = &g.zeros(&[0]);
+///     let my_output: ag::Tensor<_> = ag::Tensor::builder()
+///         .set_inputs(vec![
+///             Input::new(input), // immutable input
+///             Input::new_mut(input) // mutable input
+///         ])
+///         .build(g, DummyOp {a: 42.});
+/// });
+/// ```
 pub struct TensorBuilder<T: Float> {
     shape: Option<usize>,
     inputs: Vec<Input>,
@@ -643,82 +676,81 @@ fn test_build() {
 
 impl<'tensor, 'graph, T: Float> TensorBuilder<T> {
     #[inline]
-    pub fn set_known_shape(mut self, s: Vec<isize>) -> TensorBuilder<T> {
+    pub(crate) fn set_known_shape(mut self, s: Vec<isize>) -> TensorBuilder<T> {
         self.known_shape = Some(KnownShape::new(s));
         self
     }
 
     #[inline]
-    pub fn set_shape(mut self, s: &Tensor<'tensor, 'graph, T>) -> TensorBuilder<T> {
+    pub(crate) fn set_shape(mut self, s: &Tensor<'tensor, 'graph, T>) -> TensorBuilder<T> {
         self.shape = Some(s.id());
         self
     }
 
     #[inline]
-    pub fn set_differentiable(mut self, a: bool) -> TensorBuilder<T> {
-        self.can_have_gradient = a;
+    pub fn set_differentiable(mut self, differentiable: bool) -> TensorBuilder<T> {
+        self.can_have_gradient = differentiable;
         self
     }
 
     #[inline]
-    pub fn set_inputs_raw(mut self, a: Vec<Input>) -> TensorBuilder<T> {
+    /// Sets input tensors.
+    pub fn set_inputs(mut self, a: Vec<Input>) -> TensorBuilder<T> {
         self.inputs = a;
         self
     }
 
     #[inline]
-    pub fn set_inputs(mut self, a: &[&Tensor<T>]) -> TensorBuilder<T> {
+    /// Sets read-only input tensors.
+    pub(crate) fn set_ro_inputs(mut self, a: &[&Tensor<T>]) -> TensorBuilder<T> {
         self.inputs = a.into_iter().map(|&x| Input::new(x)).collect::<Vec<_>>();
-        // TODO: append xs to out_edges
         self
     }
 
     #[inline]
-    pub fn set_input_mut(mut self, val: &Tensor<T>) -> TensorBuilder<T> {
-        self.inputs = vec![Input::new_mut(val)];
-        self
-    }
-
-    #[inline]
-    pub fn set_input(mut self, val: &Tensor<T>) -> TensorBuilder<T> {
+    pub(crate) fn set_input(mut self, val: &Tensor<T>) -> TensorBuilder<T> {
         self.inputs = vec![Input::new(val)];
         self
     }
 
     #[inline]
-    pub fn set_is_placeholder(mut self, a: bool) -> TensorBuilder<T> {
+    pub(crate) fn set_is_placeholder(mut self, a: bool) -> TensorBuilder<T> {
         self.is_placeholder = a;
         self
     }
 
     #[inline]
-    pub fn set_constant_array(mut self, a: Arc<NdArray<T>>) -> TensorBuilder<T> {
+    pub(crate) fn set_constant_array(mut self, a: Arc<NdArray<T>>) -> TensorBuilder<T> {
         self.constant_array = Some(a);
         self
     }
 
     #[inline]
-    pub fn set_variable_array(mut self, a: Arc<RwLock<NdArray<T>>>) -> TensorBuilder<T> {
+    pub(crate) fn set_variable_array(mut self, a: Arc<RwLock<NdArray<T>>>) -> TensorBuilder<T> {
         self.variable_array = Some(a);
         self
     }
 
     #[inline]
-    pub fn set_input_indices(mut self, a: Vec<usize>) -> TensorBuilder<T> {
+    pub(crate) fn set_input_indices(mut self, a: Vec<usize>) -> TensorBuilder<T> {
         self.input_indices = Some(a);
         self
     }
 
     #[inline]
+    /// Sets inputs for backprop.
+    ///
+    /// Not required unless backprop-inputs are differs from normal-case inputs
     pub fn set_backprop_inputs(mut self, a: Vec<Input>) -> TensorBuilder<T> {
         self.backprop_inputs = Some(a);
         self
     }
 
     #[inline]
+    /// Finalizes this builder and creates a tensor with given `Op`, in the graph.
     pub fn build<O>(self, graph: &'graph Graph<T>, op: O) -> Tensor<'tensor, 'graph, T>
-        where
-            O: op::Op<T> + Send + Sync + 'static,
+    where
+        O: op::Op<T> + Send + Sync + 'static,
     {
         let rank = if self.inputs.len() == 0 {
             0
@@ -887,7 +919,7 @@ pub trait AsTensor<'tensor, 'graph: 'tensor, T: Float> {
 }
 
 impl<'graph: 'tensor, 'tensor, T: Float> AsTensor<'tensor, 'graph, T>
-for Tensor<'tensor, 'graph, T>
+    for Tensor<'tensor, 'graph, T>
 {
     fn as_tensor(&self, _: &'graph Graph<T>) -> Tensor<'tensor, 'graph, T> {
         *self
@@ -925,7 +957,7 @@ impl_as_tensor_for_array!(8);
 
 /// Trait to create constant (persistent) tensors.
 pub trait Constant<'tensor, 'scope: 'tensor, F: Float, Src: Sized> {
-    /// Creates a (persistent) constant tensor from an `NdArray` or `Arc<NdArray>`.
+    /// Creates a (persistent) constant tensor from an `NdArray`, or `Arc<NdArray>` to prevent move.
     ///
     /// ```
     /// use std::sync::Arc;
@@ -939,8 +971,8 @@ pub trait Constant<'tensor, 'scope: 'tensor, F: Float, Src: Sized> {
     /// ag::with(|g| {
     ///    // instantiate from NdArray
     ///    let v1: ag::Tensor<f64> = g.constant(v1);
-    ///    // instantiate from Arc<RwLock<NdArray>>
-    ///    let v2: ag::Tensor<f64> = g.constant(v2);
+    ///    // instantiate from `Arc<NdArray>` that allows ref-count.
+    ///    let v2: ag::Tensor<f64> = g.constant(v2.clone());
     ///    let y: ag::Tensor<f64> = 3. * v1 * v2;
     ///
     ///    assert_eq!(12., y.eval(&[]).unwrap()[0]);
@@ -951,12 +983,11 @@ pub trait Constant<'tensor, 'scope: 'tensor, F: Float, Src: Sized> {
 
 /// Trait to create variable (persistent) tensors.
 pub trait Variable<'tensor, 'scope: 'tensor, F: Float, Src: Sized> {
-    /// Creates a shared variable tensor from an `NdArray` or `Arc<RwLock<NdArray>>`.
+    /// Creates a shared variable tensor from an `NdArray`, or `Arc<RwLock<NdArray>>` to prevent move.
     ///
     /// A shared variable can be mutated with gradient descent methods
     /// implemented in `autograd::gradient_descent_ops`.
     /// For the usages, see https://github.com/perrier1034/rust-autograd/tree/master/examples.
-    ///
     /// ```
     /// use std::sync::{Arc, RwLock};
     /// use ndarray::{self, array, IxDyn, Ix1, Array};
@@ -964,7 +995,7 @@ pub trait Variable<'tensor, 'scope: 'tensor, F: Float, Src: Sized> {
     /// use ag::tensor::Variable;
     ///
     /// let v1: Array<f64, Ix1> = array![2.];
-    /// let v2: Arc<RwLock<Array<f64, IxDyn>>> = ag::array::shared(array![2.]);
+    /// let v2: Arc<RwLock<Array<f64, IxDyn>>> = ag::ndarray_ext::shared(array![2.]);
     ///
     /// ag::with(|g| {
     ///    // Instantiate from an NdArray
@@ -981,8 +1012,8 @@ pub trait Variable<'tensor, 'scope: 'tensor, F: Float, Src: Sized> {
 
 // method overload 1
 impl<'tensor, 'graph: 'tensor, F: Float>
-Constant<'tensor, 'graph, F, Arc<ndarray::Array<F, ndarray::IxDyn>>>
-for crate::graph::Graph<F>
+    Constant<'tensor, 'graph, F, Arc<ndarray::Array<F, ndarray::IxDyn>>>
+    for crate::graph::Graph<F>
 {
     #[inline]
     fn constant(
@@ -1013,8 +1044,8 @@ macro_rules! impl_constant_dim {
 
 // method overload 1
 impl<'tensor, 'graph: 'tensor, F: Float>
-Variable<'tensor, 'graph, F, Arc<RwLock<ndarray::Array<F, ndarray::IxDyn>>>>
-for crate::graph::Graph<F>
+    Variable<'tensor, 'graph, F, Arc<RwLock<ndarray::Array<F, ndarray::IxDyn>>>>
+    for crate::graph::Graph<F>
 {
     #[inline]
     fn variable(

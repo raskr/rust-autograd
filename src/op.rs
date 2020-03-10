@@ -3,7 +3,7 @@
 use crate::arrayvec::ArrayVec;
 use crate::ndarray_ext::{NdArrayView, NdArrayViewMut};
 use crate::tensor::{Tensor, TensorInternal};
-use crate::Float;
+use crate::{Float, NdArray};
 use std::any::type_name;
 use std::marker::PhantomData;
 use std::mem;
@@ -17,9 +17,7 @@ pub(crate) type Results<'v, T> =
     ArrayVec<[Result<crate::ArrRepr<'v, T>, ComputeException>; NUM_MAX_OUTPUT]>;
 
 #[derive(Clone, Copy, Debug)]
-/// Exception in an op's computation.
-///
-/// Note that this is *exception* more like error.
+/// Exception in `Op`'s computation.
 pub enum ComputeException {
     /// Computation finished correctly with no output (typically used for variable-optimizer's output)
     NoOutput,
@@ -29,12 +27,12 @@ pub enum ComputeException {
 ///
 /// # Implementing differentiable operations
 ///
-/// Many of well-known ops are pre-defined in `ag::ops`, but you can also
+/// Many of well-known ops are pre-defined in `Graph`, but you can also
 /// implement custom ops by hand.
 ///
 /// ```
-/// extern crate ndarray;
-/// extern crate autograd as ag;
+/// use ndarray;
+/// use autograd as ag;
 /// use ag::Graph;
 ///
 /// type NdArray<T: ag::Float> = ndarray::Array<T, ndarray::IxDyn>;
@@ -42,18 +40,18 @@ pub enum ComputeException {
 /// // Implements `Op` trait for `Sigmoid`.
 /// struct Sigmoid;
 ///
-/// impl<T: ag::Float> ag::Op<T> for Sigmoid {
+/// impl<T: ag::Float> ag::op::Op<T> for Sigmoid {
 ///     // In this method, any errors caused by bad user-inputs should results in "panic".
-///     // (`ag::op::ComputeException` represents an exception rather than an error.)
+///     // (`op::ComputeException` represents an exception rather than an error.)
 ///     fn compute(
 ///         &self,
 ///         ctx: &mut ag::op::ComputeContext<T>,
 ///     ) {
-///         let x = &ctx.input(0);
+///         let x: &ag::NdArrayView<_> = &ctx.input(0);
 ///         // Use `ndarray::Array::mapv` for element-wise computation.
 ///         let half = T::from(0.5).unwrap();
 ///         let y = x.mapv(move |a| ((a * half).tanh() * half) + half);
-///         ctx.append_output(Ok(ag::ArrRepr::Owned(y)));
+///         ctx.append_output(Ok(y));
 ///     }
 ///
 ///     fn grad(&self, ctx: &mut ag::op::GradientContext<T>) {
@@ -65,12 +63,14 @@ pub enum ComputeException {
 ///     }
 /// }
 ///
+///  use ag::tensor::Input;
+///
 /// // Symbolic `sigmoid` function for end-user.
-/// fn sigmoid<'graph: 'tensor, 'tensor, F: ag::Float>(x: &ag::Tensor<'tensor, 'graph, F>, g: &'graph ag::Graph<F>)
+/// fn sigmoid<'graph, 'tensor, F: ag::Float>(x: &ag::Tensor<'tensor, 'graph, F>, g: &'graph ag::Graph<F>)
 /// -> ag::Tensor<'tensor, 'graph, F> {
 ///     ag::Tensor::builder()
-///            .set_shape(&g.shape(x))
-///            .set_input(x).build(&g, Sigmoid)
+///            .set_inputs(vec![Input::new(x)])
+///            .build(g, Sigmoid)
 /// }
 /// ```
 pub trait Op<T: Float> {
@@ -128,7 +128,7 @@ impl<'v, T: Float> OpInput<'v, T> {
     }
 }
 
-/// Contains properties used for op's computation.
+/// Contains properties used for an `Op`'s computation.
 ///
 /// # Example
 ///
@@ -138,9 +138,9 @@ impl<'v, T: Float> OpInput<'v, T> {
 /// // Implementing `Op` trait for `Sigmoid`.
 /// struct Sigmoid;
 ///
-/// impl<T: ag::Float> ag::Op<T> for Sigmoid {
+/// impl<T: ag::Float> ag::op::Op<T> for Sigmoid {
 ///     // In this method, any errors caused by bad user-inputs should result in "panic".
-///     // (`ag::op::ComputeException` represents an exception rather than an error.)
+///     // (`ag::Op::ComputeException` represents an exception rather than an error.)
 ///     fn compute(
 ///         &self,
 ///         ctx: &mut ag::op::ComputeContext<T>,
@@ -150,7 +150,7 @@ impl<'v, T: Float> OpInput<'v, T> {
 ///         let half = T::from(0.5).unwrap();
 ///         let y = x.mapv(move |a| ((a * half).tanh() * half) + half);
 ///         // Put the computed result.
-///         ctx.append_output(Ok(ag::ArrRepr::Owned(y)));
+///         ctx.append_output(Ok(y));
 ///     }
 ///
 ///     fn grad(&self, ctx: &mut ag::op::GradientContext<T>) { /* ... */ }
@@ -240,21 +240,29 @@ impl<'s, 'k: 's, 'v: 's, T: Float> ComputeContext<'k, 'v, T> {
         }
     }
 
-    #[inline]
-    #[allow(dead_code)]
-    #[doc(hidden)]
-    pub fn set_output(
+    /// Appends an `ndarray::ArrayView` to the back of the output list of the current op.
+    ///
+    /// Implementors of `Op::compute` must not forget to call this method in `Op::compute`, otherwise panic occurs.
+    pub fn append_output_view(
         &mut self,
-        ys: ArrayVec<[Result<crate::ArrRepr<'v, T>, crate::op::ComputeException>; NUM_MAX_OUTPUT]>,
+        y: Result<NdArrayView<'v, T>, crate::op::ComputeException>,
     ) {
-        self.ys = ys;
+        match self.ys.try_push(y.map(crate::ArrRepr::View)) {
+            Ok(()) => {}
+            _ => {
+                panic!(
+                    "Bad op impl: reached the maximum number of output arrays ({})",
+                    NUM_MAX_OUTPUT
+                );
+            }
+        }
     }
 
     /// Appends an ndarray to the back of the output list of the current op.
     ///
     /// Implementors of `Op::compute` must not forget to call this method in `Op::compute`, otherwise panic occurs.
-    pub fn append_output(&mut self, y: Result<crate::ArrRepr<'v, T>, crate::op::ComputeException>) {
-        match self.ys.try_push(y) {
+    pub fn append_output(&mut self, y: Result<NdArray<T>, crate::op::ComputeException>) {
+        match self.ys.try_push(y.map(crate::ArrRepr::Owned)) {
             Ok(()) => {}
             _ => {
                 panic!(
@@ -272,7 +280,7 @@ impl<'s, 'k: 's, 'v: 's, T: Float> ComputeContext<'k, 'v, T> {
     }
 }
 
-/// Contains properties of this op used for gradient propagation.
+/// Contains properties of an `Op`'s gradient propagation.
 ///
 /// This is passed to an `Op` through `Op::grad`.
 /// `Op::grad` should provide the gradients of its inputs by calling `GradientContext::set_input_grads`.
@@ -282,7 +290,7 @@ impl<'s, 'k: 's, 'v: 's, T: Float> ComputeContext<'k, 'v, T> {
 ///
 /// struct Sigmoid;
 ///
-/// impl<T: ag::Float> ag::Op<T> for Sigmoid {
+/// impl<T: ag::Float> ag::op::Op<T> for Sigmoid {
 ///     fn compute(&self, ctx: &mut ag::op::ComputeContext<T>) { /* ... */ }
 ///
 ///     fn grad(&self, ctx: &mut ag::op::GradientContext<T>) {

@@ -145,7 +145,7 @@ macro_rules! impl_cmp_op {
                     }
                 };
 
-                ctx.append_output(Ok(crate::ArrRepr::Owned(ret)));
+                ctx.append_output(Ok(ret));
             }
 
             fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -200,7 +200,7 @@ fn min_max_grad<'a, 'b: 'a, T: Float>(
 impl<T: Float> op::Op<T> for Abs {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         let ret = ctx.input(0).map(|x| x.abs());
-        ctx.append_output(Ok(crate::ArrRepr::Owned(ret)));
+        ctx.append_output(Ok(ret));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -213,7 +213,7 @@ impl<T: Float> op::Op<T> for Abs {
 impl<T: Float> op::Op<T> for NegOp {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         let ret = ctx.input(0).map(|x| x.neg());
-        ctx.append_output(Ok(crate::ArrRepr::Owned(ret)));
+        ctx.append_output(Ok(ret));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -224,7 +224,7 @@ impl<T: Float> op::Op<T> for NegOp {
 impl<T: Float> op::Op<T> for Square {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         let ret = ctx.input(0).map(|&x| x * x);
-        ctx.append_output(Ok(crate::ArrRepr::Owned(ret)));
+        ctx.append_output(Ok(ret));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -236,7 +236,7 @@ impl<T: Float> op::Op<T> for Square {
 impl<T: Float> op::Op<T> for Reciprocal {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         let ret = ctx.input(0).map(|x| x.recip());
-        ctx.append_output(Ok(crate::ArrRepr::Owned(ret)));
+        ctx.append_output(Ok(ret));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -255,7 +255,7 @@ impl<T: Float> op::Op<T> for Sign {
                 x.signum()
             }
         });
-        ctx.append_output(Ok(crate::ArrRepr::Owned(ret)));
+        ctx.append_output(Ok(ret));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -266,7 +266,7 @@ impl<T: Float> op::Op<T> for Sign {
 impl<T: Float> op::Op<T> for Floor {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         let ret = ctx.input(0).map(|x| x.floor());
-        ctx.append_output(Ok(crate::ArrRepr::Owned(ret)));
+        ctx.append_output(Ok(ret));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -277,7 +277,7 @@ impl<T: Float> op::Op<T> for Floor {
 impl<T: Float> op::Op<T> for Ceil {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         let ret = ctx.input(0).map(|x| x.ceil());
-        ctx.append_output(Ok(crate::ArrRepr::Owned(ret)));
+        ctx.append_output(Ok(ret));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -290,7 +290,11 @@ impl<T: Float> op::Op<T> for Transpose {
         let perm = &ctx.input(1);
         let perm_len = perm.len();
         let x = ctx.input(0);
-        assert_eq!(x.ndim(), perm_len, "autograd::transpose: inputs's ndim and axes's length must match");
+        assert_eq!(
+            x.ndim(),
+            perm_len,
+            "autograd::transpose: inputs's ndim and axes's length must match"
+        );
 
         let ret = unsafe {
             let mut dims = crate::uninitialized_vec::<usize>(perm_len);
@@ -305,12 +309,12 @@ impl<T: Float> op::Op<T> for Transpose {
             x.permuted_axes(dims.as_slice())
         };
 
-        ctx.append_output(Ok(crate::ArrRepr::View(ret)));
+        ctx.append_output_view(Ok(ret));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
         let gx = Tensor::builder()
-            .set_inputs(&[&ctx.output_grad(), &ctx.input(1)])
+            .set_ro_inputs(&[&ctx.output_grad(), &ctx.input(1)])
             .set_shape(&ctx.graph().shape(&ctx.input(0)))
             .build(
                 ctx.graph(),
@@ -367,7 +371,7 @@ pub fn logsumexp_forward<T: Float>(x: &NdArrayView<T>, axis: isize, keep_dims: b
 impl<T: Float> op::Op<T> for LogSumExp {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         let ret = logsumexp_forward(&ctx.input(0), self.axis, self.keep_dims);
-        ctx.append_output(Ok(crate::ArrRepr::Owned(ret)));
+        ctx.append_output(Ok(ret));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -383,7 +387,7 @@ impl<T: Float> op::Op<T> for Pow<T> {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         let a = self.a;
         let ret = ctx.input(0).map(move |x| x.powf(a));
-        ctx.append_output(Ok(crate::ArrRepr::Owned(ret)));
+        ctx.append_output(Ok(ret));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -397,7 +401,7 @@ impl<T: Float> op::Op<T> for Pow<T> {
 impl<T: Float> op::Op<T> for Sqrt {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         let ret = ctx.input(0).map(|a| a.sqrt());
-        ctx.append_output(Ok(crate::ArrRepr::Owned(ret)));
+        ctx.append_output(Ok(ret));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -411,7 +415,7 @@ impl<T: Float> op::Op<T> for Sqrt {
 impl<T: Float> op::Op<T> for Log<T> {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         let ret = ctx.input(0).map(move |a| a.log(self.a));
-        ctx.append_output(Ok(crate::ArrRepr::Owned(ret)));
+        ctx.append_output(Ok(ret));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -422,7 +426,7 @@ impl<T: Float> op::Op<T> for Log<T> {
 impl<T: Float> op::Op<T> for Exp {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         let ret = ctx.input(0).map(|a| a.exp());
-        ctx.append_output(Ok(crate::ArrRepr::Owned(ret)));
+        ctx.append_output(Ok(ret));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -433,7 +437,7 @@ impl<T: Float> op::Op<T> for Exp {
 impl<T: Float> op::Op<T> for Atanh {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         let ret = ctx.input(0).map(|a| a.atanh());
-        ctx.append_output(Ok(crate::ArrRepr::Owned(ret)));
+        ctx.append_output(Ok(ret));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -447,7 +451,7 @@ impl<T: Float> op::Op<T> for Atanh {
 impl<T: Float> op::Op<T> for Acosh {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         let ret = ctx.input(0).map(|a| a.acosh());
-        ctx.append_output(Ok(crate::ArrRepr::Owned(ret)));
+        ctx.append_output(Ok(ret));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -461,7 +465,7 @@ impl<T: Float> op::Op<T> for Acosh {
 impl<T: Float> op::Op<T> for Asinh {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         let ret = ctx.input(0).map(|a| a.asinh());
-        ctx.append_output(Ok(crate::ArrRepr::Owned(ret)));
+        ctx.append_output(Ok(ret));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -475,7 +479,7 @@ impl<T: Float> op::Op<T> for Asinh {
 impl<T: Float> op::Op<T> for Tanh {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         let ret = ctx.input(0).map(|a| a.tanh());
-        ctx.append_output(Ok(crate::ArrRepr::Owned(ret)));
+        ctx.append_output(Ok(ret));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -488,7 +492,7 @@ impl<T: Float> op::Op<T> for Tanh {
 impl<T: Float> op::Op<T> for Cosh {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         let ret = ctx.input(0).map(|a| a.cosh());
-        ctx.append_output(Ok(crate::ArrRepr::Owned(ret)));
+        ctx.append_output(Ok(ret));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -501,7 +505,7 @@ impl<T: Float> op::Op<T> for Cosh {
 impl<T: Float> op::Op<T> for Sinh {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         let ret = ctx.input(0).map(|a| a.sinh());
-        ctx.append_output(Ok(crate::ArrRepr::Owned(ret)));
+        ctx.append_output(Ok(ret));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -514,7 +518,7 @@ impl<T: Float> op::Op<T> for Sinh {
 impl<T: Float> op::Op<T> for Atan {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         let ret = ctx.input(0).map(|a| a.atan());
-        ctx.append_output(Ok(crate::ArrRepr::Owned(ret)));
+        ctx.append_output(Ok(ret));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -529,7 +533,7 @@ impl<T: Float> op::Op<T> for Atan {
 impl<T: Float> op::Op<T> for Acos {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         let ret = ctx.input(0).map(|a| a.acos());
-        ctx.append_output(Ok(crate::ArrRepr::Owned(ret)));
+        ctx.append_output(Ok(ret));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -544,7 +548,7 @@ impl<T: Float> op::Op<T> for Acos {
 impl<T: Float> op::Op<T> for Asin {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         let ret = ctx.input(0).map(|a| a.asin());
-        ctx.append_output(Ok(crate::ArrRepr::Owned(ret)));
+        ctx.append_output(Ok(ret));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -558,7 +562,7 @@ impl<T: Float> op::Op<T> for Asin {
 impl<T: Float> op::Op<T> for Sin {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         let ret = ctx.input(0).map(|a| a.sin());
-        ctx.append_output(Ok(crate::ArrRepr::Owned(ret)));
+        ctx.append_output(Ok(ret));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -571,7 +575,7 @@ impl<T: Float> op::Op<T> for Sin {
 impl<T: Float> op::Op<T> for Cos {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         let ret = ctx.input(0).map(|a| a.cos());
-        ctx.append_output(Ok(crate::ArrRepr::Owned(ret)));
+        ctx.append_output(Ok(ret));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -585,7 +589,7 @@ impl<T: Float> op::Op<T> for Cos {
 impl<T: Float> op::Op<T> for Tan {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         let ret = ctx.input(0).map(|a| a.tan());
-        ctx.append_output(Ok(crate::ArrRepr::Owned(ret)));
+        ctx.append_output(Ok(ret));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {

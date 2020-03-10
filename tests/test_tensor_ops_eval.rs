@@ -164,18 +164,3 @@ fn test_batch_matmul_with_copy() {
         assert_eq!(ret.shape(), &[2, 2, 2]);
     });
 }
-
-#[test]
-fn test_hook() {
-    ag::with(|g| {
-        ag::with(|g: &mut Graph<_>| {
-            let a: ag::Tensor<f32> = g.ones(&[60]);
-            let b: ag::Tensor<f32> = g.ones(&[24]);
-            let c: ag::Tensor<f32> = g.reshape(a, &[3, 4, 5]);
-            let d: ag::Tensor<f32> = g.reshape(b, &[4, 3, 2]);
-            let e: ag::Tensor<f32> = g.tensordot(c, d, &[1, 0], &[0, 1]);
-            e.eval(&[]);  // Getting `ndarray::Array` here.
-        });
-
-    });
-}

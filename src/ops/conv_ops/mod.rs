@@ -20,8 +20,8 @@ pub mod max_pool2d;
 use crate::ndarray_ext::{get_batch_ptrs, get_batch_ptrs_mut};
 #[cfg(feature = "mkl")]
 use crate::ops::mkl_ffi::{
-    CBLAS_ROW_MAJOR, CblasTranspose::CblasTrans, CblasTranspose::CblasNoTrans,
-    MklInt, cblas_sgemm, cblas_dgemm, cblas_dgemm_batch, cblas_sgemm_batch
+    cblas_dgemm, cblas_dgemm_batch, cblas_sgemm, cblas_sgemm_batch, CblasTranspose::CblasNoTrans,
+    CblasTranspose::CblasTrans, MklInt, CBLAS_ROW_MAJOR,
 };
 
 #[test]

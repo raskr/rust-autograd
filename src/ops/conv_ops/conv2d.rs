@@ -24,8 +24,16 @@ pub struct Conv2DWithCols {
 #[cfg(feature = "mkl")]
 // inputs must be row-major matrices
 fn fast_col_x_filter_kernel<F: Float>(
-    cols: &[F], filter: &[F], y: &mut [F],
-    xch: usize, ych: usize, yh: usize, yw: usize, kh: usize, kw: usize, batch_size: usize,
+    cols: &[F],
+    filter: &[F],
+    y: &mut [F],
+    xch: usize,
+    ych: usize,
+    yh: usize,
+    yw: usize,
+    kh: usize,
+    kw: usize,
+    batch_size: usize,
 ) {
     // params for blas gemm
     let m = ych as MklInt;
@@ -62,8 +70,16 @@ fn fast_col_x_filter_kernel<F: Float>(
 
 #[cfg(not(feature = "mkl"))]
 fn slow_col_x_filter_kernel<F: Float>(
-    cols: &[F], filter: &[F], y: &mut [F],
-    xch: usize, ych: usize, yh: usize, yw: usize, kh: usize, kw: usize, batch_size: usize,
+    cols: &[F],
+    filter: &[F],
+    y: &mut [F],
+    xch: usize,
+    ych: usize,
+    yh: usize,
+    yw: usize,
+    kh: usize,
+    kw: usize,
+    batch_size: usize,
 ) {
     let size_per_batch_y = ych * yh * yw;
     let m = ych;
@@ -73,39 +89,49 @@ fn slow_col_x_filter_kernel<F: Float>(
     let (rsb, csb) = (n, 1);
     let (rsc, csc) = (n, 1);
     let size_per_batch_cols = xch * kw * kh * yh * yw;
-    macro_rules! kernel_call_def { ($ty:ty, $f:ident) => {
-        if crate::same_type::<$ty, F>() {
-            (0..batch_size).into_par_iter().for_each(|i| {
-                unsafe {
-                    // for each batch
-                    let cols_target: *const F = &cols[i * size_per_batch_cols];
-                    let y_target: *mut F = mem::transmute(&y[i * size_per_batch_y]);
-                    matrixmultiply::$f(
-                        m,
-                        k,
-                        n,
-                        1.,
-                        filter.as_ptr() as *const $ty,
-                        rsa as isize,
-                        csa as isize,
-                        cols_target as *const $ty,
-                        rsb as isize,
-                        csb as isize,
-                        0.,
-                        y_target as *mut $ty,
-                        rsc as isize,
-                        csc as isize,
-                    );
-                }
-            });
-        }
-    }}
+    macro_rules! kernel_call_def {
+        ($ty:ty, $f:ident) => {
+            if crate::same_type::<$ty, F>() {
+                (0..batch_size).into_par_iter().for_each(|i| {
+                    unsafe {
+                        // for each batch
+                        let cols_target: *const F = &cols[i * size_per_batch_cols];
+                        let y_target: *mut F = mem::transmute(&y[i * size_per_batch_y]);
+                        matrixmultiply::$f(
+                            m,
+                            k,
+                            n,
+                            1.,
+                            filter.as_ptr() as *const $ty,
+                            rsa as isize,
+                            csa as isize,
+                            cols_target as *const $ty,
+                            rsb as isize,
+                            csb as isize,
+                            0.,
+                            y_target as *mut $ty,
+                            rsc as isize,
+                            csc as isize,
+                        );
+                    }
+                });
+            }
+        };
+    }
     kernel_call_def!(f32, sgemm);
     kernel_call_def!(f64, dgemm);
 }
 
 struct Conv2DParams {
-    batch_size: usize, xch: usize, xh: usize, xw: usize, ych: usize, yh: usize, yw: usize, kh: usize, kw: usize
+    batch_size: usize,
+    xch: usize,
+    xh: usize,
+    xw: usize,
+    ych: usize,
+    yh: usize,
+    yw: usize,
+    kh: usize,
+    kw: usize,
 }
 
 // Panics for invalid inputs
@@ -119,7 +145,10 @@ fn conv2d_extract_params<F: Float>(
     dilation_h: usize,
     dilation_w: usize,
 ) -> Conv2DParams {
-    assert!(crate::same_type::<F, f32>() || crate::same_type::<F, f64>(), "autograd::conv2d: only f32 and f64 are supported.");
+    assert!(
+        crate::same_type::<F, f32>() || crate::same_type::<F, f64>(),
+        "autograd::conv2d: only f32 and f64 are supported."
+    );
     // Extract size params
     let (batch_size, xch, xh, xw) = {
         let x_shape = x.shape();
@@ -148,7 +177,17 @@ fn conv2d_extract_params<F: Float>(
     };
     let yh = (xh + 2 * pad_h - (dilation_h * (kh - 1) + 1)) / stride_h + 1;
     let yw = (xw + 2 * pad_w - (dilation_w * (kw - 1) + 1)) / stride_w + 1;
-    Conv2DParams{batch_size, xch, xh, xw, ych, yh, yw, kh, kw}
+    Conv2DParams {
+        batch_size,
+        xch,
+        xh,
+        xw,
+        ych,
+        yh,
+        yw,
+        kh,
+        kw,
+    }
 }
 
 /// Returns: (conv result, im2col result)
@@ -162,10 +201,20 @@ fn conv2d_impl<F: Float>(
     stride_w: usize,
     dilation_h: usize,
     dilation_w: usize,
-) -> (NdArray<F>, NdArray<F>)
-{
-    let Conv2DParams{batch_size, xch, xh, xw, ych, yh, yw, kh, kw} =
-        conv2d_extract_params(x, w, pad_h, pad_w, stride_h, stride_w, dilation_h, dilation_w);
+) -> (NdArray<F>, NdArray<F>) {
+    let Conv2DParams {
+        batch_size,
+        xch,
+        xh,
+        xw,
+        ych,
+        yh,
+        yw,
+        kh,
+        kw,
+    } = conv2d_extract_params(
+        x, w, pad_h, pad_w, stride_h, stride_w, dilation_h, dilation_w,
+    );
 
     let copied_x = ndarray_ext::copy_if_dirty(x);
     let copied_w = ndarray_ext::copy_if_dirty(w);
@@ -177,28 +226,54 @@ fn conv2d_impl<F: Float>(
     let w_p = unsafe { slice::from_raw_parts(w_p, w.len()) };
 
     // move vectors into ndarrays
-    let cols = im2col_batch(x_p, batch_size, xch as i32, xh as i32, xw as i32,
-                            kh as i32, kw as i32, pad_h as i32, pad_w as i32, stride_h as i32,
-                            stride_w as i32, dilation_h as i32, dilation_w as i32,
+    let cols = im2col_batch(
+        x_p,
+        batch_size,
+        xch as i32,
+        xh as i32,
+        xw as i32,
+        kh as i32,
+        kw as i32,
+        pad_h as i32,
+        pad_w as i32,
+        stride_h as i32,
+        stride_w as i32,
+        dilation_h as i32,
+        dilation_w as i32,
     );
 
     unsafe {
         let size_per_batch_y = ych * yh * yw;
         let mut y = uninitialized_vec(batch_size * size_per_batch_y);
         let f;
-        #[cfg(feature = "mkl")] { f = fast_col_x_filter_kernel; }
-        #[cfg(not(feature = "mkl"))] { f = slow_col_x_filter_kernel; }
-        f(cols.as_slice(), w_p, y.as_mut_slice(), xch, ych, yh, yw, kh, kw, batch_size);
+        #[cfg(feature = "mkl")]
+        {
+            f = fast_col_x_filter_kernel;
+        }
+        #[cfg(not(feature = "mkl"))]
+        {
+            f = slow_col_x_filter_kernel;
+        }
+        f(
+            cols.as_slice(),
+            w_p,
+            y.as_mut_slice(),
+            xch,
+            ych,
+            yh,
+            yw,
+            kh,
+            kw,
+            batch_size,
+        );
         let y = NdArray::from_shape_vec_unchecked(IxDyn(&[batch_size, ych, yh, yw]), y);
-        let cols = NdArray::from_shape_vec_unchecked(IxDyn(&[batch_size, xch, kw, kh, yh, yw]), cols);
+        let cols =
+            NdArray::from_shape_vec_unchecked(IxDyn(&[batch_size, xch, kw, kh, yh, yw]), cols);
         (y, cols)
     }
 }
 
-fn conv2d_with_cols_impl<F: Float>(
-    cols: &NdArrayView<F>,
-    w: &NdArrayView<F>,
-) -> NdArray<F> {
+fn conv2d_with_cols_impl<F: Float>(cols: &NdArrayView<F>, w: &NdArrayView<F>) -> NdArray<F> {
     // Extract size params
     let cols_shape = cols.shape();
     let k_shape = w.shape();
@@ -217,9 +292,26 @@ fn conv2d_with_cols_impl<F: Float>(
     unsafe {
         let mut y = uninitialized_vec(batch_size * size_per_batch_y);
         let f;
-        #[cfg(feature = "mkl")] { f = fast_col_x_filter_kernel; }
-        #[cfg(not(feature = "mkl"))] { f = slow_col_x_filter_kernel; }
-        f(cols.as_slice().unwrap(), w_slice, y.as_mut_slice(), xch, ych, yh, yw, kh, kw, batch_size);
+        #[cfg(feature = "mkl")]
+        {
+            f = fast_col_x_filter_kernel;
+        }
+        #[cfg(not(feature = "mkl"))]
+        {
+            f = slow_col_x_filter_kernel;
+        }
+        f(
+            cols.as_slice().unwrap(),
+            w_slice,
+            y.as_mut_slice(),
+            xch,
+            ych,
+            yh,
+            yw,
+            kh,
+            kw,
+            batch_size,
+        );
         NdArray::from_shape_vec(ndarray::IxDyn(&[batch_size, ych, yh, yw]), y).unwrap()
     }
 }
@@ -230,9 +322,18 @@ impl<T: Float> crate::op::Op<T> for Conv2D {
         // Grab inputs
         let x = &ctx.input(0);
         let w = &ctx.input(1);
-        let (y, cols) = conv2d_impl(x, w, self.pad, self.pad, self.stride, self.stride, self.dilation, self.dilation);
-        ctx.append_output(Ok(crate::ArrRepr::Owned(y)));
-        ctx.append_output(Ok(crate::ArrRepr::Owned(cols)));
+        let (y, cols) = conv2d_impl(
+            x,
+            w,
+            self.pad,
+            self.pad,
+            self.stride,
+            self.stride,
+            self.dilation,
+            self.dilation,
+        );
+        ctx.append_output(Ok(y));
+        ctx.append_output(Ok(cols));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -242,7 +343,7 @@ impl<T: Float> crate::op::Op<T> for Conv2D {
         let x = ctx.input(0);
         let w = ctx.input(1);
 
-        let gx = Tensor::builder().set_inputs(&[&gy, &w]).build(
+        let gx = Tensor::builder().set_ro_inputs(&[&gy, &w]).build(
             s,
             super::conv2d_transpose::Conv2DTranspose {
                 pad: self.pad,
@@ -253,7 +354,7 @@ impl<T: Float> crate::op::Op<T> for Conv2D {
 
         let cols = s.nth_tensor(y, 1);
         let gw = Tensor::builder()
-            .set_inputs(&[&cols, &gy, &w])
+            .set_ro_inputs(&[&cols, &gy, &w])
             .set_backprop_inputs(vec![Input::new(&x), Input::new(&gy)])
             .build(
                 s,
@@ -275,7 +376,7 @@ impl<T: Float> crate::op::Op<T> for Conv2DWithCols {
         let cols = &ctx.input(0);
         let w = &ctx.input(1);
         let y = conv2d_with_cols_impl(cols, w);
-        ctx.append_output(Ok(crate::ArrRepr::Owned(y)));
+        ctx.append_output(Ok(y));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -285,7 +386,7 @@ impl<T: Float> crate::op::Op<T> for Conv2DWithCols {
         let gy = ctx.output_grad();
         let s = ctx.graph();
 
-        let gx = Tensor::builder().set_inputs(&[&gy, &w]).build(
+        let gx = Tensor::builder().set_ro_inputs(&[&gy, &w]).build(
             s,
             super::conv2d_transpose::Conv2DTranspose {
                 pad: self.pad,
@@ -295,7 +396,7 @@ impl<T: Float> crate::op::Op<T> for Conv2DWithCols {
         );
 
         let gw = Tensor::builder()
-            .set_inputs(&[&cols, &gy, &w])
+            .set_ro_inputs(&[&cols, &gy, &w])
             .set_backprop_inputs(vec![
                 Input::new(&y.get_backprop_inputs()[0].get(s)),
                 Input::new(&gy),
@@ -318,7 +419,6 @@ fn conv2d_filter_grad_impl<F: Float>(
     gy: &NdArrayView<F>,
     w: &NdArrayView<F>,
 ) -> NdArray<F> {
-
     let k_shape = w.shape();
     let cols_shape = cols.shape();
     let gy_shape = gy.shape();
@@ -337,46 +437,68 @@ fn conv2d_filter_grad_impl<F: Float>(
         let mut gw = uninitialized_vec::<F>(ych * xch * kh * kw);
         let gw_head: *mut F = gw.as_mut_ptr();
 
-        #[cfg(feature = "mkl")] {
+        #[cfg(feature = "mkl")]
+        {
             let m = ych as MklInt;
             let n = (kh * kw * xch) as MklInt;
             let k = (yh * yw) as MklInt;
-            macro_rules! kernel_call_def { ($ty:ty, $f:ident) => {
-                if crate::same_type::<$ty, F>() {
-                    for i in 0..batch_size {
-                        $f(CBLAS_ROW_MAJOR, CblasNoTrans, CblasTrans, m, n, k, 1.,
-                           gy.offset((i * size_per_batch_g) as isize) as *const $ty, k,
-                        cols.offset((i * size_per_batch_c) as isize) as *const $ty, k,
-                        if i == 0 { 0. } else { 1. },
-                        gw_head as *mut $ty, n);
+            macro_rules! kernel_call_def {
+                ($ty:ty, $f:ident) => {
+                    if crate::same_type::<$ty, F>() {
+                        for i in 0..batch_size {
+                            $f(
+                                CBLAS_ROW_MAJOR,
+                                CblasNoTrans,
+                                CblasTrans,
+                                m,
+                                n,
+                                k,
+                                1.,
+                                gy.offset((i * size_per_batch_g) as isize) as *const $ty,
+                                k,
+                                cols.offset((i * size_per_batch_c) as isize) as *const $ty,
+                                k,
+                                if i == 0 { 0. } else { 1. },
+                                gw_head as *mut $ty,
+                                n,
+                            );
+                        }
                     }
-                }
-            }}
+                };
+            }
             kernel_call_def!(f32, cblas_sgemm);
             kernel_call_def!(f64, cblas_dgemm);
         }
-        #[cfg(not(feature = "mkl"))] {
+        #[cfg(not(feature = "mkl"))]
+        {
             let (m, n, k) = (ych, kh * kw * xch, yh * yw);
             let (rsa, csa) = (k, 1);
             let (rsb, csb) = (1, k);
             let (rsc, csc) = (n, 1);
-            macro_rules! kernel_call_def { ($ty:ty, $f:ident) => {
-                if crate::same_type::<$ty, F>() {
-                    for i in 0..batch_size {
-                        matrixmultiply::$f(
-                            m, k, n,
-                            1.,  // alpha
-                            gy.offset((i * size_per_batch_g) as isize) as *const $ty, // a
-                            rsa as isize, csa as isize,
-                            cols.offset((i * size_per_batch_c) as isize) as *const $ty, // b
-                            rsb as isize, csb as isize,
-                            if i == 0 { 0. } else { 1. }, // beta
-                            gw_head as *mut $ty,  // c
-                            rsc as isize, csc as isize,
-                        );
+            macro_rules! kernel_call_def {
+                ($ty:ty, $f:ident) => {
+                    if crate::same_type::<$ty, F>() {
+                        for i in 0..batch_size {
+                            matrixmultiply::$f(
+                                m,
+                                k,
+                                n,
+                                1.,                                                       // alpha
+                                gy.offset((i * size_per_batch_g) as isize) as *const $ty, // a
+                                rsa as isize,
+                                csa as isize,
+                                cols.offset((i * size_per_batch_c) as isize) as *const $ty, // b
+                                rsb as isize,
+                                csb as isize,
+                                if i == 0 { 0. } else { 1. }, // beta
+                                gw_head as *mut $ty,          // c
+                                rsc as isize,
+                                csc as isize,
+                            );
+                        }
                     }
-                }
-            }}
+                };
+            }
             kernel_call_def!(f32, sgemm);
             kernel_call_def!(f64, dgemm);
         }
@@ -391,7 +513,7 @@ impl<T: Float> crate::op::Op<T> for Conv2DFilterGrad {
         let gy = &ctx.input(1);
         let w = &ctx.input(2);
         let gw = conv2d_filter_grad_impl(cols, gy, w);
-        ctx.append_output(Ok(crate::ArrRepr::Owned(gw)));
+        ctx.append_output(Ok(gw));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -402,7 +524,7 @@ impl<T: Float> crate::op::Op<T> for Conv2DFilterGrad {
         let s = ctx.graph();
 
         // grad grad
-        let gx = Tensor::builder().set_inputs(&[&gy, &ggw]).build(
+        let gx = Tensor::builder().set_ro_inputs(&[&gy, &ggw]).build(
             s,
             super::conv2d_transpose::Conv2DTranspose {
                 pad: self.pad,
@@ -412,7 +534,7 @@ impl<T: Float> crate::op::Op<T> for Conv2DFilterGrad {
         );
 
         let ggy = Tensor::builder()
-            .set_inputs(&[&cols, &ggw])
+            .set_ro_inputs(&[&cols, &ggw])
             .set_backprop_inputs(vec![
                 Input::new(&y.get_backprop_inputs()[0].get(s)),
                 Input::new(&ggw),

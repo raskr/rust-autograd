@@ -1,8 +1,9 @@
 extern crate autograd as ag;
 extern crate ndarray;
 
-use ag::array;
+use ag::ndarray_ext as array;
 use ag::optimizers::adam;
+use ag::rand::seq::SliceRandom;
 use ag::tensor::Variable;
 use ag::Graph;
 use ndarray::s;
@@ -50,6 +51,12 @@ fn inputs(g: &Graph<f32>) -> (Tensor, Tensor) {
     (x, y)
 }
 
+fn get_permutation(size: usize) -> Vec<usize> {
+    let mut perm: Vec<usize> = (0..size).collect();
+    perm.shuffle(&mut rand::thread_rng());
+    perm
+}
+
 fn main() {
     let ((x_train, y_train), (x_test, y_test)) = dataset::load();
 
@@ -85,15 +92,14 @@ fn main() {
             &adam::Adam::default().compute_updates(params, grads, &adam_state, g);
 
         for epoch in 0..max_epoch {
-            timeit!({
-                let perm = ag::ndarray_ext::permutation(num_batches) * batch_size as usize;
-                for i in perm.into_iter() {
-                    let i = *i as isize;
-                    let x_batch = x_train.slice(s![i..i + batch_size, .., .., ..]).into_dyn();
-                    let y_batch = y_train.slice(s![i..i + batch_size, ..]).into_dyn();
-                    g.eval(update_ops, &[x.given(x_batch), y.given(y_batch)]);
-                }
-            });
+            //            timeit!({
+            for mut i in get_permutation(num_batches) {
+                let i = i as isize * batch_size;
+                let x_batch = x_train.slice(s![i..i + batch_size, .., .., ..]).into_dyn();
+                let y_batch = y_train.slice(s![i..i + batch_size, ..]).into_dyn();
+                g.eval(update_ops, &[x.given(x_batch), y.given(y_batch)]);
+            }
+            //            });
             println!("finish epoch {}", epoch);
         }
 

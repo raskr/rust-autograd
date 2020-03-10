@@ -207,8 +207,8 @@ impl<T: Float> crate::op::Op<T> for MaxPool2D {
         };
         let output = NdArray::from_shape_vec(ndarray::IxDyn(&[batch, c, yh, yw]), output);
         let indices = NdArray::from_shape_vec(ndarray::IxDyn(&[batch, c, yh, yw]), indices);
-        ctx.append_output(Ok(crate::ArrRepr::Owned(output.unwrap())));
-        ctx.append_output(Ok(crate::ArrRepr::Owned(indices.unwrap())));
+        ctx.append_output(Ok(output.unwrap()));
+        ctx.append_output(Ok(indices.unwrap()));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -216,7 +216,7 @@ impl<T: Float> crate::op::Op<T> for MaxPool2D {
         let gy = &ctx.output_grad();
         let y = &ctx.output();
         let indices = s.nth_tensor(y, 1);
-        let gx = Tensor::builder().set_inputs(&[gy, &indices]).build(
+        let gx = Tensor::builder().set_ro_inputs(&[gy, &indices]).build(
             s,
             MaxPool2DGrad {
                 pad: self.pad,
@@ -250,14 +250,14 @@ impl<T: Float> crate::op::Op<T> for MaxPool2DGrad {
             panic!("MaxPoolGrad supports only f32 and f64");
         };
         let gx = NdArray::from_shape_vec(ndarray::IxDyn(&[batch, c, xh, xw]), gx);
-        ctx.append_output(Ok(crate::ArrRepr::Owned(gx.unwrap())));
+        ctx.append_output(Ok(gx.unwrap()));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
         let ggx = &ctx.output_grad();
         let s = ctx.graph();
         let argmax = &ctx.input(1);
-        let ggy = Tensor::builder().set_inputs(&[&ggx, argmax]).build(
+        let ggy = Tensor::builder().set_ro_inputs(&[&ggx, argmax]).build(
             s,
             MaxPool2DGradGrad {
                 pad: self.pad,
@@ -294,7 +294,7 @@ impl<T: Float> crate::op::Op<T> for MaxPool2DGradGrad {
             };
             NdArray::from_shape_vec(ndarray::IxDyn(&[batch, c, yh, yw]), ggy).unwrap()
         };
-        ctx.append_output(Ok(crate::ArrRepr::Owned(ggy)));
+        ctx.append_output(Ok(ggy));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {

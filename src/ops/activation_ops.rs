@@ -57,10 +57,7 @@ pub fn softmax_forward<T: Float>(x: &NdArrayView<T>, axis: isize) -> NdArray<T> 
 
 impl<T: Float> op::Op<T> for Softmax {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
-        let ret = Ok(crate::ArrRepr::Owned(softmax_forward(
-            &ctx.input(0),
-            self.axis,
-        )));
+        let ret = Ok(softmax_forward(&ctx.input(0), self.axis));
         ctx.append_output(ret)
     }
 
@@ -77,9 +74,7 @@ impl<T: Float> op::Op<T> for Softplus {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         use std::f64;
         let e = T::from(f64::consts::E).unwrap();
-        let ret = Ok(crate::ArrRepr::Owned(
-            ctx.input(0).map(move |a| (a.exp() + T::one()).log(e)),
-        ));
+        let ret = Ok(ctx.input(0).map(move |a| (a.exp() + T::one()).log(e)));
         ctx.append_output(ret)
     }
 
@@ -96,10 +91,9 @@ impl<T: Float> op::Op<T> for Softplus {
 impl<T: Float> op::Op<T> for Sigmoid {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         let half = T::from(0.5).unwrap();
-        let ret = Ok(crate::ArrRepr::Owned(
-            ctx.input(0)
-                .mapv(move |a| ((a * half).tanh() * half) + half),
-        ));
+        let ret = Ok(ctx
+            .input(0)
+            .mapv(move |a| ((a * half).tanh() * half) + half));
         ctx.append_output(ret)
     }
 
@@ -113,9 +107,7 @@ impl<T: Float> op::Op<T> for Sigmoid {
 
 impl<T: Float> op::Op<T> for ReLU {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
-        let ret = Ok(crate::ArrRepr::Owned(
-            ctx.input(0).map(|a| a.max(T::zero())),
-        ));
+        let ret = Ok(ctx.input(0).map(|a| a.max(T::zero())));
         ctx.append_output(ret);
     }
 
@@ -130,8 +122,8 @@ impl<T: Float> op::Op<T> for ReLU {
 impl<T: Float> op::Op<T> for Identity {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         // do nothing
-        let ret = Ok(crate::ArrRepr::View(ctx.input(0)));
-        ctx.append_output(ret)
+        let ret = Ok(ctx.input(0));
+        ctx.append_output_view(ret)
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -150,14 +142,13 @@ impl<T: Float> op::Op<T> for ELU<T> {
                 self.alpha * (a.exp() - T::one())
             }
         });
-        let ret = Ok(crate::ArrRepr::Owned(ret));
-        ctx.append_output(ret)
+        ctx.append_output(Ok(ret))
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
         let gy = &ctx.output_grad();
         let gx = Tensor::builder()
-            .set_inputs(&[&ctx.input(0), gy])
+            .set_ro_inputs(&[&ctx.input(0), gy])
             .set_shape(&ctx.graph().shape(gy))
             .build(ctx.graph(), ELUGrad { alpha: self.alpha });
         ctx.set_input_grads(vec![Some(gx)]);
@@ -174,7 +165,7 @@ impl<T: Float> op::Op<T> for ELUGrad<T> {
                 self.alpha * (a.exp() - T::one()) + self.alpha
             }
         });
-        let ret = Ok(crate::ArrRepr::Owned(a * &ctx.input(1)));
+        let ret = Ok(a * &ctx.input(1));
         ctx.append_output(ret)
     }
 

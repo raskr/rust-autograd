@@ -11,8 +11,8 @@ impl ag::op::Op<f32> for MultiOutputOp {
     fn compute(&self, ctx: &mut ag::op::ComputeContext<f32>) {
         let a = ag::ndarray_ext::zeros(&[2, 3]);
         let b = ag::ndarray_ext::zeros(&[1, 3]);
-        ctx.append_output(Ok(ag::ArrRepr::Owned(a)));
-        ctx.append_output(Ok(ag::ArrRepr::Owned(b)));
+        ctx.append_output(Ok(a));
+        ctx.append_output(Ok(b));
     }
 
     fn grad(&self, ctx: &mut ag::op::GradientContext<f32>) {

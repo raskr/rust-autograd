@@ -16,8 +16,8 @@ pub struct LogSoftmax {
 impl<T: Float> op::Op<T> for LogSoftmax {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         let x = &ctx.input(0);
-        ctx.append_output(Ok(crate::ArrRepr::Owned(
-            x - &crate::ops::math_ops::logsumexp_forward(&x, self.axis, true),
+        ctx.append_output(Ok(x - &crate::ops::math_ops::logsumexp_forward(
+            &x, self.axis, true,
         )));
     }
 
@@ -44,7 +44,7 @@ impl<T: Float> op::Op<T> for SigmoidCrossEntropy {
         let mut tmp: NdArray<T> =
             x.mapv(move |a| ((-a.abs()).exp() + T::one()).log(e) + max_fn(T::zero(), a));
         tmp -= &(t * x);
-        ctx.append_output(Ok(crate::ArrRepr::Owned(tmp)));
+        ctx.append_output(Ok(tmp));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -86,8 +86,8 @@ impl<T: Float> op::Op<T> for SparseSoftmaxCrossEntropy {
             .into_shape(ndarray::IxDyn(&[log_x.shape()[0], 1]))
             .unwrap();
 
-        ctx.append_output(Ok(crate::ArrRepr::Owned(ret)));
-        ctx.append_output(Ok(crate::ArrRepr::Owned(log_x)));
+        ctx.append_output(Ok(ret));
+        ctx.append_output(Ok(log_x));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -97,7 +97,7 @@ impl<T: Float> op::Op<T> for SparseSoftmaxCrossEntropy {
         let log_x = s.nth_tensor(ctx.output(), 1);
 
         let gx1 = Tensor::builder()
-            .set_inputs(&[&log_x, &t, &gy])
+            .set_ro_inputs(&[&log_x, &t, &gy])
             .build(s, SparseSoftmaxCrossEntropyGrad);
 
         // gx2 won't be used in most cases.
@@ -124,7 +124,7 @@ impl<T: Float> op::Op<T> for SparseSoftmaxCrossEntropyGrad {
 
         let gy = &ctx.input(2);
         x *= gy;
-        ctx.append_output(Ok(crate::ArrRepr::Owned(x)));
+        ctx.append_output(Ok(x));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -142,12 +142,10 @@ impl<T: Float> op::Op<T> for SoftmaxCrossEntropy {
         assert_eq!(t.ndim(), 2, "t must be 2-ranked tensor");
         // - t log x ( =(batch, num_classes))
         let minus_one = T::one().neg();
-        ctx.append_output(Ok(crate::ArrRepr::Owned(
-            (t * &log_x)
-                .sum_axis(ndarray::Axis(1))
-                .mapv(move |elem| elem * minus_one),
-        )));
-        ctx.append_output(Ok(crate::ArrRepr::Owned(log_x)));
+        ctx.append_output(Ok((t * &log_x)
+            .sum_axis(ndarray::Axis(1))
+            .mapv(move |elem| elem * minus_one)));
+        ctx.append_output(Ok(log_x));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {

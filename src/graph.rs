@@ -62,6 +62,7 @@ impl<'a, 'b, F: Float> Graph<F> {
     // Removes all tensors (nodes) in this graph.
     //
     // Be careful not to remove tensors that will be needed later.
+    #[allow(dead_code)]
     fn clear(&mut self) {
         unsafe {
             (&mut *self.node_set.get()).clear();
@@ -84,9 +85,9 @@ impl<'a, 'b, F: Float> Graph<F> {
 ///
 /// This is the only way to access [Graph](struct.Graph.html) instances.
 pub fn with<F, FN>(f: FN)
-    where
-        F: Float,
-        FN: FnOnce(&mut Graph<F>) -> () + Send,
+where
+    F: Float,
+    FN: FnOnce(&mut Graph<F>) -> () + Send,
 {
     let mut g = Graph {
         node_set: UnsafeCell::new(Vec::with_capacity(128)),

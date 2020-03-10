@@ -12,7 +12,9 @@ description = "Tensors and differentiable operations in Rust"
 documentation = "https://docs.rs/autograd/"
 
 [dependencies]
-rand = "0.3.15"
+rand = "0.7.0"
+rand_xoshiro = "0.4"
+rand_distr = "0.2.2"
 ndarray = "0.12.1"
 glob = "0.2"
 rayon = "1.0"

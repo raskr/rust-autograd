@@ -1,4 +1,4 @@
-//! A small extension of rust-ndarray
+//! A small extension of [ndarray](https://github.com/rust-ndarray/ndarray)
 //!
 //! Mainly provides `array_gen`, which is a collection of array generator functions.
 use crate::Float;
@@ -19,32 +19,12 @@ pub use crate::array_gen::*;
 
 /// `Op::compute`'s output
 #[derive(Clone)]
-pub enum ArrRepr<'v, T: Float> {
+pub(crate) enum ArrRepr<'v, T: Float> {
     /// Represents `ndarray::Array<T: Float, ndarray::IxDyn>`
     Owned(NdArray<T>),
 
     /// Represents `ndarray::ArrayView<'a, T: Float, ndarray::IxDyn>`
     View(NdArrayView<'v, T>),
-}
-
-impl<'v, T: Float> ArrRepr<'v, T> {
-    #[inline]
-    pub fn to_owned(&'v self) -> NdArray<T> {
-        use crate::ArrRepr::*;
-        match self {
-            Owned(v) => v.clone(),
-            View(v) => v.to_owned(),
-        }
-    }
-
-    #[inline]
-    pub fn view(&'v self) -> NdArrayView<'v, T> {
-        use crate::ArrRepr::*;
-        match self {
-            Owned(v) => v.view(),
-            View(v) => v.clone(),
-        }
-    }
 }
 
 /// Helper to use ndarrays for variable tensors.
@@ -54,7 +34,7 @@ impl<'v, T: Float> ArrRepr<'v, T> {
 ///
 /// ```
 /// use autograd as ag;
-/// use ag::array;
+/// use ag::ndarray_ext as array;
 /// use ag::tensor::Variable;
 /// use ndarray;
 /// use std::sync::{Arc, RwLock};
@@ -249,36 +229,29 @@ pub(crate) fn get_batch_ptrs<A: Float, B>(
 /// A collection of array generator functions.
 pub mod array_gen {
     use super::*;
-    use rand::distributions::IndependentSample;
-    use rand::{self, Rng, XorShiftRng};
+    use rand::distributions::Distribution;
+    use rand::SeedableRng;
+    use rand::{self, Rng};
+    use rand_distr;
+    use rand_xoshiro::Xoshiro256StarStar;
     use std::marker::PhantomData;
     use std::sync::Mutex;
-
-    /// Range.
-    pub fn range<T: Float>(shape: &[usize]) -> NdArray<T> {
-        let prod: usize = shape.iter().product();
-        NdArray::<T>::from_shape_vec(
-            ndarray::IxDyn(shape),
-            (0..prod).map(|a| T::from(a).unwrap()).collect::<Vec<_>>(),
-        )
-        .unwrap()
-    }
 
     /// Internal object to create ndarrays whose elements are random numbers.
     ///
     /// This is actually a wrapper of an arbitrary `rand::Rng`.
     /// You can use custom `Rng` with `new` function, whereas `default` function is provided;
     /// see https://github.com/raskr/rust-autograd/issues/1.
-    pub struct ArrRng<T: Float, R: Rng + Send = XorShiftRng> {
+    pub struct ArrRng<T: Float, R: Rng + Send> {
         phantom: PhantomData<T>,
         rng: Mutex<R>,
     }
 
-    impl<T: Float> Default for ArrRng<T, XorShiftRng> {
+    impl<T: Float> Default for ArrRng<T, Xoshiro256StarStar> {
         fn default() -> Self {
             ArrRng {
                 phantom: PhantomData,
-                rng: Mutex::new(rand::weak_rng()),
+                rng: Mutex::new(Xoshiro256StarStar::seed_from_u64(42)),
             }
         }
     }
@@ -302,26 +275,17 @@ pub mod array_gen {
         /// Generates `ndarray::Array<T, ndarray::IxDyn>` whose elements are random numbers.
         pub fn gen_random_array<I>(&self, shape: &[usize], dist: I) -> NdArray<T>
         where
-            I: IndependentSample<f64>,
+            I: Distribution<f64>,
         {
             let size: usize = shape.into_iter().cloned().product();
             let mut rng = self.rng.lock().unwrap();
             unsafe {
                 let mut buf = Self::alloc(size);
                 for i in 0..size {
-                    *buf.get_unchecked_mut(i) = T::from(dist.ind_sample(&mut *rng)).unwrap();
+                    *buf.get_unchecked_mut(i) = T::from(dist.sample(&mut *rng)).unwrap();
                 }
                 NdArray::from_shape_vec(shape, buf).unwrap()
             }
-        }
-
-        pub fn permutation(&mut self, size: usize) -> ndarray::Array1<usize> {
-            let mut data: Vec<usize> = (0..size).collect();
-            let slice = data.as_mut_slice();
-
-            let mut rng = self.rng.lock().unwrap();
-            rng.shuffle(slice);
-            ndarray::Array1::<usize>::from_vec(slice.to_vec())
         }
 
         pub fn random_normal(
@@ -330,7 +294,7 @@ pub mod array_gen {
             mean: f64,
             stddev: f64,
         ) -> ndarray::Array<T, ndarray::IxDyn> {
-            let normal = rand::distributions::Normal::new(mean, stddev);
+            let normal = rand_distr::Normal::new(mean, stddev).unwrap();
             self.gen_random_array(shape, normal)
         }
 
@@ -340,42 +304,42 @@ pub mod array_gen {
             min: f64,
             max: f64,
         ) -> ndarray::Array<T, ndarray::IxDyn> {
-            let range = rand::distributions::Range::new(min, max);
+            let range = rand_distr::Uniform::new(min, max);
             self.gen_random_array(shape, range)
         }
 
         pub fn standard_normal(&self, shape: &[usize]) -> ndarray::Array<T, ndarray::IxDyn> {
-            let normal = rand::distributions::Normal::new(0., 1.);
+            let normal = rand_distr::Normal::new(0., 1.).unwrap();
             self.gen_random_array(shape, normal)
         }
 
         pub fn standard_uniform(&self, shape: &[usize]) -> ndarray::Array<T, ndarray::IxDyn> {
-            let dist = rand::distributions::Range::new(0., 1.);
+            let dist = rand_distr::Uniform::new(0., 1.);
             self.gen_random_array(shape, dist)
         }
 
         pub fn glorot_normal(&self, shape: &[usize]) -> ndarray::Array<T, ndarray::IxDyn> {
             assert_eq!(shape.len(), 2);
             let s = 1. / (shape[0] as f64).sqrt();
-            let normal = rand::distributions::Normal::new(0., s);
+            let normal = rand_distr::Normal::new(0., s).unwrap();
             self.gen_random_array(shape, normal)
         }
 
         pub fn glorot_uniform(&self, shape: &[usize]) -> ndarray::Array<T, ndarray::IxDyn> {
             assert_eq!(shape.len(), 2);
             let s = (6. / shape[0] as f64).sqrt();
-            let uniform = rand::distributions::Range::new(-s, s);
+            let uniform = rand_distr::Uniform::new(-s, s);
             self.gen_random_array(shape, uniform)
         }
 
         pub fn bernoulli(&self, shape: &[usize], p: f64) -> ndarray::Array<T, ndarray::IxDyn> {
-            let dist = rand::distributions::Range::new(0., 1.);
+            let dist = rand_distr::Uniform::new(0., 1.);
             let mut rng = self.rng.lock().unwrap();
             let size: usize = shape.into_iter().cloned().product();
             unsafe {
                 let mut buf = Self::alloc(size);
                 for i in 0..size {
-                    let val = dist.ind_sample(&mut *rng);
+                    let val = dist.sample(&mut *rng);
                     *buf.get_unchecked_mut(i) = T::from(i32::from(val < p)).unwrap();
                 }
                 NdArray::from_shape_vec(shape, buf).unwrap()
@@ -387,7 +351,7 @@ pub mod array_gen {
             shape: &[usize],
             lambda: f64,
         ) -> ndarray::Array<T, ndarray::IxDyn> {
-            let dist = rand::distributions::Exp::new(lambda);
+            let dist = rand_distr::Exp::new(lambda).unwrap();
             self.gen_random_array(shape, dist)
         }
 
@@ -397,7 +361,7 @@ pub mod array_gen {
             mean: f64,
             stddev: f64,
         ) -> ndarray::Array<T, ndarray::IxDyn> {
-            let dist = rand::distributions::LogNormal::new(mean, stddev);
+            let dist = rand_distr::LogNormal::new(mean, stddev).unwrap();
             self.gen_random_array(shape, dist)
         }
 
@@ -407,19 +371,19 @@ pub mod array_gen {
             shape_param: f64,
             scale: f64,
         ) -> ndarray::Array<T, ndarray::IxDyn> {
-            let dist = rand::distributions::Gamma::new(shape_param, scale);
+            let dist = rand_distr::Gamma::new(shape_param, scale).unwrap();
             self.gen_random_array(shape, dist)
         }
     }
 
     #[inline]
-    /// Zeros.
+    /// Creates an ndarray filled with 0s.
     pub fn zeros<T: Float>(shape: &[usize]) -> ndarray::Array<T, ndarray::IxDyn> {
         NdArray::from_elem(shape, T::zero())
     }
 
     #[inline]
-    /// Ones.
+    /// Creates an ndarray filled with 1s.
     pub fn ones<T: Float>(shape: &[usize]) -> ndarray::Array<T, ndarray::IxDyn> {
         NdArray::from_elem(shape, T::one())
     }
@@ -431,13 +395,7 @@ pub mod array_gen {
     }
 
     #[inline]
-    /// Permutation.
-    pub fn permutation(size: usize) -> ndarray::Array1<usize> {
-        ArrRng::<f64>::default().permutation(size)
-    }
-
-    #[inline]
-    /// Creates an ndarray sampled from a normal distribution with given params.
+    /// Creates an ndarray sampled from the normal distribution with given params.
     pub fn random_normal<T: Float>(
         shape: &[usize],
         mean: f64,
@@ -447,7 +405,7 @@ pub mod array_gen {
     }
 
     #[inline]
-    /// Creates an ndarray sampled from a uniform distribution with given params.
+    /// Creates an ndarray sampled from the uniform distribution with given params.
     pub fn random_uniform<T: Float>(
         shape: &[usize],
         min: f64,
@@ -480,13 +438,13 @@ pub mod array_gen {
         ArrRng::default().glorot_uniform(shape)
     }
 
-    /// Creates an ndarray sampled from a bernoulli distribution with given params.
+    /// Creates an ndarray sampled from the bernoulli distribution with given params.
     #[inline]
     pub fn bernoulli<T: Float>(shape: &[usize], p: f64) -> ndarray::Array<T, ndarray::IxDyn> {
         ArrRng::default().bernoulli(shape, p)
     }
 
-    /// Creates an ndarray sampled from an exponential distribution with given params.
+    /// Creates an ndarray sampled from the exponential distribution with given params.
     #[inline]
     pub fn exponential<T: Float>(
         shape: &[usize],
@@ -495,7 +453,7 @@ pub mod array_gen {
         ArrRng::default().exponential(shape, lambda)
     }
 
-    /// Creates an ndarray sampled from a log normal distribution with given params.
+    /// Creates an ndarray sampled from the log normal distribution with given params.
     #[inline]
     pub fn log_normal<T: Float>(
         shape: &[usize],
@@ -505,7 +463,7 @@ pub mod array_gen {
         ArrRng::default().log_normal(shape, mean, stddev)
     }
 
-    /// Creates an ndarray sampled from a gamma distribution with given params.
+    /// Creates an ndarray sampled from the gamma distribution with given params.
     #[inline]
     pub fn gamma<T: Float>(
         shape: &[usize],

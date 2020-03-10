@@ -1,8 +1,68 @@
+//! Differentiable operations and tensors backed by [ndarray](https://github.com/rust-ndarray/ndarray).
+//! ## Installation
+//!
+//! ```toml
+//! [dependencies]
+//! autograd = { version = "0.9.8", features = ["mkl"] }
+//! ```
+//!
+//! `mkl` feature is recommended to speedup gemm operations using [Intel MKL](https://software.intel.com/en-us/mkl).
+//!
+//! ## Features
+//! ### Lazy, zero-copy tensor evaluation
+//! Computation graphs are created on the fly (a.k.a. *define-by-run*), but are not evaluated until `Tensor::eval` or `ag::eval` is called.
+//! This mechanism balances better performance and flexibility.
+//! ```rust
+//! use autograd as ag;
+//!
+//! ag::with(|g: &mut ag::Graph<_>| {
+//!     let a: ag::Tensor<f32> = g.ones(&[60]);
+//!     let b: ag::Tensor<f32> = g.ones(&[24]);
+//!     let c: ag::Tensor<f32> = g.reshape(a, &[3, 4, 5]);
+//!     let d: ag::Tensor<f32> = g.reshape(b, &[4, 3, 2]);
+//!     let e: ag::Tensor<f32> = g.tensordot(c, d, &[1, 0], &[0, 1]);
+//!     let result: ag::ndarray::Array<_, _> = e.eval(&[]).unwrap();  // Getting `ndarray::Array` here.
+//! });
+//! ```
+//!
+//! ### Reverse-mode automatic differentiation
+//! There are a lot of [built-in operations](https://docs.rs/autograd/0.9.8/autograd/ops/index.html)
+//! that support *higher-order* derivatives, and
+//! you can also [define your own differentiable ops](https://docs.rs/autograd/0.9.8/autograd/op/trait.Op.html) with ndarrays easily.
+//!
+//! Here we are just computing partial derivatives of `z = 2x^2 + 3y + 1`.
+//!
+//! ```rust
+//! use autograd as ag;
+//!
+//! # fn main() {
+//! ag::with(|g: &mut ag::Graph<_>| {
+//!     let x = g.placeholder(&[]);
+//!     let y = g.placeholder(&[]);
+//!     let z = 2.*x*x + 3.*y + 1.;
+//!
+//!     // dz/dy
+//!     let gy = &g.grad(&[z], &[y])[0];
+//!     println!("{:?}", gy.eval(&[]));   // => Some(3.)
+//!
+//!     // dz/dx (requires to fill the placeholder `x`)
+//!     let gx = &g.grad(&[z], &[x])[0];
+//!     let feed = ag::ndarray::arr0(2.);
+//!     println!("{:?}", gx.eval(&[x.given(feed.view())]));  // => Some(8.)
+//!     // ddz/dx (differentiates `z` again)
+//!     let ggx = &g.grad(&[gx], &[x])[0];
+//!     println!("{:?}", ggx.eval(&[]));  // => Some(4.)
+//! });
+//! # }
+//! ```
+//!
+
 #[allow(unused_imports)]
 // Expose to prevent version conflict
 #[macro_use(s)]
+/// re-exported for convenience and version-compatibility
 pub extern crate ndarray;
-pub extern crate arrayvec;
+pub(crate) extern crate arrayvec;
 extern crate crossbeam;
 extern crate hashbrown;
 #[cfg(feature = "mkl")]
@@ -12,7 +72,10 @@ extern crate libc;
 extern crate matrixmultiply;
 extern crate num;
 extern crate num_traits;
-extern crate rand;
+/// re-exported for convenience and version-compatibility
+pub extern crate rand;
+extern crate rand_distr;
+extern crate rand_xoshiro;
 extern crate rayon;
 extern crate rustc_hash;
 
@@ -97,17 +160,13 @@ pub(crate) fn same_type<A: 'static, B: 'static>() -> bool {
 
 pub use crate::ndarray_ext::array_gen;
 
-pub use crate::ndarray_ext as array;
-
-pub use crate::op::Op;
-
 pub use crate::ndarray_ext::{NdArray, NdArrayView, NdArrayViewMut};
 
 pub use crate::runtime::{Eval, Feed};
 
 pub use crate::tensor::Tensor;
 
-pub use crate::ndarray_ext::ArrRepr;
+pub(crate) use crate::ndarray_ext::ArrRepr;
 
 pub use crate::graph::{with, Graph};
 

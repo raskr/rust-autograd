@@ -26,9 +26,9 @@ impl<T: Float> op::Op<T> for PreprocessBinOpGrad {
         let x_shape = x_shape_.as_slice();
         let gy_shape = gy.shape();
 
-        let ret = if x_shape == gy_shape {
+        if x_shape == gy_shape {
             // The case where forward path didn't cause broadcast.
-            Ok(crate::ArrRepr::View(gy.clone()))
+            ctx.append_output_view(Ok(gy.clone()));
         } else {
             // Broadcast occurred. We need reduction of `gy`.
             // First, handle the case where x is scalar.
@@ -66,14 +66,13 @@ impl<T: Float> op::Op<T> for PreprocessBinOpGrad {
                 // case of x_axis == gy_axis: nothing to do
             }
             // TODO
-            Ok(crate::ArrRepr::Owned(folded.unwrap()))
+            ctx.append_output(Ok(folded.unwrap()));
         };
-        ctx.append_output(ret);
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
         let gx = Tensor::builder()
-            .set_inputs(&[&ctx.output_grad(), &ctx.input(1)])
+            .set_ro_inputs(&[&ctx.output_grad(), &ctx.input(1)])
             .build(ctx.graph(), PreprocessBinOpGradGrad);
         ctx.set_input_grads(vec![Some(gx), None]);
     }
@@ -89,7 +88,7 @@ impl<T: Float> op::Op<T> for PreprocessBinOpGradGrad {
 
         let gy = ctx.input(0);
         if gy.shape() == target_shape {
-            ctx.append_output(Ok(crate::ArrRepr::View(gy)));
+            ctx.append_output_view(Ok(gy));
             return;
         }
 
@@ -106,7 +105,7 @@ impl<T: Float> op::Op<T> for PreprocessBinOpGradGrad {
 
         // do broadcast
         if let Some(ret) = gy.broadcast(target_shape) {
-            ctx.append_output(Ok(crate::ArrRepr::Owned(ret.to_owned())));
+            ctx.append_output(Ok(ret.to_owned()));
         } else {
             panic!("Cant't broadcast.");
         }
@@ -114,7 +113,7 @@ impl<T: Float> op::Op<T> for PreprocessBinOpGradGrad {
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
         let gx = Tensor::builder()
-            .set_inputs(&[&ctx.input(0), &ctx.output_grad()])
+            .set_ro_inputs(&[&ctx.input(0), &ctx.output_grad()])
             .build(ctx.graph(), PreprocessBinOpGrad);
         ctx.set_input_grads(vec![Some(gx), None]);
     }
@@ -144,11 +143,11 @@ impl<T: Float> op::Op<T> for SubOp {
         let ret = if shape0 == [] {
             // is scalar
             let x0_elem = x0[ndarray::IxDyn(&[])];
-            crate::ArrRepr::Owned(x1.map(move |&a| x0_elem - a))
+            Ok(x1.map(move |&a| x0_elem - a))
         } else {
-            crate::ArrRepr::Owned(&x0 - &x1)
+            Ok(&x0 - &x1)
         };
-        ctx.append_output(Ok(ret));
+        ctx.append_output(ret);
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -197,7 +196,7 @@ impl<T: Float> op::Op<T> for DivOp {
         } else {
             x0 / x1
         };
-        ctx.append_output(Ok(crate::ArrRepr::Owned(ret)));
+        ctx.append_output(Ok(ret));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -222,11 +221,11 @@ fn preprocess_gy<'a, 'b: 'a, 'c, T: Float>(
     c: &'b Graph<T>,
 ) -> (Tensor<'a, 'b, T>, Tensor<'a, 'b, T>) {
     let gy0 = Tensor::builder()
-        .set_inputs(&[gy, shape0])
+        .set_ro_inputs(&[gy, shape0])
         .set_shape(shape0)
         .build(c, PreprocessBinOpGrad);
     let gy1 = Tensor::builder()
-        .set_inputs(&[gy, shape1])
+        .set_ro_inputs(&[gy, shape1])
         .set_shape(shape1)
         .build(c, PreprocessBinOpGrad);
     (gy0, gy1)
@@ -234,7 +233,7 @@ fn preprocess_gy<'a, 'b: 'a, 'c, T: Float>(
 
 macro_rules! impl_bin_op_forward {
     ($forward_name:ident, $bin_op:tt) => {
-        fn $forward_name<'v, T: Float>(x0: &NdArrayView<'v, T>, x1: &NdArrayView<'v, T>) -> crate::ArrRepr<'v, T>
+        fn $forward_name<'v, T: Float>(x0: &NdArrayView<'v, T>, x1: &NdArrayView<'v, T>) -> NdArray<T>
         {
             let shape0: &[usize]  = x0.shape();
             let shape1: &[usize]  = x1.shape();
@@ -261,7 +260,7 @@ macro_rules! impl_bin_op_forward {
             } else {
                 x0 $bin_op x1
             };
-            crate::ArrRepr::Owned(ret)
+            ret
         }
     };
 }

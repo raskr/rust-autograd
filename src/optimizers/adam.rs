@@ -1,3 +1,4 @@
+//! Adam optimizer
 use crate::ops::gradient_descent_ops::adam;
 use crate::tensor::{Input, Tensor, Variable};
 use crate::Float;
@@ -12,13 +13,13 @@ use std::sync::{Arc, RwLock};
 /// ```
 /// extern crate autograd as ag;
 /// use ag::tensor::Variable;
-/// use ag::array::shared;
+/// use ag::ndarray_ext::shared;
 /// use std::sync::{Arc, RwLock};
 /// use ag::optimizers::adam;
 ///
 /// // Define parameters to optimize.
-/// let w: Arc<RwLock<ag::NdArray<f32>>> = shared(ag::array::glorot_uniform(&[28 * 28, 10]));
-/// let b: Arc<RwLock<ag::NdArray<f32>>> = shared(ag::array::zeros(&[1, 10]));
+/// let w: Arc<RwLock<ag::NdArray<f32>>> = shared(ag::ndarray_ext::glorot_uniform(&[28 * 28, 10]));
+/// let b: Arc<RwLock<ag::NdArray<f32>>> = shared(ag::ndarray_ext::zeros(&[1, 10]));
 /// // Make a state of adam.
 /// let state = adam::AdamState::new(&[&w, &b]);
 ///
@@ -91,7 +92,7 @@ impl<'t, 's: 't, F: Float> Adam<F> {
 
             ret.push(
                 Tensor::builder()
-                    .set_inputs_raw(vec![
+                    .set_inputs(vec![
                         Input::new_mut(param),
                         Input::new(&grads[i]),
                         Input::new_mut(&m),

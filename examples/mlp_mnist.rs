@@ -1,8 +1,9 @@
 extern crate autograd as ag;
 extern crate ndarray;
 
-use ag::array;
+use ag::ndarray_ext as array;
 use ag::optimizers::adam;
+use ag::rand::seq::SliceRandom;
 use ag::tensor::Variable;
 use ag::Graph;
 use ndarray::s;
@@ -36,6 +37,13 @@ fn inputs(g: &Graph<f32>) -> (Tensor, Tensor) {
     (x, y)
 }
 
+// e.g. [4, 0, 2, 1, 3], given size = 5
+fn get_permutation(size: usize) -> Vec<usize> {
+    let mut perm: Vec<usize> = (0..size).collect();
+    perm.shuffle(&mut rand::thread_rng());
+    perm
+}
+
 // Writing in define-by-run style for fun.
 fn main() {
     let ((x_train, y_train), (x_test, y_test)) = dataset::load();
@@ -50,27 +58,26 @@ fn main() {
     let num_batches = num_samples / batch_size as usize;
 
     for epoch in 0..max_epoch {
-        timeit!({
-            ag::with(|g| {
-                let w = g.variable(w_arr.clone());
-                let b = g.variable(b_arr.clone());
-                let (x, y) = inputs(g);
-                let z = g.matmul(x, w) + b;
-                let loss = g.sparse_softmax_cross_entropy(z, &y);
-                let grads = &g.grad(&[&loss], &[w, b]);
-                let update_ops: &[Tensor] =
-                    &adam::Adam::default().compute_updates(&[w, b], grads, &adam_state, g);
+        //        timeit!({
+        ag::with(|g| {
+            let w = g.variable(w_arr.clone());
+            let b = g.variable(b_arr.clone());
+            let (x, y) = inputs(g);
+            let z = g.matmul(x, w) + b;
+            let loss = g.sparse_softmax_cross_entropy(z, &y);
+            let grads = &g.grad(&[&loss], &[w, b]);
+            let update_ops: &[Tensor] =
+                &adam::Adam::default().compute_updates(&[w, b], grads, &adam_state, g);
 
-                let perm = ag::ndarray_ext::permutation(num_batches) * batch_size as usize;
-                for i in perm.into_iter() {
-                    let i = *i as isize;
-                    let x_batch = x_train.slice(s![i..i + batch_size, ..]).into_dyn();
-                    let y_batch = y_train.slice(s![i..i + batch_size, ..]).into_dyn();
-                    g.eval(update_ops, &[x.given(x_batch), y.given(y_batch)]);
-                }
-                println!("finish epoch {}", epoch);
-            });
+            for mut i in get_permutation(num_batches) {
+                let i = i as isize * batch_size;
+                let x_batch = x_train.slice(s![i..i + batch_size, ..]).into_dyn();
+                let y_batch = y_train.slice(s![i..i + batch_size, ..]).into_dyn();
+                g.eval(update_ops, &[x.given(x_batch), y.given(y_batch)]);
+            }
+            println!("finish epoch {}", epoch);
         });
+        //        });
     }
 
     ag::with(|g| {

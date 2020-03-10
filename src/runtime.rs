@@ -1,13 +1,13 @@
 use crate::ndarray_ext::{NdArray, NdArrayView};
 use crate::op::{ComputeContext, OpInput};
-use crate::tensor::{Tensor, TensorInternal, PersistentArray};
+use crate::tensor::{PersistentArray, Tensor, TensorInternal};
 use crate::{hashbrown::hash_map::Entry, FxHashMap, FxHashSet};
 use crate::{Float, Graph};
 use crossbeam::crossbeam_channel;
-use std::ops::Deref;
 use std::cell::UnsafeCell;
 use std::mem;
-use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard, Arc, TryLockError};
+use std::ops::Deref;
+use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard, TryLockError};
 
 /// Helper structure for batched evaluation.
 ///
@@ -28,7 +28,6 @@ use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard, Arc, TryLockError};
 ///        .extend(&[y, z])
 ///        .feed(&[a.given(ndarray::arr0(2.).view())])
 ///        .run();  // Do eval
-///
 ///    });
 /// ```
 pub struct Eval<'v, 'f, 't, 's, F: Float> {
@@ -51,8 +50,8 @@ impl<'f, 't, 'v, 's: 't, F: Float> Eval<'v, 'f, 't, 's, F> {
     #[inline]
     /// Appends a tensor to the back of the evaluation targets.
     pub fn push<A>(&mut self, x: A) -> &mut Self
-        where
-            A: AsRef<Tensor<'t, 's, F>>,
+    where
+        A: AsRef<Tensor<'t, 's, F>>,
     {
         self.buf.push(*x.as_ref());
         self
@@ -67,8 +66,8 @@ impl<'f, 't, 'v, 's: 't, F: Float> Eval<'v, 'f, 't, 's, F> {
     #[inline]
     /// Extends the evaluation targets with `xs`.
     pub fn extend<A>(&mut self, xs: &'t [A]) -> &mut Self
-        where
-            A: AsRef<Tensor<'t, 's, F>>,
+    where
+        A: AsRef<Tensor<'t, 's, F>>,
     {
         self.buf.extend(xs.iter().map(|x| *x.as_ref()));
         self
@@ -96,7 +95,8 @@ impl<'f, 't, 'v, 's: 't, F: Float> Eval<'v, 'f, 't, 's, F> {
 ///
 ///     // Fills the placeholder with an ArrayView, then eval.
 ///     let value = array![1., 1.];
-///     x.eval(&[x.given(value.view())]);
+///     let feed: ag::Feed<_> = x.given(value.view());
+///     x.eval(&[feed]);
 /// });
 /// ```
 pub struct Feed<'feed, T: Float> {
@@ -156,9 +156,8 @@ impl<'t, 's, F: Float> NodeWithStateAsync<'t, F> {
         node: &'t TensorInternal<F>,
         successor: Option<&'t TensorInternal<F>>,
         g: &'s Graph<F>,
-        target_idx: Option<usize>
-    ) -> Self
-    {
+        target_idx: Option<usize>,
+    ) -> Self {
         let mut successors = Vec::new();
         if let Some(suc) = successor {
             if !contains(successors.as_slice(), suc) {
@@ -174,7 +173,7 @@ impl<'t, 's, F: Float> NodeWithStateAsync<'t, F> {
         let state = NodeStateAsync {
             pending_count: 0,
             scheduled: false,
-            value_info_list: Vec::new()
+            value_info_list: Vec::new(),
         };
         NodeWithStateAsync {
             node,
@@ -215,10 +214,13 @@ impl<'t, 's, F: Float> NodeWithStateAsync<'t, F> {
 fn build_stateful_subgraph_from<'t, 's, F, A>(
     targets: &'t [A],
     graph: &'s Graph<F>,
-) -> (FxHashMap<usize, NodeWithStateAsync<'t, F>>, FxHashSet<&'t TensorInternal<F>>)
-    where
-        F: Float,
-        A: AsRef<Tensor<'t, 's, F>> + Copy,
+) -> (
+    FxHashMap<usize, NodeWithStateAsync<'t, F>>,
+    FxHashSet<&'t TensorInternal<F>>,
+)
+where
+    F: Float,
+    A: AsRef<Tensor<'t, 's, F>> + Copy,
 {
     let mut map = FxHashMap::<usize, NodeWithStateAsync<F>>::default();
     let mut sources = FxHashSet::default();
@@ -245,7 +247,12 @@ fn build_stateful_subgraph_from<'t, 's, F, A>(
             match map.entry(child.get(graph).id()) {
                 Entry::Vacant(ent) => {
                     // initial visit
-                    let inserted = ent.insert(NodeWithStateAsync::new(child.get_inner(graph), Some(node), graph, None));
+                    let inserted = ent.insert(NodeWithStateAsync::new(
+                        child.get_inner(graph),
+                        Some(node),
+                        graph,
+                        None,
+                    ));
                     dfs_stack.push(inserted.node);
                 }
                 Entry::Occupied(mut ent) => {
@@ -259,10 +266,7 @@ fn build_stateful_subgraph_from<'t, 's, F, A>(
                 }
             }
             if found_new_successor {
-                map
-                    .get_mut(&node.id())
-                    .unwrap()
-                    .increment_pending_count();
+                map.get_mut(&node.id()).unwrap().increment_pending_count();
             }
         }
     }
@@ -304,7 +308,7 @@ impl ValueInfo {
 struct OpEvalResult<'tensor, 'view, T: Float> {
     tensor: &'tensor TensorInternal<T>,
     ys: Option<crate::op::Results<'view, T>>,
-    rescheduled: bool
+    rescheduled: bool,
 }
 
 struct ViewStorage<'view, F: Float> {
@@ -316,13 +320,10 @@ struct ValueStorage<F: Float> {
 }
 
 impl<'view, F: Float> ViewStorage<'view, F> {
-
     #[inline]
     fn new() -> Self {
         let inner = Arc::new(RwLock::new(Vec::new()));
-        Self {
-            inner
-        }
+        Self { inner }
     }
 
     #[inline]
@@ -347,9 +348,7 @@ impl<'view, F: Float> ValueStorage<F> {
     #[inline]
     fn new() -> Self {
         let inner = Arc::new(RwLock::new(Vec::new()));
-        Self {
-            inner
-        }
+        Self { inner }
     }
 
     #[inline]
@@ -391,7 +390,7 @@ impl<'tensor, 'view, 'lock, F: Float> OutputStorage<'view, F> {
             inner: UnsafeCell::new(OutputStorageInner {
                 owned: Vec::new(),
                 borrowed: Vec::new(),
-            })
+            }),
         }
     }
 
@@ -450,10 +449,11 @@ impl<'t, 'lock, F: Float> LockGuardRegistry<'lock, F> {
         &self,
         node_id: usize,
         input_idx: usize,
-        g: RwLockWriteGuard<'lock, NdArray<F>>
+        g: RwLockWriteGuard<'lock, NdArray<F>>,
     ) -> &mut RwLockWriteGuard<'lock, NdArray<F>> {
         unsafe {
-            let got: &mut Vec<Option<_>> = (&mut *self.write_guards.get()).get_mut(&node_id).unwrap();
+            let got: &mut Vec<Option<_>> =
+                (&mut *self.write_guards.get()).get_mut(&node_id).unwrap();
             got[input_idx] = Some(g);
             got[input_idx].as_mut().unwrap()
         }
@@ -464,10 +464,11 @@ impl<'t, 'lock, F: Float> LockGuardRegistry<'lock, F> {
         &self,
         node_id: usize,
         input_idx: usize,
-        g: RwLockReadGuard<'lock, NdArray<F>>
+        g: RwLockReadGuard<'lock, NdArray<F>>,
     ) -> &RwLockReadGuard<'lock, NdArray<F>> {
         unsafe {
-            let got: &mut Vec<Option<_>> = (&mut *self.read_guards.get()).get_mut(&node_id).unwrap();
+            let got: &mut Vec<Option<_>> =
+                (&mut *self.read_guards.get()).get_mut(&node_id).unwrap();
             got[input_idx] = Some(g);
             let ref_: &RwLockReadGuard<'lock, NdArray<F>> = got[input_idx].as_ref().unwrap();
             ref_
@@ -502,16 +503,12 @@ struct StatefulSubGraph<'t, F: Float> {
 impl<'t, F: Float> StatefulSubGraph<'t, F> {
     #[inline]
     fn state(&self, key: &usize) -> *const NodeWithStateAsync<'t, F> {
-        unsafe {
-            (&*self.map.get()).get(key).unwrap()
-        }
+        unsafe { (&*self.map.get()).get(key).unwrap() }
     }
 
     #[inline]
     fn state_mut(&self, key: &usize) -> *mut NodeWithStateAsync<'t, F> {
-        unsafe {
-            (&mut *self.map.get()).get_mut(key).unwrap()
-        }
+        unsafe { (&mut *self.map.get()).get_mut(key).unwrap() }
     }
 }
 
@@ -569,14 +566,14 @@ fn install_compute_results_async<'lock, 't, 'view, F: Float>(
     ys: crate::op::Results<'view, F>,
     value_storage: &ValueStorage<F>,
     view_storage: &ViewStorage<'view, F>,
-    node_state: &mut NodeWithStateAsync<'t, F>,  // mut actually
+    node_state: &mut NodeWithStateAsync<'t, F>, // mut actually
 ) {
     let mut info_list = Vec::with_capacity(ys.len());
     for y in ys {
         let info = match y {
             Ok(crate::ArrRepr::Owned(val)) => {
                 let key = value_storage.push(val);
-                ValueInfo::new(ValueType::Owned, key)  // inserted pos
+                ValueInfo::new(ValueType::Owned, key) // inserted pos
             }
             Ok(crate::ArrRepr::View(val)) => {
                 let key = view_storage.push(val);
@@ -592,13 +589,13 @@ fn install_compute_results_async<'lock, 't, 'view, F: Float>(
 #[derive(Clone, Copy, PartialEq, Debug)]
 enum NodeStatus {
     Completed,
-    NotYet
+    NotYet,
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 enum GraphStatus {
     Completed,
-    NotYet
+    NotYet,
 }
 
 struct CompletionStatus {
@@ -609,11 +606,11 @@ struct CompletionStatus {
 }
 
 impl CompletionStatus {
-
     // updates targets_remaining if necessary and returns the status
     #[inline]
     fn maybe_update_with<F: Float>(&mut self, evaluated: &NodeWithStateAsync<F>) -> GraphStatus {
-        if let Some(idx) = evaluated.target_idx {  // if `evaluated` is the evaluation target..
+        if let Some(idx) = evaluated.target_idx {
+            // if `evaluated` is the evaluation target..
             let mut slot = &mut self.target_statuses[idx];
             if slot.1 == NodeStatus::NotYet {
                 slot.1 = NodeStatus::Completed;
@@ -628,7 +625,6 @@ impl CompletionStatus {
     }
 }
 
-
 impl<F: Float> Graph<F> {
     #[allow(dead_code)]
     // FIXME: too slow, and deadlock in parallel cargo test
@@ -637,8 +633,8 @@ impl<F: Float> Graph<F> {
         tensors: &'tensor [A],
         feeds: &[Feed<'feed, F>],
     ) -> Vec<Option<NdArray<F>>>
-        where
-            A: AsRef<Tensor<'tensor, 'scope, F>> + Copy,
+    where
+        A: AsRef<Tensor<'tensor, 'scope, F>> + Copy,
     {
         // Panics if given shapes are invalid
         validate_feed_shapes(feeds, self);
@@ -662,41 +658,51 @@ impl<F: Float> Graph<F> {
                 whole_status: GraphStatus::NotYet,
                 targets_remaining: num_targets,
             };
-            let graph_state = StatefulSubGraph { map: UnsafeCell::new(state_map) };
+            let graph_state = StatefulSubGraph {
+                map: UnsafeCell::new(state_map),
+            };
             let (tx, rx) = crossbeam_channel::unbounded();
             let guard_registry = LockGuardRegistry::new();
 
             // schedule source nodes.
             for &src in &sources {
-                tx
-                    .send(OpEvalResult {
-                        rescheduled: false,
-                        tensor: src,
-                        ys: if !src.requires_compute() {
-                            None
-                        } else {
-                            let mut ctx = ComputeContext::new(src, Vec::new());
-                            src.op.compute(&mut ctx);
-                            let ys = ctx.extract_outputs();
-                            if ys.is_empty() {
-                                panic!("Bad op implementation: empty return value");
-                            }
-                            Some(ys)
-                        },
-                    })
-                    .unwrap();
+                tx.send(OpEvalResult {
+                    rescheduled: false,
+                    tensor: src,
+                    ys: if !src.requires_compute() {
+                        None
+                    } else {
+                        let mut ctx = ComputeContext::new(src, Vec::new());
+                        src.op.compute(&mut ctx);
+                        let ys = ctx.extract_outputs();
+                        if ys.is_empty() {
+                            panic!("Bad op implementation: empty return value");
+                        }
+                        Some(ys)
+                    },
+                })
+                .unwrap();
             }
 
             // main loop.
             loop {
                 // aggregate and register a compute result.
                 let (status, evaluated) = unsafe {
-                    let OpEvalResult { tensor, ys, rescheduled } = rx.recv().unwrap();
+                    let OpEvalResult {
+                        tensor,
+                        ys,
+                        rescheduled,
+                    } = rx.recv().unwrap();
                     guard_registry.deregister_input_guards_of(tensor);
                     let state_mut = graph_state.state_mut(&tensor.id());
                     if !rescheduled {
                         if let Some(ys) = ys {
-                            install_compute_results_async(ys, owned_storage, view_storage, &mut *state_mut);
+                            install_compute_results_async(
+                                ys,
+                                owned_storage,
+                                view_storage,
+                                &mut *state_mut,
+                            );
                         }
                     }
                     let imm = &*state_mut;
@@ -724,10 +730,13 @@ impl<F: Float> Graph<F> {
                             // Aggregate in_node's inputs
                             let mut should_reschedule = false;
 
-                            for (i, ((input, &in_idx), in_arr)) in suc.in_edges.iter()
+                            for (i, ((input, &in_idx), in_arr)) in suc
+                                .in_edges
+                                .iter()
                                 .zip(&suc.input_indices)
                                 .zip(suc_input_persistent_arrays)
-                                .enumerate() {
+                                .enumerate()
+                            {
                                 let x = if input.is_placeholder {
                                     OpInput::new(retrieve_feed(feeds, input.id))
                                 } else if let PersistentArray::Variable(ref lock) = in_arr {
@@ -737,13 +746,19 @@ impl<F: Float> Graph<F> {
                                             guard_registry_write_init = true;
                                         }
                                         match lock.try_write() {
-                                            Ok(guard) => {
-                                                OpInput::new_mut((*(&mut *guard_registry.register_write(suc.id(), i, guard) as *mut RwLockWriteGuard<NdArray<F>>)).view_mut())
-                                            },
+                                            Ok(guard) => OpInput::new_mut(
+                                                (*(&mut *guard_registry.register_write(
+                                                    suc.id(),
+                                                    i,
+                                                    guard,
+                                                )
+                                                    as *mut RwLockWriteGuard<NdArray<F>>))
+                                                    .view_mut(),
+                                            ),
                                             Err(TryLockError::WouldBlock) => {
                                                 should_reschedule = true;
                                                 break;
-                                            },
+                                            }
                                             Err(TryLockError::Poisoned(_)) => {
                                                 panic!("TryLockError::Poisoned");
                                             }
@@ -754,13 +769,19 @@ impl<F: Float> Graph<F> {
                                             guard_registry_read_init = true;
                                         }
                                         match lock.try_read() {
-                                            Ok(guard) => {
-                                                OpInput::new((*(&*guard_registry.register_read(suc.id(), i, guard) as *const RwLockReadGuard<NdArray<F>>)).view())
-                                            },
+                                            Ok(guard) => OpInput::new(
+                                                (*(&*guard_registry.register_read(
+                                                    suc.id(),
+                                                    i,
+                                                    guard,
+                                                )
+                                                    as *const RwLockReadGuard<NdArray<F>>))
+                                                    .view(),
+                                            ),
                                             Err(TryLockError::WouldBlock) => {
                                                 should_reschedule = true;
                                                 break;
-                                            },
+                                            }
                                             Err(TryLockError::Poisoned(_)) => {
                                                 panic!("TryLockError::Poisoned");
                                             }
@@ -779,10 +800,10 @@ impl<F: Float> Graph<F> {
                                     match info.ty {
                                         ValueType::Owned => {
                                             OpInput::new(owned_storage.view(info.key))
-                                        },
+                                        }
                                         ValueType::View => {
                                             OpInput::new(view_storage.view(info.key))
-                                        },
+                                        }
                                         ValueType::Empty => {
                                             panic!("Attempting to use an empty output as an op's input.");
                                         }
@@ -793,7 +814,12 @@ impl<F: Float> Graph<F> {
                             // unwrapping Result<(), SendError<T>> is ok since the channel outlives this scope.
                             if should_reschedule {
                                 // input aggregation cancelled, rescheduling...
-                                tx.send(OpEvalResult { rescheduled: true, tensor: evaluated.node, ys: None }).unwrap();
+                                tx.send(OpEvalResult {
+                                    rescheduled: true,
+                                    tensor: evaluated.node,
+                                    ys: None,
+                                })
+                                .unwrap();
                             } else {
                                 // schedule the task in the global worker pool
                                 let tx = tx.clone();
@@ -806,7 +832,12 @@ impl<F: Float> Graph<F> {
                                     if ys.is_empty() {
                                         panic!("Bad op implementation: empty return value");
                                     }
-                                    tx.send(OpEvalResult { rescheduled: false, tensor: suc, ys: Some(ys) }).unwrap();
+                                    tx.send(OpEvalResult {
+                                        rescheduled: false,
+                                        tensor: suc,
+                                        ys: Some(ys),
+                                    })
+                                    .unwrap();
                                 });
                             }
                         }
@@ -829,13 +860,9 @@ impl<F: Float> Graph<F> {
                         match info.ty {
                             ValueType::Owned => {
                                 mem::replace(&mut owned_storage.owned()[info.key], None)
-                            },
-                            ValueType::View => {
-                                Some(view_storage.view(info.key).to_owned())
-                            },
-                            ValueType::Empty => {
-                                None
                             }
+                            ValueType::View => Some(view_storage.view(info.key).to_owned()),
+                            ValueType::Empty => None,
                         }
                     };
                     ret.push(owned_value);
@@ -845,7 +872,7 @@ impl<F: Float> Graph<F> {
         })
     }
 
-    /// Evaluates given symbolic tensors.
+    /// Evaluates given symbolic tensors as a list of `ndarray::Array<F, ndarray::IxDyn>`.
     ///
     /// Each return value can be `None`;
     /// for example, evaluation of `gradient_descent_ops::*`
@@ -873,8 +900,8 @@ impl<F: Float> Graph<F> {
         tensors: &'tensor [A],
         feeds: &[Feed<'feed, F>],
     ) -> Vec<Option<NdArray<F>>>
-        where
-            A: AsRef<Tensor<'tensor, 'scope, F>> + Copy,
+    where
+        A: AsRef<Tensor<'tensor, 'scope, F>> + Copy,
     {
         validate_feed_shapes(feeds, self);
 
@@ -906,11 +933,19 @@ impl<F: Float> Graph<F> {
                             if in_node.mut_usage {
                                 write_guards.push(lock.write().unwrap());
                                 let inserted = write_guards.len() - 1;
-                                OpInput::new_mut((*(&mut write_guards[inserted] as *mut RwLockWriteGuard<NdArray<F>>)).view_mut())
+                                OpInput::new_mut(
+                                    (*(&mut write_guards[inserted]
+                                        as *mut RwLockWriteGuard<NdArray<F>>))
+                                        .view_mut(),
+                                )
                             } else {
                                 read_guards.push(lock.read().unwrap());
                                 let inserted = read_guards.len() - 1;
-                                OpInput::new((*(&mut read_guards[inserted] as *mut RwLockReadGuard<NdArray<F>>)).view())
+                                OpInput::new(
+                                    (*(&mut read_guards[inserted]
+                                        as *mut RwLockReadGuard<NdArray<F>>))
+                                        .view(),
+                                )
                             }
                         }
                     } else if let Some(ref arr) = input_inner.get_constant_array() {
@@ -920,7 +955,8 @@ impl<F: Float> Graph<F> {
                         let vi = &node_info_map.get(&in_node.id).unwrap().value_info_list[in_idx];
                         match vi.ty {
                             ValueType::Owned => {
-                                OpInput::new(storage.owned()[vi.key].as_ref().unwrap().view())  // imm
+                                OpInput::new(storage.owned()[vi.key].as_ref().unwrap().view())
+                                // imm
                             }
                             ValueType::View => OpInput::new(storage.view()[vi.key].clone()),
                             ValueType::Empty => {
@@ -942,7 +978,7 @@ impl<F: Float> Graph<F> {
                     panic!("Bad op implementation: empty return value");
                 }
                 // register compute result
-                let node_info = install_compute_results(ys, &storage, node);  // mut storage
+                let node_info = install_compute_results(ys, &storage, node); // mut storage
                 node_info_map.insert(node.id(), node_info);
             } else {
                 // Update dfs stack
@@ -980,7 +1016,10 @@ impl<F: Float> Graph<F> {
     }
 
     #[inline]
-    fn would_not_visit<'t>(node: &TensorInternal<F>, info_map: &FxHashMap<usize, NodeInfo<'t, F>>) -> bool {
+    fn would_not_visit<'t>(
+        node: &TensorInternal<F>,
+        info_map: &FxHashMap<usize, NodeInfo<'t, F>>,
+    ) -> bool {
         node.is_placeholder || node.has_persistent_array || info_map.contains_key(&node.id())
     }
 }

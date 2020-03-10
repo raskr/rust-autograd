@@ -1,30 +1,29 @@
 /// Some gemm kernel usages are ported from ndarray
 use crate::ndarray_ext::NdArray;
-use crate::{op, NdArrayViewMut};
+#[cfg(feature = "mkl")]
+use crate::ndarray_ext::{get_batch_ptrs, get_batch_ptrs_mut};
+#[cfg(feature = "mkl")]
+use crate::ops::mkl_ffi::*;
 #[cfg(feature = "mkl")]
 use crate::same_type;
 use crate::tensor::Tensor;
-use crate::NdArrayView;
 use crate::Float;
+use crate::NdArrayView;
+use crate::{op, NdArrayViewMut};
 use ndarray;
-use ndarray::{ArrayView2, ArrayViewMut2};
 #[cfg(feature = "mkl")]
 use ndarray::Dimension;
+use ndarray::{ArrayView2, ArrayViewMut2};
 #[cfg(feature = "mkl")]
 use std::cmp;
 #[cfg(feature = "mkl")]
 use std::mem;
-#[cfg(feature = "mkl")]
-use crate::ops::mkl_ffi::*;
-#[cfg(feature = "mkl")]
-use crate::ndarray_ext::{get_batch_ptrs, get_batch_ptrs_mut};
-
 
 #[cfg(feature = "mkl")]
 #[inline]
 fn blas_row_major_2d<T: 'static, F>(a: &ndarray::ArrayView2<F>) -> bool
-    where
-        F: Float,
+where
+    F: Float,
 {
     if !same_type::<F, T>() {
         return false;
@@ -35,15 +34,20 @@ fn blas_row_major_2d<T: 'static, F>(a: &ndarray::ArrayView2<F>) -> bool
 #[cfg(feature = "mkl")]
 #[inline]
 fn blas_row_major_nd<T: 'static, F>(a: &NdArrayView<F>) -> bool
-    where
-        F: Float,
+where
+    F: Float,
 {
     if !same_type::<F, T>() {
         return false;
     }
     let strides = a.strides();
     let rank = strides.len();
-    is_blas_nd(a.shape(), strides[rank - 2], strides[rank - 1], MemoryOrder::C)
+    is_blas_nd(
+        a.shape(),
+        strides[rank - 2],
+        strides[rank - 1],
+        MemoryOrder::C,
+    )
 }
 
 #[cfg(feature = "mkl")]
@@ -61,15 +65,20 @@ where
 #[cfg(feature = "mkl")]
 #[inline]
 fn blas_row_major_nd_mut<T: 'static, F>(a: &NdArrayViewMut<F>) -> bool
-    where
-        F: Float,
+where
+    F: Float,
 {
     if !same_type::<F, T>() {
         return false;
     }
     let strides = a.strides();
     let rank = strides.len();
-    is_blas_nd(a.shape(), strides[rank - 2], strides[rank - 1], MemoryOrder::C)
+    is_blas_nd(
+        a.shape(),
+        strides[rank - 2],
+        strides[rank - 1],
+        MemoryOrder::C,
+    )
 }
 
 #[cfg(feature = "mkl")]
@@ -122,7 +131,6 @@ fn is_blas_2d(dim: &ndarray::Ix2, stride: &[isize], order: MemoryOrder) -> bool 
     true
 }
 
-
 // mkl version of ndarray's mat_mul_impl
 #[cfg(feature = "mkl")]
 fn mat_mul_impl_blas<F: Float>(
@@ -131,8 +139,7 @@ fn mat_mul_impl_blas<F: Float>(
     rhs: &ArrayView2<'_, F>,
     beta: F,
     c: &mut ArrayViewMut2<'_, F>,
-)
-{
+) {
     const GEMM_BLAS_CUTOFF: usize = 7;
 
     // size cutoff for using BLAS
@@ -200,14 +207,14 @@ fn mat_mul_impl_blas<F: Float>(
                             m as MklInt,               // m, rows of Op(a)
                             n as MklInt,               // n, cols of Op(b)
                             k as MklInt,               // k, cols of Op(a)
-                            crate::cast_as(&alpha),               // alpha
+                            crate::cast_as(&alpha),    // alpha
                             lhs_.as_ptr() as *const _, // a
-                            lhs_stride,                    // lda
+                            lhs_stride,                // lda
                             rhs_.as_ptr() as *const _, // b
-                            rhs_stride,                    // ldb
-                            crate::cast_as(&beta),                // beta
-                            c_.as_mut_ptr() as *mut _,     // c
-                            c_stride,                      // ldc
+                            rhs_stride,                // ldb
+                            crate::cast_as(&beta),     // beta
+                            c_.as_mut_ptr() as *mut _, // c
+                            c_stride,                  // ldc
                         );
                     }
                     return;
@@ -228,12 +235,15 @@ fn batch_mat_mul_impl<F: Float>(
     rhs: &NdArrayView<'_, F>,
     beta: F,
     c: &mut NdArrayViewMut<'_, F>,
-)
-{
+) {
     let lhs_shape = lhs.shape();
     let rhs_shape = rhs.shape();
     let rank = lhs.ndim();
-    let (mut m, a, mut n) = (lhs_shape[rank - 2], lhs_shape[rank - 1], rhs_shape[rank - 1]);
+    let (mut m, a, mut n) = (
+        lhs_shape[rank - 2],
+        lhs_shape[rank - 1],
+        rhs_shape[rank - 1],
+    );
 
     {
         // Use `c` for c-order and `f` for an f-order matrix
@@ -348,8 +358,7 @@ fn mat_mul_impl_slow<F: Float>(
     rhs: &ArrayView2<'_, F>,
     beta: F,
     c: &mut ArrayViewMut2<'_, F>,
-) where
-{
+) {
     let ((m, k), (_, n)) = (lhs.dim(), rhs.dim());
     // common parameters for gemm
     let ap = lhs.as_ptr();
@@ -378,7 +387,7 @@ fn mat_mul_impl_slow<F: Float>(
                     );
                 }
             }
-        }
+        };
     }
     kernel_call_def!(f32, sgemm);
     kernel_call_def!(f64, dgemm);
@@ -393,8 +402,7 @@ fn batch_mat_mul_impl_slow<F: Float>(
     rhs: &NdArrayView<'_, F>,
     beta: F,
     c: &mut NdArrayViewMut<'_, F>,
-) where
-{
+) {
     let mut lhs_ = lhs.view();
     let mut rhs_ = rhs.view();
     let c_ = c.view_mut();
@@ -422,7 +430,11 @@ fn batch_mat_mul_impl_slow<F: Float>(
 
     let lhs_shape = lhs_.shape();
     let rhs_shape = rhs_.shape();
-    let (m, k, n) = (lhs_shape[rank - 2], lhs_shape[rank - 1], rhs_shape[rank - 1]);
+    let (m, k, n) = (
+        lhs_shape[rank - 2],
+        lhs_shape[rank - 1],
+        rhs_shape[rank - 1],
+    );
 
     // common parameters for gemm
     let (rsa, csa) = (lhs_strides[rank - 2], lhs_strides[rank - 1]);
@@ -467,14 +479,12 @@ fn batch_mat_mul_impl_slow<F: Float>(
                         );
                     }
                 }
-            }
+            };
         }
         kernel_call_def!(f32, sgemm);
         kernel_call_def!(f64, dgemm);
     }
-
 }
-
 
 #[inline]
 fn batch_mat_mul_requires_copy(stride: &[ndarray::Ixs]) -> bool {
@@ -499,7 +509,6 @@ fn dot_shape_error(m: usize, k: usize, k2: usize, n: usize) -> ! {
     );
 }
 
-
 // ========= Op impls =========
 
 use ndarray::ShapeBuilder;
@@ -516,8 +525,14 @@ pub struct BatchMatMul {
 
 impl<T: Float> op::Op<T> for MatMul {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
-        let mut a = ctx.input(0).into_dimensionality::<ndarray::Ix2>().expect("lhs input for MatMul must be 2D");
-        let mut b = ctx.input(1).into_dimensionality::<ndarray::Ix2>().expect("rhs input for MatMul must be 2D");
+        let mut a = ctx
+            .input(0)
+            .into_dimensionality::<ndarray::Ix2>()
+            .expect("lhs input for MatMul must be 2D");
+        let mut b = ctx
+            .input(1)
+            .into_dimensionality::<ndarray::Ix2>()
+            .expect("rhs input for MatMul must be 2D");
         if self.transpose_a {
             a.swap_axes(0, 1);
         }
@@ -540,26 +555,34 @@ impl<T: Float> op::Op<T> for MatMul {
             c = ndarray::Array::from_shape_vec_unchecked((m, n).set_f(column_major), v);
         }
 
-        #[cfg(feature = "mkl")] {
+        #[cfg(feature = "mkl")]
+        {
             mat_mul_impl_blas(T::one(), &a, &b, T::zero(), &mut c.view_mut());
         }
-        #[cfg(not(feature = "mkl"))] {
+        #[cfg(not(feature = "mkl"))]
+        {
             mat_mul_impl_slow(T::one(), &a, &b, T::zero(), &mut c.view_mut());
         }
-        ctx.append_output(Ok(crate::ArrRepr::Owned(c.into_dyn())));
+        ctx.append_output(Ok(c.into_dyn()));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
         let s = ctx.graph();
         let gy = &ctx.output_grad();
-        let opa = Tensor::builder().set_inputs(&[gy, &ctx.input(1)]).build(
+        let opa = Tensor::builder().set_ro_inputs(&[gy, &ctx.input(1)]).build(
             s,
-            MatMul {transpose_a: false, transpose_b: true},
+            MatMul {
+                transpose_a: false,
+                transpose_b: true,
+            },
         );
 
-        let opb = Tensor::builder().set_inputs(&[&ctx.input(0), gy]).build(
+        let opb = Tensor::builder().set_ro_inputs(&[&ctx.input(0), gy]).build(
             s,
-            MatMul {transpose_a: true, transpose_b: false},
+            MatMul {
+                transpose_a: true,
+                transpose_b: false,
+            },
         );
 
         ctx.set_input_grads(vec![Some(opa), Some(opb)]);
@@ -613,20 +636,22 @@ impl<T: Float> op::Op<T> for BatchMatMul {
             // BatchMatMul's ret val is a c-order array.
             c = ndarray::Array::from_shape_vec_unchecked(ret_shape, v);
         }
-        #[cfg(feature = "mkl")] {
+        #[cfg(feature = "mkl")]
+        {
             batch_mat_mul_impl(T::one(), &x0, &x1, T::zero(), &mut c.view_mut());
         }
-        #[cfg(not(feature = "mkl"))] {
+        #[cfg(not(feature = "mkl"))]
+        {
             batch_mat_mul_impl_slow(T::one(), &x0, &x1, T::zero(), &mut c.view_mut())
         }
 
         // reshape to dst shape with safe unwrapping
-        ctx.append_output(Ok(crate::ArrRepr::Owned(c)));
+        ctx.append_output(Ok(c));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
         let gy = &ctx.output_grad();
-        let opa = Tensor::builder().set_inputs(&[gy, &ctx.input(1)]).build(
+        let opa = Tensor::builder().set_ro_inputs(&[gy, &ctx.input(1)]).build(
             ctx.graph(),
             BatchMatMul {
                 transpose_a: false,
@@ -634,7 +659,7 @@ impl<T: Float> op::Op<T> for BatchMatMul {
             },
         );
 
-        let opb = Tensor::builder().set_inputs(&[&ctx.input(0), gy]).build(
+        let opb = Tensor::builder().set_ro_inputs(&[&ctx.input(0), gy]).build(
             ctx.graph(),
             BatchMatMul {
                 transpose_a: true,
@@ -711,11 +736,11 @@ impl<T: Float> op::Op<T> for TensordotPreprocess {
         let r3 = NdArray::from_shape_vec(ndarray::IxDyn(&[new_shape0.len()]), new_shape0).unwrap();
         let r4 = NdArray::from_shape_vec(ndarray::IxDyn(&[new_shape1.len()]), new_shape1).unwrap();
 
-        ctx.append_output(Ok(crate::ArrRepr::Owned(r0)));
-        ctx.append_output(Ok(crate::ArrRepr::Owned(r1)));
-        ctx.append_output(Ok(crate::ArrRepr::Owned(r2)));
-        ctx.append_output(Ok(crate::ArrRepr::Owned(r3)));
-        ctx.append_output(Ok(crate::ArrRepr::Owned(r4)));
+        ctx.append_output(Ok(r0));
+        ctx.append_output(Ok(r1));
+        ctx.append_output(Ok(r2));
+        ctx.append_output(Ok(r3));
+        ctx.append_output(Ok(r4));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {

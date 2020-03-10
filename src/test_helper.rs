@@ -45,7 +45,10 @@ pub fn check_theoretical_grads<'s: 't, 't, 'v, T: Float, A>(
             let evacuated;
             // +
             unsafe {
-                let mut guard_mut = var_node.as_ref().lock_variable_array_mut().expect("This is not a variable");
+                let mut guard_mut = var_node
+                    .as_ref()
+                    .lock_variable_array_mut()
+                    .expect("This is not a variable");
                 let head = guard_mut.as_mut_ptr();
                 evacuated = *head.offset(i);
                 *head.offset(i) = evacuated + eps;
@@ -61,7 +64,10 @@ pub fn check_theoretical_grads<'s: 't, 't, 'v, T: Float, A>(
 
             // -
             unsafe {
-                let mut guard_mut = var_node.as_ref().lock_variable_array_mut().expect("This is not a variable");
+                let mut guard_mut = var_node
+                    .as_ref()
+                    .lock_variable_array_mut()
+                    .expect("This is not a variable");
                 let head = guard_mut.as_mut_ptr();
                 *head.offset(i) = evacuated - eps;
             }
@@ -76,7 +82,10 @@ pub fn check_theoretical_grads<'s: 't, 't, 'v, T: Float, A>(
 
             // restore
             unsafe {
-                let mut guard_mut = var_node.as_ref().lock_variable_array_mut().expect("This is not a variable");
+                let mut guard_mut = var_node
+                    .as_ref()
+                    .lock_variable_array_mut()
+                    .expect("This is not a variable");
                 let head = guard_mut.as_mut_ptr();
                 *head.offset(i) = evacuated;
             }

@@ -16,9 +16,7 @@ pub struct Scalar<T: Float> {
 
 impl<T: Float> op::Op<T> for Scalar<T> {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
-        ctx.append_output(Ok(crate::ArrRepr::Owned(
-            ndarray::arr0(self.val).into_dyn(),
-        )));
+        ctx.append_output(Ok(ndarray::arr0(self.val).into_dyn()));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -45,7 +43,7 @@ impl<T: Float> op::Op<T> for Zeros {
                     .as_slice(),
             )
         };
-        ctx.append_output(Ok(crate::ArrRepr::Owned(ret)));
+        ctx.append_output(Ok(ret));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -72,7 +70,7 @@ impl<T: Float> op::Op<T> for Ones {
                     .as_slice(),
             )
         };
-        ctx.append_output(Ok(crate::ArrRepr::Owned(ret)));
+        ctx.append_output(Ok(ret));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -95,9 +93,7 @@ impl<T: Float> op::Op<T> for Range {
         let end = x1[ndarray::IxDyn(&[])];
         let step = x2[ndarray::IxDyn(&[])];
         assert!(start < end, "`start` and `end` overlap.");
-        ctx.append_output(Ok(crate::ArrRepr::Owned(
-            ndarray::Array1::range(start, end, step).into_dyn(),
-        )));
+        ctx.append_output(Ok(ndarray::Array1::range(start, end, step).into_dyn()));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -107,7 +103,7 @@ impl<T: Float> op::Op<T> for Range {
 
 impl<T: Float> op::Op<T> for ConvertToTensor<T> {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
-        ctx.append_output(Ok(crate::ArrRepr::Owned(self.arr.clone())));
+        ctx.append_output(Ok(self.arr.clone()));
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
