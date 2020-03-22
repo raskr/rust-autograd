@@ -28,7 +28,7 @@ impl<T: Float> op::Op<T> for PreprocessBinOpGrad {
 
         if x_shape == gy_shape {
             // The case where forward path didn't cause broadcast.
-            ctx.append_output_view(Ok(gy.clone()));
+            ctx.append_output_view(gy.clone());
         } else {
             // Broadcast occurred. We need reduction of `gy`.
             // First, handle the case where x is scalar.
@@ -59,14 +59,17 @@ impl<T: Float> op::Op<T> for PreprocessBinOpGrad {
                             );
                         }
                     } else {
-                        panic!("Incorrect gradient shape");
+                        ctx.append_error(op::OpError::IncompatibleShape(
+                            "Incorrect gradient shape".to_string(),
+                        ));
+                        return;
                     }
                 }
                 // case of x_axis < gy_axis: unreachable
                 // case of x_axis == gy_axis: nothing to do
             }
             // TODO
-            ctx.append_output(Ok(folded.unwrap()));
+            ctx.append_output(folded.unwrap());
         };
     }
 
@@ -74,7 +77,8 @@ impl<T: Float> op::Op<T> for PreprocessBinOpGrad {
         let gx = Tensor::builder()
             .set_ro_inputs(&[&ctx.output_grad(), &ctx.input(1)])
             .build(ctx.graph(), PreprocessBinOpGradGrad);
-        ctx.set_input_grads(vec![Some(gx), None]);
+        ctx.append_input_grad(Some(gx));
+        ctx.append_input_grad(None);
     }
 }
 
@@ -88,7 +92,7 @@ impl<T: Float> op::Op<T> for PreprocessBinOpGradGrad {
 
         let gy = ctx.input(0);
         if gy.shape() == target_shape {
-            ctx.append_output_view(Ok(gy));
+            ctx.append_output_view(gy);
             return;
         }
 
@@ -105,9 +109,11 @@ impl<T: Float> op::Op<T> for PreprocessBinOpGradGrad {
 
         // do broadcast
         if let Some(ret) = gy.broadcast(target_shape) {
-            ctx.append_output(Ok(ret.to_owned()));
+            ctx.append_output(ret.to_owned());
         } else {
-            panic!("Cant't broadcast.");
+            ctx.append_error(op::OpError::IncompatibleShape(
+                "PreprocessBinOpGradGrad: Cant't broadcast.".to_string(),
+            ));
         }
     }
 
@@ -115,14 +121,15 @@ impl<T: Float> op::Op<T> for PreprocessBinOpGradGrad {
         let gx = Tensor::builder()
             .set_ro_inputs(&[&ctx.input(0), &ctx.output_grad()])
             .build(ctx.graph(), PreprocessBinOpGrad);
-        ctx.set_input_grads(vec![Some(gx), None]);
+        ctx.append_input_grad(Some(gx));
+        ctx.append_input_grad(None);
     }
 }
 
 impl<T: Float> op::Op<T> for AddOp {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         let ret = add_forward(&ctx.input(0), &ctx.input(1));
-        ctx.append_output(Ok(ret));
+        ctx.append_output(ret);
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -131,7 +138,8 @@ impl<T: Float> op::Op<T> for AddOp {
         let shape0 = &ctx.graph().shape(x0);
         let shape1 = &ctx.graph().shape(x1);
         let (gy1, gy2) = preprocess_gy(shape0, shape1, &ctx.output_grad(), ctx.graph());
-        ctx.set_input_grads(vec![Some(gy1), Some(gy2)]);
+        ctx.append_input_grad(Some(gy1));
+        ctx.append_input_grad(Some(gy2));
     }
 }
 
@@ -143,9 +151,9 @@ impl<T: Float> op::Op<T> for SubOp {
         let ret = if shape0 == [] {
             // is scalar
             let x0_elem = x0[ndarray::IxDyn(&[])];
-            Ok(x1.map(move |&a| x0_elem - a))
+            x1.map(move |&a| x0_elem - a)
         } else {
-            Ok(&x0 - &x1)
+            &x0 - &x1
         };
         ctx.append_output(ret);
     }
@@ -156,14 +164,15 @@ impl<T: Float> op::Op<T> for SubOp {
         let shape0 = &ctx.graph().shape(x0);
         let shape1 = &ctx.graph().shape(x1);
         let (gy1, gy2) = preprocess_gy(shape0, shape1, &ctx.output_grad(), ctx.graph());
-        ctx.set_input_grads(vec![Some(gy1), Some(ctx.graph().neg(&gy2))]);
+        ctx.append_input_grad(Some(gy1));
+        ctx.append_input_grad(Some(ctx.graph().neg(&gy2)));
     }
 }
 
 impl<T: Float> op::Op<T> for MulOp {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         let ret = mul_forward(&ctx.input(0), &ctx.input(1));
-        ctx.append_output(Ok(ret));
+        ctx.append_output(ret);
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -172,7 +181,8 @@ impl<T: Float> op::Op<T> for MulOp {
         let shape0 = &ctx.graph().shape(x0);
         let shape1 = &ctx.graph().shape(x1);
         let (gy1, gy2) = preprocess_gy(shape0, shape1, &ctx.output_grad(), ctx.graph());
-        ctx.set_input_grads(vec![Some(gy1 * x1), Some(gy2 * x0)]);
+        ctx.append_input_grad(Some(gy1 * x1));
+        ctx.append_input_grad(Some(gy2 * x0));
     }
 }
 
@@ -196,7 +206,7 @@ impl<T: Float> op::Op<T> for DivOp {
         } else {
             x0 / x1
         };
-        ctx.append_output(Ok(ret));
+        ctx.append_output(ret);
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -206,10 +216,10 @@ impl<T: Float> op::Op<T> for DivOp {
         let shape0 = &scope.shape(x0);
         let shape1 = &scope.shape(x1);
         let (gy1, gy2) = preprocess_gy(shape0, shape1, &ctx.output_grad(), scope);
-        ctx.set_input_grads(vec![
-            Some(gy1 / x1),
-            Some(scope.neg(x0) * scope.pow(x1, T::from(-2.).unwrap()) * gy2),
-        ]);
+        ctx.append_input_grad(Some(gy1 / x1));
+        ctx.append_input_grad(Some(
+            scope.neg(x0) * scope.pow(x1, T::from(-2.).unwrap()) * gy2,
+        ));
     }
 }
 

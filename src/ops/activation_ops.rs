@@ -57,7 +57,7 @@ pub fn softmax_forward<T: Float>(x: &NdArrayView<T>, axis: isize) -> NdArray<T> 
 
 impl<T: Float> op::Op<T> for Softmax {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
-        let ret = Ok(softmax_forward(&ctx.input(0), self.axis));
+        let ret = softmax_forward(&ctx.input(0), self.axis);
         ctx.append_output(ret)
     }
 
@@ -66,7 +66,7 @@ impl<T: Float> op::Op<T> for Softmax {
         let y = ctx.output();
         let gy = ctx.output_grad();
         let sum = s.reduce_sum(y * gy, &[self.axis], true);
-        ctx.set_input_grads(vec![Some((gy - sum) * y)]);
+        ctx.append_input_grad(Some((gy - sum) * y))
     }
 }
 
@@ -74,7 +74,7 @@ impl<T: Float> op::Op<T> for Softplus {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         use std::f64;
         let e = T::from(f64::consts::E).unwrap();
-        let ret = Ok(ctx.input(0).map(move |a| (a.exp() + T::one()).log(e)));
+        let ret = ctx.input(0).map(move |a| (a.exp() + T::one()).log(e));
         ctx.append_output(ret)
     }
 
@@ -84,16 +84,16 @@ impl<T: Float> op::Op<T> for Softplus {
         let a = s.exp(ctx.input(0));
         let b = a + s.scalar(T::one());
         let gx = gy * (a / b);
-        ctx.set_input_grads(vec![Some(gx)]);
+        ctx.append_input_grad(Some(gx))
     }
 }
 
 impl<T: Float> op::Op<T> for Sigmoid {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         let half = T::from(0.5).unwrap();
-        let ret = Ok(ctx
+        let ret = ctx
             .input(0)
-            .mapv(move |a| ((a * half).tanh() * half) + half));
+            .mapv(move |a| ((a * half).tanh() * half) + half);
         ctx.append_output(ret)
     }
 
@@ -101,13 +101,13 @@ impl<T: Float> op::Op<T> for Sigmoid {
         let gy = ctx.output_grad();
         let y = ctx.output();
         let s = ctx.graph();
-        ctx.set_input_grads(vec![Some(gy * (y - s.square(y)))]);
+        ctx.append_input_grad(Some(gy * (y - s.square(y))));
     }
 }
 
 impl<T: Float> op::Op<T> for ReLU {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
-        let ret = Ok(ctx.input(0).map(|a| a.max(T::zero())));
+        let ret = ctx.input(0).map(|a| a.max(T::zero()));
         ctx.append_output(ret);
     }
 
@@ -115,21 +115,21 @@ impl<T: Float> op::Op<T> for ReLU {
         let s = ctx.graph();
         let gy = ctx.output_grad();
         let bin = s.greater(ctx.input(0), s.scalar(T::zero()));
-        ctx.set_input_grads(vec![Some(s.mul(bin.tensor, gy.tensor))]);
+        ctx.append_input_grad(Some(s.mul(bin.inner, gy.inner)))
     }
 }
 
 impl<T: Float> op::Op<T> for Identity {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         // do nothing
-        let ret = Ok(ctx.input(0));
+        let ret = ctx.input(0);
         ctx.append_output_view(ret)
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
         let gy = ctx.output_grad();
         // use gy's array with rc increment.
-        ctx.set_input_grads(vec![Some(gy)]);
+        ctx.append_input_grad(Some(gy))
     }
 }
 
@@ -142,7 +142,7 @@ impl<T: Float> op::Op<T> for ELU<T> {
                 self.alpha * (a.exp() - T::one())
             }
         });
-        ctx.append_output(Ok(ret))
+        ctx.append_output(ret)
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -151,7 +151,7 @@ impl<T: Float> op::Op<T> for ELU<T> {
             .set_ro_inputs(&[&ctx.input(0), gy])
             .set_shape(&ctx.graph().shape(gy))
             .build(ctx.graph(), ELUGrad { alpha: self.alpha });
-        ctx.set_input_grads(vec![Some(gx)]);
+        ctx.append_input_grad(Some(gx))
     }
 }
 
@@ -165,11 +165,12 @@ impl<T: Float> op::Op<T> for ELUGrad<T> {
                 self.alpha * (a.exp() - T::one()) + self.alpha
             }
         });
-        let ret = Ok(a * &ctx.input(1));
+        let ret = a * &ctx.input(1);
         ctx.append_output(ret)
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
-        ctx.set_input_grads(vec![None, None]);
+        ctx.append_input_grad(None);
+        ctx.append_input_grad(None);
     }
 }

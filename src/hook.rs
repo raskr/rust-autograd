@@ -32,30 +32,30 @@ impl<T: Float, FUN: Fn(&NdArrayView<T>) -> () + Send + Sync> Hook<T> for Raw<T, 
 
 impl<T: Float> Hook<T> for Print {
     fn call(&self, _: &crate::ndarray_ext::NdArrayView<T>) -> () {
-        println!("{}\n", self.0);
+        eprintln!("{}\n", self.0);
     }
 }
 
 impl<T: Float> Hook<T> for Show {
     fn call(&self, arr: &crate::ndarray_ext::NdArrayView<T>) -> () {
-        println!("{:?}\n", arr);
+        eprintln!("{:?}\n", arr);
     }
 }
 
 impl<T: Float> Hook<T> for ShowWith {
     fn call(&self, arr: &crate::ndarray_ext::NdArrayView<T>) -> () {
-        println!("{}\n {:?}\n", self.0, arr);
+        eprintln!("{}\n {:?}\n", self.0, arr);
     }
 }
 
 impl<T: Float> Hook<T> for ShowShape {
     fn call(&self, arr: &crate::ndarray_ext::NdArrayView<T>) -> () {
-        println!("{:?}\n", arr.shape());
+        eprintln!("{:?}\n", arr.shape());
     }
 }
 
 impl<T: Float> Hook<T> for ShowShapeWith {
     fn call(&self, arr: &crate::ndarray_ext::NdArrayView<T>) -> () {
-        println!("{}\n{:?}\n", self.0, arr.shape());
+        eprintln!("{}\n{:?}\n", self.0, arr.shape());
     }
 }

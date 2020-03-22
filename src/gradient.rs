@@ -64,7 +64,7 @@ fn has_marked_child<'a, 'b, T: Float>(
 ) -> bool {
     let mut it = parent.get_backprop_inputs().iter();
     while let Some(child) = it.next() {
-        if path.get(child.get(s).tensor).unwrap().has_gradient {
+        if path.get(child.get(s).inner).unwrap().has_gradient {
             return true;
         }
     }
@@ -110,15 +110,15 @@ fn get_between_nodes<'a, 'b: 'a, T: Float>(
                         // Add to result, but don't allow any more recursive search
                         // because there will be no `wrt` nodes in this direction....
                         ret.insert(
-                            child.tensor,
+                            child.inner,
                             GradInfo::new(
-                                child.is_differentiable() && is_wrt(child.tensor, wrt),
+                                child.is_differentiable() && is_wrt(child.inner, wrt),
                                 None,
                             ),
                         );
                     } else {
                         // Recurse
-                        dfs_stack.push((child.tensor, false));
+                        dfs_stack.push((child.inner, false));
                     }
                 }
             }
@@ -181,14 +181,14 @@ pub(crate) fn symbolic_gradients<'a, 'b: 'a, T: Float>(
         let xs = y.inner.get_backprop_inputs();
         for (gx, x) in gxs.into_iter().zip(xs) {
             let x = x.get(s);
-            let mut x_info = between_nodes.get_mut(x.tensor).unwrap();
+            let mut x_info = between_nodes.get_mut(x.inner).unwrap();
             if x_info.has_gradient {
                 if let Some(gx) = gx {
                     x_info.push_grad(gx);
                     // update heap
                     if !x.is_source() && !x_info.grad_called {
                         x_info.grad_called = true;
-                        heap.push(x.tensor.wrapped());
+                        heap.push(x.inner.wrapped());
                     }
                 }
             }

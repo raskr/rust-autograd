@@ -144,40 +144,42 @@ fn conv2d_extract_params<F: Float>(
     stride_w: usize,
     dilation_h: usize,
     dilation_w: usize,
-) -> Conv2DParams {
-    assert!(
-        crate::same_type::<F, f32>() || crate::same_type::<F, f64>(),
-        "autograd::conv2d: only f32 and f64 are supported."
-    );
+) -> Result<Conv2DParams, op::OpError> {
+    if !crate::same_type::<F, f32>() && !crate::same_type::<F, f64>() {
+        return Err(op::OpError::TypeUnsupported(
+            "conv2d: only f32 and f64 are supported.".to_string(),
+        ));
+    }
     // Extract size params
     let (batch_size, xch, xh, xw) = {
         let x_shape = x.shape();
-        assert_eq!(
-            x_shape.len(),
-            4,
-            "autograd::conv2d: lhs input must be 4D (got {:?})",
-            x_shape
-        );
+        if x_shape.len() != 4 {
+            return Err(op::OpError::IncompatibleShape(format!(
+                "conv2d: lhs input must be 4D (got {:?})",
+                x_shape
+            )));
+        }
         (x_shape[0], x_shape[1], x_shape[2], x_shape[3])
     };
     let (ych, kh, kw) = {
         let w_shape = w.shape();
-        assert_eq!(
-            w_shape.len(),
-            4,
-            "autograd::conv2d: filter must be 4D (got {:?})",
-            w_shape
-        );
-        assert_eq!(
-            xch, w_shape[1],
-            "autograd::conv2d: input channel dim ({:?}) must match filter's second dim ({:?})",
-            xch, w_shape[1]
-        );
+        if w_shape.len() != 4 {
+            return Err(op::OpError::IncompatibleShape(format!(
+                "conv2d: filter must be 4D (got {:?})",
+                w_shape
+            )));
+        }
+        if xch != w_shape[1] {
+            return Err(op::OpError::IncompatibleShape(format!(
+                "conv2d: input channel dim ({:?}) must match filter's second dim ({:?})",
+                xch, w_shape[1]
+            )));
+        }
         (w_shape[0], w_shape[2], w_shape[3])
     };
     let yh = (xh + 2 * pad_h - (dilation_h * (kh - 1) + 1)) / stride_h + 1;
     let yw = (xw + 2 * pad_w - (dilation_w * (kw - 1) + 1)) / stride_w + 1;
-    Conv2DParams {
+    Ok(Conv2DParams {
         batch_size,
         xch,
         xh,
@@ -187,7 +189,7 @@ fn conv2d_extract_params<F: Float>(
         yw,
         kh,
         kw,
-    }
+    })
 }
 
 /// Returns: (conv result, im2col result)
@@ -201,7 +203,7 @@ fn conv2d_impl<F: Float>(
     stride_w: usize,
     dilation_h: usize,
     dilation_w: usize,
-) -> (NdArray<F>, NdArray<F>) {
+) -> Result<(NdArray<F>, NdArray<F>), op::OpError> {
     let Conv2DParams {
         batch_size,
         xch,
@@ -214,10 +216,10 @@ fn conv2d_impl<F: Float>(
         kw,
     } = conv2d_extract_params(
         x, w, pad_h, pad_w, stride_h, stride_w, dilation_h, dilation_w,
-    );
+    )?;
 
-    let copied_x = ndarray_ext::copy_if_dirty(x);
-    let copied_w = ndarray_ext::copy_if_dirty(w);
+    let copied_x = ndarray_ext::copy_if_not_standard(x);
+    let copied_w = ndarray_ext::copy_if_not_standard(w);
 
     // Prepare pointers to buffers
     let x_p = copied_x.map(|inner| inner.as_ptr()).unwrap_or(x.as_ptr());
@@ -269,7 +271,7 @@ fn conv2d_impl<F: Float>(
         let y = NdArray::from_shape_vec_unchecked(IxDyn(&[batch_size, ych, yh, yw]), y);
         let cols =
             NdArray::from_shape_vec_unchecked(IxDyn(&[batch_size, xch, kw, kh, yh, yw]), cols);
-        (y, cols)
+        Ok((y, cols))
     }
 }
 
@@ -283,7 +285,7 @@ fn conv2d_with_cols_impl<F: Float>(cols: &NdArrayView<F>, w: &NdArrayView<F>) ->
     let size_per_batch_y = ych * yh * yw;
 
     // Prepare buffers
-    let copied_w = ndarray_ext::copy_if_dirty(w);
+    let copied_w = ndarray_ext::copy_if_not_standard(w);
     let w_slice = if let Some(ref inner) = copied_w {
         inner.as_slice().unwrap()
     } else {
@@ -322,7 +324,7 @@ impl<T: Float> crate::op::Op<T> for Conv2D {
         // Grab inputs
         let x = &ctx.input(0);
         let w = &ctx.input(1);
-        let (y, cols) = conv2d_impl(
+        let conv = conv2d_impl(
             x,
             w,
             self.pad,
@@ -332,8 +334,15 @@ impl<T: Float> crate::op::Op<T> for Conv2D {
             self.dilation,
             self.dilation,
         );
-        ctx.append_output(Ok(y));
-        ctx.append_output(Ok(cols));
+        match conv {
+            Ok((y, cols)) => {
+                ctx.append_output(y);
+                ctx.append_output(cols);
+            }
+            Err(e) => {
+                ctx.append_error(e);
+            }
+        }
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -355,7 +364,7 @@ impl<T: Float> crate::op::Op<T> for Conv2D {
         let cols = s.nth_tensor(y, 1);
         let gw = Tensor::builder()
             .set_ro_inputs(&[&cols, &gy, &w])
-            .set_backprop_inputs(vec![Input::new(&x), Input::new(&gy)])
+            .set_backprop_inputs(&[Input::new(&x), Input::new(&gy)])
             .build(
                 s,
                 Conv2DFilterGrad {
@@ -365,7 +374,8 @@ impl<T: Float> crate::op::Op<T> for Conv2D {
                 },
             );
 
-        ctx.set_input_grads(vec![Some(gx), Some(gw)]);
+        ctx.append_input_grad(Some(gx));
+        ctx.append_input_grad(Some(gw));
     }
 }
 
@@ -376,7 +386,7 @@ impl<T: Float> crate::op::Op<T> for Conv2DWithCols {
         let cols = &ctx.input(0);
         let w = &ctx.input(1);
         let y = conv2d_with_cols_impl(cols, w);
-        ctx.append_output(Ok(y));
+        ctx.append_output(y);
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -397,7 +407,7 @@ impl<T: Float> crate::op::Op<T> for Conv2DWithCols {
 
         let gw = Tensor::builder()
             .set_ro_inputs(&[&cols, &gy, &w])
-            .set_backprop_inputs(vec![
+            .set_backprop_inputs(&[
                 Input::new(&y.get_backprop_inputs()[0].get(s)),
                 Input::new(&gy),
             ])
@@ -410,7 +420,8 @@ impl<T: Float> crate::op::Op<T> for Conv2DWithCols {
                 },
             );
 
-        ctx.set_input_grads(vec![Some(gx), Some(gw)]);
+        ctx.append_input_grad(Some(gx));
+        ctx.append_input_grad(Some(gw));
     }
 }
 
@@ -430,7 +441,7 @@ fn conv2d_filter_grad_impl<F: Float>(
     let (batch_size, ych, yh, yw) = (gy_shape[0], gy_shape[1], gy_shape[2], gy_shape[3]);
 
     let cols = cols.as_ptr();
-    let copied_gy = ndarray_ext::copy_if_dirty(gy);
+    let copied_gy = ndarray_ext::copy_if_not_standard(gy);
     let gy = copied_gy.map(|inner| inner.as_ptr()).unwrap_or(gy.as_ptr());
 
     unsafe {
@@ -513,7 +524,7 @@ impl<T: Float> crate::op::Op<T> for Conv2DFilterGrad {
         let gy = &ctx.input(1);
         let w = &ctx.input(2);
         let gw = conv2d_filter_grad_impl(cols, gy, w);
-        ctx.append_output(Ok(gw));
+        ctx.append_output(gw);
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -535,7 +546,7 @@ impl<T: Float> crate::op::Op<T> for Conv2DFilterGrad {
 
         let ggy = Tensor::builder()
             .set_ro_inputs(&[&cols, &ggw])
-            .set_backprop_inputs(vec![
+            .set_backprop_inputs(&[
                 Input::new(&y.get_backprop_inputs()[0].get(s)),
                 Input::new(&ggw),
             ])
@@ -548,6 +559,8 @@ impl<T: Float> crate::op::Op<T> for Conv2DFilterGrad {
                 },
             );
 
-        ctx.set_input_grads(vec![Some(gx), Some(ggy), None]);
+        ctx.append_input_grad(Some(gx));
+        ctx.append_input_grad(Some(ggy));
+        ctx.append_input_grad(None);
     }
 }

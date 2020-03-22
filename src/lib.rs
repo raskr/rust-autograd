@@ -1,12 +1,4 @@
 //! Differentiable operations and tensors backed by [ndarray](https://github.com/rust-ndarray/ndarray).
-//! ## Installation
-//!
-//! ```toml
-//! [dependencies]
-//! autograd = { version = "0.9.8", features = ["mkl"] }
-//! ```
-//!
-//! `mkl` feature is recommended to speedup gemm operations using [Intel MKL](https://software.intel.com/en-us/mkl).
 //!
 //! ## Features
 //! ### Lazy, zero-copy tensor evaluation
@@ -62,8 +54,6 @@
 #[macro_use(s)]
 /// re-exported for convenience and version-compatibility
 pub extern crate ndarray;
-pub(crate) extern crate arrayvec;
-extern crate crossbeam;
 extern crate hashbrown;
 #[cfg(feature = "mkl")]
 extern crate intel_mkl_src;
@@ -75,9 +65,9 @@ extern crate num_traits;
 /// re-exported for convenience and version-compatibility
 pub extern crate rand;
 extern crate rand_distr;
-extern crate rand_xoshiro;
 extern crate rayon;
 extern crate rustc_hash;
+pub(crate) extern crate smallvec;
 
 mod gradient;
 pub(crate) mod graph;
@@ -96,7 +86,6 @@ use std::fmt;
 use std::hash::BuildHasherDefault;
 
 pub(crate) type FxHashMap<K, V> = hashbrown::HashMap<K, V, BuildHasherDefault<FxHasher>>;
-pub(crate) type FxHashSet<V> = hashbrown::HashSet<V, BuildHasherDefault<FxHasher>>;
 
 /// Primitive type in this crate, which is actually a decorated `num_traits::Float`.
 pub trait Float:
@@ -177,19 +166,27 @@ pub(crate) unsafe fn uninitialized_vec<T>(size: usize) -> Vec<T> {
     buf
 }
 
-#[inline]
-pub(crate) fn none_vec<T>(len: usize) -> Vec<Option<T>> {
-    let mut vec = Vec::with_capacity(len);
-    for _ in 0..len {
-        vec.push(None);
-    }
-    vec
-}
-
 // Read pointer to type `A` as type `B`.
 //
 // **Panics** if `A` and `B` are not the same type
 #[inline]
 pub(crate) fn cast_as<A: 'static + Copy, B: 'static + Copy>(a: &A) -> B {
     unsafe { ::std::ptr::read(a as *const _ as *const B) }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum EvalError {
+    OpError(op::OpError),
+    Empty,
+}
+
+impl std::error::Error for EvalError {}
+
+impl fmt::Display for EvalError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            EvalError::OpError(e) => e.fmt(f),
+            EvalError::Empty => write!(f, "Empty return value from a stateful op"),
+        }
+    }
 }

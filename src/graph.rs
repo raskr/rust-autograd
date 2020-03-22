@@ -2,6 +2,7 @@
 
 use crate::{tensor::TensorInternal, Float};
 use std::cell::UnsafeCell;
+use std::fmt;
 
 /// Generator of `Tensor` objects.
 ///
@@ -29,7 +30,7 @@ use std::cell::UnsafeCell;
 ///         // ^^^^^^ invalid access for `graph1`
 ///
 ///         // a + c
-///         // ^ invalid access for `a` that is belonging to ``graph1`
+///         // ^ invalid access for `a` that belongs to ``graph1`
 ///     });
 ///     // tensors in graph2 destructed here.
 /// });
@@ -68,15 +69,17 @@ impl<'a, 'b, F: Float> Graph<F> {
             (&mut *self.node_set.get()).clear();
         }
     }
+}
 
-    /// Prints all nodes in this graph to stdout in adhoc fashion
-    pub fn print_graph(&self) {
+impl<T: Float> fmt::Debug for Graph<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         unsafe {
             let set = &*self.node_set.get();
-            println!("graph size: {}", set.len());
+            let mut buf = format!("graph size: {}\n", set.len());
             for ref node in set {
-                println!("{:?}", node);
+                buf += format!("{}\n", node).as_str();
             }
+            write!(f, "{}", buf)
         }
     }
 }

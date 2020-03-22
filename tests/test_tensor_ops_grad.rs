@@ -720,7 +720,7 @@ fn conv2d() {
 #[test]
 fn max_pool2d() {
     with(|graph| {
-        let x = graph.variable(ag::ndarray_ext::range(&[2, 2, 3, 3]));
+        let x = graph.variable(ag::ndarray_ext::standard_normal(&[2, 2, 3, 3]));
         let y = graph.max_pool2d(x, 2, 0, 1);
         let g = graph.grad(&[y], &[x]);
         ag::test_helper::check_theoretical_grads(y, &g, &[x], &[], 1e-3, 1e-2);
@@ -730,8 +730,8 @@ fn max_pool2d() {
 #[test]
 fn max_pool2d_grad() {
     with(|graph| {
-        let arr_x = ag::ndarray_ext::range(&[2, 2, 3, 3]);
-        let arr_gx = ag::ndarray_ext::range(&[2, 2, 2, 2]);
+        let arr_x = ag::ndarray_ext::standard_normal(&[2, 2, 3, 3]);
+        let arr_gx = ag::ndarray_ext::standard_normal(&[2, 2, 2, 2]);
         let x = graph.variable(arr_x);
         let y = graph.max_pool2d(x, 2, 0, 1);
         let gy = graph.variable(arr_gx);

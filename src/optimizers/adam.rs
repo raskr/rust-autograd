@@ -13,13 +13,13 @@ use std::sync::{Arc, RwLock};
 /// ```
 /// extern crate autograd as ag;
 /// use ag::tensor::Variable;
-/// use ag::ndarray_ext::shared;
+/// use ag::ndarray_ext::into_shared;
 /// use std::sync::{Arc, RwLock};
 /// use ag::optimizers::adam;
 ///
 /// // Define parameters to optimize.
-/// let w: Arc<RwLock<ag::NdArray<f32>>> = shared(ag::ndarray_ext::glorot_uniform(&[28 * 28, 10]));
-/// let b: Arc<RwLock<ag::NdArray<f32>>> = shared(ag::ndarray_ext::zeros(&[1, 10]));
+/// let w: Arc<RwLock<ag::NdArray<f32>>> = into_shared(ag::ndarray_ext::glorot_uniform(&[28 * 28, 10]));
+/// let b: Arc<RwLock<ag::NdArray<f32>>> = into_shared(ag::ndarray_ext::zeros(&[1, 10]));
 /// // Make a state of adam.
 /// let state = adam::AdamState::new(&[&w, &b]);
 ///
@@ -73,18 +73,18 @@ impl<'t, 's: 't, F: Float> Adam<F> {
         states: &AdamState<F>,
         g: &'s Graph<F>,
     ) -> Vec<Tensor<'t, 's, F>> {
-        let len = params.len();
-        let mut ret = Vec::with_capacity(len);
-        for i in 0..len {
+        let num_params = params.len();
+        let mut ret = Vec::with_capacity(num_params);
+        for i in 0..num_params {
             let param = &params[i];
             let a: &RwLock<NdArray<F>> = &**param
-                .get_variable_array()
+                .get_variable_array_ref()
                 .as_ref()
                 .expect("Adam expects its inputs to be *variables*.");
-            let k = a as *const RwLock<NdArray<F>> as usize;
+            let key = a as *const RwLock<NdArray<F>> as usize;
             let state = states
                 .var2state
-                .get(&k)
+                .get(&key)
                 .expect("Adam: state object wasn't fed correctly");
             let m = g.variable(state.m.clone());
             let v = g.variable(state.v.clone());
@@ -92,7 +92,7 @@ impl<'t, 's: 't, F: Float> Adam<F> {
 
             ret.push(
                 Tensor::builder()
-                    .set_inputs(vec![
+                    .set_inputs(&[
                         Input::new_mut(param),
                         Input::new(&grads[i]),
                         Input::new_mut(&m),
@@ -131,11 +131,11 @@ impl<'t, 's: 't, F: Float> AdamState<F> {
         let mut map = crate::FxHashMap::default();
         for &var in variables {
             // Use the address on the heap as a hash key
-            let k = ((&**var) as *const RwLock<_>) as usize;
+            let key = ((&**var) as *const RwLock<_>) as usize;
             let var = var.read().unwrap();
             let var_shape = var.shape();
             map.insert(
-                k,
+                key,
                 StateArrays {
                     m: Arc::new(RwLock::new(crate::ndarray_ext::zeros(var_shape))),
                     v: Arc::new(RwLock::new(crate::ndarray_ext::zeros(var_shape))),

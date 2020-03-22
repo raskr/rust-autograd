@@ -13,7 +13,6 @@ documentation = "https://docs.rs/autograd/"
 
 [dependencies]
 rand = "0.7.0"
-rand_xoshiro = "0.4"
 rand_distr = "0.2.2"
 ndarray = "0.12.1"
 glob = "0.2"
@@ -26,7 +25,7 @@ num = "0.2"
 rustc-hash = "1.0.1"
 hashbrown = "0.6"
 crossbeam = "0.7.2"
-arrayvec = "0.5.1"
+smallvec = "1.2.0"
 
 [features]
 mkl = ["intel-mkl-src"]

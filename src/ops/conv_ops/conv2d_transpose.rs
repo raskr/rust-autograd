@@ -34,7 +34,12 @@ fn conv2d_transpose_extract_params<F: Float>(
     stride_w: usize,
     dilation_h: usize,
     dilation_w: usize,
-) -> Conv2DTransposeParams {
+) -> Result<Conv2DTransposeParams, op::OpError> {
+    if !crate::same_type::<F, f32>() && !crate::same_type::<F, f64>() {
+        return Err(op::OpError::TypeUnsupported(
+            "conv2d_transpose: only f32 and f64 are supported.".to_string(),
+        ));
+    }
     let gy_shape = gy.shape();
     let f_shape = w.shape();
 
@@ -49,24 +54,25 @@ fn conv2d_transpose_extract_params<F: Float>(
     let xh = stride_h * (yh - 1) - 2 * pad_h + (dilation_h * (kh - 1) + 1);
     let xw = stride_w * (yw - 1) - 2 * pad_w + (dilation_w * (kw - 1) + 1);
 
-    assert_eq!(
-        gy_shape.len(),
-        4,
-        "ag::conv2d_transpose: Input must be 4D (got {:?})",
-        gy_shape
-    );
-    assert_eq!(
-        f_shape.len(),
-        4,
-        "ag::conv2d_transpose: Filter must be 4D (got {:?})",
-        f_shape
-    );
-    assert_eq!(
-        ych, f_shape[0],
-        "ag::conv2d_transpose: Number of input channels ({:?}) must match second filter dim ({:?})",
-        ych, f_shape[0]
-    );
-    Conv2DTransposeParams {
+    if gy_shape.len() != 4 {
+        return Err(op::OpError::IncompatibleShape(format!(
+            "conv2d_transpose: Input must be 4D (got {:?})",
+            gy_shape
+        )));
+    }
+    if f_shape.len() != 4 {
+        return Err(op::OpError::IncompatibleShape(format!(
+            "conv2d_transpose: Filter must be 4D (got {:?})",
+            f_shape
+        )));
+    }
+    if ych != f_shape[0] {
+        return Err(op::OpError::IncompatibleShape(format!(
+            "conv2d_transpose: Number of input channels ({:?}) must match second filter dim ({:?})",
+            ych, f_shape[0]
+        )));
+    }
+    Ok(Conv2DTransposeParams {
         batch_size,
         xch,
         xh,
@@ -76,7 +82,7 @@ fn conv2d_transpose_extract_params<F: Float>(
         yw,
         kh,
         kw,
-    }
+    })
 }
 
 fn conv2d_transpose_impl<F: Float>(
@@ -88,7 +94,7 @@ fn conv2d_transpose_impl<F: Float>(
     stride_w: usize,
     dilation_h: usize,
     dilation_w: usize,
-) -> NdArray<F> {
+) -> Result<NdArray<F>, op::OpError> {
     let Conv2DTransposeParams {
         batch_size,
         xch,
@@ -101,7 +107,7 @@ fn conv2d_transpose_impl<F: Float>(
         kw,
     } = conv2d_transpose_extract_params(
         gy, w, pad_h, pad_w, stride_h, stride_w, dilation_h, dilation_w,
-    );
+    )?;
 
     // sgemm params
     let k = ych;
@@ -110,8 +116,8 @@ fn conv2d_transpose_impl<F: Float>(
 
     let size_per_batch_col = xch * kh * kw * yh * yw;
 
-    let copied_gy = ndarray_ext::copy_if_dirty(&gy);
-    let copied_w = ndarray_ext::copy_if_dirty(w);
+    let copied_gy = ndarray_ext::copy_if_not_standard(&gy);
+    let copied_w = ndarray_ext::copy_if_not_standard(w);
     let gy_ptr = copied_gy.map(|inner| inner.as_ptr()).unwrap_or(gy.as_ptr());
     let w_ptr = copied_w.map(|inner| inner.as_ptr()).unwrap_or(w.as_ptr());
 
@@ -214,7 +220,12 @@ fn conv2d_transpose_impl<F: Float>(
         )
     };
     // return gx
-    unsafe { NdArray::from_shape_vec_unchecked(ndarray::IxDyn(&[batch_size, xch, xh, xw]), gx) }
+    unsafe {
+        Ok(NdArray::from_shape_vec_unchecked(
+            ndarray::IxDyn(&[batch_size, xch, xh, xw]),
+            gx,
+        ))
+    }
 }
 
 impl<T: Float> crate::op::Op<T> for Conv2DTranspose {
@@ -231,7 +242,14 @@ impl<T: Float> crate::op::Op<T> for Conv2DTranspose {
             self.dilation,
             self.dilation,
         );
-        ctx.append_output(Ok(gx));
+        match gx {
+            Ok(gx) => {
+                ctx.append_output(gx);
+            }
+            Err(e) => {
+                ctx.append_error(e);
+            }
+        }
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -260,7 +278,8 @@ impl<T: Float> crate::op::Op<T> for Conv2DTranspose {
                 },
             );
 
-        ctx.set_input_grads(vec![Some(gx), Some(gw)]);
+        ctx.append_input_grad(Some(gx));
+        ctx.append_input_grad(Some(gw));
     }
 }
 
@@ -406,7 +425,7 @@ impl<T: Float> crate::op::Op<T> for Conv2DTransposeFilterGrad {
             self.stride,
             self.stride,
         );
-        ctx.append_output(Ok(gw));
+        ctx.append_output(gw);
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -433,7 +452,9 @@ impl<T: Float> crate::op::Op<T> for Conv2DTransposeFilterGrad {
             },
         );
 
-        ctx.set_input_grads(vec![Some(ggy), Some(ggx), None]);
+        ctx.append_input_grad(Some(ggy));
+        ctx.append_input_grad(Some(ggx));
+        ctx.append_input_grad(None);
     }
 }
 

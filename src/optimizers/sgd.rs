@@ -34,7 +34,7 @@ impl<'a, 'b: 'a, T: Float> SGD<T> {
         for i in 0..len {
             ret.push(
                 Tensor::builder()
-                    .set_inputs(vec![Input::new_mut(&params[i]), Input::new(&grads[i])])
+                    .set_inputs(&[Input::new_mut(&params[i]), Input::new(&grads[i])])
                     .build(c, sgd::SGDOp::new(self.lr)),
             );
         }

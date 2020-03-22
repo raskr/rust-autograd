@@ -496,17 +496,17 @@ fn batch_mat_mul_requires_copy(stride: &[ndarray::Ixs]) -> bool {
     min_str < row_str || min_str < col_str
 }
 
-#[cold]
-#[inline(never)]
-fn dot_shape_error(m: usize, k: usize, k2: usize, n: usize) -> ! {
+fn dot_shape_error(m: usize, k: usize, k2: usize, n: usize) -> String {
     match m.checked_mul(n) {
         Some(len) if len <= ::std::isize::MAX as usize => {}
-        _ => panic!("ndarray: shape {} × {} overflows isize", m, n),
+        _ => {
+            return format!("ndarray: shape {} × {} overflows isize", m, n);
+        }
     }
-    panic!(
+    format!(
         "ndarray: inputs {} × {} and {} × {} are not compatible for matrix multiplication",
         m, k, k2, n
-    );
+    )
 }
 
 // ========= Op impls =========
@@ -541,7 +541,8 @@ impl<T: Float> op::Op<T> for MatMul {
         }
         let ((m, k), (k2, n)) = (a.dim(), b.dim());
         if k != k2 || m.checked_mul(n).is_none() {
-            dot_shape_error(m, k, k2, n);
+            ctx.append_error(op::OpError::IncompatibleShape(dot_shape_error(m, k, k2, n)));
+            return;
         }
 
         let lhs_s0 = a.strides()[0];
@@ -563,7 +564,7 @@ impl<T: Float> op::Op<T> for MatMul {
         {
             mat_mul_impl_slow(T::one(), &a, &b, T::zero(), &mut c.view_mut());
         }
-        ctx.append_output(Ok(c.into_dyn()));
+        ctx.append_output(c.into_dyn());
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -585,7 +586,8 @@ impl<T: Float> op::Op<T> for MatMul {
             },
         );
 
-        ctx.set_input_grads(vec![Some(opa), Some(opb)]);
+        ctx.append_input_grad(Some(opa));
+        ctx.append_input_grad(Some(opb));
     }
 }
 
@@ -596,16 +598,20 @@ impl<T: Float> op::Op<T> for BatchMatMul {
         let rank0 = x0.ndim();
         let rank1 = x1.ndim();
 
-        assert!(
-            rank0 >= 2,
-            "BatchMatMul: Left-hand-side input's ndim must be >= 2, actual: {}",
-            rank0
-        );
-        assert!(
-            rank1 >= 2,
-            "BatchMatMul: Right-hand-side input's ndim must be >= 2, actual: {}",
-            rank1
-        );
+        if rank0 < 2 {
+            ctx.append_error(op::OpError::IncompatibleShape(format!(
+                "BatchMatMul: Left-hand-side input's ndim must be >= 2, actual: {}",
+                rank0
+            )));
+            return;
+        }
+        if rank1 < 2 {
+            ctx.append_error(op::OpError::IncompatibleShape(format!(
+                "BatchMatMul: Right-hand-side input's ndim must be >= 2, actual: {}",
+                rank1
+            )));
+            return;
+        }
 
         if self.transpose_a {
             x0.swap_axes(rank0 - 2, rank0 - 1);
@@ -618,7 +624,11 @@ impl<T: Float> op::Op<T> for BatchMatMul {
         let shape0 = x0.shape();
         let shape1 = x1.shape();
         if rank0 != rank1 || shape0[..rank0 - 2] != shape1[..rank0 - 2] {
-            panic!("Input shapes mismatch: {:?} vs {:?}", shape0, shape1);
+            ctx.append_error(op::OpError::IncompatibleShape(format!(
+                "Input shapes mismatch: {:?} vs {:?}",
+                shape0, shape1
+            )));
+            return;
         }
 
         let ret_shape = {
@@ -646,7 +656,7 @@ impl<T: Float> op::Op<T> for BatchMatMul {
         }
 
         // reshape to dst shape with safe unwrapping
-        ctx.append_output(Ok(c));
+        ctx.append_output(c);
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -667,7 +677,8 @@ impl<T: Float> op::Op<T> for BatchMatMul {
             },
         );
 
-        ctx.set_input_grads(vec![Some(opa), Some(opb)]);
+        ctx.append_input_grad(Some(opa));
+        ctx.append_input_grad(Some(opb));
     }
 }
 
@@ -736,14 +747,17 @@ impl<T: Float> op::Op<T> for TensordotPreprocess {
         let r3 = NdArray::from_shape_vec(ndarray::IxDyn(&[new_shape0.len()]), new_shape0).unwrap();
         let r4 = NdArray::from_shape_vec(ndarray::IxDyn(&[new_shape1.len()]), new_shape1).unwrap();
 
-        ctx.append_output(Ok(r0));
-        ctx.append_output(Ok(r1));
-        ctx.append_output(Ok(r2));
-        ctx.append_output(Ok(r3));
-        ctx.append_output(Ok(r4));
+        ctx.append_output(r0);
+        ctx.append_output(r1);
+        ctx.append_output(r2);
+        ctx.append_output(r3);
+        ctx.append_output(r4);
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
-        ctx.set_input_grads(vec![None; 4]);
+        ctx.append_input_grad(None);
+        ctx.append_input_grad(None);
+        ctx.append_input_grad(None);
+        ctx.append_input_grad(None);
     }
 }

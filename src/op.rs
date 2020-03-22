@@ -1,26 +1,57 @@
 //! Defining things related to `ag::op::Op`.
 //!
-use crate::arrayvec::ArrayVec;
 use crate::ndarray_ext::{NdArrayView, NdArrayViewMut};
+use crate::smallvec::SmallVec;
 use crate::tensor::{Tensor, TensorInternal};
 use crate::{Float, NdArray};
 use std::any::type_name;
+use std::fmt;
 use std::marker::PhantomData;
 use std::mem;
 
-pub(crate) const NUM_MAX_OUTPUT: usize = 8;
+pub(crate) const NUM_MAX_OUTPUT: usize = 6;
+pub(crate) const NUM_MAX_INPUT: usize = 6;
+
+pub(crate) type InputArray<T> = SmallVec<[T; NUM_MAX_INPUT]>;
+pub(crate) type OutputArray<T> = SmallVec<[T; NUM_MAX_OUTPUT]>;
+
+pub(crate) type ComputeResult<'v, T> = Result<crate::ArrRepr<'v, T>, OpError>;
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum OpError {
+    NdArrayError(String, ndarray::ShapeError),
+    IncompatibleShape(String),
+    TypeUnsupported(String),
+    InvalidDims(String),
+    OutOfBounds(String),
+}
+
+impl std::error::Error for OpError {}
+
+impl fmt::Display for OpError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            OpError::NdArrayError(pref, e) => write!(f, "{}: ", pref).and_then(|()| e.fmt(f)),
+            OpError::IncompatibleShape(s) => write!(f, "{}: ", s),
+            OpError::TypeUnsupported(s) => write!(f, "{}: ", s),
+            OpError::InvalidDims(s) => write!(f, "{}: ", s),
+            OpError::OutOfBounds(s) => write!(f, "{}: ", s),
+        }
+    }
+}
 
 /// Sequence of an op's compute result.
 ///
 /// Op can have multiple output arrays.
-pub(crate) type Results<'v, T> =
-    ArrayVec<[Result<crate::ArrRepr<'v, T>, ComputeException>; NUM_MAX_OUTPUT]>;
+pub(crate) type Results<'v, T> = OutputArray<Option<ComputeResult<'v, T>>>;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 /// Exception in `Op`'s computation.
 pub enum ComputeException {
     /// Computation finished correctly with no output (typically used for variable-optimizer's output)
     NoOutput,
+    /// Computation failed due to bad-input etc.
+    ComputeFailed(String),
 }
 
 /// Operation trait. `Tensor` wraps trait-object of this.
@@ -59,7 +90,7 @@ pub enum ComputeException {
 ///         let gy = ctx.output_grad();
 ///         let y = ctx.output();
 ///         let gx = gy * (y - ctx.graph().square(y));
-///         ctx.set_input_grads(vec![Some(gx)]);
+///         ctx.append_input_grad(Some(gx));
 ///     }
 /// }
 ///
@@ -69,7 +100,7 @@ pub enum ComputeException {
 /// fn sigmoid<'graph, 'tensor, F: ag::Float>(x: &ag::Tensor<'tensor, 'graph, F>, g: &'graph ag::Graph<F>)
 /// -> ag::Tensor<'tensor, 'graph, F> {
 ///     ag::Tensor::builder()
-///            .set_inputs(vec![Input::new(x)])
+///            .set_inputs(&[Input::new(x)])
 ///            .build(g, Sigmoid)
 /// }
 /// ```
@@ -128,7 +159,7 @@ impl<'v, T: Float> OpInput<'v, T> {
     }
 }
 
-/// Contains properties used for an `Op`'s computation.
+/// Contains properties for an `Op`'s computation phase.
 ///
 /// # Example
 ///
@@ -157,19 +188,15 @@ impl<'v, T: Float> OpInput<'v, T> {
 /// }
 /// ```
 pub struct ComputeContext<'k, 'v, T: Float> {
-    // A `Tensor` object can be looked up in `Op::compute`
     node: &'k TensorInternal<T>,
     // Input arrays
     xs: Vec<OpInput<'v, T>>,
     // Output arrays
-    ys: ArrayVec<[Result<crate::ArrRepr<'v, T>, crate::op::ComputeException>; NUM_MAX_OUTPUT]>,
+    ys: Results<'v, T>,
 }
 
 impl<'s, 'k: 's, 'v: 's, T: Float> ComputeContext<'k, 'v, T> {
-    pub(crate) fn extract_outputs(
-        self,
-    ) -> ArrayVec<[Result<crate::ArrRepr<'v, T>, crate::op::ComputeException>; NUM_MAX_OUTPUT]>
-    {
+    pub(crate) fn extract_outputs(self) -> Results<'v, T> {
         self.ys
     }
 
@@ -178,7 +205,7 @@ impl<'s, 'k: 's, 'v: 's, T: Float> ComputeContext<'k, 'v, T> {
         ComputeContext {
             node,
             xs,
-            ys: ArrayVec::<[_; NUM_MAX_OUTPUT]>::new(),
+            ys: OutputArray::new(),
         }
     }
 
@@ -242,35 +269,35 @@ impl<'s, 'k: 's, 'v: 's, T: Float> ComputeContext<'k, 'v, T> {
 
     /// Appends an `ndarray::ArrayView` to the back of the output list of the current op.
     ///
-    /// Implementors of `Op::compute` must not forget to call this method in `Op::compute`, otherwise panic occurs.
-    pub fn append_output_view(
-        &mut self,
-        y: Result<NdArrayView<'v, T>, crate::op::ComputeException>,
-    ) {
-        match self.ys.try_push(y.map(crate::ArrRepr::View)) {
-            Ok(()) => {}
-            _ => {
-                panic!(
-                    "Bad op impl: reached the maximum number of output arrays ({})",
-                    NUM_MAX_OUTPUT
-                );
-            }
-        }
+    /// NOTE: Implementor of `Op::compute` must not forget to call `append_*` as many as the number of its output in `Op::compute`, otherwise panic occurs.
+    #[inline]
+    pub fn append_output_view(&mut self, y: NdArrayView<'v, T>) {
+        self.ys.push(Some(Ok(crate::ArrRepr::View(y))));
     }
 
     /// Appends an ndarray to the back of the output list of the current op.
     ///
-    /// Implementors of `Op::compute` must not forget to call this method in `Op::compute`, otherwise panic occurs.
-    pub fn append_output(&mut self, y: Result<NdArray<T>, crate::op::ComputeException>) {
-        match self.ys.try_push(y.map(crate::ArrRepr::Owned)) {
-            Ok(()) => {}
-            _ => {
-                panic!(
-                    "Bad op impl: reached the maximum number of output arrays ({})",
-                    NUM_MAX_OUTPUT
-                );
-            }
-        }
+    /// NOTE: Implementor of `Op::compute` must not forget to call `append_*` as many as the number of its output in `Op::compute`, otherwise panic occurs.
+    #[inline]
+    pub fn append_output(&mut self, y: NdArray<T>) {
+        self.ys.push(Some(Ok(crate::ArrRepr::Owned(y))));
+    }
+
+    /// Appends an empty result to the back of the output list of the current op.
+    ///
+    /// For example, this is used for gradient-descent-optimizers.
+    /// NOTE: Implementor of `Op::compute` must not forget to call `append_*` as many as the number of its output in `Op::compute`, otherwise panic occurs.
+    #[inline]
+    pub fn append_empty_output(&mut self) {
+        self.ys.push(None);
+    }
+
+    /// Appends an ndarray to the back of the output list of the current op.
+    ///
+    /// NOTE: Implementor of `Op::compute` must not forget to call `append_*` as many as the number of its output in `Op::compute`, otherwise panic occurs.
+    #[inline]
+    pub fn append_error(&mut self, y: OpError) {
+        self.ys.push(Some(Err(y)));
     }
 
     /// Returns a number of input arrays.
@@ -301,22 +328,22 @@ impl<'s, 'k: 's, 'v: 's, T: Float> ComputeContext<'k, 'v, T> {
 ///         // `Tensor` computations
 ///         let gx = gy * (y - ctx.graph().square(y));
 ///         // Propagates input's gradient.
-///         ctx.set_input_grads(vec![Some(gx)]);
+///         ctx.append_input_grad(Some(gx));
 ///     }
 /// }
 /// ```
 pub struct GradientContext<'tensor, 'scope: 'tensor, T: Float> {
     gy: Tensor<'tensor, 'scope, T>,
-    xs: Vec<Tensor<'tensor, 'scope, T>>,
+    xs: InputArray<Tensor<'tensor, 'scope, T>>,
     y: Tensor<'tensor, 'scope, T>,
     graph: &'scope crate::graph::Graph<T>,
-    gxs: Option<Vec<Option<Tensor<'tensor, 'scope, T>>>>,
+    gxs: Option<InputArray<Option<Tensor<'tensor, 'scope, T>>>>,
 }
 
 impl<'tensor, 'scope: 'tensor, T: Float> GradientContext<'tensor, 'scope, T> {
     pub(crate) fn new(
         gy: Tensor<'tensor, 'scope, T>,
-        xs: Vec<Tensor<'tensor, 'scope, T>>,
+        xs: InputArray<Tensor<'tensor, 'scope, T>>,
         y: Tensor<'tensor, 'scope, T>,
         graph: &'scope crate::graph::Graph<T>,
     ) -> Self {
@@ -329,7 +356,7 @@ impl<'tensor, 'scope: 'tensor, T: Float> GradientContext<'tensor, 'scope, T> {
         }
     }
 
-    pub(crate) fn extract_input_grads(self) -> Vec<Option<Tensor<'tensor, 'scope, T>>> {
+    pub(crate) fn extract_input_grads(self) -> InputArray<Option<Tensor<'tensor, 'scope, T>>> {
         self.gxs
             .expect("Bad Op impl: GradientContext::set_input_grads was not called")
     }
@@ -358,17 +385,22 @@ impl<'tensor, 'scope: 'tensor, T: Float> GradientContext<'tensor, 'scope, T> {
         self.xs.len()
     }
 
-    /// Returns a graph object that is usable for tensor computations
+    /// Returns a graph object that is usable for tensor computations in the context.
     #[inline]
     pub fn graph(&self) -> &'scope crate::graph::Graph<T> {
         self.graph
     }
 
-    /// Sets gradients of `xs`.
+    /// Back-propagates the input's gradient.
     ///
-    /// All the `Op::grad` implementation must call this function even if it is not differentiable.
+    /// Appends the given tensor to the back of the input-gradient-list.
+    /// `None` argument indicates that the `Op`'s input doesn't have gradient.
+    /// Note that `Op::grad` must call this function as many as `num_inputs()`.
     #[inline]
-    pub fn set_input_grads(&mut self, gxs: Vec<Option<Tensor<'tensor, 'scope, T>>>) {
-        self.gxs = Some(gxs);
+    pub fn append_input_grad(&mut self, gx: Option<Tensor<'tensor, 'scope, T>>) {
+        if self.gxs.is_none() {
+            self.gxs = Some(InputArray::new());
+        }
+        self.gxs.as_mut().unwrap().push(gx);
     }
 }

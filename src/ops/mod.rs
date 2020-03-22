@@ -1,7 +1,7 @@
 //! A collection of functions to manipulate `ag::Tensor` objects
 use ndarray;
 
-use crate::ndarray_ext::{ArrRng, NdArray};
+use crate::ndarray_ext::{ArrayRng, NdArray};
 use crate::tensor::{AsTensor, Tensor, TensorInternal};
 use crate::Float;
 use rand::Rng;
@@ -54,7 +54,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
         x: &'tensor TensorInternal<F>,
     ) -> Tensor<'tensor, 'graph, F> {
         Tensor {
-            tensor: x,
+            inner: x,
             graph: self,
         }
     }
@@ -136,9 +136,9 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
         B: AsRef<Tensor<'tensor, 'graph, F>> + Copy,
         C: AsRef<Tensor<'tensor, 'graph, F>> + Copy,
     {
-        let xs: Vec<_> = xs.iter().map(|x| x.as_ref().tensor).collect();
-        let ys: Vec<_> = ys.iter().map(|y| y.as_ref().tensor).collect();
-        let ys_grads: Vec<_> = ys_grads.iter().map(|x| x.as_ref().tensor).collect();
+        let xs: Vec<_> = xs.iter().map(|x| x.as_ref().inner).collect();
+        let ys: Vec<_> = ys.iter().map(|y| y.as_ref().inner).collect();
+        let ys_grads: Vec<_> = ys_grads.iter().map(|x| x.as_ref().inner).collect();
         crate::gradient::symbolic_gradients(ys.as_slice(), xs.as_slice(), ys_grads.as_slice(), self)
     }
 
@@ -179,13 +179,13 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
         B: AsRef<Tensor<'tensor, 'graph, F>> + Copy,
     {
         let y = y_.as_ref();
-        let xs: Vec<_> = xs_.iter().map(|x| x.as_ref().tensor).collect();
+        let xs: Vec<_> = xs_.iter().map(|x| x.as_ref().inner).collect();
         let mut vec_vec = Vec::with_capacity(objective_len);
-        let gy = self.scalar(F::one()).tensor;
+        let gy = self.scalar(F::one()).inner;
         for i in 0..objective_len as isize {
             vec_vec.push({
                 crate::gradient::symbolic_gradients(
-                    &[y.access_elem(i).tensor],
+                    &[y.access_elem(i).inner],
                     xs.as_slice(),
                     &[gy],
                     self,
@@ -299,9 +299,9 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
     where
         A: AsRef<Tensor<'tensor, 'graph, F>> + Copy,
     {
-        if let Some(id) = x.as_ref().tensor.shape {
+        if let Some(id) = x.as_ref().inner.shape {
             Tensor {
-                tensor: self.access_node(id),
+                inner: self.access_node(id),
                 graph: self,
             }
         } else {
@@ -500,7 +500,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
     {
         Tensor::builder()
             .set_input(x.as_ref())
-            .set_input_indices(vec![n])
+            .set_input_indices(&[n])
             .build(self, activation_ops::Identity)
     }
 
@@ -1870,6 +1870,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
     where
         A: AsRef<Tensor<'tensor, 'graph, F>> + Copy,
     {
+        assert_ne!(_tensors.len(), 0);
         let op = array_ops::Concat { axis };
         let tensors = _tensors.iter().map(|t| t.as_ref()).collect::<Vec<_>>();
         Tensor::builder().set_ro_inputs(&tensors).build(self, op)
@@ -2053,9 +2054,11 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
     }
 
     /// Outputs values sampled from the normal distribution.
-    pub fn random_normal_rng<A, R: Rng + Send + 'static>(
+    ///
+    /// Pre-instantiated [ArrayRng](ndarray_ext/array_gen/struct.ArrayRng.html) is acceptable.
+    pub fn random_normal_rng<A, R: Rng + 'static>(
         &'graph self,
-        arr_rng: ArrRng<F, R>,
+        arr_rng: ArrayRng<F, R>,
         shape: &A,
         mean: f64,
         stddev: f64,
@@ -2085,10 +2088,10 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
 
     /// Outputs values sampled from the uniform distribution.
     ///
-    /// See https://github.com/raskr/rust-autograd/issues/1.
-    pub fn random_uniform_rng<A, R: Rng + Send + 'static>(
+    /// Pre-instantiated [ArrayRng](ndarray_ext/array_gen/struct.ArrayRng.html) is acceptable.
+    pub fn random_uniform_rng<A, R: Rng + 'static>(
         &'graph self,
-        arr_rng: ArrRng<F, R>,
+        arr_rng: ArrayRng<F, R>,
         shape: &A,
         min: f64,
         max: f64,
@@ -2113,10 +2116,10 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
 
     /// Outputs values sampled from the standard normal distribution.
     ///
-    /// See https://github.com/raskr/rust-autograd/issues/1.
-    pub fn standard_normal_rng<A, R: Rng + Send + 'static>(
+    /// Pre-instantiated [ArrayRng](ndarray_ext/array_gen/struct.ArrayRng.html) is acceptable.
+    pub fn standard_normal_rng<A, R: Rng + 'static>(
         &'graph self,
-        arr_rng: ArrRng<F, R>,
+        arr_rng: ArrayRng<F, R>,
         shape: &A,
     ) -> Tensor<'tensor, 'graph, F>
     where
@@ -2140,10 +2143,10 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
 
     /// Outputs values sampled from the standard uniform distribution.
     ///
-    /// See https://github.com/raskr/rust-autograd/issues/1.
-    pub fn standard_uniform_rng<A, R: Rng + Send + 'static>(
+    /// Pre-instantiated [ArrayRng](ndarray_ext/array_gen/struct.ArrayRng.html) is acceptable.
+    pub fn standard_uniform_rng<A, R: Rng + 'static>(
         &'graph self,
-        arr_rng: ArrRng<F, R>,
+        arr_rng: ArrayRng<F, R>,
         shape: &A,
     ) -> Tensor<'tensor, 'graph, F>
     where
@@ -2166,10 +2169,10 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
 
     /// Outputs values sampled from the bernoulli distribution.
     ///
-    /// See https://github.com/raskr/rust-autograd/issues/1.
-    pub fn bernoulli_rng<A, R: Rng + Send + 'static>(
+    /// Pre-instantiated [ArrayRng](ndarray_ext/array_gen/struct.ArrayRng.html) is acceptable.
+    pub fn bernoulli_rng<A, R: Rng + 'static>(
         &'graph self,
-        arr_rng: ArrRng<F, R>,
+        arr_rng: ArrayRng<F, R>,
         shape: &A,
         p: f64,
     ) -> Tensor<'tensor, 'graph, F>
@@ -2193,10 +2196,10 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
 
     /// Outputs values sampled from the exponential distribution.
     ///
-    /// See https://github.com/raskr/rust-autograd/issues/1.
-    pub fn random_exp_rng<A, R: Rng + Send + 'static>(
+    /// Pre-instantiated [ArrayRng](ndarray_ext/array_gen/struct.ArrayRng.html) is acceptable.
+    pub fn random_exp_rng<A, R: Rng + 'static>(
         &'graph self,
-        arr_rng: ArrRng<F, R>,
+        arr_rng: ArrayRng<F, R>,
         shape: &A,
         lambda: f64,
     ) -> Tensor<'tensor, 'graph, F>
@@ -2225,10 +2228,10 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
 
     /// Outputs values sampled from the gamma distribution.
     ///
-    /// See https://github.com/raskr/rust-autograd/issues/1.
-    pub fn random_gamma_rng<A, R: Rng + Send + 'static>(
+    /// Pre-instantiated [ArrayRng](ndarray_ext/array_gen/struct.ArrayRng.html) is acceptable.
+    pub fn random_gamma_rng<A, R: Rng + 'static>(
         &'graph self,
-        arr_rng: ArrRng<F, R>,
+        arr_rng: ArrayRng<F, R>,
         shape: &A,
         shape_param: f64,
         scale: f64,
@@ -2258,10 +2261,10 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
 
     /// Outputs values sampled from the log-normal distribution.
     ///
-    /// See https://github.com/raskr/rust-autograd/issues/1.
-    pub fn log_normal_rng<A, R: Rng + Send + 'static>(
+    /// Pre-instantiated [ArrayRng](ndarray_ext/array_gen/struct.ArrayRng.html) is acceptable.
+    pub fn log_normal_rng<A, R: Rng + 'static>(
         &'graph self,
-        arr_rng: ArrRng<F, R>,
+        arr_rng: ArrayRng<F, R>,
         shape: &A,
         mean: f64,
         stddev: f64,

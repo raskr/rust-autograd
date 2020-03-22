@@ -11,12 +11,13 @@ impl ag::op::Op<f32> for MultiOutputOp {
     fn compute(&self, ctx: &mut ag::op::ComputeContext<f32>) {
         let a = ag::ndarray_ext::zeros(&[2, 3]);
         let b = ag::ndarray_ext::zeros(&[1, 3]);
-        ctx.append_output(Ok(a));
-        ctx.append_output(Ok(b));
+        ctx.append_output(a);
+        ctx.append_output(b);
     }
 
     fn grad(&self, ctx: &mut ag::op::GradientContext<f32>) {
-        ctx.set_input_grads(vec![None; 2])
+        ctx.append_input_grad(None);
+        ctx.append_input_grad(None);
     }
 }
 

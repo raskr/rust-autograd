@@ -169,7 +169,7 @@ impl<T: Float> crate::op::Op<T> for MaxPool2D {
         let c = x_shape[1];
         let xh = x_shape[2];
         let xw = x_shape[3];
-        let copied_x = ndarray_ext::copy_if_dirty(x);
+        let copied_x = ndarray_ext::copy_if_not_standard(x);
         let x = copied_x.map(|inner| inner.as_ptr()).unwrap_or(x.as_ptr());
 
         let yh = (xh + 2 * self.pad - self.size) / self.stride + 1;
@@ -202,13 +202,20 @@ impl<T: Float> crate::op::Op<T> for MaxPool2D {
                     self.stride,
                 )
             } else {
-                panic!("MaxPoolGrad supports only f32 and f64");
+                ctx.append_error(op::OpError::TypeUnsupported(
+                    "MaxPool supports only f32 and f64".to_string(),
+                ));
+                return;
             }
         };
-        let output = NdArray::from_shape_vec(ndarray::IxDyn(&[batch, c, yh, yw]), output);
-        let indices = NdArray::from_shape_vec(ndarray::IxDyn(&[batch, c, yh, yw]), indices);
-        ctx.append_output(Ok(output.unwrap()));
-        ctx.append_output(Ok(indices.unwrap()));
+        unsafe {
+            let output =
+                NdArray::from_shape_vec_unchecked(ndarray::IxDyn(&[batch, c, yh, yw]), output);
+            let indices =
+                NdArray::from_shape_vec_unchecked(ndarray::IxDyn(&[batch, c, yh, yw]), indices);
+            ctx.append_output(output);
+            ctx.append_output(indices);
+        }
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -224,7 +231,7 @@ impl<T: Float> crate::op::Op<T> for MaxPool2D {
                 size: self.size,
             },
         );
-        ctx.set_input_grads(vec![Some(gx)]);
+        ctx.append_input_grad(Some(gx));
     }
 }
 
@@ -237,7 +244,7 @@ impl<T: Float> crate::op::Op<T> for MaxPool2DGrad {
         let c = gy_shape[1];
         let yh = gy_shape[2];
         let yw = gy_shape[3];
-        let copied_gy = ndarray_ext::copy_if_dirty(gy);
+        let copied_gy = ndarray_ext::copy_if_not_standard(gy);
         let gy = copied_gy.map(|inner| inner.as_ptr()).unwrap_or(gy.as_ptr());
 
         let xh = self.stride * (yh - 1) - 2 * self.pad + self.size;
@@ -247,10 +254,15 @@ impl<T: Float> crate::op::Op<T> for MaxPool2DGrad {
         } else if same_type::<T, f64>() {
             max_pool_grad_f64(batch, gy, xh, xw, yh, yw, c, argmax.as_ptr() as *const f64)
         } else {
-            panic!("MaxPoolGrad supports only f32 and f64");
+            ctx.append_error(op::OpError::TypeUnsupported(
+                "MaxPool2DGrad supports only f32 and f64".to_string(),
+            ));
+            return;
         };
-        let gx = NdArray::from_shape_vec(ndarray::IxDyn(&[batch, c, xh, xw]), gx);
-        ctx.append_output(Ok(gx.unwrap()));
+        unsafe {
+            let gx = NdArray::from_shape_vec_unchecked(ndarray::IxDyn(&[batch, c, xh, xw]), gx);
+            ctx.append_output(gx);
+        }
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -265,7 +277,8 @@ impl<T: Float> crate::op::Op<T> for MaxPool2DGrad {
                 size: self.size,
             },
         );
-        ctx.set_input_grads(vec![Some(ggy), None]);
+        ctx.append_input_grad(Some(ggy));
+        ctx.append_input_grad(None);
     }
 }
 
@@ -273,7 +286,7 @@ impl<T: Float> crate::op::Op<T> for MaxPool2DGradGrad {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         let ggx = &ctx.input(0);
         let x_shape = ggx.shape();
-        let copied_ggx = ndarray_ext::copy_if_dirty(ggx);
+        let copied_ggx = ndarray_ext::copy_if_not_standard(ggx);
         let ggx = copied_ggx
             .map(|inner| inner.as_ptr())
             .unwrap_or(ggx.as_ptr());
@@ -290,14 +303,18 @@ impl<T: Float> crate::op::Op<T> for MaxPool2DGradGrad {
             } else if same_type::<T, f64>() {
                 max_pool_grad_grad_f64(ggx, yh, yw, c, batch, argmax.as_ptr() as *const f64)
             } else {
-                panic!("MaxPoolGradGrad supports only f32 and f64");
+                ctx.append_error(op::OpError::TypeUnsupported(
+                    "MaxPool2DGradGrad supports only f32 and f64".to_string(),
+                ));
+                return;
             };
-            NdArray::from_shape_vec(ndarray::IxDyn(&[batch, c, yh, yw]), ggy).unwrap()
+            NdArray::from_shape_vec_unchecked(ndarray::IxDyn(&[batch, c, yh, yw]), ggy)
         };
-        ctx.append_output(Ok(ggy));
+        ctx.append_output(ggy);
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
-        ctx.set_input_grads(vec![None, None]);
+        ctx.append_input_grad(None);
+        ctx.append_input_grad(None);
     }
 }

@@ -27,7 +27,7 @@ pub(crate) enum ArrRepr<'v, T: Float> {
     View(NdArrayView<'v, T>),
 }
 
-/// Helper to use ndarrays for variable tensors.
+/// Helper to feed ndarrays into variable tensors.
 ///
 /// Converts the input array into `ndarray::Array<F, ndarray::IxDyn>`
 /// and then simply wraps it with `Arc<RwLock<...>>`.
@@ -41,14 +41,14 @@ pub(crate) enum ArrRepr<'v, T: Float> {
 ///
 /// type NdArray = ndarray::Array<f32, ndarray::IxDyn>;
 ///
-/// let w_arr: Arc<RwLock<NdArray>> = array::shared(array::glorot_uniform(&[28 * 28, 10]));
+/// let w_arr: Arc<RwLock<NdArray>> = array::into_shared(array::glorot_uniform(&[28 * 28, 10]));
 /// ag::with(|g| {
 ///     let w = g.variable(w_arr.clone());
 /// });
 ///
 /// ```
 #[inline]
-pub fn shared<F: Float, D: ndarray::Dimension>(
+pub fn into_shared<F: Float, D: ndarray::Dimension>(
     arr: ndarray::Array<F, D>,
 ) -> Arc<RwLock<NdArray<F>>> {
     Arc::new(RwLock::new(arr.into_dyn()))
@@ -143,7 +143,7 @@ pub(crate) fn is_fully_transposed(strides: &[ndarray::Ixs]) -> bool {
 }
 
 #[inline]
-pub(crate) fn copy_if_dirty<T: Float>(x: &NdArrayView<T>) -> Option<NdArray<T>> {
+pub(crate) fn copy_if_not_standard<T: Float>(x: &NdArrayView<T>) -> Option<NdArray<T>> {
     if !x.is_standard_layout() {
         Some(deep_copy(x))
     } else {
@@ -230,57 +230,65 @@ pub(crate) fn get_batch_ptrs<A: Float, B>(
 pub mod array_gen {
     use super::*;
     use rand::distributions::Distribution;
-    use rand::SeedableRng;
     use rand::{self, Rng};
     use rand_distr;
-    use rand_xoshiro::Xoshiro256StarStar;
     use std::marker::PhantomData;
     use std::sync::Mutex;
 
-    /// Internal object to create ndarrays whose elements are random numbers.
+    /// Structure to create ndarrays whose elements are pseudorandom numbers.
     ///
-    /// This is actually a wrapper of an arbitrary `rand::Rng`.
-    /// You can use custom `Rng` with `new` function, whereas `default` function is provided;
-    /// see https://github.com/raskr/rust-autograd/issues/1.
-    pub struct ArrRng<T: Float, R: Rng + Send> {
+    /// This is actually a wrapper of an arbitrary `rand::Rng`, the default is `rand::rngs::ThreadRng`.
+    ///
+    /// ```
+    /// use autograd as ag;
+    /// use rand;
+    ///
+    /// type NdArray = ndarray::Array<f32, ndarray::IxDyn>;
+    ///
+    /// let my_rng = ag::ndarray_ext::ArrayRng::new(rand::thread_rng());
+    /// let random: NdArray = my_rng.standard_normal(&[2, 3]);
+    ///
+    /// // The default is `ThreadRng` (seed number is not fixed).
+    /// let default = ag::ndarray_ext::ArrayRng::default();
+    /// let random: NdArray = default.standard_normal(&[2, 3]);
+    ///
+    /// // Well-known distributions with default Rng are built-in.
+    /// // This is same as `ag::ndarray_ext::ArrayRng::default()::standard_normal`.
+    /// let random: NdArray = ag::ndarray_ext::standard_normal(&[2, 3]);
+    /// ```
+    pub struct ArrayRng<T: Float, R: Rng> {
         phantom: PhantomData<T>,
         rng: Mutex<R>,
     }
 
-    impl<T: Float> Default for ArrRng<T, Xoshiro256StarStar> {
+    impl<T: Float> Default for ArrayRng<T, rand::rngs::ThreadRng> {
+        /// Initialize with `rand::rngs::ThreadRng`.
         fn default() -> Self {
-            ArrRng {
+            ArrayRng {
                 phantom: PhantomData,
-                rng: Mutex::new(Xoshiro256StarStar::seed_from_u64(42)),
+                rng: Mutex::new(rand::thread_rng()),
             }
         }
     }
 
-    impl<T: Float, R: Rng + Send> ArrRng<T, R> {
-        /// Creates `ArrRng` object with `Rng` object.
+    impl<T: Float, R: Rng> ArrayRng<T, R> {
+        /// Creates `ArrRng` with pre-instantiated `Rng`.
         pub fn new(rng: R) -> Self {
-            ArrRng {
+            ArrayRng {
                 phantom: PhantomData,
                 rng: Mutex::new(rng),
             }
         }
 
-        #[inline]
-        unsafe fn alloc(size: usize) -> Vec<T> {
-            let mut buf: Vec<T> = Vec::with_capacity(size);
-            buf.set_len(size);
-            buf
-        }
-
         /// Generates `ndarray::Array<T, ndarray::IxDyn>` whose elements are random numbers.
-        pub fn gen_random_array<I>(&self, shape: &[usize], dist: I) -> NdArray<T>
+        fn gen_random_array<I>(&self, shape: &[usize], dist: I) -> NdArray<T>
         where
             I: Distribution<f64>,
         {
             let size: usize = shape.into_iter().cloned().product();
             let mut rng = self.rng.lock().unwrap();
             unsafe {
-                let mut buf = Self::alloc(size);
+                let mut buf = crate::uninitialized_vec(size);
                 for i in 0..size {
                     *buf.get_unchecked_mut(i) = T::from(dist.sample(&mut *rng)).unwrap();
                 }
@@ -337,7 +345,7 @@ pub mod array_gen {
             let mut rng = self.rng.lock().unwrap();
             let size: usize = shape.into_iter().cloned().product();
             unsafe {
-                let mut buf = Self::alloc(size);
+                let mut buf = crate::uninitialized_vec(size);
                 for i in 0..size {
                     let val = dist.sample(&mut *rng);
                     *buf.get_unchecked_mut(i) = T::from(i32::from(val < p)).unwrap();
@@ -401,7 +409,7 @@ pub mod array_gen {
         mean: f64,
         stddev: f64,
     ) -> ndarray::Array<T, ndarray::IxDyn> {
-        ArrRng::default().random_normal(shape, mean, stddev)
+        ArrayRng::default().random_normal(shape, mean, stddev)
     }
 
     #[inline]
@@ -411,37 +419,37 @@ pub mod array_gen {
         min: f64,
         max: f64,
     ) -> ndarray::Array<T, ndarray::IxDyn> {
-        ArrRng::default().random_uniform(shape, min, max)
+        ArrayRng::default().random_uniform(shape, min, max)
     }
 
     #[inline]
     /// Creates an ndarray sampled from the standard normal distribution.
     pub fn standard_normal<T: Float>(shape: &[usize]) -> ndarray::Array<T, ndarray::IxDyn> {
-        ArrRng::default().standard_normal(shape)
+        ArrayRng::default().standard_normal(shape)
     }
 
     #[inline]
     /// Creates an ndarray sampled from the standard uniform distribution.
     pub fn standard_uniform<T: Float>(shape: &[usize]) -> ndarray::Array<T, ndarray::IxDyn> {
-        ArrRng::default().standard_uniform(shape)
+        ArrayRng::default().standard_uniform(shape)
     }
 
     #[inline]
     /// Glorot normal initialization. (a.k.a. Xavier normal initialization)
     pub fn glorot_normal<T: Float>(shape: &[usize]) -> ndarray::Array<T, ndarray::IxDyn> {
-        ArrRng::default().glorot_normal(shape)
+        ArrayRng::default().glorot_normal(shape)
     }
 
     #[inline]
     /// Glorot uniform initialization. (a.k.a. Xavier uniform initialization)
     pub fn glorot_uniform<T: Float>(shape: &[usize]) -> ndarray::Array<T, ndarray::IxDyn> {
-        ArrRng::default().glorot_uniform(shape)
+        ArrayRng::default().glorot_uniform(shape)
     }
 
     /// Creates an ndarray sampled from the bernoulli distribution with given params.
     #[inline]
     pub fn bernoulli<T: Float>(shape: &[usize], p: f64) -> ndarray::Array<T, ndarray::IxDyn> {
-        ArrRng::default().bernoulli(shape, p)
+        ArrayRng::default().bernoulli(shape, p)
     }
 
     /// Creates an ndarray sampled from the exponential distribution with given params.
@@ -450,7 +458,7 @@ pub mod array_gen {
         shape: &[usize],
         lambda: f64,
     ) -> ndarray::Array<T, ndarray::IxDyn> {
-        ArrRng::default().exponential(shape, lambda)
+        ArrayRng::default().exponential(shape, lambda)
     }
 
     /// Creates an ndarray sampled from the log normal distribution with given params.
@@ -460,7 +468,7 @@ pub mod array_gen {
         mean: f64,
         stddev: f64,
     ) -> ndarray::Array<T, ndarray::IxDyn> {
-        ArrRng::default().log_normal(shape, mean, stddev)
+        ArrayRng::default().log_normal(shape, mean, stddev)
     }
 
     /// Creates an ndarray sampled from the gamma distribution with given params.
@@ -470,6 +478,6 @@ pub mod array_gen {
         shape_param: f64,
         scale: f64,
     ) -> ndarray::Array<T, ndarray::IxDyn> {
-        ArrRng::default().gamma(shape, shape_param, scale)
+        ArrayRng::default().gamma(shape, shape_param, scale)
     }
 }

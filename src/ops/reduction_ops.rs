@@ -118,14 +118,14 @@ fn preprocess_axes<T: Float>(
 impl<T: Float> op::Op<T> for ReduceSumToScalar {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         let x = &ctx.input(0);
-        ctx.append_output(Ok(ndarray::arr0(x.sum()).into_dyn()));
+        ctx.append_output(ndarray::arr0(x.sum()).into_dyn());
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
         let gx = Tensor::builder()
             .set_ro_inputs(&[&ctx.output_grad(), &ctx.graph().shape(ctx.input(0))])
             .build(ctx.graph(), ReduceSumToScalarGrad);
-        ctx.set_input_grads(vec![Some(gx)]);
+        ctx.append_input_grad(Some(gx))
     }
 }
 
@@ -138,14 +138,15 @@ impl<T: Float> op::Op<T> for ReduceSumToScalarGrad {
             let x = *ctx.input(0).as_ptr();
             ndarray::ArrayD::<T>::from_elem(ndarray::IxDyn(shape.as_slice()), x)
         };
-        ctx.append_output(Ok(ret));
+        ctx.append_output(ret);
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
         let gx = Tensor::builder()
             .set_input(&ctx.output_grad())
             .build(ctx.graph(), ReduceSumToScalar);
-        ctx.set_input_grads(vec![Some(gx), None]);
+        ctx.append_input_grad(Some(gx));
+        ctx.append_input_grad(None);
     }
 }
 
@@ -154,8 +155,8 @@ impl<T: Float> op::Op<T> for ReduceSum {
         let x = &ctx.input(0);
         let axes = preprocess_axes(x, &ctx.input(1), self.sparse_axes);
         match compute_reduce_sum(x, axes, self.keep_dims) {
-            crate::ArrRepr::Owned(ret) => ctx.append_output(Ok(ret)),
-            crate::ArrRepr::View(ret) => ctx.append_output_view(Ok(ret)),
+            crate::ArrRepr::Owned(ret) => ctx.append_output(ret),
+            crate::ArrRepr::View(ret) => ctx.append_output_view(ret),
         }
     }
 
@@ -171,7 +172,8 @@ impl<T: Float> op::Op<T> for ReduceSum {
                 &ctx.input(1),
             ])
             .build(ctx.graph(), grad_op);
-        ctx.set_input_grads(vec![Some(gx), None]);
+        ctx.append_input_grad(Some(gx));
+        ctx.append_input_grad(None);
     }
 }
 
@@ -181,7 +183,7 @@ impl<T: Float> op::Op<T> for ReduceMean {
         let axes = preprocess_axes(x, &ctx.input(1), self.sparse_axes);
         let x_shape = x.shape();
         if axes.is_empty() {
-            return ctx.append_output_view(Ok(x.clone()));
+            return ctx.append_output_view(x.clone());
         }
 
         // Make reduction_len
@@ -197,9 +199,9 @@ impl<T: Float> op::Op<T> for ReduceMean {
             crate::ArrRepr::Owned(mut arr) => {
                 let reduction_len_inv = T::one() / T::from(reduction_len).unwrap();
                 arr.mapv_inplace(move |elem| elem * reduction_len_inv);
-                ctx.append_output(Ok(arr))
+                ctx.append_output(arr)
             }
-            crate::ArrRepr::View(view) => ctx.append_output_view(Ok(view)),
+            crate::ArrRepr::View(view) => ctx.append_output_view(view),
         };
     }
 
@@ -224,7 +226,8 @@ impl<T: Float> op::Op<T> for ReduceMean {
         let reduction_len = s.reduce_prod(reduction_sizes, &[0], false);
         let gx = broadcast / reduction_len;
 
-        ctx.set_input_grads(vec![Some(gx), None]);
+        ctx.append_input_grad(Some(gx));
+        ctx.append_input_grad(None);
     }
 }
 
@@ -234,10 +237,10 @@ impl<T: Float> op::Op<T> for ReduceProd {
         let axes = preprocess_axes(x, &ctx.input(1), self.sparse_axes);
         match compute_reduce_prod(x, axes, self.keep_dims) {
             crate::ArrRepr::Owned(ret) => {
-                ctx.append_output(Ok(ret));
+                ctx.append_output(ret);
             }
             crate::ArrRepr::View(ret) => {
-                ctx.append_output_view(Ok(ret));
+                ctx.append_output_view(ret);
             }
         }
     }
@@ -255,7 +258,8 @@ impl<T: Float> op::Op<T> for ReduceProd {
             .set_ro_inputs(&[&(gy * output), &ctx.graph().shape(x0), &x1])
             .build(ctx.graph(), grad_op);
         let gx = tmp / x0;
-        ctx.set_input_grads(vec![Some(gx), None]);
+        ctx.append_input_grad(Some(gx));
+        ctx.append_input_grad(None);
     }
 }
 
@@ -265,16 +269,16 @@ impl<T: Float> op::Op<T> for ReduceMin {
         let axes = preprocess_axes(x, &ctx.input(1), self.sparse_axes);
         match compute_reduce_min(x, axes, self.keep_dims) {
             crate::ArrRepr::Owned(ret) => {
-                ctx.append_output(Ok(ret));
+                ctx.append_output(ret);
             }
             crate::ArrRepr::View(ret) => {
-                ctx.append_output_view(Ok(ret));
+                ctx.append_output_view(ret);
             }
         }
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
-        ctx.set_input_grads(min_max_grad(
+        min_max_grad(
             &ctx.output_grad(),
             &ctx.input(0),
             &ctx.input(1),
@@ -282,7 +286,8 @@ impl<T: Float> op::Op<T> for ReduceMin {
             ctx.graph(),
             self.keep_dims,
             self.sparse_axes,
-        ));
+            ctx,
+        );
     }
 }
 
@@ -292,16 +297,16 @@ impl<T: Float> op::Op<T> for ReduceMax {
         let axes = preprocess_axes(x, &ctx.input(1), self.sparse_axes);
         match compute_reduce_max(x, axes, self.keep_dims) {
             crate::ArrRepr::Owned(ret) => {
-                ctx.append_output(Ok(ret));
+                ctx.append_output(ret);
             }
             crate::ArrRepr::View(ret) => {
-                ctx.append_output_view(Ok(ret));
+                ctx.append_output_view(ret);
             }
         }
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
-        ctx.set_input_grads(min_max_grad(
+        min_max_grad(
             &ctx.output_grad(),
             &ctx.input(0),
             &ctx.input(1),
@@ -309,11 +314,12 @@ impl<T: Float> op::Op<T> for ReduceMax {
             ctx.graph(),
             self.keep_dims,
             self.sparse_axes,
-        ));
+            ctx,
+        );
     }
 }
 
-fn min_max_grad<'c: 'b, 'a, 'b: 'a, T: Float>(
+fn min_max_grad<'a, 'b: 'a, T: Float>(
     gy: &Tensor<'a, 'b, T>,
     x1: &Tensor<'a, 'b, T>,
     x2: &Tensor<'a, 'b, T>,
@@ -321,7 +327,8 @@ fn min_max_grad<'c: 'b, 'a, 'b: 'a, T: Float>(
     s: &'b Graph<T>,
     keep_dims: bool,
     sparse_axes: bool,
-) -> Vec<Option<Tensor<'a, 'b, T>>> {
+    ctx: &mut op::GradientContext<'a, 'b, T>,
+) {
     let grad_op1 = ReduceGradCommon {
         should_make_broadcast_dims: !keep_dims,
         sparse_axes,
@@ -338,7 +345,8 @@ fn min_max_grad<'c: 'b, 'a, 'b: 'a, T: Float>(
         .set_ro_inputs(&[gy, x_shape, x2])
         .build(s, grad_op2);
     let eq = s.equal(x1, y);
-    vec![Some(s.mul(eq.tensor, gy.tensor)), None]
+    ctx.append_input_grad(Some(s.mul(eq.inner, gy.inner)));
+    ctx.append_input_grad(None);
 }
 
 impl<T: Float> op::Op<T> for ArgMax {
@@ -404,11 +412,11 @@ impl<T: Float> op::Op<T> for ArgMax {
                 .unwrap()
         };
 
-        ctx.append_output(Ok(result));
+        ctx.append_output(result);
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
-        ctx.set_input_grads(vec![None])
+        ctx.append_input_grad(None)
     }
 }
 
@@ -419,7 +427,7 @@ impl<T: Float> op::Op<T> for ReduceGradCommon {
         let target_shape = ndarray_ext::as_shape(&ctx.input(1)); // x's shape
 
         if gy.shape() == target_shape.as_slice() {
-            return ctx.append_output_view(Ok(gy.clone()));
+            return ctx.append_output_view(gy.clone());
         }
 
         let x_is_scalar = ndarray_ext::is_scalar_shape(gy.shape());
@@ -458,7 +466,7 @@ impl<T: Float> op::Op<T> for ReduceGradCommon {
             }
         };
 
-        ctx.append_output(Ok(ret));
+        ctx.append_output(ret);
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -470,6 +478,8 @@ impl<T: Float> op::Op<T> for ReduceGradCommon {
         let gx = Tensor::builder()
             .set_ro_inputs(&[&ctx.output_grad(), axes])
             .build(ctx.graph(), sum);
-        ctx.set_input_grads(vec![Some(gx), None, None]);
+        ctx.append_input_grad(Some(gx));
+        ctx.append_input_grad(None);
+        ctx.append_input_grad(None);
     }
 }

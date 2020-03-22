@@ -35,14 +35,13 @@ fn conv_pool<'t, 's: 't>(
     w: Tensor<'t, 's>,
     b: Tensor<'t, 's>,
 ) -> Tensor<'t, 's> {
-    let g = x.graph;
     let y1 = g.conv2d(x, w, 1, 1) + b;
     let y2 = g.relu(y1);
-    g.max_pool2d(y2, 2, 0, 2)
+    x.graph().max_pool2d(y2, 2, 0, 2)
 }
 
 fn logits<'t, 's: 't>(x: Tensor<'t, 's>, w: Tensor<'t, 's>, b: Tensor<'t, 's>) -> Tensor<'t, 's> {
-    x.graph.matmul(x, w) + b
+    x.graph().matmul(x, w) + b
 }
 
 fn inputs(g: &Graph<f32>) -> (Tensor, Tensor) {
@@ -65,22 +64,19 @@ fn main() {
     let num_samples = x_train.shape()[0];
     let num_batches = num_samples / batch_size as usize;
 
-    let w1_ = array::shared(array::random_normal(&[32, 1, 3, 3], 0., 0.1));
-    let w2_ = array::shared(array::random_normal(&[64, 32, 3, 3], 0., 0.1));
-    let w3_ = array::shared(array::glorot_uniform(&[64 * 7 * 7, 10]));
-    let b1_ = array::shared(array::zeros(&[1, 32, 28, 28]));
-    let b2_ = array::shared(array::zeros(&[1, 64, 14, 14]));
-    let b3_ = array::shared(array::zeros(&[1, 10]));
-    let adam_state = adam::AdamState::new(&[&w1_, &w2_, &w3_, &b1_, &b2_, &b3_]);
-
     ag::with(|g| {
-        let w1 = g.variable(w1_);
-        let w2 = g.variable(w2_);
-        let w3 = g.variable(w3_);
-        let b1 = g.variable(b1_);
-        let b2 = g.variable(b2_);
-        let b3 = g.variable(b3_);
+        let w1 = g.variable(array::random_normal(&[32, 1, 3, 3], 0., 0.1));
+        let w2 = g.variable(array::random_normal(&[64, 32, 3, 3], 0., 0.1));
+        let w3 = g.variable(array::glorot_uniform(&[64 * 7 * 7, 10]));
+        let b1 = g.variable(array::zeros(&[1, 32, 28, 28]));
+        let b2 = g.variable(array::zeros(&[1, 64, 14, 14]));
+        let b3 = g.variable(array::zeros(&[1, 10]));
         let params = &[w1, w2, w3, b1, b2, b3];
+        let param_arrays = params
+            .iter()
+            .map(|v| v.get_variable_array().unwrap())
+            .collect::<Vec<_>>();
+        let adam_state = adam::AdamState::new(param_arrays.as_slice());
         let (x, y) = inputs(g);
         let z1 = conv_pool(x, w1, b1); // map to 32 channel
         let z2 = conv_pool(z1, w2, b2); // map to 64 channel
@@ -92,14 +88,14 @@ fn main() {
             &adam::Adam::default().compute_updates(params, grads, &adam_state, g);
 
         for epoch in 0..max_epoch {
-            //            timeit!({
-            for mut i in get_permutation(num_batches) {
-                let i = i as isize * batch_size;
-                let x_batch = x_train.slice(s![i..i + batch_size, .., .., ..]).into_dyn();
-                let y_batch = y_train.slice(s![i..i + batch_size, ..]).into_dyn();
-                g.eval(update_ops, &[x.given(x_batch), y.given(y_batch)]);
-            }
-            //            });
+            timeit!({
+                for i in get_permutation(num_batches) {
+                    let i = i as isize * batch_size;
+                    let x_batch = x_train.slice(s![i..i + batch_size, .., .., ..]).into_dyn();
+                    let y_batch = y_train.slice(s![i..i + batch_size, ..]).into_dyn();
+                    g.eval(update_ops, &[x.given(x_batch), y.given(y_batch)]);
+                }
+            });
             println!("finish epoch {}", epoch);
         }
 

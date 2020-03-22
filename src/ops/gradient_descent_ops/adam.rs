@@ -49,10 +49,10 @@ impl<F: Float> crate::op::Op<F> for AdamOp<F> {
             *t.as_mut_ptr() += F::one();
         }
 
-        ctx.append_output(Err(crate::op::ComputeException::NoOutput));
+        ctx.append_empty_output();
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<F>) {
-        ctx.set_input_grads(vec![None])
+        ctx.append_input_grad(None);
     }
 }

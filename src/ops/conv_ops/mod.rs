@@ -1,5 +1,6 @@
 use crate::ndarray_ext;
 use crate::ndarray_ext::{NdArray, NdArrayView};
+use crate::op;
 use crate::same_type;
 use crate::uninitialized_vec;
 use crate::Float;

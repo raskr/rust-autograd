@@ -6,6 +6,14 @@
 
 Differentiable operations and tensors backed by [ndarray](https://github.com/rust-ndarray/ndarray).
 
+## Motivation
+- **An example of an ML framework that combines speed, extendability and simplicity.**
+This crate is extendable with [ndarray](https://github.com/rust-ndarray/ndarray), which is a fast and easy to use for general n-dimensional tasks.
+
+- **As a reference implementation of full-featured computation graph.**
+The core of this crate is quite small compared to others (due to being implemented in pure Rust and ndarray).
+Therefore it might be reasonable for those who do not know how this kind of libraries work.
+
 ## Installation
 ``` toml
 [dependencies]
@@ -46,11 +54,11 @@ This mechanism balances better performance and flexibility.
  // This achieves 0.918 test accuracy after 3 epochs (0.11 sec/epoch on 2.7GHz Intel Core i5).
  use autograd::{with, Graph, optimizers::adam, ndarray_ext as arr, tensor::Variable};
 
- with(|g: &mut Graph<f32>|{
-     let w_arr = arr::shared(arr::glorot_uniform(&[28 * 28, 10]));
-     let b_arr = arr::shared(arr::zeros(&[1, 10]));
-     let adam_state = adam::AdamState::new(&[&w_arr, &b_arr]);
+ let w_arr = arr::shared(arr::glorot_uniform(&[28 * 28, 10]));
+ let b_arr = arr::shared(arr::zeros(&[1, 10]));
+ let adam_state = adam::AdamState::new(&[&w_arr, &b_arr]);
 
+ with(|g: &mut Graph<f32>|{
      let w = g.variable(w_arr.clone());
      let b = g.variable(b_arr.clone());
      let x = g.placeholder(&[-1, 28*28]);
@@ -60,7 +68,6 @@ This mechanism balances better performance and flexibility.
      let grads = g.grad(&[loss], &[w, b]);
      let predictions = g.argmax(z, -1, true);
      let accuracy = g.reduce_mean(&g.equal(predictions, y), &[0], false);
-     let state = adam::AdamState::new(&[&w_arr, &b_arr]);
      let optimizer = adam::Adam::<f32>::default();
      let update_ops = optimizer.compute_updates(&[w, b], &grads, &state, g);
 
@@ -102,14 +109,6 @@ This mechanism balances better performance and flexibility.
      //  [0.0, 0.0, 0.0]] shape=[4, 3], strides=[3, 1], layout=C (0x1), dynamic ndim=2
  });
  ```
-
-## Why Rust?
-
-- **No need for bridges for fast languages.**
-The entire logic including hotspots (kernels etc) is implemented in pure Rust,
-without compromising performance.
-
-- **Memory safety.** For example, Rust's lifetime checker makes it possible to implement zero-copy computation graphs without GC.
 
 For more, see [documentation](https://docs.rs/autograd/) or
 [examples](https://github.com/raskr/rust-autograd/tree/master/examples)
