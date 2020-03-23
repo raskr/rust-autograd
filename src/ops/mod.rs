@@ -130,9 +130,9 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
         B: AsRef<Tensor<'graph, F>> + Copy,
         C: AsRef<Tensor<'graph, F>> + Copy,
     {
-        let xs: Vec<_> = xs.iter().map(|x| x.as_ref().inner2()).collect();
-        let ys: Vec<_> = ys.iter().map(|y| y.as_ref().inner2()).collect();
-        let ys_grads: Vec<_> = ys_grads.iter().map(|x| x.as_ref().inner2()).collect();
+        let xs: Vec<_> = xs.iter().map(|x| x.as_ref().scoped_inner()).collect();
+        let ys: Vec<_> = ys.iter().map(|y| y.as_ref().scoped_inner()).collect();
+        let ys_grads: Vec<_> = ys_grads.iter().map(|x| x.as_ref().scoped_inner()).collect();
         crate::gradient::symbolic_gradients(ys.as_slice(), xs.as_slice(), ys_grads.as_slice(), self)
     }
 

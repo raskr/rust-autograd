@@ -18,7 +18,8 @@ use std::sync::{Arc, RwLock};
 /// use ag::optimizers::adam;
 ///
 /// // Define parameters to optimize.
-/// let w: Arc<RwLock<ag::NdArray<f32>>> = into_shared(ag::ndarray_ext::glorot_uniform(&[28 * 28, 10]));
+/// let rng = ag::ndarray_ext::ArrayRng::<f32>::default();
+/// let w: Arc<RwLock<ag::NdArray<f32>>> = into_shared(rng.glorot_uniform(&[28 * 28, 10]));
 /// let b: Arc<RwLock<ag::NdArray<f32>>> = into_shared(ag::ndarray_ext::zeros(&[1, 10]));
 /// // Make a state of adam.
 /// let state = adam::AdamState::new(&[&w, &b]);
@@ -39,7 +40,7 @@ use std::sync::{Arc, RwLock};
 /// });
 /// ```
 ///
-/// See also https://github.com/raskr/rust-autograd/blob/master/examples/mlp_mnist.rs
+/// See also https://github.com/raskr/rust-autograd/blob/master/examples/
 pub struct Adam<F: Float> {
     static_params: StaticParams<F>,
 }

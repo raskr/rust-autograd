@@ -62,9 +62,10 @@ fn main() {
     let num_batches = num_samples / batch_size as usize;
 
     ag::with(|g| {
-        let w1 = g.variable(array::random_normal(&[32, 1, 3, 3], 0., 0.1));
-        let w2 = g.variable(array::random_normal(&[64, 32, 3, 3], 0., 0.1));
-        let w3 = g.variable(array::glorot_uniform(&[64 * 7 * 7, 10]));
+        let rng = ag::ndarray_ext::ArrayRng::<f32>::default();
+        let w1 = g.variable(rng.random_normal(&[32, 1, 3, 3], 0., 0.1));
+        let w2 = g.variable(rng.random_normal(&[64, 32, 3, 3], 0., 0.1));
+        let w3 = g.variable(rng.glorot_uniform(&[64 * 7 * 7, 10]));
         let b1 = g.variable(array::zeros(&[1, 32, 28, 28]));
         let b2 = g.variable(array::zeros(&[1, 64, 14, 14]));
         let b3 = g.variable(array::zeros(&[1, 10]));

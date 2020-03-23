@@ -17,16 +17,17 @@ struct LSTM<'g> {
 
 impl<'g> LSTM<'g> {
     fn new(vector_dim: usize, s: &'g Graph<f32>) -> LSTM<'g> {
+        let rng = ag::ndarray_ext::ArrayRng::<f32>::default();
         LSTM {
             vector_dim,
             hs: vec![],
             cells: vec![],
-            wx: s.variable(ag::ndarray_ext::random_normal(
+            wx: s.variable(rng.random_normal(
                 &[vector_dim, 4 * vector_dim],
                 0.,
                 0.01,
             )),
-            wh: s.variable(ag::ndarray_ext::random_normal(
+            wh: s.variable(rng.random_normal(
                 &[vector_dim, 4 * vector_dim],
                 0.,
                 0.01,
@@ -74,12 +75,13 @@ pub fn main() {
         let sentences = s.placeholder(&[-1, max_sent]);
         let ref mut rnn = LSTM::new(vec_dim, s);
 
-        let lookup_table = s.variable(ag::ndarray_ext::random_normal(
+        let rng = ag::ndarray_ext::ArrayRng::<f32>::default();
+        let lookup_table = s.variable(rng.random_normal(
             &[vocab_size, vec_dim],
             0.,
             0.01,
         ));
-        let w_pred = s.variable(ag::ndarray_ext::random_uniform(
+        let w_pred = s.variable(rng.random_uniform(
             &[vec_dim, vocab_size],
             0.,
             0.01,

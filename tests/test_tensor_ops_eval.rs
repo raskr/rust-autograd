@@ -7,7 +7,8 @@ use ndarray::array;
 #[test]
 fn reduce_prod() {
     with(|g| {
-        let v = g.constant(ag::ndarray_ext::standard_normal::<f32>(&[3, 2]));
+        let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
+        let v = g.constant(rng.standard_normal(&[3, 2]));
         let z = g.reduce_prod(v, &[0, 1], false); // keep_dims=false
         let empty_shape: &[usize] = &[];
         assert_eq!(z.eval(&[]).unwrap().shape(), empty_shape);

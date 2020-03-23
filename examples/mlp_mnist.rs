@@ -48,7 +48,8 @@ fn get_permutation(size: usize) -> Vec<usize> {
 fn main() {
     let ((x_train, y_train), (x_test, y_test)) = dataset::load();
 
-    let w_arr = array::into_shared(array::glorot_uniform(&[28 * 28, 10]));
+    let rng = ag::ndarray_ext::ArrayRng::<f32>::default();
+    let w_arr = array::into_shared(rng.glorot_uniform(&[28 * 28, 10]));
     let b_arr = array::into_shared(array::zeros(&[1, 10]));
     let adam_state = adam::AdamState::new(&[&w_arr, &b_arr]);
 
