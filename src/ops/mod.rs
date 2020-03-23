@@ -136,71 +136,72 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
         crate::gradient::symbolic_gradients(ys.as_slice(), xs.as_slice(), ys_grads.as_slice(), self)
     }
 
-    // /// Computes jacobians for variables.
-    // ///
-    // /// # Arguments
-    // /// * `y` - Target of differentiation.
-    // /// * `xs` - Tensors with which differentiate `ys`.
-    // /// * `y_size` - (flattened) size of `y`
-    // ///
-    // /// # Returns
-    // /// Jacobians for each variable. Each one is a matrix of shape `(y_size, x size)`.
-    // ///
-    // /// Note: the current implementation works correctly but is unoptimized for serious use.
-    // ///
-    // /// ```
-    // /// use autograd as ag;
-    // /// use ag::tensor::Variable;
-    // ///
-    // /// ag::with(|g| {
-    // ///    let a = g.variable(ag::ndarray_ext::standard_normal::<f32>(&[4, 2]));
-    // ///    let b = g.variable(ag::ndarray_ext::standard_normal::<f32>(&[2, 3]));
-    // ///    let c = g.matmul(a, b);
-    // ///    let j = g.jacobians(c, &[a, b], 4*3);
-    // ///
-    // ///    assert_eq!(j[0].eval(&[]).unwrap().shape(), &[4*3, 4*2]);
-    // ///    assert_eq!(j[1].eval(&[]).unwrap().shape(), &[4*3, 2*3]);
-    // /// });
-    // /// ```
-    // pub fn jacobians<A: 'tensor, B: 'tensor>(
-    //     &'graph self,
-    //     y_: A,
-    //     xs_: &[B],
-    //     objective_len: usize,
-    // ) -> Vec<Tensor<'graph, F>>
-    // where
-    //     A: AsRef<Tensor<'graph, F>> + Copy,
-    //     B: AsRef<Tensor<'graph, F>> + Copy,
-    // {
-    //     let y = y_.as_ref();
-    //     let xs: Vec<_> = xs_.iter().map(|x| x.as_ref().inner).collect();
-    //     let mut vec_vec = Vec::with_capacity(objective_len);
-    //     let gy = self.scalar(F::one()).inner;
-    //     for i in 0..objective_len as isize {
-    //         vec_vec.push({
-    //             crate::gradient::symbolic_gradients(
-    //                 &[y.access_elem(i).inner],
-    //                 xs.as_slice(),
-    //                 &[gy],
-    //                 self,
-    //             )
-    //         });
-    //     }
-    //
-    //     let len = xs.len();
-    //     let mut ret = Vec::with_capacity(len);
-    //     // post process gradients
-    //     for i in 0..len {
-    //         // jac is matrix
-    //         let mut jac = Vec::with_capacity(objective_len);
-    //         for j in 0..objective_len {
-    //             jac.push(self.expand_dims(self.flatten(&vec_vec[j][i]), &[0]));
-    //         }
-    //         // (y size, x size)
-    //         ret.push(self.concat(&jac, 0));
-    //     }
-    //     ret
-    // }
+    /// Computes jacobians for variables.
+    ///
+    /// # Arguments
+    /// * `y` - Target of differentiation.
+    /// * `xs` - Tensors with which differentiate `ys`.
+    /// * `y_size` - (flattened) size of `y`
+    ///
+    /// # Returns
+    /// Jacobians for each variable. Each one is a matrix of shape `(y_size, x size)`.
+    ///
+    /// Note: the current implementation works correctly but is unoptimized for serious use.
+    ///
+    /// ```
+    /// use autograd as ag;
+    /// use ag::tensor::Variable;
+    ///
+    /// ag::with(|g| {
+    ///    let rng = ag::ndarray_ext::ArrayRng::<f32>::default();
+    ///    let a = g.variable(rng.standard_normal(&[4, 2]));
+    ///    let b = g.variable(rng.standard_normal(&[2, 3]));
+    ///    let c = g.matmul(a, b);
+    ///    let j = g.jacobians(c, &[a, b], 4*3);
+    ///
+    ///    assert_eq!(j[0].eval(&[]).unwrap().shape(), &[4*3, 4*2]);
+    ///    assert_eq!(j[1].eval(&[]).unwrap().shape(), &[4*3, 2*3]);
+    /// });
+    /// ```
+    pub fn jacobians<A: 'tensor, B: 'tensor>(
+        &'graph self,
+        y_: A,
+        xs_: &[B],
+        objective_len: usize,
+    ) -> Vec<Tensor<'graph, F>>
+    where
+        A: AsRef<Tensor<'graph, F>> + Copy,
+        B: AsRef<Tensor<'graph, F>> + Copy,
+    {
+        let y = y_.as_ref();
+        let xs: Vec<_> = xs_.iter().map(|x| x.as_ref().scoped_inner()).collect();
+        let mut vec_vec = Vec::with_capacity(objective_len);
+        let gy = self.scalar(F::one()).scoped_inner();
+        for i in 0..objective_len as isize {
+            vec_vec.push({
+                crate::gradient::symbolic_gradients(
+                    &[y.access_elem(i).scoped_inner()],
+                    xs.as_slice(),
+                    &[gy],
+                    self,
+                )
+            });
+        }
+
+        let len = xs.len();
+        let mut ret = Vec::with_capacity(len);
+        // post process gradients
+        for i in 0..len {
+            // jac is matrix
+            let mut jac = Vec::with_capacity(objective_len);
+            for j in 0..objective_len {
+                jac.push(self.expand_dims(self.flatten(&vec_vec[j][i]), &[0]));
+            }
+            // (y size, x size)
+            ret.push(self.concat(&jac, 0));
+        }
+        ret
+    }
 
     /// (Experimental) Computes hessian vector product
     pub fn _hessian_vector_product<A, B, C: 'tensor>(
@@ -1054,7 +1055,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
             .build(self, op)
     }
 
-    /// Reshapes the input tensor.
+    /// Reshapes the input tensor without copy.
     ///
     /// Only one element in `shape` can be `-1`.
     ///
@@ -1078,7 +1079,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
             .build(self, array_ops::Reshape)
     }
 
-    /// Flattens the input tensor into 1-ranked (vector).
+    /// Flattens the input tensor into 1-ranked (vector) without copy.
     ///
     /// ```
     /// use autograd as ag;
@@ -1699,10 +1700,11 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
             .build(self, op)
     }
 
-    /// Permutes dimensions.
+    /// Permutes dimensions without copy.
     ///
     /// It's like TensorFlow or NumPy's.
     /// `x`'s rank (ndim) and `axes.len()` must match.
+    ///
     ///
     /// ```
     /// use autograd as ag;
