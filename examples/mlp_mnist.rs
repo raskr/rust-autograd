@@ -9,7 +9,7 @@ use ag::Graph;
 use ndarray::s;
 use std::time::Instant;
 
-type Tensor<'tensor, 'graph> = ag::Tensor<'tensor, 'graph, f32>;
+type Tensor<'graph> = ag::Tensor<'graph, f32>;
 
 // This is a softmax regression with Adam optimizer for mnist.
 // 0.918 test accuracy after 3 epochs, 0.11 sec/epoch on 2.7GHz Intel Core i5

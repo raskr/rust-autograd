@@ -4,19 +4,19 @@ extern crate ndarray;
 use ag::tensor::Variable;
 use ag::Graph;
 
-type Tensor<'tensor, 'graph> = ag::Tensor<'tensor, 'graph, f32>;
+type Tensor<'graph> = ag::Tensor<'graph, f32>;
 
-struct LSTM<'tensor, 'graph: 'tensor> {
+struct LSTM<'g> {
     vector_dim: usize,
-    hs: Vec<Tensor<'tensor, 'graph>>,
-    cells: Vec<Tensor<'tensor, 'graph>>,
-    wx: Tensor<'tensor, 'graph>,
-    wh: Tensor<'tensor, 'graph>,
-    b: Tensor<'tensor, 'graph>,
+    hs: Vec<Tensor<'g>>,
+    cells: Vec<Tensor<'g>>,
+    wx: Tensor<'g>,
+    wh: Tensor<'g>,
+    b: Tensor<'g>,
 }
 
-impl<'t, 'g> LSTM<'t, 'g> {
-    fn new(vector_dim: usize, s: &Graph<f32>) -> LSTM {
+impl<'g> LSTM<'g> {
+    fn new(vector_dim: usize, s: &'g Graph<f32>) -> LSTM<'g> {
         LSTM {
             vector_dim,
             hs: vec![],
@@ -40,7 +40,7 @@ impl<'t, 'g> LSTM<'t, 'g> {
     ///
     /// # Returns
     /// Output tensor of this unit with shape `(batch_size, state_size)`.
-    fn step(&mut self, x: Tensor<'t, 'g>, s: &'g Graph<f32>) -> &Tensor<'t, 'g> {
+    fn step(&mut self, x: Tensor<'g>, s: &'g Graph<f32>) -> &Tensor<'g> {
         let (cell, h) = {
             let ref last_output = self.hs.pop().unwrap_or_else(|| s.zeros(&s.shape(x)));
             let last_cell = self.cells.pop().unwrap_or_else(|| s.zeros(&s.shape(x)));

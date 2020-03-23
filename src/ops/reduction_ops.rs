@@ -320,14 +320,14 @@ impl<T: Float> op::Op<T> for ReduceMax {
 }
 
 fn min_max_grad<'a, 'b: 'a, T: Float>(
-    gy: &Tensor<'a, 'b, T>,
-    x1: &Tensor<'a, 'b, T>,
-    x2: &Tensor<'a, 'b, T>,
-    y: &Tensor<'a, 'b, T>,
+    gy: &Tensor<'b, T>,
+    x1: &Tensor<'b, T>,
+    x2: &Tensor<'b, T>,
+    y: &Tensor<'b, T>,
     s: &'b Graph<T>,
     keep_dims: bool,
     sparse_axes: bool,
-    ctx: &mut op::GradientContext<'a, 'b, T>,
+    ctx: &mut op::GradientContext<'b, T>,
 ) {
     let grad_op1 = ReduceGradCommon {
         should_make_broadcast_dims: !keep_dims,
@@ -345,7 +345,7 @@ fn min_max_grad<'a, 'b: 'a, T: Float>(
         .set_ro_inputs(&[gy, x_shape, x2])
         .build(s, grad_op2);
     let eq = s.equal(x1, y);
-    ctx.append_input_grad(Some(s.mul(eq.inner, gy.inner)));
+    ctx.append_input_grad(Some(s.mul(eq, gy)));
     ctx.append_input_grad(None);
 }
 

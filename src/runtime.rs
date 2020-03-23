@@ -9,7 +9,8 @@ use std::sync::{RwLockReadGuard, RwLockWriteGuard};
 
 /// Helper structure for batched evaluation.
 ///
-/// Use this in case `ag::eval` doesn't help.
+/// Use this in case [Tensor::eval](tensor/struct.Tensor.html#method.eval)
+/// or [Graph::eval](struct.Graph.html#method.eval) doesn't help.
 ///
 /// ```
 /// use autograd as ag;
@@ -28,13 +29,13 @@ use std::sync::{RwLockReadGuard, RwLockWriteGuard};
 ///        .run();  // Do eval
 ///    });
 /// ```
-pub struct Eval<'v, 'f, 't, 's, F: Float> {
+pub struct Eval<'v, 'f, 's, F: Float> {
     scope: &'s Graph<F>,
-    buf: Vec<Tensor<'t, 's, F>>,
+    buf: Vec<Tensor<'s, F>>,
     feeds: Option<&'f [crate::runtime::Feed<'v, F>]>,
 }
 
-impl<'f, 't, 'v, 's: 't, F: Float> Eval<'v, 'f, 't, 's, F> {
+impl<'f, 't, 'v, 's, F: Float> Eval<'v, 'f, 's, F> {
     #[inline]
     /// Instantiates a new evaluation session.
     pub fn new(scope: &'s Graph<F>) -> Self {
@@ -49,7 +50,7 @@ impl<'f, 't, 'v, 's: 't, F: Float> Eval<'v, 'f, 't, 's, F> {
     /// Appends a tensor to the back of the evaluation targets.
     pub fn push<A>(&mut self, x: A) -> &mut Self
     where
-        A: AsRef<Tensor<'t, 's, F>>,
+        A: AsRef<Tensor<'s, F>>,
     {
         self.buf.push(*x.as_ref());
         self
@@ -65,7 +66,7 @@ impl<'f, 't, 'v, 's: 't, F: Float> Eval<'v, 'f, 't, 's, F> {
     /// Extends the evaluation targets with `xs`.
     pub fn extend<A>(&mut self, xs: &'t [A]) -> &mut Self
     where
-        A: AsRef<Tensor<'t, 's, F>>,
+        A: AsRef<Tensor<'s, F>>,
     {
         self.buf.extend(xs.iter().map(|x| *x.as_ref()));
         self
@@ -239,12 +240,10 @@ fn install_compute_results<'t, 'view, F: Float>(
 impl<F: Float> Graph<F> {
     /// Evaluates given symbolic tensors as a list of `ndarray::Array<F, ndarray::IxDyn>`.
     ///
-    /// Each return value can be `None`;
-    /// for example, evaluation of `gradient_descent_ops::*`
-    /// would result in `None`.
+    /// Unlike [Tensor::eval](tensor/struct.Tensor.html#method.eval), this function
+    /// supports batched evaluation.
     ///
-    /// NOTE: All the runtime errors are not reported by return values, but by *panic*.
-    ///
+    /// See also [Eval](struct.Eval.html).
     /// ```
     /// use ndarray::array;
     /// use autograd as ag;
@@ -255,18 +254,17 @@ impl<F: Float> Graph<F> {
     ///
     ///     // eval two tensors at once.
     ///     let evaluated = g.eval(&[a, b], &[]);
-    ///     assert_eq!(evaluated[0], Some(array![0., 0.].into_dyn()));
-    ///     assert_eq!(evaluated[1], Some(array![1., 1.].into_dyn()));
+    ///     assert_eq!(evaluated[0], Ok(array![0., 0.].into_dyn()));
+    ///     assert_eq!(evaluated[1], Ok(array![1., 1.].into_dyn()));
     /// });
     /// ```
-    /// See also [Tensor::eval](tensor/struct.Tensor.html#method.eval).
     pub fn eval<'feed, 'tensor, 'scope, A>(
         &'scope self,
         tensors: &'tensor [A],
         feeds: &[Feed<'feed, F>],
     ) -> Vec<Result<NdArray<F>, crate::EvalError>>
     where
-        A: AsRef<Tensor<'tensor, 'scope, F>> + Copy,
+        A: AsRef<Tensor<'scope, F>> + Copy,
     {
         validate_feed_shapes(feeds, self);
 
@@ -277,7 +275,7 @@ impl<F: Float> Graph<F> {
 
         let mut dfs_stack = Vec::<(&TensorInternal<F>, bool)>::with_capacity(100);
         for t in tensors.iter() {
-            dfs_stack.push((t.as_ref().inner, false));
+            dfs_stack.push((t.as_ref().inner(), false));
         }
 
         while let Some((node, is_parent)) = dfs_stack.pop() {
@@ -290,7 +288,7 @@ impl<F: Float> Graph<F> {
                 let mut xs = Vec::with_capacity(node.in_edges.len());
                 let (mut write_guards, mut read_guards) = (Vec::new(), Vec::new());
                 for (in_node, &in_idx) in node.in_edges.iter().zip(&node.input_indices) {
-                    let input_inner = in_node.get(self).inner;
+                    let input_inner = in_node.get_inner(self);
                     let x = if input_inner.is_placeholder {
                         OpInput::new(retrieve_feed(feeds, in_node.id))
                     } else if let Some(ref lock) = input_inner.variable_array {
@@ -365,8 +363,9 @@ impl<F: Float> Graph<F> {
                 dfs_stack.push((node, true));
                 // Push children if needed
                 for child in &node.in_edges {
-                    if !Self::would_not_visit(child.get(self).inner, &node_info_map) {
-                        dfs_stack.push((child.get(self).inner, false));
+                    let child = child.get(self).scoped_inner();
+                    if !Self::would_not_visit(child, &node_info_map) {
+                        dfs_stack.push((child, false));
                     }
                 }
             }

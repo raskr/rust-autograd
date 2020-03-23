@@ -9,7 +9,7 @@ use ag::Graph;
 use ndarray::s;
 use std::time::Instant;
 
-type Tensor<'t, 's> = ag::Tensor<'t, 's, f32>;
+type Tensor<'graph> = ag::Tensor<'graph, f32>;
 
 // This is a toy convolutional network for MNIST.
 // Got 0.987 test accuracy in 350 sec on 2.7GHz Intel Core i5.
@@ -30,17 +30,14 @@ macro_rules! timeit {
     }};
 }
 
-fn conv_pool<'t, 's: 't>(
-    x: Tensor<'t, 's>,
-    w: Tensor<'t, 's>,
-    b: Tensor<'t, 's>,
-) -> Tensor<'t, 's> {
+fn conv_pool<'g>(x: Tensor<'g>, w: Tensor<'g>, b: Tensor<'g>) -> Tensor<'g> {
+    let g = x.graph();
     let y1 = g.conv2d(x, w, 1, 1) + b;
     let y2 = g.relu(y1);
     x.graph().max_pool2d(y2, 2, 0, 2)
 }
 
-fn logits<'t, 's: 't>(x: Tensor<'t, 's>, w: Tensor<'t, 's>, b: Tensor<'t, 's>) -> Tensor<'t, 's> {
+fn logits<'g>(x: Tensor<'g>, w: Tensor<'g>, b: Tensor<'g>) -> Tensor<'g> {
     x.graph().matmul(x, w) + b
 }
 

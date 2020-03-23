@@ -173,10 +173,10 @@ impl_cmp_op!(Minimum, "Minimum", minimum, min_max_grad);
 
 #[inline]
 fn none_grad<'a, 'b: 'a, T: Float>(
-    _: Tensor<'a, 'b, T>,
-    _: Tensor<'a, 'b, T>,
-    _: Tensor<'a, 'b, T>,
-    _: Tensor<'a, 'b, T>,
+    _: Tensor<'b, T>,
+    _: Tensor<'b, T>,
+    _: Tensor<'b, T>,
+    _: Tensor<'b, T>,
     _: &'b Graph<T>,
     ctx: &mut crate::op::GradientContext<T>,
 ) {
@@ -185,17 +185,17 @@ fn none_grad<'a, 'b: 'a, T: Float>(
 
 #[inline]
 fn min_max_grad<'a, 'b: 'a, T: Float>(
-    gy: Tensor<'a, 'b, T>,
-    x1: Tensor<'a, 'b, T>,
-    x2: Tensor<'a, 'b, T>,
-    y: Tensor<'a, 'b, T>,
+    gy: Tensor<'b, T>,
+    x1: Tensor<'b, T>,
+    x2: Tensor<'b, T>,
+    y: Tensor<'b, T>,
     c: &'b Graph<T>,
-    ctx: &mut crate::op::GradientContext<'a, 'b, T>,
+    ctx: &mut crate::op::GradientContext<'b, T>,
 ) {
     let selected_a = c.equal(x1, y);
     let selected_b = c.equal(x2, y);
-    ctx.append_input_grad(Some(c.mul(selected_a.inner, gy.inner)));
-    ctx.append_input_grad(Some(c.mul(selected_b.inner, gy.inner)));
+    ctx.append_input_grad(Some(c.mul(selected_a, gy)));
+    ctx.append_input_grad(Some(c.mul(selected_b, gy)));
 }
 
 impl<T: Float> op::Op<T> for Abs {

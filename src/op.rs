@@ -17,6 +17,7 @@ pub(crate) type OutputArray<T> = SmallVec<[T; NUM_MAX_OUTPUT]>;
 
 pub(crate) type ComputeResult<'v, T> = Result<crate::ArrRepr<'v, T>, OpError>;
 
+/// Error in `Op`'s computation.
 #[derive(Clone, Debug, PartialEq)]
 pub enum OpError {
     NdArrayError(String, ndarray::ShapeError),
@@ -82,7 +83,7 @@ pub enum ComputeException {
 ///         // Use `ndarray::Array::mapv` for element-wise computation.
 ///         let half = T::from(0.5).unwrap();
 ///         let y = x.mapv(move |a| ((a * half).tanh() * half) + half);
-///         ctx.append_output(Ok(y));
+///         ctx.append_output(y);
 ///     }
 ///
 ///     fn grad(&self, ctx: &mut ag::op::GradientContext<T>) {
@@ -97,8 +98,8 @@ pub enum ComputeException {
 ///  use ag::tensor::Input;
 ///
 /// // Symbolic `sigmoid` function for end-user.
-/// fn sigmoid<'graph, 'tensor, F: ag::Float>(x: &ag::Tensor<'tensor, 'graph, F>, g: &'graph ag::Graph<F>)
-/// -> ag::Tensor<'tensor, 'graph, F> {
+/// fn sigmoid<'graph, 'tensor, F: ag::Float>(x: &ag::Tensor<'graph, F>, g: &'graph ag::Graph<F>)
+/// -> ag::Tensor<'graph, F> {
 ///     ag::Tensor::builder()
 ///            .set_inputs(&[Input::new(x)])
 ///            .build(g, Sigmoid)
@@ -181,7 +182,7 @@ impl<'v, T: Float> OpInput<'v, T> {
 ///         let half = T::from(0.5).unwrap();
 ///         let y = x.mapv(move |a| ((a * half).tanh() * half) + half);
 ///         // Put the computed result.
-///         ctx.append_output(Ok(y));
+///         ctx.append_output(y);
 ///     }
 ///
 ///     fn grad(&self, ctx: &mut ag::op::GradientContext<T>) { /* ... */ }
@@ -332,57 +333,59 @@ impl<'s, 'k: 's, 'v: 's, T: Float> ComputeContext<'k, 'v, T> {
 ///     }
 /// }
 /// ```
-pub struct GradientContext<'tensor, 'scope: 'tensor, T: Float> {
-    gy: Tensor<'tensor, 'scope, T>,
-    xs: InputArray<Tensor<'tensor, 'scope, T>>,
-    y: Tensor<'tensor, 'scope, T>,
+pub struct GradientContext<'scope, T: Float> {
+    gy: Tensor<'scope, T>,
+    y: Tensor<'scope, T>,
     graph: &'scope crate::graph::Graph<T>,
-    gxs: Option<InputArray<Option<Tensor<'tensor, 'scope, T>>>>,
+    gxs: Option<InputArray<Option<Tensor<'scope, T>>>>,
 }
 
-impl<'tensor, 'scope: 'tensor, T: Float> GradientContext<'tensor, 'scope, T> {
+impl<'tensor, 'scope: 'tensor, T: Float> GradientContext<'scope, T> {
     pub(crate) fn new(
-        gy: Tensor<'tensor, 'scope, T>,
-        xs: InputArray<Tensor<'tensor, 'scope, T>>,
-        y: Tensor<'tensor, 'scope, T>,
+        gy: Tensor<'scope, T>,
+        y: Tensor<'scope, T>,
         graph: &'scope crate::graph::Graph<T>,
     ) -> Self {
         GradientContext {
             gy,
-            xs,
             y,
             graph,
             gxs: None,
         }
     }
 
-    pub(crate) fn extract_input_grads(self) -> InputArray<Option<Tensor<'tensor, 'scope, T>>> {
+    pub(crate) fn extract_input_grads(self) -> InputArray<Option<Tensor<'scope, T>>> {
         self.gxs
             .expect("Bad Op impl: GradientContext::set_input_grads was not called")
     }
 
     /// Returns the symbolic gradient of the op's output.
     #[inline]
-    pub fn output_grad(&self) -> Tensor<'tensor, 'scope, T> {
+    pub fn output_grad(&self) -> Tensor<'scope, T> {
         self.gy
     }
 
     /// Grabs the symbolic output of the op.
     #[inline]
-    pub fn output(&self) -> Tensor<'tensor, 'scope, T> {
+    pub fn output(&self) -> Tensor<'scope, T> {
         self.y
     }
 
     /// Grabs the `i` th symbolic input.
     #[inline]
-    pub fn input(&self, i: usize) -> Tensor<'tensor, 'scope, T> {
-        self.xs[i]
+    pub fn input(&self, i: usize) -> Tensor<'scope, T> {
+        self.y
+            .inner()
+            .in_edges
+            .get(i)
+            .expect("bad Op::grad impl")
+            .get(self.graph)
     }
 
     /// Returns the number of inputs.
     #[inline]
     pub fn num_inputs(&self) -> usize {
-        self.xs.len()
+        self.y.inner().in_edges.len()
     }
 
     /// Returns a graph object that is usable for tensor computations in the context.
@@ -397,7 +400,7 @@ impl<'tensor, 'scope: 'tensor, T: Float> GradientContext<'tensor, 'scope, T> {
     /// `None` argument indicates that the `Op`'s input doesn't have gradient.
     /// Note that `Op::grad` must call this function as many as `num_inputs()`.
     #[inline]
-    pub fn append_input_grad(&mut self, gx: Option<Tensor<'tensor, 'scope, T>>) {
+    pub fn append_input_grad(&mut self, gx: Option<Tensor<'scope, T>>) {
         if self.gxs.is_none() {
             self.gxs = Some(InputArray::new());
         }

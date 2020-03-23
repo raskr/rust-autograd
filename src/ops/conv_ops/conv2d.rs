@@ -319,12 +319,11 @@ fn conv2d_with_cols_impl<F: Float>(cols: &NdArrayView<F>, w: &NdArrayView<F>) ->
 }
 
 impl<T: Float> crate::op::Op<T> for Conv2D {
-    #[allow(unused_mut)]
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         // Grab inputs
         let x = &ctx.input(0);
         let w = &ctx.input(1);
-        let conv = conv2d_impl(
+        let result = conv2d_impl(
             x,
             w,
             self.pad,
@@ -334,7 +333,7 @@ impl<T: Float> crate::op::Op<T> for Conv2D {
             self.dilation,
             self.dilation,
         );
-        match conv {
+        match result {
             Ok((y, cols)) => {
                 ctx.append_output(y);
                 ctx.append_output(cols);

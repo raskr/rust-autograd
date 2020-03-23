@@ -86,7 +86,7 @@ impl<T: Float> fmt::Debug for Graph<T> {
 
 /// Creates a scope for a computation graph.
 ///
-/// This is the only way to access [Graph](struct.Graph.html) instances.
+/// This is the only way to create [Graph](struct.Graph.html) instances.
 pub fn with<F, FN>(f: FN)
 where
     F: Float,

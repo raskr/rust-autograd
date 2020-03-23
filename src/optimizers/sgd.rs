@@ -19,16 +19,16 @@ pub struct SGD<T: Float> {
     pub lr: T,
 }
 
-impl<'a, 'b: 'a, T: Float> SGD<T> {
+impl<'b, T: Float> SGD<T> {
     /// Creates ops to optimize `params` with SGD.
     ///
     /// Evaluated results of the return values will be `None`.
     pub fn compute_updates(
         &self,
-        params: Vec<Tensor<'a, 'b, T>>,
-        grads: Vec<Tensor<'a, 'b, T>>,
+        params: Vec<Tensor<'b, T>>,
+        grads: Vec<Tensor<'b, T>>,
         c: &'b Graph<T>,
-    ) -> Vec<Tensor<'a, 'b, T>> {
+    ) -> Vec<Tensor<'b, T>> {
         let len = params.len();
         let mut ret = Vec::with_capacity(len);
         for i in 0..len {

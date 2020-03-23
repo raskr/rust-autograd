@@ -174,9 +174,15 @@ pub(crate) fn cast_as<A: 'static + Copy, B: 'static + Copy>(a: &A) -> B {
     unsafe { ::std::ptr::read(a as *const _ as *const B) }
 }
 
+/// Error during tensor's evaluation.
 #[derive(Debug, PartialEq)]
 pub enum EvalError {
+    /// Error during `Op`'s computation.
     OpError(op::OpError),
+    /// A value of tensor is empty.
+    ///
+    /// For example, compute results of inplace ops (e.g. optimizers) are not available
+    /// and are represented as `Empty`.
     Empty,
 }
 

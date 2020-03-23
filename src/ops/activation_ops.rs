@@ -115,7 +115,7 @@ impl<T: Float> op::Op<T> for ReLU {
         let s = ctx.graph();
         let gy = ctx.output_grad();
         let bin = s.greater(ctx.input(0), s.scalar(T::zero()));
-        ctx.append_input_grad(Some(s.mul(bin.inner, gy.inner)))
+        ctx.append_input_grad(Some(s.mul(bin, gy)))
     }
 }
 

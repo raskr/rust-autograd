@@ -13,7 +13,7 @@ pub fn check_theoretical_grads<'s: 't, 't, 'v, T: Float, A>(
     eps: T,
     tol: T,
 ) where
-    A: AsRef<Tensor<'t, 's, T>> + Copy,
+    A: AsRef<Tensor<'s, T>> + Copy,
 {
     let graph = objective.as_ref().graph;
     let objective = graph.reduce_sum_to_scalar(objective);

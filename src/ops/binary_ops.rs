@@ -225,11 +225,11 @@ impl<T: Float> op::Op<T> for DivOp {
 
 // Reduce gy if broadcast occurred in the forward path.
 fn preprocess_gy<'a, 'b: 'a, 'c, T: Float>(
-    shape0: &Tensor<'a, 'b, T>,
-    shape1: &Tensor<'a, 'b, T>,
-    gy: &Tensor<'a, 'b, T>,
+    shape0: &Tensor<'b, T>,
+    shape1: &Tensor<'b, T>,
+    gy: &Tensor<'b, T>,
     c: &'b Graph<T>,
-) -> (Tensor<'a, 'b, T>, Tensor<'a, 'b, T>) {
+) -> (Tensor<'b, T>, Tensor<'b, T>) {
     let gy0 = Tensor::builder()
         .set_ro_inputs(&[gy, shape0])
         .set_shape(shape0)

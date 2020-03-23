@@ -68,20 +68,19 @@ impl<'t, 's: 't, F: Float> Adam<F> {
     /// Evaluated results of the return values will be `None`.
     pub fn compute_updates(
         &self,
-        params: &[Tensor<'t, 's, F>],
-        grads: &[Tensor<'t, 's, F>],
+        params: &[Tensor<'s, F>],
+        grads: &[Tensor<'s, F>],
         states: &AdamState<F>,
         g: &'s Graph<F>,
-    ) -> Vec<Tensor<'t, 's, F>> {
+    ) -> Vec<Tensor<'s, F>> {
         let num_params = params.len();
         let mut ret = Vec::with_capacity(num_params);
         for i in 0..num_params {
             let param = &params[i];
-            let a: &RwLock<NdArray<F>> = &**param
-                .get_variable_array_ref()
-                .as_ref()
-                .expect("Adam expects its inputs to be *variables*.");
-            let key = a as *const RwLock<NdArray<F>> as usize;
+            let a: *const RwLock<NdArray<F>> = param
+                .get_variable_array_ptr()
+                .expect("Adam requires *variables* as its inputs.");
+            let key = a as usize;
             let state = states
                 .var2state
                 .get(&key)
