@@ -46,15 +46,6 @@ impl fmt::Display for OpError {
 /// Op can have multiple output arrays.
 pub(crate) type Results<'v, T> = OutputArray<Option<ComputeResult<'v, T>>>;
 
-#[derive(Clone, Debug)]
-/// Exception in `Op`'s computation.
-pub enum ComputeException {
-    /// Computation finished correctly with no output (typically used for variable-optimizer's output)
-    NoOutput,
-    /// Computation failed due to bad-input etc.
-    ComputeFailed(String),
-}
-
 /// Operation trait. `Tensor` wraps trait-object of this.
 ///
 /// # Implementing differentiable operations
@@ -73,8 +64,6 @@ pub enum ComputeException {
 /// struct Sigmoid;
 ///
 /// impl<T: ag::Float> ag::op::Op<T> for Sigmoid {
-///     // In this method, any errors caused by bad user-inputs should results in "panic".
-///     // (`op::ComputeException` represents an exception rather than an error.)
 ///     fn compute(
 ///         &self,
 ///         ctx: &mut ag::op::ComputeContext<T>,
@@ -171,8 +160,6 @@ impl<'v, T: Float> OpInput<'v, T> {
 /// struct Sigmoid;
 ///
 /// impl<T: ag::Float> ag::op::Op<T> for Sigmoid {
-///     // In this method, any errors caused by bad user-inputs should result in "panic".
-///     // (`ag::Op::ComputeException` represents an exception rather than an error.)
 ///     fn compute(
 ///         &self,
 ///         ctx: &mut ag::op::ComputeContext<T>,

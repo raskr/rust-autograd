@@ -207,11 +207,10 @@ fn retrieve_feed<'t, 'feeds, 'feed, F: Float>(
     panic!("Placeholder unfilled");
 }
 
-// Extract output arrays from `ys` and stores into `storage` (and `node`).
+// Extract output arrays from `ys` and stores into `storage`.
 fn install_compute_results<'t, 'view, F: Float>(
     results: crate::op::Results<'view, F>,
     storage: &OutputStorage<'view, F>,
-    // node: &'t TensorInternal<F>,
 ) -> NodeInfo {
     let mut value_info_list = op::OutputArray::new();
     for y in results {
@@ -286,53 +285,51 @@ impl<F: Float> Graph<F> {
 
                 // Aggregate inputs for `in_node`
                 let mut xs = Vec::with_capacity(node.in_edges.len());
+                let mut input_failed = Ok(());
                 let (mut write_guards, mut read_guards) = (Vec::new(), Vec::new());
+
                 for (in_node, &in_idx) in node.in_edges.iter().zip(&node.input_indices) {
                     let input_inner = in_node.get_inner(self);
                     let x = if input_inner.is_placeholder {
-                        OpInput::new(retrieve_feed(feeds, in_node.id))
+                        Ok(OpInput::new(retrieve_feed(feeds, in_node.id)))
                     } else if let Some(ref lock) = input_inner.variable_array {
                         unsafe {
                             if in_node.mut_usage {
                                 write_guards.push(lock.write().unwrap());
                                 let inserted = write_guards.len() - 1;
-                                OpInput::new_mut(
+                                Ok(OpInput::new_mut(
                                     (*(&mut write_guards[inserted]
                                         as *mut RwLockWriteGuard<NdArray<F>>))
                                         .view_mut(),
-                                )
+                                ))
                             } else {
                                 read_guards.push(lock.read().unwrap());
                                 let inserted = read_guards.len() - 1;
-                                OpInput::new(
+                                Ok(OpInput::new(
                                     (*(&mut read_guards[inserted]
                                         as *mut RwLockReadGuard<NdArray<F>>))
                                         .view(),
-                                )
+                                ))
                             }
                         }
                     } else if let Some(ref arr) = input_inner.get_constant_array_inner() {
-                        OpInput::new(arr.view())
+                        Ok(OpInput::new(arr.view()))
                     } else {
                         // Search the output of other nodes
                         let vi_list = &node_info_map.get(&in_node.id).unwrap().value_info_list;
                         match vi_list.get(in_idx) {
                             Some(vi) => match &vi.ty {
                                 ValueType::Owned => {
-                                    OpInput::new(storage.owned()[vi.key].as_ref().unwrap().view())
+                                    Ok(OpInput::new(storage.owned()[vi.key].as_ref().unwrap().view()))
                                 }
-                                ValueType::View => OpInput::new(storage.view()[vi.key].clone()),
+                                ValueType::View => Ok(OpInput::new(storage.view()[vi.key].clone())),
+                                ValueType::ComputeFailed(ref e) => {
+                                    Err(e.clone())
+                                }
                                 ValueType::Empty => {
                                     panic!(
                                         "Attempting to use {}'s output which is empty.",
                                         input_inner.op.name()
-                                    );
-                                }
-                                ValueType::ComputeFailed(ref e) => {
-                                    panic!(
-                                        "Attempting to use {}'s output which was errored: {}",
-                                        input_inner.op.name(),
-                                        e.to_string()
                                     );
                                 }
                             },
@@ -344,19 +341,31 @@ impl<F: Float> Graph<F> {
                             }
                         }
                     };
-                    xs.push(x);
+                    match x {
+                        Ok(x) => xs.push(x),
+                        Err(e) => {
+                            input_failed = Err(e);
+                            break;
+                        }
+                    }
                 }
 
-                // run compute
-                let mut ctx = ComputeContext::new(node, xs);
-                node.op.compute(&mut ctx);
-                let ys = ctx.extract_outputs();
-                if ys.is_empty() {
-                    panic!("Bad op implementation: empty return value");
-                }
-                // register compute result
-                // let node_info = install_compute_results(ys, &storage, node); // mut storage
-                let node_info = install_compute_results(ys, &storage); // mut storage
+                let node_info = if let Err(e) = input_failed {
+                    // propagate the input's error
+                    let mut value_info_list = op::OutputArray::new();
+                    value_info_list.push(ValueInfo::new(ValueType::ComputeFailed(e), /*dummy = */ 0));
+                    NodeInfo { value_info_list }
+                } else {
+                    // run compute
+                    let mut ctx = ComputeContext::new(node, xs);
+                    node.op.compute(&mut ctx);
+                    let ys = ctx.extract_outputs();
+                    if ys.is_empty() {
+                        panic!("Bad op implementation: empty return value");
+                    }
+                    // register compute result
+                    install_compute_results(ys, &storage) // mut storage
+                };
                 node_info_map.insert(node.id(), node_info);
             } else {
                 // Update dfs stack
