@@ -16,9 +16,9 @@ struct GradInfo<'a, 'b, T: Float + 'a> {
     default_grad: Option<&'a TensorInternal<T>>,
 }
 
-impl<'t, 's, T: Float> GradInfo<'t, 's, T> {
+impl<'t, 'g, T: Float> GradInfo<'t, 'g, T> {
     #[inline]
-    fn new(has_gradient: bool, default_grad: Option<&'t TensorInternal<T>>) -> GradInfo<'t, 's, T> {
+    fn new(has_gradient: bool, default_grad: Option<&'t TensorInternal<T>>) -> GradInfo<'t, 'g, T> {
         GradInfo {
             has_gradient,
             computed_grads: UnsafeCell::new(InputArray::new()),
@@ -29,13 +29,13 @@ impl<'t, 's, T: Float> GradInfo<'t, 's, T> {
     }
 
     #[inline]
-    fn push_grad(&self, g: Tensor<'s, T>) {
+    fn push_grad(&self, g: Tensor<'g, T>) {
         unsafe {
             (&mut *self.computed_grads.get()).push(g);
         }
     }
 
-    fn accumulate_then_get(&self, s: &'s Graph<T>) -> Tensor<'s, T> {
+    fn accumulate_then_get(&self, s: &'g Graph<T>) -> Tensor<'g, T> {
         unsafe {
             if let Some(ret) = *self.accumulated_grad.get() {
                 // accumulation completed
@@ -57,10 +57,10 @@ impl<'t, 's, T: Float> GradInfo<'t, 's, T> {
 }
 
 #[inline]
-fn has_marked_child<'a, 'b, T: Float>(
-    s: &'b Graph<T>,
+fn has_marked_child<'t, 'g, T: Float>(
+    s: &'g Graph<T>,
     parent: &TensorInternal<T>,
-    path: &FxHashMap<usize, GradInfo<'a, 'b, T>>,
+    path: &FxHashMap<usize, GradInfo<'t, 'g, T>>,
 ) -> bool {
     for child in parent.get_backprop_inputs().iter() {
         if path.get(&child.get(s).id()).unwrap().has_gradient {
@@ -81,11 +81,11 @@ fn is_wrt<T: Float>(node: &TensorInternal<T>, wrt: &[&TensorInternal<T>]) -> boo
 // Strategy
 //   1. Record all nodes that are reachable from `ys` into `ret`.
 //   2. Mark the path between `ys` and `xs` as `has_gradient`.
-fn get_between_nodes<'a, 'b: 'a, T: Float>(
-    s: &'b Graph<T>,
-    ys: &[&'a TensorInternal<T>],
-    wrt: &[&'a TensorInternal<T>],
-) -> FxHashMap<usize, GradInfo<'a, 'b, T>> {
+fn get_between_nodes<'t, 'g, T: Float>(
+    s: &'g Graph<T>,
+    ys: &[&'t TensorInternal<T>],
+    wrt: &[&'t TensorInternal<T>],
+) -> FxHashMap<usize, GradInfo<'t, 'g, T>> {
     // Randomly accessible by use of each node's lookup key.
     let mut ret = FxHashMap::<usize, GradInfo<T>>::default();
 
@@ -136,12 +136,12 @@ fn get_between_nodes<'a, 'b: 'a, T: Float>(
 ///
 /// NOTE: Nodes that do not have gradients won't be included in the subgraph to avoid
 /// unnecessary computation.
-pub(crate) fn symbolic_gradients<'a, 'b, T: Float>(
-    ys: &[&'a TensorInternal<T>],
-    wrt: &[&'a TensorInternal<T>],
-    gys: &[&'a TensorInternal<T>],
-    g: &'b Graph<T>,
-) -> Vec<Tensor<'b, T>> {
+pub(crate) fn symbolic_gradients<'t, 'g, T: Float>(
+    ys: &[&'t TensorInternal<T>],
+    wrt: &[&'t TensorInternal<T>],
+    gys: &[&'t TensorInternal<T>],
+    g: &'g Graph<T>,
+) -> Vec<Tensor<'g, T>> {
     assert_eq!(ys.len(), gys.len(), "`ys.len()` must match `gys.len()`");
 
     // Setup gradient path.
@@ -211,18 +211,18 @@ pub(crate) fn symbolic_gradients<'a, 'b, T: Float>(
     ret
 }
 
-struct TensorWrapper<'a, T: Float + 'a> {
-    tsr: &'a TensorInternal<T>,
+struct TensorWrapper<'t, T: Float + 't> {
+    tsr: &'t TensorInternal<T>,
 }
 
-impl<'a, T: Float> Ord for TensorWrapper<'a, T> {
+impl<'t, T: Float> Ord for TensorWrapper<'t, T> {
     // Compares the ranks in topological ordering
     fn cmp(&self, other: &Self) -> Ordering {
         self.tsr.top_rank.cmp(&other.tsr.top_rank)
     }
 }
 
-impl<'a, T: Float> PartialOrd for TensorWrapper<'a, T> {
+impl<'t, T: Float> PartialOrd for TensorWrapper<'t, T> {
     #[inline]
     // Compares the ranks in topological ordering
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
@@ -230,18 +230,18 @@ impl<'a, T: Float> PartialOrd for TensorWrapper<'a, T> {
     }
 }
 
-impl<'a, T: Float> Eq for TensorWrapper<'a, T> {}
+impl<'t, T: Float> Eq for TensorWrapper<'t, T> {}
 
-impl<'a, T: Float> PartialEq for TensorWrapper<'a, T> {
+impl<'t, T: Float> PartialEq for TensorWrapper<'t, T> {
     #[inline]
-    fn eq(&self, other: &TensorWrapper<'a, T>) -> bool {
+    fn eq(&self, other: &TensorWrapper<'t, T>) -> bool {
         self.tsr.id() == other.tsr.id()
     }
 }
 
-impl<'a, T: Float> TensorInternal<T> {
+impl<'t, T: Float> TensorInternal<T> {
     #[inline]
-    fn wrapped(&'a self) -> TensorWrapper<'a, T> {
+    fn wrapped(&'t self) -> TensorWrapper<'t, T> {
         TensorWrapper { tsr: self }
     }
 }
