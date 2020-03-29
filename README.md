@@ -15,7 +15,7 @@ therefore it might be reasonable for those who are not familiar with how this ki
 ## Installation
 ``` toml
 [dependencies]
-autograd = { version = "0.9.8", features = ["mkl"] }
+autograd = { version = "1.0.0", features = ["mkl"] }
 ```
 `mkl` feature is recommended to speedup linalg operations using [Intel MKL](https://software.intel.com/en-us/mkl).
 
