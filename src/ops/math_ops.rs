@@ -205,6 +205,7 @@ fn min_max_grad<'g, T: Float>(
     ctx.append_input_grad(Some(c.mul(selected_b, gy)));
 }
 
+#[cfg(feature = "mkl")]
 macro_rules! elem_wise_vm_or_std {
     ($vms_op:ident, $vmd_op:ident, $closure:expr, $ctx:expr) => {
         let x = $ctx.input(0);
@@ -233,6 +234,7 @@ macro_rules! elem_wise_vm_or_std {
     };
 }
 
+#[cfg(feature = "mkl")]
 macro_rules! elem_wise_vm_with_param_or_std {
     ($vms_op:ident, $vmd_op:ident, $std_name:ident, $param:expr, $ctx:expr) => {
         let x = $ctx.input(0);

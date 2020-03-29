@@ -96,7 +96,7 @@ fn slow_col_x_filter_kernel<F: Float>(
                     unsafe {
                         // for each batch
                         let cols_target: *const F = &cols[i * size_per_batch_cols];
-                        let y_target: *mut F = mem::transmute(&y[i * size_per_batch_y]);
+                        let y_target = &y[i * size_per_batch_y] as *const F as *mut F;
                         matrixmultiply::$f(
                             m,
                             k,
@@ -339,7 +339,7 @@ impl<T: Float> crate::op::Op<T> for Conv2D {
                 ctx.append_output(cols);
             }
             Err(e) => {
-                ctx.append_error(e);
+                ctx.set_error(e);
             }
         }
     }
@@ -493,11 +493,11 @@ fn conv2d_filter_grad_impl<F: Float>(
                                 m,
                                 k,
                                 n,
-                                1.,                                                       // alpha
-                                gy.offset((i * size_per_batch_g) as isize) as *const $ty, // a
+                                1.,                                         // alpha
+                                gy.add(i * size_per_batch_g) as *const $ty, // a
                                 rsa as isize,
                                 csa as isize,
-                                cols.offset((i * size_per_batch_c) as isize) as *const $ty, // b
+                                cols.add(i * size_per_batch_c) as *const $ty, // b
                                 rsb as isize,
                                 csb as isize,
                                 if i == 0 { 0. } else { 1. }, // beta

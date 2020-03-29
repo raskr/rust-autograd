@@ -76,7 +76,7 @@ impl<T: Float> fmt::Debug for Graph<T> {
         unsafe {
             let set = &*self.node_set.get();
             let mut buf = format!("graph size: {}\n", set.len());
-            for ref node in set {
+            for node in set {
                 buf += format!("{}\n", node).as_str();
             }
             write!(f, "{}", buf)

@@ -143,7 +143,7 @@ impl<T: Float> op::Op<T> for ReduceSumToScalarGrad {
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
         let gx = Tensor::builder()
-            .set_input(&ctx.output_grad())
+            .append_input(&ctx.output_grad())
             .build(ctx.graph(), ReduceSumToScalar);
         ctx.append_input_grad(Some(gx));
         ctx.append_input_grad(None);
@@ -319,15 +319,15 @@ impl<T: Float> op::Op<T> for ReduceMax {
     }
 }
 
-fn min_max_grad<'a, 'b: 'a, T: Float>(
-    gy: &Tensor<'b, T>,
-    x1: &Tensor<'b, T>,
-    x2: &Tensor<'b, T>,
-    y: &Tensor<'b, T>,
-    s: &'b Graph<T>,
+fn min_max_grad<'g, T: Float>(
+    gy: &Tensor<'g, T>,
+    x1: &Tensor<'g, T>,
+    x2: &Tensor<'g, T>,
+    y: &Tensor<'g, T>,
+    s: &'g Graph<T>,
     keep_dims: bool,
     sparse_axes: bool,
-    ctx: &mut op::GradientContext<'b, T>,
+    ctx: &mut op::GradientContext<'g, T>,
 ) {
     let grad_op1 = ReduceGradCommon {
         should_make_broadcast_dims: !keep_dims,

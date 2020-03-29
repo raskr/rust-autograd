@@ -1,5 +1,6 @@
 use crate::ndarray_ext::{NdArray, NdArrayView};
-use crate::op::{self, ComputeContext, OpInput};
+use crate::op::{self, ComputeContext, InputArray, OpInput};
+use crate::smallvec::SmallVec;
 use crate::tensor::{Tensor, TensorInternal};
 use crate::FxHashMap;
 use crate::{Float, Graph};
@@ -7,8 +8,14 @@ use std::cell::UnsafeCell;
 use std::mem;
 use std::sync::{RwLockReadGuard, RwLockWriteGuard};
 
+const NUM_MAX_EVAL_BUF: usize = 8;
+
+type EvalBuf<T> = SmallVec<[T; NUM_MAX_EVAL_BUF]>;
+
 /// Helper structure for batched evaluation.
 ///
+/// `Eval` structure can buffer evaluation targets with useful `push` and `extend` functions
+/// and runs batched evaluation.
 /// Use this in case [Tensor::eval](tensor/struct.Tensor.html#method.eval)
 /// or [Graph::eval](struct.Graph.html#method.eval) doesn't help.
 ///
@@ -29,20 +36,20 @@ use std::sync::{RwLockReadGuard, RwLockWriteGuard};
 ///        .run();  // Do eval
 ///    });
 /// ```
-pub struct Eval<'v, 'f, 's, F: Float> {
-    scope: &'s Graph<F>,
-    buf: Vec<Tensor<'s, F>>,
-    feeds: Option<&'f [crate::runtime::Feed<'v, F>]>,
+pub struct Eval<'view, 'feed, 'graph, F: Float> {
+    scope: &'graph Graph<F>,
+    buf: EvalBuf<Tensor<'graph, F>>,
+    feeds: Option<&'feed [crate::runtime::Feed<'view, F>]>,
 }
 
-impl<'f, 't, 'v, 's, F: Float> Eval<'v, 'f, 's, F> {
+impl<'feed, 'tensor, 'view, 'graph, F: Float> Eval<'view, 'feed, 'graph, F> {
     #[inline]
     /// Instantiates a new evaluation session.
-    pub fn new(scope: &'s Graph<F>) -> Self {
+    pub fn new(scope: &'graph Graph<F>) -> Self {
         Eval {
             feeds: None,
             scope,
-            buf: Vec::new(),
+            buf: EvalBuf::new(),
         }
     }
 
@@ -50,23 +57,23 @@ impl<'f, 't, 'v, 's, F: Float> Eval<'v, 'f, 's, F> {
     /// Appends a tensor to the back of the evaluation targets.
     pub fn push<A>(&mut self, x: A) -> &mut Self
     where
-        A: AsRef<Tensor<'s, F>>,
+        A: AsRef<Tensor<'graph, F>>,
     {
         self.buf.push(*x.as_ref());
         self
     }
 
     /// `feeds` is a sequence of `(placeholder-tensor, its value)`
-    pub fn feed(&mut self, feeds: &'f [crate::Feed<'v, F>]) -> &mut Self {
+    pub fn feed(&mut self, feeds: &'feed [crate::Feed<'view, F>]) -> &mut Self {
         self.feeds = Some(feeds);
         self
     }
 
     #[inline]
     /// Extends the evaluation targets with `xs`.
-    pub fn extend<A>(&mut self, xs: &'t [A]) -> &mut Self
+    pub fn extend<A>(&mut self, xs: &'tensor [A]) -> &mut Self
     where
-        A: AsRef<Tensor<'s, F>>,
+        A: AsRef<Tensor<'graph, F>>,
     {
         self.buf.extend(xs.iter().map(|x| *x.as_ref()));
         self
@@ -74,7 +81,7 @@ impl<'f, 't, 'v, 's, F: Float> Eval<'v, 'f, 's, F> {
 
     #[inline]
     /// Evaluates the buffered tensors.
-    pub fn run(&'t self) -> Vec<Result<NdArray<F>, crate::EvalError>> {
+    pub fn run(&'tensor self) -> Vec<Result<NdArray<F>, crate::EvalError>> {
         self.scope
             .eval(self.buf.as_slice(), self.feeds.unwrap_or(&[]))
     }
@@ -115,22 +122,12 @@ impl<'feed, F: Float> Feed<'feed, F> {
     }
 }
 
-//#[derive(Debug)]
-struct NodeInfo {
-    // node: &'t TensorInternal<T>,
-    // the len matches the number of outputs of this node
-    value_info_list: op::InputArray<ValueInfo>,
-}
-
-// #[derive(Debug)]
 enum ValueType {
     Owned,
     View,
     Empty,
-    ComputeFailed(op::OpError),
 }
 
-//#[derive(Debug)]
 struct ValueInfo {
     ty: ValueType,
     // key to lookup output
@@ -149,6 +146,8 @@ struct OutputStorage<'view, F: Float> {
 }
 
 struct OutputStorageInner<'view, F: Float> {
+    // Each of NdArray is Some right up until eval's ret-val extraction phase.
+    // In that phase, each of entry is replaced with None to avoid copying the entire vector.
     owned: Vec<Option<NdArray<F>>>,
     borrowed: Vec<NdArrayView<'view, F>>,
 }
@@ -166,22 +165,22 @@ impl<'tensor, 'view, 'lock, F: Float> OutputStorage<'view, F> {
 
     #[inline]
     fn owned_mut(&self) -> &mut Vec<Option<NdArray<F>>> {
-        unsafe { &mut (&mut *self.inner.get()).owned }
+        unsafe { &mut (*self.inner.get()).owned }
     }
 
     #[inline]
     fn owned(&self) -> &[Option<NdArray<F>>] {
-        unsafe { &(&*self.inner.get()).owned }
+        unsafe { &(*self.inner.get()).owned }
     }
 
     #[inline]
     fn view_mut(&self) -> &mut Vec<NdArrayView<'view, F>> {
-        unsafe { &mut (&mut *self.inner.get()).borrowed }
+        unsafe { &mut (*self.inner.get()).borrowed }
     }
 
     #[inline]
     fn view(&self) -> &[NdArrayView<'view, F>] {
-        unsafe { &(&*self.inner.get()).borrowed }
+        unsafe { &(*self.inner.get()).borrowed }
     }
 }
 
@@ -194,7 +193,8 @@ fn validate_feed_shapes<F: Float>(feeds: &[Feed<F>], g: &Graph<F>) {
 }
 
 #[inline]
-fn retrieve_feed<'t, 'feeds, 'feed, F: Float>(
+// search the feed using `in_node_id`
+fn retrieve_feed<'feeds, 'feed, F: Float>(
     feeds: &'feeds [Feed<'feed, F>],
     in_node_id: usize,
 ) -> NdArrayView<'feeds, F> {
@@ -207,33 +207,104 @@ fn retrieve_feed<'t, 'feeds, 'feed, F: Float>(
     panic!("Placeholder unfilled");
 }
 
-// Extract output arrays from `ys` and stores into `storage`.
-fn install_compute_results<'t, 'view, F: Float>(
+// Extract output arrays from `results` and stores into `storage`.
+fn install_compute_results<'view, F: Float>(
     results: crate::op::Results<'view, F>,
     storage: &OutputStorage<'view, F>,
-) -> NodeInfo {
+) -> Result<op::OutputArray<ValueInfo>, op::OpError> {
     let mut value_info_list = op::OutputArray::new();
     for y in results {
-        let info = match y {
+        match y {
             Some(Ok(crate::ArrRepr::Owned(val))) => {
                 storage.owned_mut().push(Some(val));
-                ValueInfo::new(ValueType::Owned, storage.owned().len() - 1)
+                value_info_list.push(ValueInfo::new(ValueType::Owned, storage.owned().len() - 1));
             }
             Some(Ok(crate::ArrRepr::View(val))) => {
                 storage.view_mut().push(val);
-                ValueInfo::new(ValueType::View, storage.view().len() - 1)
+                value_info_list.push(ValueInfo::new(ValueType::View, storage.view().len() - 1));
             }
             Some(Err(e)) => {
-                ValueInfo::new(ValueType::ComputeFailed(e), /*dummy = */ 0)
+                // error is set at the head of list
+                // value_info_list[0] = ValueInfo::new(ValueType::ComputeFailed(e), /*dummy = */ 0);
+                return Err(e);
             }
-            None => ValueInfo::new(ValueType::Empty, /*dummy = */ 0),
+            None => {
+                value_info_list.push(ValueInfo::new(ValueType::Empty, /*dummy = */ 0))
+            }
         };
-        value_info_list.push(info);
     }
-    NodeInfo {
-        // node,
-        value_info_list,
+    Ok(value_info_list)
+}
+
+// aggregated ones are pushed in `input_values`.
+// input's status is returned.
+#[inline]
+fn aggregate_op_inputs<'ret, 'tensor: 'ret, 'slice: 'ret, 'feed: 'slice, F: Float>(
+    node: &'tensor TensorInternal<F>,
+    g: &Graph<F>,
+    node_info_map: &FxHashMap<usize, Result<op::OutputArray<ValueInfo>, op::OpError>>,
+    feeds: &'slice [Feed<'feed, F>],
+    storage: &'ret OutputStorage<'ret, F>,
+    input_values: &mut InputArray<OpInput<'ret, F>>,
+    read_guards: &mut InputArray<RwLockReadGuard<'tensor, NdArray<F>>>, // guard storage for variable arrays
+    write_guards: &mut InputArray<RwLockWriteGuard<'tensor, NdArray<F>>>, // guard storage for variable arrays
+) -> Result<(), op::OpError> {
+    let mut input_status = Ok(());
+
+    for (in_node, &in_idx) in node.in_edges.iter().zip(&node.input_indices) {
+        // `in_idx` is not 0 only when `in_node` is multi-output op and `node` selects nth value from it using `Graph::nth_tensor`.
+        let input_inner: &TensorInternal<F> = in_node.get_inner(g);
+        let x = if input_inner.is_placeholder {
+            Ok(OpInput::new(retrieve_feed(feeds, in_node.id)))
+        } else if let Some(ref lock) = input_inner.variable_array {
+            unsafe {
+                if in_node.mut_usage {
+                    write_guards.push(lock.write().unwrap());
+                    let inserted = write_guards.len() - 1;
+                    Ok(OpInput::new_mut(
+                        (*(&mut write_guards[inserted] as *mut RwLockWriteGuard<NdArray<F>>))
+                            .view_mut(),
+                    ))
+                } else {
+                    read_guards.push(lock.read().unwrap());
+                    let inserted = read_guards.len() - 1;
+                    Ok(OpInput::new(
+                        (*(&mut read_guards[inserted] as *mut RwLockReadGuard<NdArray<F>>)).view(),
+                    ))
+                }
+            }
+        } else if let Some(ref arr) = input_inner.get_constant_array_inner() {
+            Ok(OpInput::new(arr.view()))
+        } else {
+            // Search the value of input nodes.
+            match &node_info_map.get(&in_node.id).unwrap() {
+                Err(e) => Err(e.clone()),
+                Ok(vi_list) => {
+                    let vi = &vi_list[in_idx];
+                    match vi.ty {
+                        ValueType::Owned => Ok(OpInput::new(
+                            storage.owned()[vi.key].as_ref().unwrap().view(),
+                        )),
+                        ValueType::View => Ok(OpInput::new(storage.view()[vi.key].clone())),
+                        ValueType::Empty => {
+                            panic!(
+                                "Attempting to use {}'s output which is empty.",
+                                input_inner.op.name()
+                            );
+                        }
+                    }
+                }
+            }
+        };
+        match x {
+            Ok(x) => input_values.push(x),
+            Err(e) => {
+                input_status = Err(e);
+                break;
+            }
+        }
     }
+    input_status
 }
 
 impl<F: Float> Graph<F> {
@@ -267,7 +338,8 @@ impl<F: Float> Graph<F> {
     {
         validate_feed_shapes(feeds, self);
 
-        let mut node_info_map: FxHashMap<usize, NodeInfo> = FxHashMap::default();
+        let mut node_info_map: FxHashMap<usize, Result<op::OutputArray<ValueInfo>, op::OpError>> =
+            FxHashMap::default();
 
         // Storage in which compute results are stored. Accessed through UnsafeCell.
         let storage = OutputStorage::new();
@@ -279,84 +351,26 @@ impl<F: Float> Graph<F> {
 
         while let Some((node, is_parent)) = dfs_stack.pop() {
             if is_parent {
-                if Self::would_not_visit(node, &node_info_map) {
+                if would_not_visit(node, &node_info_map) {
                     continue;
                 }
 
-                // Aggregate inputs for `in_node`
-                let mut xs = Vec::with_capacity(node.in_edges.len());
-                let mut input_failed = Ok(());
-                let (mut write_guards, mut read_guards) = (Vec::new(), Vec::new());
+                // Aggregate input values for `node`. if any of the inputs failed, it's a total failure.
+                let mut xs = InputArray::new();
+                let (mut write_guards, mut read_guards) = (InputArray::new(), InputArray::new());
+                let input_status = aggregate_op_inputs(
+                    node,
+                    self,
+                    &node_info_map,
+                    feeds,
+                    &storage,
+                    &mut xs,
+                    &mut read_guards,
+                    &mut write_guards,
+                );
 
-                for (in_node, &in_idx) in node.in_edges.iter().zip(&node.input_indices) {
-                    let input_inner = in_node.get_inner(self);
-                    let x = if input_inner.is_placeholder {
-                        Ok(OpInput::new(retrieve_feed(feeds, in_node.id)))
-                    } else if let Some(ref lock) = input_inner.variable_array {
-                        unsafe {
-                            if in_node.mut_usage {
-                                write_guards.push(lock.write().unwrap());
-                                let inserted = write_guards.len() - 1;
-                                Ok(OpInput::new_mut(
-                                    (*(&mut write_guards[inserted]
-                                        as *mut RwLockWriteGuard<NdArray<F>>))
-                                        .view_mut(),
-                                ))
-                            } else {
-                                read_guards.push(lock.read().unwrap());
-                                let inserted = read_guards.len() - 1;
-                                Ok(OpInput::new(
-                                    (*(&mut read_guards[inserted]
-                                        as *mut RwLockReadGuard<NdArray<F>>))
-                                        .view(),
-                                ))
-                            }
-                        }
-                    } else if let Some(ref arr) = input_inner.get_constant_array_inner() {
-                        Ok(OpInput::new(arr.view()))
-                    } else {
-                        // Search the output of other nodes
-                        let vi_list = &node_info_map.get(&in_node.id).unwrap().value_info_list;
-                        match vi_list.get(in_idx) {
-                            Some(vi) => match &vi.ty {
-                                ValueType::Owned => {
-                                    Ok(OpInput::new(storage.owned()[vi.key].as_ref().unwrap().view()))
-                                }
-                                ValueType::View => Ok(OpInput::new(storage.view()[vi.key].clone())),
-                                ValueType::ComputeFailed(ref e) => {
-                                    Err(e.clone())
-                                }
-                                ValueType::Empty => {
-                                    panic!(
-                                        "Attempting to use {}'s output which is empty.",
-                                        input_inner.op.name()
-                                    );
-                                }
-                            },
-                            None => {
-                                panic!(
-                                    "Attempting to use {}'s output which was errored",
-                                    input_inner.op.name(),
-                                );
-                            }
-                        }
-                    };
-                    match x {
-                        Ok(x) => xs.push(x),
-                        Err(e) => {
-                            input_failed = Err(e);
-                            break;
-                        }
-                    }
-                }
-
-                let node_info = if let Err(e) = input_failed {
-                    // propagate the input's error
-                    let mut value_info_list = op::OutputArray::new();
-                    value_info_list.push(ValueInfo::new(ValueType::ComputeFailed(e), /*dummy = */ 0));
-                    NodeInfo { value_info_list }
-                } else {
-                    // run compute
+                // run compute if `node`'s inputs were not failed
+                let installed_node_info = input_status.and_then(|()| {
                     let mut ctx = ComputeContext::new(node, xs);
                     node.op.compute(&mut ctx);
                     let ys = ctx.extract_outputs();
@@ -364,16 +378,16 @@ impl<F: Float> Graph<F> {
                         panic!("Bad op implementation: empty return value");
                     }
                     // register compute result
-                    install_compute_results(ys, &storage) // mut storage
-                };
-                node_info_map.insert(node.id(), node_info);
+                    install_compute_results(ys, &storage)
+                });
+                node_info_map.insert(node.id(), installed_node_info);
             } else {
                 // Update dfs stack
                 dfs_stack.push((node, true));
                 // Push children if needed
                 for child in &node.in_edges {
                     let child = child.get(self).scoped_inner();
-                    if !Self::would_not_visit(child, &node_info_map) {
+                    if !would_not_visit(child, &node_info_map) {
                         dfs_stack.push((child, false));
                     }
                 }
@@ -389,28 +403,35 @@ impl<F: Float> Graph<F> {
             } else if t.is_placeholder() {
                 Ok(retrieve_feed(feeds, t.id()).to_owned())
             } else {
-                let info = &node_info_map.get(&t.id()).unwrap().value_info_list[0];
-                match &info.ty {
-                    ValueType::Owned => {
-                        Ok(mem::replace(&mut storage.owned_mut()[info.key], None).unwrap())
+                match &node_info_map.get(&t.id()).unwrap() {
+                    Ok(value_info_list) => {
+                        let info = &value_info_list[0];
+                        match &info.ty {
+                            ValueType::Owned => {
+                                Ok(mem::replace(&mut storage.owned_mut()[info.key], None).unwrap())
+                            }
+                            ValueType::View => Ok(storage.view()[info.key].to_owned()),
+                            ValueType::Empty => Err(crate::EvalError::Empty),
+                        }
                     }
-                    ValueType::View => Ok(storage.view()[info.key].to_owned()),
-                    ValueType::Empty => Err(crate::EvalError::Empty),
-                    ValueType::ComputeFailed(e) => Err(crate::EvalError::OpError(e.clone())),
+                    Err(e) => {
+                        // convert to EvalError
+                        Err(crate::EvalError::OpError(e.clone()))
+                    }
                 }
             };
             ret.push(arr);
         }
         ret
     }
+}
 
-    #[inline]
-    fn would_not_visit<'t>(
-        node: &TensorInternal<F>,
-        info_map: &FxHashMap<usize, NodeInfo>,
-    ) -> bool {
-        node.is_placeholder || node.has_persistent_array || info_map.contains_key(&node.id())
-    }
+#[inline]
+fn would_not_visit<F: Float>(
+    node: &TensorInternal<F>,
+    info_map: &FxHashMap<usize, Result<op::OutputArray<ValueInfo>, op::OpError>>,
+) -> bool {
+    node.is_placeholder || node.has_persistent_array || info_map.contains_key(&node.id())
 }
 
 #[test]

@@ -7,10 +7,11 @@ use crate::{Float, NdArray};
 use std::any::type_name;
 use std::fmt;
 use std::marker::PhantomData;
-use std::mem;
 
-pub(crate) const NUM_MAX_OUTPUT: usize = 6;
-pub(crate) const NUM_MAX_INPUT: usize = 6;
+// Properties for op's `compute` method.
+// Actual number of inout/output nodes are around 1~2 in most cases.
+pub(crate) const NUM_MAX_OUTPUT: usize = 2;
+pub(crate) const NUM_MAX_INPUT: usize = 4;
 
 pub(crate) type InputArray<T> = SmallVec<[T; NUM_MAX_INPUT]>;
 pub(crate) type OutputArray<T> = SmallVec<[T; NUM_MAX_OUTPUT]>;
@@ -43,7 +44,7 @@ impl fmt::Display for OpError {
 
 /// Sequence of an op's compute result.
 ///
-/// Op can have multiple output arrays.
+/// Op can have multiple output NdArrays.
 pub(crate) type Results<'v, T> = OutputArray<Option<ComputeResult<'v, T>>>;
 
 /// Operation trait. `Tensor` wraps trait-object of this.
@@ -87,24 +88,24 @@ pub(crate) type Results<'v, T> = OutputArray<Option<ComputeResult<'v, T>>>;
 ///  use ag::tensor::Input;
 ///
 /// // Symbolic `sigmoid` function for end-user.
-/// fn sigmoid<'graph, 'tensor, F: ag::Float>(x: &ag::Tensor<'graph, F>, g: &'graph ag::Graph<F>)
+/// fn sigmoid<'graph, F: ag::Float>(x: &ag::Tensor<'graph, F>, g: &'graph ag::Graph<F>)
 /// -> ag::Tensor<'graph, F> {
 ///     ag::Tensor::builder()
 ///            .set_inputs(&[Input::new(x)])
 ///            .build(g, Sigmoid)
 /// }
 /// ```
-pub trait Op<T: Float> {
+pub trait Op<F: Float> {
     /// Name of this op
     fn name(&self) -> &str {
         type_name::<Self>()
     }
 
-    /// Runs this op.
-    fn compute(&self, ctx: &mut ComputeContext<T>);
+    /// Runs this op with `ComputeContext`.
+    fn compute(&self, ctx: &mut ComputeContext<F>);
 
-    /// Returns symbolic gradients for input nodes by use of output gradient etc.
-    fn grad(&self, ctx: &mut GradientContext<T>);
+    /// Returns symbolic gradients for input nodes by use of output's gradients etc.
+    fn grad(&self, ctx: &mut GradientContext<F>);
 }
 
 pub(crate) struct DummyOp<F: Float> {
@@ -120,9 +121,9 @@ impl<F: Float> DummyOp<F> {
     }
 }
 
-impl<T: Float> Op<T> for DummyOp<T> {
-    fn compute(&self, _: &mut ComputeContext<T>) {}
-    fn grad(&self, _: &mut GradientContext<T>) {}
+impl<F: Float> Op<F> for DummyOp<F> {
+    fn compute(&self, _: &mut ComputeContext<F>) {}
+    fn grad(&self, _: &mut GradientContext<F>) {}
 }
 
 /// Wrapper object of NdArrayView/NdArrayViewMut which is fed to `Op::compute`
@@ -149,7 +150,7 @@ impl<'v, T: Float> OpInput<'v, T> {
     }
 }
 
-/// Contains properties for an `Op`'s computation phase.
+/// Context of an `Op`'s computation phase.
 ///
 /// # Example
 ///
@@ -178,18 +179,18 @@ impl<'v, T: Float> OpInput<'v, T> {
 pub struct ComputeContext<'k, 'v, T: Float> {
     node: &'k TensorInternal<T>,
     // Input arrays
-    xs: Vec<OpInput<'v, T>>,
+    xs: InputArray<OpInput<'v, T>>,
     // Output arrays
     ys: Results<'v, T>,
 }
 
-impl<'s, 'k: 's, 'v: 's, T: Float> ComputeContext<'k, 'v, T> {
+impl<'g, 't, 'v, T: Float> ComputeContext<'t, 'v, T> {
     pub(crate) fn extract_outputs(self) -> Results<'v, T> {
         self.ys
     }
 
     #[inline]
-    pub(crate) fn new(node: &'k TensorInternal<T>, xs: Vec<OpInput<'v, T>>) -> Self {
+    pub(crate) fn new(node: &'t TensorInternal<T>, xs: InputArray<OpInput<'v, T>>) -> Self {
         ComputeContext {
             node,
             xs,
@@ -207,7 +208,7 @@ impl<'s, 'k: 's, 'v: 's, T: Float> ComputeContext<'k, 'v, T> {
             None => panic!("Bad op impl: input index out of range."),
         };
         match x {
-            OpInput::RO(ref mut a) => match mem::replace(a, None) {
+            OpInput::RO(ref mut a) => match a.take() {
                 Some(ret) => ret,
                 None => panic!(
                     "Bad op impl of {}: input({})/input_mut({}) cannot be called twice",
@@ -236,7 +237,7 @@ impl<'s, 'k: 's, 'v: 's, T: Float> ComputeContext<'k, 'v, T> {
             None => panic!("Bad op impl: {}'s input doesn't exist.", i),
         };
         match x {
-            OpInput::RW(ref mut a) => match mem::replace(a, None) {
+            OpInput::RW(ref mut a) => match a.take() {
                 Some(ret) => ret,
                 None => panic!(
                     "Bad op impl of {}: input({})/input_mut({}) cannot be called twice",
@@ -274,17 +275,18 @@ impl<'s, 'k: 's, 'v: 's, T: Float> ComputeContext<'k, 'v, T> {
     /// Appends an empty result to the back of the output list of the current op.
     ///
     /// For example, this is used for gradient-descent-optimizers.
+    ///
     /// NOTE: Implementor of `Op::compute` must not forget to call `append_*` as many as the number of its output in `Op::compute`, otherwise panic occurs.
     #[inline]
     pub fn append_empty_output(&mut self) {
         self.ys.push(None);
     }
 
-    /// Appends an ndarray to the back of the output list of the current op.
+    /// Marks this op's compute session as failed.
     ///
-    /// NOTE: Implementor of `Op::compute` must not forget to call `append_*` as many as the number of its output in `Op::compute`, otherwise panic occurs.
+    /// NOTE: After called this function, Op::compute should return early.
     #[inline]
-    pub fn append_error(&mut self, y: OpError) {
+    pub fn set_error(&mut self, y: OpError) {
         self.ys.push(Some(Err(y)));
     }
 
@@ -295,10 +297,12 @@ impl<'s, 'k: 's, 'v: 's, T: Float> ComputeContext<'k, 'v, T> {
     }
 }
 
-/// Contains properties of an `Op`'s gradient propagation.
+/// Context of an `Op`'s gradient propagation phase.
 ///
 /// This is passed to an `Op` through `Op::grad`.
 /// `Op::grad` should provide the gradients of its inputs by calling `GradientContext::set_input_grads`.
+///
+/// Use `graph()` to access `Graph` object for tensor computations.
 ///
 /// ```
 /// use autograd as ag;
@@ -320,18 +324,18 @@ impl<'s, 'k: 's, 'v: 's, T: Float> ComputeContext<'k, 'v, T> {
 ///     }
 /// }
 /// ```
-pub struct GradientContext<'scope, T: Float> {
-    gy: Tensor<'scope, T>,
-    y: Tensor<'scope, T>,
-    graph: &'scope crate::graph::Graph<T>,
-    gxs: Option<InputArray<Option<Tensor<'scope, T>>>>,
+pub struct GradientContext<'g, T: Float> {
+    gy: Tensor<'g, T>,
+    y: Tensor<'g, T>,
+    graph: &'g crate::graph::Graph<T>,
+    gxs: Option<InputArray<Option<Tensor<'g, T>>>>,
 }
 
-impl<'tensor, 'scope: 'tensor, T: Float> GradientContext<'scope, T> {
+impl<'g, T: Float> GradientContext<'g, T> {
     pub(crate) fn new(
-        gy: Tensor<'scope, T>,
-        y: Tensor<'scope, T>,
-        graph: &'scope crate::graph::Graph<T>,
+        gy: Tensor<'g, T>,
+        y: Tensor<'g, T>,
+        graph: &'g crate::graph::Graph<T>,
     ) -> Self {
         GradientContext {
             gy,
@@ -341,26 +345,26 @@ impl<'tensor, 'scope: 'tensor, T: Float> GradientContext<'scope, T> {
         }
     }
 
-    pub(crate) fn extract_input_grads(self) -> InputArray<Option<Tensor<'scope, T>>> {
+    pub(crate) fn extract_input_grads(self) -> InputArray<Option<Tensor<'g, T>>> {
         self.gxs
             .expect("Bad Op impl: GradientContext::set_input_grads was not called")
     }
 
     /// Returns the symbolic gradient of the op's output.
     #[inline]
-    pub fn output_grad(&self) -> Tensor<'scope, T> {
+    pub fn output_grad(&self) -> Tensor<'g, T> {
         self.gy
     }
 
     /// Grabs the symbolic output of the op.
     #[inline]
-    pub fn output(&self) -> Tensor<'scope, T> {
+    pub fn output(&self) -> Tensor<'g, T> {
         self.y
     }
 
     /// Grabs the `i` th symbolic input.
     #[inline]
-    pub fn input(&self, i: usize) -> Tensor<'scope, T> {
+    pub fn input(&self, i: usize) -> Tensor<'g, T> {
         self.y
             .inner()
             .in_edges
@@ -377,7 +381,7 @@ impl<'tensor, 'scope: 'tensor, T: Float> GradientContext<'scope, T> {
 
     /// Returns a graph object that is usable for tensor computations in the context.
     #[inline]
-    pub fn graph(&self) -> &'scope crate::graph::Graph<T> {
+    pub fn graph(&self) -> &'g crate::graph::Graph<T> {
         self.graph
     }
 
@@ -387,7 +391,7 @@ impl<'tensor, 'scope: 'tensor, T: Float> GradientContext<'scope, T> {
     /// `None` argument indicates that the `Op`'s input doesn't have gradient.
     /// Note that `Op::grad` must call this function as many as `num_inputs()`.
     #[inline]
-    pub fn append_input_grad(&mut self, gx: Option<Tensor<'scope, T>>) {
+    pub fn append_input_grad(&mut self, gx: Option<Tensor<'g, T>>) {
         if self.gxs.is_none() {
             self.gxs = Some(InputArray::new());
         }

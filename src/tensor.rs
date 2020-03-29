@@ -16,7 +16,7 @@ use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 /// `Tensor` is:
 ///
 /// - created by operations of a `Graph`.
-/// - not evaluated until `Graph::eval` or `Tensor::eval` is called.
+/// - not evaluated until `Tensor::eval`, `Graph::eval` or `Eval::run` is called.
 /// - cheap to `Copy` since it contains only refs to the owned internal objects.
 ///
 /// The builtin operations for tensors are provided as [Graph's methods](../graph/struct.Graph.html).
@@ -161,7 +161,7 @@ impl<'graph, 'tensor, F: Float> Tensor<'graph, F> {
         hook: H,
     ) -> Tensor<'graph, F> {
         Tensor::builder()
-            .set_input(&self)
+            .append_input(&self)
             .build(self.graph, crate::ops::hook_ops::HookOp::new(hook))
     }
 
@@ -306,10 +306,7 @@ impl<'graph, 'tensor, F: Float> Tensor<'graph, F> {
     pub fn get_variable_array(&self) -> Option<&Arc<RwLock<NdArray<F>>>> {
         let id = self.inner().id();
         let inner = self.graph.access_node(id);
-        match inner.variable_array {
-            Some(ref inner) => Some(inner),
-            None => None,
-        }
+        inner.variable_array.as_ref()
     }
 
     #[inline]
@@ -451,12 +448,10 @@ impl<T: Float> TensorInternal<T> {
     pub(crate) fn clone_persistent_array(&self) -> Option<NdArray<T>> {
         if let Some(ref arr) = self.variable_array {
             Some((*arr.read().unwrap()).clone())
+        } else if let Some(ref arr) = self.constant_array {
+            Some((**arr).clone())
         } else {
-            if let Some(ref arr) = self.constant_array {
-                Some((**arr).clone())
-            } else {
-                None
-            }
+            None
         }
     }
 
@@ -714,7 +709,6 @@ impl<'tensor, 'graph, T: Float> TensorBuilder<T> {
     #[inline]
     /// Sets read-only input tensors.
     pub(crate) fn set_ro_inputs(mut self, a: &[&Tensor<T>]) -> TensorBuilder<T> {
-        self.in_edges = op::InputArray::with_capacity(a.len());
         for &x in a {
             self.in_edges.push(Input::new(x));
         }
@@ -722,8 +716,7 @@ impl<'tensor, 'graph, T: Float> TensorBuilder<T> {
     }
 
     #[inline]
-    pub(crate) fn set_input(mut self, val: &Tensor<T>) -> TensorBuilder<T> {
-        self.in_edges = op::InputArray::new();
+    pub(crate) fn append_input(mut self, val: &Tensor<T>) -> TensorBuilder<T> {
         self.in_edges.push(Input::new(val));
         self
     }
@@ -767,7 +760,7 @@ impl<'tensor, 'graph, T: Float> TensorBuilder<T> {
     where
         O: op::Op<T> + 'static,
     {
-        let rank = if self.in_edges.len() == 0 {
+        let rank = if self.in_edges.is_empty() {
             0
         } else {
             self.in_edges
@@ -790,7 +783,7 @@ impl<'tensor, 'graph, T: Float> TensorBuilder<T> {
         };
 
         let new = TensorInternal {
-            // `id` is set in `c.install`
+            // `id` is set in `Graph::install`
             id: usize::default(),
             op: Box::new(op),
             in_edges: self.in_edges,
@@ -805,9 +798,8 @@ impl<'tensor, 'graph, T: Float> TensorBuilder<T> {
             backprop_inputs: self.backprop_inputs,
             known_shape: self.known_shape,
         };
-        let inner = graph.install(new);
         Tensor {
-            inner_: inner as *const _,
+            inner_: graph.install(new),
             graph,
         }
     }
@@ -816,13 +808,8 @@ impl<'tensor, 'graph, T: Float> TensorBuilder<T> {
 pub(crate) struct Dummy;
 
 impl<T: Float> crate::op::Op<T> for Dummy {
-    fn compute(&self, _: &mut crate::op::ComputeContext<T>) {
-        unreachable!()
-    }
-
-    fn grad(&self, _: &mut GradientContext<T>) {
-        unreachable!()
-    }
+    fn compute(&self, _: &mut crate::op::ComputeContext<T>) {}
+    fn grad(&self, _: &mut GradientContext<T>) {}
 }
 
 // -- std::ops::{Add, Sub, Mul, Div} implementations --

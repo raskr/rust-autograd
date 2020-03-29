@@ -16,6 +16,7 @@ pub struct DivOp;
 pub struct PreprocessBinOpGrad;
 pub struct PreprocessBinOpGradGrad;
 
+#[cfg(feature = "mkl")]
 macro_rules! bin_op_same_shape {
     ($vms_op:ident, $vmd_op:ident, $std_op:tt, $a:expr, $b:expr) => {
         unsafe {

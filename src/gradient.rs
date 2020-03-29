@@ -1,5 +1,5 @@
 //! Defining things related to gradient computation.
-use crate::op::GradientContext;
+use crate::op::{GradientContext, InputArray};
 use crate::tensor::{Tensor, TensorInternal};
 use crate::Float;
 use crate::FxHashMap;
@@ -11,7 +11,7 @@ use std::collections::binary_heap::BinaryHeap;
 struct GradInfo<'a, 'b, T: Float + 'a> {
     has_gradient: bool,
     grad_called: bool,
-    computed_grads: UnsafeCell<Vec<Tensor<'b, T>>>,
+    computed_grads: UnsafeCell<InputArray<Tensor<'b, T>>>,
     accumulated_grad: UnsafeCell<Option<Tensor<'b, T>>>,
     default_grad: Option<&'a TensorInternal<T>>,
 }
@@ -21,7 +21,7 @@ impl<'t, 's, T: Float> GradInfo<'t, 's, T> {
     fn new(has_gradient: bool, default_grad: Option<&'t TensorInternal<T>>) -> GradInfo<'t, 's, T> {
         GradInfo {
             has_gradient,
-            computed_grads: UnsafeCell::new(Vec::new()),
+            computed_grads: UnsafeCell::new(InputArray::new()),
             grad_called: false,
             accumulated_grad: UnsafeCell::new(None),
             default_grad,
@@ -62,8 +62,7 @@ fn has_marked_child<'a, 'b, T: Float>(
     parent: &TensorInternal<T>,
     path: &FxHashMap<usize, GradInfo<'a, 'b, T>>,
 ) -> bool {
-    let mut it = parent.get_backprop_inputs().iter();
-    while let Some(child) = it.next() {
+    for child in parent.get_backprop_inputs().iter() {
         if path.get(&child.get(s).id()).unwrap().has_gradient {
             return true;
         }
@@ -72,7 +71,7 @@ fn has_marked_child<'a, 'b, T: Float>(
 }
 
 #[inline]
-fn is_wrt<'a, T: Float>(node: &TensorInternal<T>, wrt: &[&TensorInternal<T>]) -> bool {
+fn is_wrt<T: Float>(node: &TensorInternal<T>, wrt: &[&TensorInternal<T>]) -> bool {
     wrt.contains(&node)
 }
 

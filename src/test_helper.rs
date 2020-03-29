@@ -18,10 +18,10 @@ pub fn check_theoretical_grads<'s: 't, 't, 'v, T: Float, A>(
     let graph = objective.as_ref().graph;
     let objective = graph.reduce_sum_to_scalar(objective);
     // backprop
-    let theoretical_grads = graph.eval(gradients, feeds.clone());
+    let theoretical_grads = graph.eval(gradients, feeds);
 
     // for each variable nodes
-    for (var_node, th_grad) in variables.into_iter().zip(theoretical_grads) {
+    for (var_node, th_grad) in variables.iter().zip(theoretical_grads) {
         // Copy gradient array if needed
         let th_copied = if th_grad.as_ref().unwrap().is_standard_layout() {
             None

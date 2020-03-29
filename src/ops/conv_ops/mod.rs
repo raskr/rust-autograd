@@ -9,7 +9,6 @@ use ndarray;
 #[allow(unused_imports)]
 use rayon::iter::*;
 use std::f32;
-use std::mem;
 use std::slice;
 
 #[macro_use]
@@ -100,7 +99,7 @@ fn im2col_batch<T: Float>(
         // parallelize outer loop
         (0..batch_size).into_par_iter().for_each(|i| {
             let mut x: *const T = x.get_unchecked(i * xch as usize * channel_size) as *const _;
-            let mut ret: *mut T = mem::transmute(ret.get_unchecked(i * size_per_batch_y));
+            let mut ret = ret.get_unchecked(i * size_per_batch_y) as *const T as *mut T;
             for _ in 0..xch {
                 for cur_kh in 0..kh {
                     let y_start: i32 = cur_kh * dh - ph;
@@ -161,7 +160,7 @@ fn col2im_batch<T: Float>(
     // parallelize outer loop
     (0..batch_size).into_par_iter().for_each(|i| unsafe {
         let mut x: *const T = x.get_unchecked(i * size_per_batch_x as usize) as *const T;
-        let mut ret: *mut T = mem::transmute(ret.get_unchecked(i * (xch * xh * xw) as usize));
+        let mut ret = ret.get_unchecked(i * (xch * xh * xw) as usize) as *const T as *mut T;
         for _ in 0..xch {
             for ky in 0..kh {
                 let y_start = ky * dh - ph;
@@ -174,17 +173,17 @@ fn col2im_batch<T: Float>(
                             let cache = y_offset * xw;
                             for j in 0..yw as isize {
                                 if (x_offset as u32) < (xw as u32) {
-                                    *ret.offset((cache + x_offset) as isize) += *x.offset(j);
+                                    *ret.add((cache + x_offset) as usize) += *x.offset(j);
                                 }
                                 x_offset += sw;
                             }
                         }
-                        x = x.offset(yw as isize);
+                        x = x.add(yw as usize);
                         y_offset += sh;
                     }
                 }
             }
-            ret = ret.offset(channel_size as isize);
+            ret = ret.add(channel_size as usize);
         }
     });
     ret

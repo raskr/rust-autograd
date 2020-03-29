@@ -230,11 +230,11 @@ pub(crate) fn get_batch_ptrs<A: Float, B>(
 pub mod array_gen {
     use super::*;
     use rand::distributions::Distribution;
+    use rand::rngs::ThreadRng;
     use rand::{self, Rng};
     use rand_distr;
     use std::marker::PhantomData;
     use std::sync::Mutex;
-    use rand::rngs::ThreadRng;
 
     /// Helper structure to create ndarrays whose elements are pseudorandom numbers.
     ///
@@ -279,10 +279,10 @@ pub mod array_gen {
 
         /// Generates `ndarray::Array<T, ndarray::IxDyn>` whose elements are random numbers.
         fn gen_random_array<I>(&self, shape: &[usize], dist: I) -> NdArray<T>
-            where
-                I: Distribution<f64>,
+        where
+            I: Distribution<f64>,
         {
-            let size: usize = shape.into_iter().cloned().product();
+            let size: usize = shape.iter().cloned().product();
             let mut rng = self.rng.lock().unwrap();
             unsafe {
                 let mut buf = crate::uninitialized_vec(size);
@@ -347,7 +347,7 @@ pub mod array_gen {
         pub fn bernoulli(&self, shape: &[usize], p: f64) -> ndarray::Array<T, ndarray::IxDyn> {
             let dist = rand_distr::Uniform::new(0., 1.);
             let mut rng = self.rng.lock().unwrap();
-            let size: usize = shape.into_iter().cloned().product();
+            let size: usize = shape.iter().cloned().product();
             unsafe {
                 let mut buf = crate::uninitialized_vec(size);
                 for i in 0..size {

@@ -3,7 +3,9 @@ use crate::ndarray_ext::{NdArray, NdArrayView};
 use crate::op;
 use crate::tensor::{Input, Tensor};
 use crate::Float;
-use crate::{ndarray, NdArrayViewMut};
+#[cfg(feature = "mkl")]
+use crate::ndarray_ext::NdArrayViewMut;
+use crate::ndarray;
 use std::iter::FromIterator;
 
 pub struct ExpandDims;

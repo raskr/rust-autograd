@@ -22,16 +22,8 @@ impl<'g> LSTM<'g> {
             vector_dim,
             hs: vec![],
             cells: vec![],
-            wx: s.variable(rng.random_normal(
-                &[vector_dim, 4 * vector_dim],
-                0.,
-                0.01,
-            )),
-            wh: s.variable(rng.random_normal(
-                &[vector_dim, 4 * vector_dim],
-                0.,
-                0.01,
-            )),
+            wx: s.variable(rng.random_normal(&[vector_dim, 4 * vector_dim], 0., 0.01)),
+            wh: s.variable(rng.random_normal(&[vector_dim, 4 * vector_dim], 0., 0.01)),
             b: s.variable(ag::ndarray_ext::zeros(&[1, 4 * vector_dim])),
         }
     }
@@ -76,16 +68,8 @@ pub fn main() {
         let ref mut rnn = LSTM::new(vec_dim, s);
 
         let rng = ag::ndarray_ext::ArrayRng::<f32>::default();
-        let lookup_table = s.variable(rng.random_normal(
-            &[vocab_size, vec_dim],
-            0.,
-            0.01,
-        ));
-        let w_pred = s.variable(rng.random_uniform(
-            &[vec_dim, vocab_size],
-            0.,
-            0.01,
-        ));
+        let lookup_table = s.variable(rng.random_normal(&[vocab_size, vec_dim], 0., 0.01));
+        let w_pred = s.variable(rng.random_uniform(&[vec_dim, vocab_size], 0., 0.01));
 
         // Compute cross entropy losses for each LSTM step
         let losses: Vec<ag::Tensor<_>> = (0..max_sent)

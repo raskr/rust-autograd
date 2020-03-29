@@ -174,11 +174,9 @@ fn conv2d_transpose_impl<F: Float>(
                     if same_type::<F, $ty>() {
                         (0..batch_size).into_par_iter().for_each(|i| {
                             let w = w_slice.as_ptr();
-                            let gy_region_head =
-                                gy_slice.as_ptr().offset((i * size_per_batch_gy) as isize);
-                            let col_region_head: *mut F = mem::transmute(col_ref);
-                            let col_region_head =
-                                col_region_head.offset((i * size_per_batch_col) as isize);
+                            let gy_region_head = gy_slice.as_ptr().add(i * size_per_batch_gy);
+                            let col_region_head = col_ref as *const F as *mut F;
+                            let col_region_head = col_region_head.add(i * size_per_batch_col);
                             matrixmultiply::$f(
                                 m,
                                 k,
@@ -247,7 +245,7 @@ impl<T: Float> crate::op::Op<T> for Conv2DTranspose {
                 ctx.append_output(gx);
             }
             Err(e) => {
-                ctx.append_error(e);
+                ctx.set_error(e);
             }
         }
     }

@@ -541,7 +541,7 @@ impl<T: Float> op::Op<T> for MatMul {
         }
         let ((m, k), (k2, n)) = (a.dim(), b.dim());
         if k != k2 || m.checked_mul(n).is_none() {
-            ctx.append_error(op::OpError::IncompatibleShape(dot_shape_error(m, k, k2, n)));
+            ctx.set_error(op::OpError::IncompatibleShape(dot_shape_error(m, k, k2, n)));
             return;
         }
 
@@ -599,14 +599,14 @@ impl<T: Float> op::Op<T> for BatchMatMul {
         let rank1 = x1.ndim();
 
         if rank0 < 2 {
-            ctx.append_error(op::OpError::IncompatibleShape(format!(
+            ctx.set_error(op::OpError::IncompatibleShape(format!(
                 "BatchMatMul: Left-hand-side input's ndim must be >= 2, actual: {}",
                 rank0
             )));
             return;
         }
         if rank1 < 2 {
-            ctx.append_error(op::OpError::IncompatibleShape(format!(
+            ctx.set_error(op::OpError::IncompatibleShape(format!(
                 "BatchMatMul: Right-hand-side input's ndim must be >= 2, actual: {}",
                 rank1
             )));
@@ -624,7 +624,7 @@ impl<T: Float> op::Op<T> for BatchMatMul {
         let shape0 = x0.shape();
         let shape1 = x1.shape();
         if rank0 != rank1 || shape0[..rank0 - 2] != shape1[..rank0 - 2] {
-            ctx.append_error(op::OpError::IncompatibleShape(format!(
+            ctx.set_error(op::OpError::IncompatibleShape(format!(
                 "Input shapes mismatch: {:?} vs {:?}",
                 shape0, shape1
             )));

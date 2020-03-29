@@ -202,7 +202,7 @@ impl<T: Float> crate::op::Op<T> for MaxPool2D {
                     self.stride,
                 )
             } else {
-                ctx.append_error(op::OpError::TypeUnsupported(
+                ctx.set_error(op::OpError::TypeUnsupported(
                     "MaxPool supports only f32 and f64".to_string(),
                 ));
                 return;
@@ -254,7 +254,7 @@ impl<T: Float> crate::op::Op<T> for MaxPool2DGrad {
         } else if same_type::<T, f64>() {
             max_pool_grad_f64(batch, gy, xh, xw, yh, yw, c, argmax.as_ptr() as *const f64)
         } else {
-            ctx.append_error(op::OpError::TypeUnsupported(
+            ctx.set_error(op::OpError::TypeUnsupported(
                 "MaxPool2DGrad supports only f32 and f64".to_string(),
             ));
             return;
@@ -303,7 +303,7 @@ impl<T: Float> crate::op::Op<T> for MaxPool2DGradGrad {
             } else if same_type::<T, f64>() {
                 max_pool_grad_grad_f64(ggx, yh, yw, c, batch, argmax.as_ptr() as *const f64)
             } else {
-                ctx.append_error(op::OpError::TypeUnsupported(
+                ctx.set_error(op::OpError::TypeUnsupported(
                     "MaxPool2DGradGrad supports only f32 and f64".to_string(),
                 ));
                 return;
