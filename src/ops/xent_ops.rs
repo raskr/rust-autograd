@@ -36,11 +36,9 @@ impl<T: Float> op::Op<T> for SigmoidCrossEntropy {
 
         assert_eq!(x.shape(), t.shape(), "x.shape must match t.shape");
 
-        use std::f64;
-        let e = T::from(f64::consts::E).unwrap();
         let max_fn = T::max;
         let mut tmp: NdArray<T> =
-            x.mapv(move |a| ((-a.abs()).exp() + T::one()).log(e) + max_fn(T::zero(), a));
+            x.mapv(move |a| ((-a.abs()).exp() + T::one()).ln() + max_fn(T::zero(), a));
         tmp -= &(t * x);
         ctx.append_output(tmp);
     }
@@ -69,7 +67,7 @@ impl<T: Float> op::Op<T> for SparseSoftmaxCrossEntropy {
         {
             let t_shape = t.shape();
             if log_x.ndim() != 2 {
-                ctx.append_error(op::OpError::IncompatibleShape(
+                ctx.set_error(op::OpError::IncompatibleShape(
                     "Bad first argument's shape".to_string(),
                 ));
                 return;
@@ -77,13 +75,13 @@ impl<T: Float> op::Op<T> for SparseSoftmaxCrossEntropy {
             let t_rank = t_shape.len();
             if t_rank == 2 {
                 if t_shape[1] != 1 {
-                    ctx.append_error(op::OpError::IncompatibleShape(
+                    ctx.set_error(op::OpError::IncompatibleShape(
                         "Bad first argument's shape".to_string(),
                     ));
                     return;
                 }
             } else if t_rank != 1 {
-                ctx.append_error(op::OpError::IncompatibleShape(
+                ctx.set_error(op::OpError::IncompatibleShape(
                     "Bad first argument's shape".to_string(),
                 ));
                 return;
@@ -114,8 +112,6 @@ impl<T: Float> op::Op<T> for SparseSoftmaxCrossEntropy {
 
         // gx2 won't be used in most cases.
         let gx2 = {
-            // ローカル変数の参照を返している。
-            // ローカル変数の
             let x = s.exp(log_x);
             let sum = s.reduce_sum(x * log_x, &[1], true);
             x * gy * (sum - log_x)

@@ -97,4 +97,144 @@ extern "C" {
         group_count: MklInt,                 // batch size
         group_size: *const MklInt,
     );
+
+    pub(crate) fn vsSin(n: MklInt, a: *const libc::c_float, y: *mut libc::c_float);
+    pub(crate) fn vdSin(n: MklInt, a: *const libc::c_double, y: *mut libc::c_double);
+
+    pub(crate) fn vsAsin(n: MklInt, a: *const libc::c_float, y: *mut libc::c_float);
+    pub(crate) fn vdAsin(n: MklInt, a: *const libc::c_double, y: *mut libc::c_double);
+
+    pub(crate) fn vsSinh(n: MklInt, a: *const libc::c_float, y: *mut libc::c_float);
+    pub(crate) fn vdSinh(n: MklInt, a: *const libc::c_double, y: *mut libc::c_double);
+
+    pub(crate) fn vsAsinh(n: MklInt, a: *const libc::c_float, y: *mut libc::c_float);
+    pub(crate) fn vdAsinh(n: MklInt, a: *const libc::c_double, y: *mut libc::c_double);
+
+    pub(crate) fn vsCos(n: MklInt, a: *const libc::c_float, y: *mut libc::c_float);
+    pub(crate) fn vdCos(n: MklInt, a: *const libc::c_double, y: *mut libc::c_double);
+
+    pub(crate) fn vsAcos(n: MklInt, a: *const libc::c_float, y: *mut libc::c_float);
+    pub(crate) fn vdAcos(n: MklInt, a: *const libc::c_double, y: *mut libc::c_double);
+
+    pub(crate) fn vsCosh(n: MklInt, a: *const libc::c_float, y: *mut libc::c_float);
+    pub(crate) fn vdCosh(n: MklInt, a: *const libc::c_double, y: *mut libc::c_double);
+
+    pub(crate) fn vsAcosh(n: MklInt, a: *const libc::c_float, y: *mut libc::c_float);
+    pub(crate) fn vdAcosh(n: MklInt, a: *const libc::c_double, y: *mut libc::c_double);
+
+    pub(crate) fn vsTan(n: MklInt, a: *const libc::c_float, y: *mut libc::c_float);
+    pub(crate) fn vdTan(n: MklInt, a: *const libc::c_double, y: *mut libc::c_double);
+
+    pub(crate) fn vsAtan(n: MklInt, a: *const libc::c_float, y: *mut libc::c_float);
+    pub(crate) fn vdAtan(n: MklInt, a: *const libc::c_double, y: *mut libc::c_double);
+
+    pub(crate) fn vsTanh(n: MklInt, a: *const libc::c_float, y: *mut libc::c_float);
+    pub(crate) fn vdTanh(n: MklInt, a: *const libc::c_double, y: *mut libc::c_double);
+
+    pub(crate) fn vsAtanh(n: MklInt, a: *const libc::c_float, y: *mut libc::c_float);
+    pub(crate) fn vdAtanh(n: MklInt, a: *const libc::c_double, y: *mut libc::c_double);
+
+    pub(crate) fn vsExp(n: MklInt, a: *const libc::c_float, y: *mut libc::c_float);
+    pub(crate) fn vdExp(n: MklInt, a: *const libc::c_double, y: *mut libc::c_double);
+
+    pub(crate) fn vsExp2(n: MklInt, a: *const libc::c_float, y: *mut libc::c_float);
+    pub(crate) fn vdExp2(n: MklInt, a: *const libc::c_double, y: *mut libc::c_double);
+
+    pub(crate) fn vsExp10(n: MklInt, a: *const libc::c_float, y: *mut libc::c_float);
+    pub(crate) fn vdExp10(n: MklInt, a: *const libc::c_double, y: *mut libc::c_double);
+
+    pub(crate) fn vsLn(n: MklInt, a: *const libc::c_float, y: *mut libc::c_float);
+    pub(crate) fn vdLn(n: MklInt, a: *const libc::c_double, y: *mut libc::c_double);
+
+    pub(crate) fn vsLog2(n: MklInt, a: *const libc::c_float, y: *mut libc::c_float);
+    pub(crate) fn vdLog2(n: MklInt, a: *const libc::c_double, y: *mut libc::c_double);
+
+    pub(crate) fn vsLog10(n: MklInt, a: *const libc::c_float, y: *mut libc::c_float);
+    pub(crate) fn vdLog10(n: MklInt, a: *const libc::c_double, y: *mut libc::c_double);
+
+    pub(crate) fn vsInv(n: MklInt, a: *const libc::c_float, y: *mut libc::c_float);
+    pub(crate) fn vdInv(n: MklInt, a: *const libc::c_double, y: *mut libc::c_double);
+
+    pub(crate) fn vsDiv(
+        n: MklInt,
+        a: *const libc::c_float,
+        b: *const libc::c_float,
+        y: *mut libc::c_float,
+    );
+    pub(crate) fn vdDiv(
+        n: MklInt,
+        a: *const libc::c_double,
+        b: *const libc::c_double,
+        y: *mut libc::c_double,
+    );
+
+    pub(crate) fn vsSqrt(n: MklInt, a: *const libc::c_float, y: *mut libc::c_float);
+    pub(crate) fn vdSqrt(n: MklInt, a: *const libc::c_double, y: *mut libc::c_double);
+
+    pub(crate) fn vsPowx(
+        n: MklInt,
+        a: *const libc::c_float,
+        b: libc::c_float,
+        y: *mut libc::c_float,
+    );
+    pub(crate) fn vdPowx(
+        n: MklInt,
+        a: *const libc::c_double,
+        b: libc::c_double,
+        y: *mut libc::c_double,
+    );
+
+    pub(crate) fn vsInvSqrt(n: MklInt, a: *const libc::c_float, y: *mut libc::c_float);
+    pub(crate) fn vdInvSqrt(n: MklInt, a: *const libc::c_double, y: *mut libc::c_double);
+
+    pub(crate) fn vsAdd(
+        n: MklInt,
+        a: *const libc::c_float,
+        b: *const libc::c_float,
+        y: *mut libc::c_float,
+    );
+    pub(crate) fn vdAdd(
+        n: MklInt,
+        a: *const libc::c_double,
+        b: *const libc::c_double,
+        y: *mut libc::c_double,
+    );
+
+    pub(crate) fn vsSub(
+        n: MklInt,
+        a: *const libc::c_float,
+        b: *const libc::c_float,
+        y: *mut libc::c_float,
+    );
+    pub(crate) fn vdSub(
+        n: MklInt,
+        a: *const libc::c_double,
+        b: *const libc::c_double,
+        y: *mut libc::c_double,
+    );
+
+    pub(crate) fn vsSqr(n: MklInt, a: *const libc::c_float, y: *mut libc::c_float);
+    pub(crate) fn vdSqr(n: MklInt, a: *const libc::c_double, y: *mut libc::c_double);
+
+    pub(crate) fn vsMul(
+        n: MklInt,
+        a: *const libc::c_float,
+        b: *const libc::c_float,
+        y: *mut libc::c_float,
+    );
+    pub(crate) fn vdMul(
+        n: MklInt,
+        a: *const libc::c_double,
+        b: *const libc::c_double,
+        y: *mut libc::c_double,
+    );
+
+    pub(crate) fn vsAbs(n: MklInt, a: *const libc::c_float, y: *mut libc::c_float);
+    pub(crate) fn vdAbs(n: MklInt, a: *const libc::c_double, y: *mut libc::c_double);
+
+    pub(crate) fn vsFloor(n: MklInt, a: *const libc::c_float, y: *mut libc::c_float);
+    pub(crate) fn vdFloor(n: MklInt, a: *const libc::c_double, y: *mut libc::c_double);
+
+    pub(crate) fn vsCeil(n: MklInt, a: *const libc::c_float, y: *mut libc::c_float);
+    pub(crate) fn vdCeil(n: MklInt, a: *const libc::c_double, y: *mut libc::c_double);
 }

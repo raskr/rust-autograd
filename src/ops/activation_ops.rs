@@ -1,9 +1,12 @@
 use crate::ndarray_ext::{NdArray, NdArrayView};
 use crate::op;
+#[cfg(feature = "mkl")]
+use crate::ops::mkl_ffi::*;
+#[cfg(feature = "mkl")]
+use crate::same_type;
 use crate::tensor::Tensor;
 use crate::Float;
 use ndarray;
-
 pub struct ELU<T: Float> {
     pub alpha: T,
 }
@@ -24,8 +27,36 @@ pub struct Softmax {
     pub axis: isize,
 }
 
+#[cfg(feature = "mkl")]
+fn fast_sigmoid_impl<F: Float>(x: &NdArrayView<F>) -> NdArray<F> {
+    let half = F::from(0.5).unwrap();
+    unsafe {
+        if same_type::<F, f32>() {
+            let mut y = x.mapv(move |x| x * half);
+            vsTanh(
+                y.len() as MklInt,
+                y.as_ptr() as *const f32,
+                y.as_mut_ptr() as *mut f32,
+            );
+            y.mapv_inplace(move |x2| half * (x2 + F::one()));
+            return y;
+        } else if same_type::<F, f64>() {
+            let mut y = x.mapv(move |x| x * half);
+            vdTanh(
+                y.len() as MklInt,
+                y.as_ptr() as *const f64,
+                y.as_mut_ptr() as *mut f64,
+            );
+            y.mapv_inplace(move |x2| half * (x2 + F::one()));
+            return y;
+        } else {
+            x.mapv(move |a| ((a * half).tanh() * half) + half)
+        }
+    }
+}
+
 #[inline]
-pub fn softmax_forward<T: Float>(x: &NdArrayView<T>, axis: isize) -> NdArray<T> {
+pub fn softmax_impl<T: Float>(x: &NdArrayView<T>, axis: isize) -> NdArray<T> {
     let axis = if axis < 0 {
         (x.ndim() as isize + axis) as usize
     } else {
@@ -37,7 +68,7 @@ pub fn softmax_forward<T: Float>(x: &NdArrayView<T>, axis: isize) -> NdArray<T> 
     let reduced_shape = a.as_slice();
     let max_fn = T::max;
     // unwrap is safe
-    let ref max = x
+    let max = &x
         .fold_axis(ndarray::Axis(axis), T::min_value(), move |&a, &b| {
             max_fn(a, b)
         })
@@ -45,7 +76,14 @@ pub fn softmax_forward<T: Float>(x: &NdArrayView<T>, axis: isize) -> NdArray<T> 
         .unwrap();
     // subtract `max` to prevent overflow
     let mut tmp = x - max;
-    tmp.mapv_inplace(|a| a.exp());
+    #[cfg(feature = "mkl")]
+    {
+        crate::ops::math_ops::fast_inplace_exp_impl(&mut tmp);
+    }
+    #[cfg(not(feature = "mkl"))]
+    {
+        tmp.mapv_inplace(move |a| a.exp());
+    }
     // unwrap is safe
     let sum = tmp
         .sum_axis(ndarray::Axis(axis))
@@ -57,7 +95,7 @@ pub fn softmax_forward<T: Float>(x: &NdArrayView<T>, axis: isize) -> NdArray<T> 
 
 impl<T: Float> op::Op<T> for Softmax {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
-        let ret = softmax_forward(&ctx.input(0), self.axis);
+        let ret = softmax_impl(&ctx.input(0), self.axis);
         ctx.append_output(ret)
     }
 
@@ -72,9 +110,7 @@ impl<T: Float> op::Op<T> for Softmax {
 
 impl<T: Float> op::Op<T> for Softplus {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
-        use std::f64;
-        let e = T::from(f64::consts::E).unwrap();
-        let ret = ctx.input(0).map(move |a| (a.exp() + T::one()).log(e));
+        let ret = ctx.input(0).map(move |a| (a.exp() + T::one()).ln());
         ctx.append_output(ret)
     }
 
@@ -90,18 +126,25 @@ impl<T: Float> op::Op<T> for Softplus {
 
 impl<T: Float> op::Op<T> for Sigmoid {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
-        let half = T::from(0.5).unwrap();
-        let ret = ctx
-            .input(0)
-            .mapv(move |a| ((a * half).tanh() * half) + half);
+        let ret;
+        #[cfg(feature = "mkl")]
+        {
+            ret = fast_sigmoid_impl(&ctx.input(0));
+        }
+        #[cfg(not(feature = "mkl"))]
+        {
+            let half = T::from(0.5).unwrap();
+            ret = ctx
+                .input(0)
+                .mapv(move |a| ((a * half).tanh() * half) + half);
+        }
         ctx.append_output(ret)
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
         let gy = ctx.output_grad();
         let y = ctx.output();
-        let s = ctx.graph();
-        ctx.append_input_grad(Some(gy * (y - s.square(y))));
+        ctx.append_input_grad(Some(gy * (y - ctx.graph().square(y))));
     }
 }
 

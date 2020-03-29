@@ -43,7 +43,7 @@ impl<'tensor, 'graph, F: Float> Tensor<'graph, F> {
     /// ```
     pub fn access_elem(self, i: isize) -> Tensor<'graph, F> {
         let op = array_ops::IndexOp { index: i };
-        Tensor::builder().set_input(&self).build(self.graph, op)
+        Tensor::builder().append_input(&self).build(self.graph, op)
     }
 }
 
@@ -194,8 +194,8 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
         for i in 0..len {
             // jac is matrix
             let mut jac = Vec::with_capacity(objective_len);
-            for j in 0..objective_len {
-                jac.push(self.expand_dims(self.flatten(&vec_vec[j][i]), &[0]));
+            for vec in &vec_vec {
+                jac.push(self.expand_dims(self.flatten(&vec[i]), &[0]));
             }
             // (y size, x size)
             ret.push(self.concat(&jac, 0));
@@ -233,7 +233,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
         A: AsRef<Tensor<'graph, F>> + Copy,
     {
         Tensor::builder()
-            .set_input(x.as_ref())
+            .append_input(x.as_ref())
             .set_differentiable(false)
             .build(self, gradient_ops::StopGradient)
     }
@@ -302,7 +302,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
             }
         } else {
             Tensor::builder()
-                .set_input(x.as_ref())
+                .append_input(x.as_ref())
                 .set_differentiable(false)
                 .build(self, array_ops::Shape)
         }
@@ -326,7 +326,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
         A: AsRef<Tensor<'graph, F>> + Copy,
     {
         Tensor::builder()
-            .set_input(x.as_ref())
+            .append_input(x.as_ref())
             .set_differentiable(false)
             .build(self, array_ops::Size)
     }
@@ -348,7 +348,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
         A: AsRef<Tensor<'graph, F>> + Copy,
     {
         Tensor::builder()
-            .set_input(x.as_ref())
+            .append_input(x.as_ref())
             .set_differentiable(false)
             .build(self, array_ops::Rank)
     }
@@ -359,7 +359,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
         A: AsRef<Tensor<'graph, F>> + Copy,
     {
         Tensor::builder()
-            .set_input(x.as_ref())
+            .append_input(x.as_ref())
             .set_shape(&self.shape(x))
             .build(self, math_ops::Sin)
     }
@@ -370,7 +370,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
         A: AsRef<Tensor<'graph, F>> + Copy,
     {
         Tensor::builder()
-            .set_input(x.as_ref())
+            .append_input(x.as_ref())
             .set_shape(&self.shape(x))
             .build(self, math_ops::Cos)
     }
@@ -381,7 +381,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
         A: AsRef<Tensor<'graph, F>> + Copy,
     {
         Tensor::builder()
-            .set_input(x.as_ref())
+            .append_input(x.as_ref())
             .set_shape(&self.shape(x))
             .build(self, math_ops::Tan)
     }
@@ -392,7 +392,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
         A: AsRef<Tensor<'graph, F>> + Copy,
     {
         Tensor::builder()
-            .set_input(x.as_ref())
+            .append_input(x.as_ref())
             .set_shape(&self.shape(x))
             .build(self, math_ops::Asin)
     }
@@ -403,7 +403,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
         A: AsRef<Tensor<'graph, F>> + Copy,
     {
         Tensor::builder()
-            .set_input(x.as_ref())
+            .append_input(x.as_ref())
             .set_shape(&self.shape(x))
             .build(self, math_ops::Acos)
     }
@@ -414,7 +414,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
         A: AsRef<Tensor<'graph, F>> + Copy,
     {
         Tensor::builder()
-            .set_input(x.as_ref())
+            .append_input(x.as_ref())
             .set_shape(&self.shape(x))
             .build(self, math_ops::Atan)
     }
@@ -425,7 +425,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
         A: AsRef<Tensor<'graph, F>> + Copy,
     {
         Tensor::builder()
-            .set_input(x.as_ref())
+            .append_input(x.as_ref())
             .set_shape(&self.shape(x))
             .build(self, math_ops::Sinh)
     }
@@ -436,7 +436,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
         A: AsRef<Tensor<'graph, F>> + Copy,
     {
         Tensor::builder()
-            .set_input(x.as_ref())
+            .append_input(x.as_ref())
             .set_shape(&self.shape(x))
             .build(self, math_ops::Cosh)
     }
@@ -447,7 +447,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
         A: AsRef<Tensor<'graph, F>> + Copy,
     {
         Tensor::builder()
-            .set_input(x.as_ref())
+            .append_input(x.as_ref())
             .set_shape(&self.shape(x))
             .build(self, math_ops::Tanh)
     }
@@ -458,7 +458,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
         A: AsRef<Tensor<'graph, F>> + Copy,
     {
         Tensor::builder()
-            .set_input(x.as_ref())
+            .append_input(x.as_ref())
             .set_shape(&self.shape(x))
             .build(self, math_ops::Asinh)
     }
@@ -469,7 +469,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
         A: AsRef<Tensor<'graph, F>> + Copy,
     {
         Tensor::builder()
-            .set_input(x.as_ref())
+            .append_input(x.as_ref())
             .set_shape(&self.shape(x))
             .build(self, math_ops::Acosh)
     }
@@ -480,7 +480,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
         A: AsRef<Tensor<'graph, F>> + Copy,
     {
         Tensor::builder()
-            .set_input(x.as_ref())
+            .append_input(x.as_ref())
             .set_shape(&self.shape(x))
             .build(self, math_ops::Atanh)
     }
@@ -495,7 +495,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
         A: AsRef<Tensor<'graph, F>> + Copy,
     {
         Tensor::builder()
-            .set_input(x.as_ref())
+            .append_input(x.as_ref())
             .set_input_indices(&[n])
             .build(self, activation_ops::Identity)
     }
@@ -506,7 +506,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
         A: AsRef<Tensor<'graph, F>> + Copy,
     {
         Tensor::builder()
-            .set_input(x.as_ref())
+            .append_input(x.as_ref())
             .set_shape(&self.shape(x))
             .build(self, activation_ops::Identity)
     }
@@ -589,7 +589,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
         A: AsRef<Tensor<'graph, F>> + Copy,
     {
         Tensor::builder()
-            .set_input(x.as_ref())
+            .append_input(x.as_ref())
             .set_shape(&self.shape(x))
             .build(self, math_ops::Sqrt)
     }
@@ -600,31 +600,75 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
         A: AsRef<Tensor<'graph, F>> + Copy,
     {
         Tensor::builder()
-            .set_input(x.as_ref())
+            .append_input(x.as_ref())
             .set_shape(&self.shape(x))
             .build(self, math_ops::Pow { a })
     }
 
-    /// Elementwise log
-    pub fn log<A>(&'graph self, x: A, a: F) -> Tensor<'graph, F>
+    /// Elementwise base e (napier) logarithm
+    pub fn ln<A>(&'graph self, x: A) -> Tensor<'graph, F>
     where
         A: AsRef<Tensor<'graph, F>> + Copy,
     {
         Tensor::builder()
-            .set_input(x.as_ref())
+            .append_input(x.as_ref())
             .set_shape(&self.shape(x))
-            .build(self, math_ops::Log { a })
+            .build(self, math_ops::Ln)
     }
 
-    /// Elementwise exponential
+    /// Elementwise base 2 logarithm
+    pub fn log2<A>(&'graph self, x: A) -> Tensor<'graph, F>
+    where
+        A: AsRef<Tensor<'graph, F>> + Copy,
+    {
+        Tensor::builder()
+            .append_input(x.as_ref())
+            .set_shape(&self.shape(x))
+            .build(self, math_ops::Log2)
+    }
+
+    /// Elementwise base 10 logarithm
+    pub fn log10<A>(&'graph self, x: A) -> Tensor<'graph, F>
+    where
+        A: AsRef<Tensor<'graph, F>> + Copy,
+    {
+        Tensor::builder()
+            .append_input(x.as_ref())
+            .set_shape(&self.shape(x))
+            .build(self, math_ops::Log10)
+    }
+
+    /// Elementwise base e (napier) exponential
     pub fn exp<A>(&'graph self, x: A) -> Tensor<'graph, F>
     where
         A: AsRef<Tensor<'graph, F>> + Copy,
     {
         Tensor::builder()
-            .set_input(x.as_ref())
+            .append_input(x.as_ref())
             .set_shape(&self.shape(x))
             .build(self, math_ops::Exp)
+    }
+
+    /// Elementwise base 2 exponential
+    pub fn exp2<A>(&'graph self, x: A) -> Tensor<'graph, F>
+    where
+        A: AsRef<Tensor<'graph, F>> + Copy,
+    {
+        Tensor::builder()
+            .append_input(x.as_ref())
+            .set_shape(&self.shape(x))
+            .build(self, math_ops::Exp2)
+    }
+
+    /// Elementwise base 10 exponential
+    pub fn exp10<A>(&'graph self, x: A) -> Tensor<'graph, F>
+    where
+        A: AsRef<Tensor<'graph, F>> + Copy,
+    {
+        Tensor::builder()
+            .append_input(x.as_ref())
+            .set_shape(&self.shape(x))
+            .build(self, math_ops::Exp10)
     }
 
     /// Returns the max of x and y (i.e. x > y ? x : y) element-wise.
@@ -789,7 +833,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
         A: AsRef<Tensor<'graph, F>> + Copy,
     {
         let op = reduction_ops::ArgMax { axis, keep_dim };
-        Tensor::builder().set_input(x.as_ref()).build(self, op)
+        Tensor::builder().append_input(x.as_ref()).build(self, op)
     }
 
     /// Expands the shape (inserts axes).
@@ -863,7 +907,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
         A: AsRef<Tensor<'graph, F>> + Copy,
     {
         let op = array_ops::Tile { axis, num };
-        Tensor::builder().set_input(x.as_ref()).build(self, op)
+        Tensor::builder().append_input(x.as_ref()).build(self, op)
     }
 
     /// Limits all elements of `x` so as to be within `[min, max]`
@@ -884,7 +928,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
         A: AsRef<Tensor<'graph, F>> + Copy,
     {
         let op = array_ops::Clip { min, max };
-        Tensor::builder().set_input(x.as_ref()).build(self, op)
+        Tensor::builder().append_input(x.as_ref()).build(self, op)
     }
 
     /// Takes max along specified axes.
@@ -963,7 +1007,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
         A: AsRef<Tensor<'graph, F>> + Copy,
     {
         Tensor::builder()
-            .set_input(x.as_ref())
+            .append_input(x.as_ref())
             .build(self, reduction_ops::ReduceSumToScalar)
     }
 
@@ -1122,7 +1166,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
     {
         Tensor::builder()
             .set_shape(&self.shape(a))
-            .set_input(a.as_ref())
+            .append_input(a.as_ref())
             .build(self, math_ops::Sign)
     }
 
@@ -1148,7 +1192,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
     {
         Tensor::builder()
             .set_shape(&self.shape(a))
-            .set_input(a.as_ref())
+            .append_input(a.as_ref())
             .build(self, math_ops::Abs)
     }
 
@@ -1174,7 +1218,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
     {
         Tensor::builder()
             .set_shape(&self.shape(a))
-            .set_input(a.as_ref())
+            .append_input(a.as_ref())
             .build(self, math_ops::Floor)
     }
 
@@ -1199,7 +1243,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
         A: AsRef<Tensor<'graph, F>> + Copy,
     {
         Tensor::builder()
-            .set_input(a.as_ref())
+            .append_input(a.as_ref())
             .build(self, math_ops::NegOp)
     }
 
@@ -1225,7 +1269,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
     {
         Tensor::builder()
             .set_shape(&self.shape(a))
-            .set_input(a.as_ref())
+            .append_input(a.as_ref())
             .build(self, math_ops::Square)
     }
 
@@ -1238,21 +1282,47 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
     ///
     /// ag::with(|g| {
     ///    let a = g.constant(array![2.]);
-    ///    let b = g.reciprocal(a);
+    ///    let b = g.inv(a);
     ///    assert_eq!(
     ///        b.eval(&[]),
     ///        Ok(array![0.5].into_dyn())
     ///    );
     /// });
     /// ```
-    pub fn reciprocal<A>(&'graph self, x: A) -> Tensor<'graph, F>
+    pub fn inv<A>(&'graph self, x: A) -> Tensor<'graph, F>
     where
         A: AsRef<Tensor<'graph, F>> + Copy,
     {
         Tensor::builder()
             .set_shape(&self.shape(x))
-            .set_input(x.as_ref())
-            .build(self, math_ops::Reciprocal)
+            .append_input(x.as_ref())
+            .build(self, math_ops::Inv)
+    }
+
+    /// Returns the `1/sqrt(x)`, element-wise.
+    ///
+    /// ```
+    /// use ndarray::array;
+    /// use autograd as ag;
+    /// use ag::tensor::Constant;
+    ///
+    /// ag::with(|g| {
+    ///    let a = g.constant(array![4.]);
+    ///    let b = g.inv_sqrt(a);
+    ///    assert_eq!(
+    ///        b.eval(&[]),
+    ///        Ok(array![0.5].into_dyn())
+    ///    );
+    /// });
+    /// ```
+    pub fn inv_sqrt<A>(&'graph self, x: A) -> Tensor<'graph, F>
+    where
+        A: AsRef<Tensor<'graph, F>> + Copy,
+    {
+        Tensor::builder()
+            .set_shape(&self.shape(x))
+            .append_input(x.as_ref())
+            .build(self, math_ops::InvSqrt)
     }
 
     /// Returns the smallest integer greater than or equal to a number, element-wise.
@@ -1278,7 +1348,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
     {
         Tensor::builder()
             .set_shape(&self.shape(a))
-            .set_input(a.as_ref())
+            .append_input(a.as_ref())
             .build(self, math_ops::Ceil)
     }
 
@@ -1345,7 +1415,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
     {
         Tensor::builder()
             .set_shape(&self.shape(x))
-            .set_input(x.as_ref())
+            .append_input(x.as_ref())
             .build(self, activation_ops::Sigmoid)
     }
 
@@ -1358,7 +1428,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
     {
         Tensor::builder()
             .set_shape(&self.shape(x))
-            .set_input(x.as_ref())
+            .append_input(x.as_ref())
             .build(self, activation_ops::ELU { alpha })
     }
 
@@ -1369,7 +1439,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
     {
         Tensor::builder()
             .set_shape(&self.shape(x))
-            .set_input(x.as_ref())
+            .append_input(x.as_ref())
             .build(self, activation_ops::ReLU)
     }
 
@@ -1392,7 +1462,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
     {
         Tensor::builder()
             .set_shape(&self.shape(x))
-            .set_input(x.as_ref())
+            .append_input(x.as_ref())
             .build(self, activation_ops::Softplus)
     }
 
@@ -1407,7 +1477,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
             axis,
             keep_dims: keep_dim,
         };
-        Tensor::builder().set_input(x.as_ref()).build(self, op)
+        Tensor::builder().append_input(x.as_ref()).build(self, op)
     }
 
     /// Log softmax function.
@@ -1421,7 +1491,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
     {
         Tensor::builder()
             .set_shape(&self.shape(x))
-            .set_input(x.as_ref())
+            .append_input(x.as_ref())
             .build(self, xent_ops::LogSoftmax { axis })
     }
 
@@ -1433,7 +1503,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
         A: AsRef<Tensor<'graph, F>> + Copy,
     {
         let op = activation_ops::Softmax { axis };
-        Tensor::builder().set_input(x.as_ref()).build(self, op)
+        Tensor::builder().append_input(x.as_ref()).build(self, op)
     }
 
     /// Computes `binary_cross_entropy(sigmoid(y), t)`.
@@ -1762,7 +1832,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
                 start_index += size;
             }
             let end_index = start_index + sizes[i];
-            ret.push(Tensor::builder().set_input(x.as_ref()).build(
+            ret.push(Tensor::builder().append_input(x.as_ref()).build(
                 self,
                 array_ops::Split {
                     start_index: start_index as isize,
@@ -1808,7 +1878,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
             .collect::<Vec<ndarray::SliceOrIndex>>();
 
         Tensor::builder()
-            .set_input(x.as_ref())
+            .append_input(x.as_ref())
             .build(self, array_ops::Slice { indices })
     }
 
@@ -1828,14 +1898,17 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
     ///    assert_eq!(d.eval(&[]).unwrap().shape(), &[9, 2]);
     /// });
     /// ```
-    pub fn concat<A>(&'graph self, _tensors: &[A], axis: isize) -> Tensor<'graph, F>
+    pub fn concat<A>(&'graph self, tensors: &[A], axis: isize) -> Tensor<'graph, F>
     where
         A: AsRef<Tensor<'graph, F>> + Copy,
     {
-        assert_ne!(_tensors.len(), 0);
+        assert_ne!(tensors.len(), 0);
         let op = array_ops::Concat { axis };
-        let tensors = _tensors.iter().map(|t| t.as_ref()).collect::<Vec<_>>();
-        Tensor::builder().set_ro_inputs(&tensors).build(self, op)
+        let mut b = Tensor::builder();
+        for t in tensors {
+            b = b.append_input(t.as_ref());
+        }
+        b.build(self, op)
     }
 
     /// Gathers subviews from the input tensor.
@@ -1938,7 +2011,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
         let centered = x - mean;
         let variance = self.reduce_mean(self.square(centered), &axes, true);
         let em5 = self.scalar(F::from(1e-5).unwrap());
-        (x - mean) / self.sqrt(variance + em5)
+        centered * self.inv_sqrt(variance + em5)
     }
 
     /// Applies batch normalization.
@@ -2015,7 +2088,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
     {
         let t = shape.as_tensor(self);
         Tensor::builder()
-            .set_input(&t)
+            .append_input(&t)
             .set_shape(&t)
             .build(self, random_ops::RandomNormal::new(arr_rng, mean, stddev))
     }
@@ -2043,7 +2116,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
     {
         let t = shape.as_tensor(self);
         Tensor::builder()
-            .set_input(&t)
+            .append_input(&t)
             .set_shape(&t)
             .build(self, random_ops::RandomUniform::new(arr_rng, min, max))
     }
@@ -2070,7 +2143,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
         let shape = shape;
         let t = shape.as_tensor(self);
         Tensor::builder()
-            .set_input(&t)
+            .append_input(&t)
             .set_shape(&t)
             .build(self, random_ops::StandardNormal::new(arr_rng))
     }
@@ -2096,7 +2169,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
     {
         let t = shape.as_tensor(self);
         Tensor::builder()
-            .set_input(&t)
+            .append_input(&t)
             .set_shape(&t)
             .build(self, random_ops::StandardUniform::new(arr_rng))
     }
@@ -2123,7 +2196,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
     {
         let t = shape.as_tensor(self);
         Tensor::builder()
-            .set_input(&t)
+            .append_input(&t)
             .set_shape(&t)
             .build(self, random_ops::Bernoulli::new(arr_rng, p))
     }
@@ -2150,7 +2223,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
     {
         let t = shape.as_tensor(self);
         Tensor::builder()
-            .set_input(&t)
+            .append_input(&t)
             .set_shape(&t)
             .build(self, random_ops::Exponential::new(arr_rng, lambda))
     }
@@ -2183,7 +2256,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
     {
         let t = shape.as_tensor(self);
         Tensor::builder()
-            .set_input(&t)
+            .append_input(&t)
             .set_shape(&t)
             .build(self, random_ops::Gamma::new(arr_rng, shape_param, scale))
     }
@@ -2211,7 +2284,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
     {
         let t = shape.as_tensor(self);
         Tensor::builder()
-            .set_input(&t)
+            .append_input(&t)
             .set_shape(&t)
             .build(self, random_ops::LogNormal::new(arr_rng, mean, stddev))
     }
@@ -2260,7 +2333,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
         A: AsTensor<'graph, F>,
     {
         Tensor::builder()
-            .set_input(&shape.as_tensor(self))
+            .append_input(&shape.as_tensor(self))
             .build(self, const_gen_ops::Zeros)
     }
 
@@ -2280,7 +2353,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
         A: AsTensor<'graph, F>,
     {
         Tensor::builder()
-            .set_input(&shape.as_tensor(self))
+            .append_input(&shape.as_tensor(self))
             .build(self, const_gen_ops::Ones)
     }
 
@@ -2446,7 +2519,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
     where
         A: AsRef<Tensor<'graph, F>> + Copy,
     {
-        Tensor::builder().set_input(x.as_ref()).build(
+        Tensor::builder().append_input(x.as_ref()).build(
             self,
             conv_ops::max_pool2d::MaxPool2D {
                 pad,

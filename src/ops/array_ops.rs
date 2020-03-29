@@ -1,10 +1,9 @@
-use crate::ndarray;
 use crate::ndarray_ext;
 use crate::ndarray_ext::{NdArray, NdArrayView};
 use crate::op;
 use crate::tensor::{Input, Tensor};
 use crate::Float;
-use std::collections::HashSet;
+use crate::{ndarray, NdArrayViewMut};
 use std::iter::FromIterator;
 
 pub struct ExpandDims;
@@ -99,7 +98,7 @@ impl<T: Float> op::Op<T> for InferBinOpShape {
             let a_rank = a_shape.len();
             let b_rank = b_shape.len();
             if a_rank != b_rank {
-                ctx.append_error(op::OpError::IncompatibleShape(
+                ctx.set_error(op::OpError::IncompatibleShape(
                     "InferBinOpShape: rank of lhs and rhs must match.".to_string(),
                 ))
             }
@@ -191,7 +190,7 @@ impl<T: Float> op::Op<T> for Reshape {
         {
             ctx.append_output(a)
         } else {
-            ctx.append_error(op::OpError::IncompatibleShape(format!(
+            ctx.set_error(op::OpError::IncompatibleShape(format!(
                 "reshape failed: {:?} vs {:?}",
                 x.shape(),
                 target
@@ -216,14 +215,14 @@ impl<T: Float> op::Op<T> for SetDiff1D {
         let x0 = ctx.input(0);
         let x1 = &ctx.input(1);
 
-        let set_a: HashSet<isize> = HashSet::from_iter(
+        let set_a: crate::FxHashSet<isize> = crate::FxHashSet::from_iter(
             x0.as_slice()
                 .unwrap()
                 .iter()
                 .map(|&a| a.to_isize().unwrap()),
         );
 
-        let set_b: HashSet<isize> = HashSet::from_iter(
+        let set_b: crate::FxHashSet<isize> = crate::FxHashSet::from_iter(
             x1.as_slice()
                 .unwrap()
                 .iter()
@@ -263,7 +262,7 @@ impl<T: Float> op::Op<T> for IndexOp {
         if let Some(ret) = flat_x.get(i) {
             ctx.append_output(ndarray::arr0(*ret).into_dyn());
         } else {
-            ctx.append_error(op::OpError::OutOfBounds("access_elem failed.".to_string()));
+            ctx.set_error(op::OpError::OutOfBounds("access_elem failed.".to_string()));
         }
     }
 
@@ -300,7 +299,7 @@ impl<T: Float> op::Op<T> for IndexOpGrad {
         {
             *a = gy[ndarray::IxDyn(&[])];
         } else {
-            ctx.append_error(op::OpError::OutOfBounds("access_elem failed.".to_string()));
+            ctx.set_error(op::OpError::OutOfBounds("access_elem failed.".to_string()));
             return;
         }
         ctx.append_output(result);
@@ -427,6 +426,33 @@ impl<T: Float> op::Op<T> for GatherGrad {
     }
 }
 
+#[cfg(feature = "mkl")]
+pub(crate) fn inplace_add_impl<F: Float>(mut a: NdArrayViewMut<F>, b: &NdArrayView<F>) {
+    use crate::ops::mkl_ffi::{vdAdd, vsAdd, MklInt};
+    use crate::same_type;
+    unsafe {
+        if same_type::<F, f32>() {
+            vsAdd(
+                a.len() as MklInt,
+                a.as_ptr() as *const f32,
+                b.as_ptr() as *const f32,
+                a.as_mut_ptr() as *mut f32,
+            );
+            return;
+        } else if same_type::<F, f64>() {
+            vdAdd(
+                a.len() as MklInt,
+                a.as_ptr() as *const f64,
+                b.as_ptr() as *const f64,
+                a.as_mut_ptr() as *mut f64,
+            );
+            return;
+        } else {
+            a += b;
+        }
+    }
+}
+
 impl<T: Float> op::Op<T> for AddN {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         if 0 == ctx.num_inputs() {
@@ -435,13 +461,19 @@ impl<T: Float> op::Op<T> for AddN {
             let ret = ctx.input(0);
             ctx.append_output_view(ret);
         } else if 2 == ctx.num_inputs() {
-            // TODO: add で shpae error が出るはずで、それをハンドルしたい
             let ret = &ctx.input(0) + &ctx.input(1);
             ctx.append_output(ret);
         } else {
             let mut base = &ctx.input(0) + &ctx.input(1);
             for i in 2..ctx.num_inputs() {
-                base += &ctx.input(i);
+                #[cfg(feature = "mkl")]
+                {
+                    inplace_add_impl(base.view_mut(), &ctx.input(i));
+                }
+                #[cfg(not(feature = "mkl"))]
+                {
+                    base += &ctx.input(i);
+                }
             }
             ctx.append_output(base);
         }
@@ -511,7 +543,7 @@ impl<T: Float> op::Op<T> for Concat {
                 ctx.append_output(y);
             }
             Err(e) => {
-                ctx.append_error(op::OpError::NdArrayError("concat".to_string(), e));
+                ctx.set_error(op::OpError::NdArrayError("concat".to_string(), e));
             }
         }
     }
@@ -585,7 +617,7 @@ impl<T: Float> op::Op<T> for ConcatGrad {
                 ctx.append_output_view(ret);
             }
             Err(e) => {
-                ctx.append_error(op::OpError::NdArrayError("ConcatGrad: ".to_string(), e));
+                ctx.set_error(op::OpError::NdArrayError("ConcatGrad: ".to_string(), e));
             }
         }
     }
@@ -607,7 +639,7 @@ impl<T: Float> op::Op<T> for Tile {
                 ctx.append_output(ret);
             }
             Err(e) => {
-                ctx.append_error(op::OpError::NdArrayError("tile: ".to_string(), e));
+                ctx.set_error(op::OpError::NdArrayError("tile: ".to_string(), e));
             }
         }
     }
@@ -749,8 +781,7 @@ impl<T: Float> op::Op<T> for Squeeze {
             .map(|a| a.to_isize().unwrap())
             .collect::<Vec<_>>();
         axes.sort();
-        let mut adjust = 0;
-        for &i in axes.iter() {
+        for (adjust, &i) in axes.iter().enumerate() {
             let axis = if i < 0 {
                 (x.ndim() as isize + i as isize) as usize
             } else {
@@ -760,7 +791,6 @@ impl<T: Float> op::Op<T> for Squeeze {
             assert_eq!(1, x.shape()[axis], "Can't squeeze a dim whose size != 1");
             // axis making ok
             x = x.index_axis_move(ndarray::Axis(axis), 0);
-            adjust += 1;
         }
         ctx.append_output_view(x);
     }

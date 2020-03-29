@@ -193,12 +193,12 @@ fn exp() {
 }
 
 #[test]
-fn log() {
+fn ln() {
     with(|graph| {
         use std::f64;
         let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
         let v = graph.variable(rng.random_uniform(&[3], 1., 1.1));
-        let z = graph.log(v, f64::consts::E);
+        let z = graph.ln(v);
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-2);
     });
@@ -429,7 +429,7 @@ fn reciprocal() {
     with(|graph| {
         let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
         let v = graph.variable(rng.random_uniform(&[2, 3], 1., 1.01));
-        let z = graph.reciprocal(v);
+        let z = graph.inv(v);
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
     });
@@ -543,7 +543,7 @@ fn softplus() {
 fn logsumexp() {
     with(|graph| {
         let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-        let v = graph.variable(rng.standard_normal(&[1, 3]));
+        let v = graph.variable(rng.standard_normal(&[2, 3]));
         let z = graph.reduce_logsumexp(v, 1, true);
         let g = graph.grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);

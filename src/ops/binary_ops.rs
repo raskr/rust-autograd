@@ -16,6 +16,24 @@ pub struct DivOp;
 pub struct PreprocessBinOpGrad;
 pub struct PreprocessBinOpGradGrad;
 
+macro_rules! bin_op_same_shape {
+    ($vms_op:ident, $vmd_op:ident, $std_op:tt, $a:expr, $b:expr) => {
+        unsafe {
+            if same_type::<T, f32>() {
+                let mut y = crate::uninitialized_vec($a.len());
+                $vms_op($a.len() as MklInt, $a.as_ptr() as *const f32, $b.as_ptr() as *const f32, y.as_mut_ptr() as *mut f32);
+                NdArray::from_shape_vec_unchecked($a.shape(), y)
+            } else if same_type::<T, f64>() {
+                let mut y = crate::uninitialized_vec($a.len());
+                $vmd_op($a.len() as MklInt, $a.as_ptr() as *const f64, $b.as_ptr() as *const f64, y.as_mut_ptr() as *mut f64);
+                NdArray::from_shape_vec_unchecked($a.shape(), y)
+            } else {
+                $a $std_op $b
+            }
+        }
+    };
+}
+
 impl<T: Float> op::Op<T> for PreprocessBinOpGrad {
     // Computes x's gradient.
     // Involves reduction as necessary.
@@ -59,7 +77,7 @@ impl<T: Float> op::Op<T> for PreprocessBinOpGrad {
                             );
                         }
                     } else {
-                        ctx.append_error(op::OpError::IncompatibleShape(
+                        ctx.set_error(op::OpError::IncompatibleShape(
                             "Incorrect gradient shape".to_string(),
                         ));
                         return;
@@ -111,7 +129,7 @@ impl<T: Float> op::Op<T> for PreprocessBinOpGradGrad {
         if let Some(ret) = gy.broadcast(target_shape) {
             ctx.append_output(ret.to_owned());
         } else {
-            ctx.append_error(op::OpError::IncompatibleShape(
+            ctx.set_error(op::OpError::IncompatibleShape(
                 "PreprocessBinOpGradGrad: Cant't broadcast.".to_string(),
             ));
         }
@@ -145,15 +163,26 @@ impl<T: Float> op::Op<T> for AddOp {
 
 impl<T: Float> op::Op<T> for SubOp {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
-        let x0 = ctx.input(0);
-        let x1 = ctx.input(1);
+        let x0 = &ctx.input(0);
+        let x1 = &ctx.input(1);
         let shape0: &[usize] = x0.shape();
+        let shape1: &[usize] = x1.shape();
         let ret = if shape0 == [] {
             // is scalar
             let x0_elem = x0[ndarray::IxDyn(&[])];
             x1.map(move |&a| x0_elem - a)
+        } else if shape0 == shape1 {
+            #[cfg(feature = "mkl")]
+            {
+                use crate::{ops::mkl_ffi::*, same_type};
+                bin_op_same_shape!(vsSub, vdSub, -, x0, x1)
+            }
+            #[cfg(not(feature = "mkl"))]
+            {
+                x0 - x1
+            }
         } else {
-            &x0 - &x1
+            x0 - x1
         };
         ctx.append_output(ret);
     }
@@ -203,6 +232,16 @@ impl<T: Float> op::Op<T> for DivOp {
             let x1_elem = x1[ndarray::IxDyn(&[])];
             let rhs = T::one() / x1_elem;
             x0.mapv(|x0_elem| x0_elem * rhs)
+        } else if shape0 == shape1 {
+            #[cfg(feature = "mkl")]
+            {
+                use crate::{ops::mkl_ffi::*, same_type};
+                bin_op_same_shape!(vsDiv, vdDiv, /, x0, x1)
+            }
+            #[cfg(not(feature = "mkl"))]
+            {
+                x0 / x1
+            }
         } else {
             x0 / x1
         };
@@ -224,7 +263,7 @@ impl<T: Float> op::Op<T> for DivOp {
 }
 
 // Reduce gy if broadcast occurred in the forward path.
-fn preprocess_gy<'a, 'b: 'a, 'c, T: Float>(
+fn preprocess_gy<'b, T: Float>(
     shape0: &Tensor<'b, T>,
     shape1: &Tensor<'b, T>,
     gy: &Tensor<'b, T>,
@@ -242,18 +281,18 @@ fn preprocess_gy<'a, 'b: 'a, 'c, T: Float>(
 }
 
 macro_rules! impl_bin_op_forward {
-    ($forward_name:ident, $bin_op:tt) => {
+    ($forward_name:ident, $bin_op:tt, $vms_op:ident, $vmd_op:ident) => {
         fn $forward_name<'v, T: Float>(x0: &NdArrayView<'v, T>, x1: &NdArrayView<'v, T>) -> NdArray<T>
         {
-            let shape0: &[usize]  = x0.shape();
-            let shape1: &[usize]  = x1.shape();
+            let shape0: &[usize] = x0.shape();
+            let shape1: &[usize] = x1.shape();
             let scalar_shape = &[];
             let scalar_shape1 = &[0];
 
             let x0_is_scalar = shape0 == scalar_shape || shape0 == scalar_shape1;
             let x1_is_scalar = shape1 == scalar_shape || shape1 == scalar_shape1;
 
-            let ret = if x0_is_scalar && !x1_is_scalar {
+            if x0_is_scalar && !x1_is_scalar {
                 let elem = x0[ndarray::IxDyn(&[])];
                 x1.map(move |&a| a $bin_op elem)
             } else if x1_is_scalar && !x0_is_scalar {
@@ -265,15 +304,23 @@ macro_rules! impl_bin_op_forward {
                 if len0 > len1 {
                     x0 $bin_op x1
                 } else {
-                    x1 $bin_op x0
+                    // tensor vs tensor (same shapes)
+                    #[cfg(feature = "mkl")]
+                    {
+                        use crate::{ops::mkl_ffi::*, same_type};
+                        bin_op_same_shape!($vms_op, $vmd_op, $bin_op, x0, x1)
+                    }
+                    #[cfg(not(feature = "mkl"))] {
+                        x0 $bin_op x1
+                    }
                 }
             } else {
+                // scalar vs scalar
                 x0 $bin_op x1
-            };
-            ret
+            }
         }
     };
 }
 
-impl_bin_op_forward!(add_forward, +);
-impl_bin_op_forward!(mul_forward, *);
+impl_bin_op_forward!(add_forward, +, vsAdd, vdAdd);
+impl_bin_op_forward!(mul_forward, *, vsMul, vdMul);

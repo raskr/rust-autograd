@@ -1,5 +1,9 @@
 use crate::ndarray_ext::{NdArray, NdArrayView};
 use crate::op;
+#[cfg(feature = "mkl")]
+use crate::ops::mkl_ffi::*;
+#[cfg(feature = "mkl")]
+use crate::same_type;
 use crate::tensor::Tensor;
 use crate::Float;
 use crate::Graph;
@@ -19,17 +23,20 @@ pub struct Asinh;
 pub struct Acosh;
 pub struct Atanh;
 pub struct Exp;
+pub struct Exp2;
+pub struct Exp10;
 pub struct Sqrt;
 pub struct NegOp;
 pub struct Floor;
 pub struct Ceil;
 pub struct Sign;
-pub struct Reciprocal;
+pub struct Inv;
+pub struct InvSqrt;
 pub struct Square;
 pub struct Abs;
-pub struct Log<T: Float> {
-    pub a: T,
-}
+pub struct Log2;
+pub struct Log10;
+pub struct Ln;
 pub struct Pow<T: Float> {
     pub a: T,
 }
@@ -172,25 +179,25 @@ impl_cmp_op!(Maximum, "Maximum", maximum, min_max_grad);
 impl_cmp_op!(Minimum, "Minimum", minimum, min_max_grad);
 
 #[inline]
-fn none_grad<'a, 'b: 'a, T: Float>(
-    _: Tensor<'b, T>,
-    _: Tensor<'b, T>,
-    _: Tensor<'b, T>,
-    _: Tensor<'b, T>,
-    _: &'b Graph<T>,
+fn none_grad<'g, T: Float>(
+    _: Tensor<'g, T>,
+    _: Tensor<'g, T>,
+    _: Tensor<'g, T>,
+    _: Tensor<'g, T>,
+    _: &'g Graph<T>,
     ctx: &mut crate::op::GradientContext<T>,
 ) {
     ctx.append_input_grad(None);
 }
 
 #[inline]
-fn min_max_grad<'a, 'b: 'a, T: Float>(
-    gy: Tensor<'b, T>,
-    x1: Tensor<'b, T>,
-    x2: Tensor<'b, T>,
-    y: Tensor<'b, T>,
-    c: &'b Graph<T>,
-    ctx: &mut crate::op::GradientContext<'b, T>,
+fn min_max_grad<'g, T: Float>(
+    gy: Tensor<'g, T>,
+    x1: Tensor<'g, T>,
+    x2: Tensor<'g, T>,
+    y: Tensor<'g, T>,
+    c: &'g Graph<T>,
+    ctx: &mut crate::op::GradientContext<'g, T>,
 ) {
     let selected_a = c.equal(x1, y);
     let selected_b = c.equal(x2, y);
@@ -198,10 +205,77 @@ fn min_max_grad<'a, 'b: 'a, T: Float>(
     ctx.append_input_grad(Some(c.mul(selected_b, gy)));
 }
 
+macro_rules! elem_wise_vm_or_std {
+    ($vms_op:ident, $vmd_op:ident, $closure:expr, $ctx:expr) => {
+        let x = $ctx.input(0);
+        let ret = unsafe {
+            if same_type::<T, f32>() {
+                let mut y = crate::uninitialized_vec(x.len());
+                $vms_op(
+                    x.len() as MklInt,
+                    x.as_ptr() as *const f32,
+                    y.as_mut_ptr() as *mut f32,
+                );
+                NdArray::from_shape_vec_unchecked(x.shape(), y)
+            } else if same_type::<T, f64>() {
+                let mut y = crate::uninitialized_vec(x.len());
+                $vmd_op(
+                    x.len() as MklInt,
+                    x.as_ptr() as *const f64,
+                    y.as_mut_ptr() as *mut f64,
+                );
+                NdArray::from_shape_vec_unchecked(x.shape(), y)
+            } else {
+                $ctx.input(0).mapv($closure)
+            }
+        };
+        $ctx.append_output(ret);
+    };
+}
+
+macro_rules! elem_wise_vm_with_param_or_std {
+    ($vms_op:ident, $vmd_op:ident, $std_name:ident, $param:expr, $ctx:expr) => {
+        let x = $ctx.input(0);
+        let ret = unsafe {
+            if same_type::<T, f32>() {
+                let mut y = crate::uninitialized_vec(x.len());
+                let p = $param.to_f32().unwrap();
+                $vms_op(
+                    x.len() as MklInt,
+                    x.as_ptr() as *const f32,
+                    p,
+                    y.as_mut_ptr() as *mut f32,
+                );
+                NdArray::from_shape_vec_unchecked(x.shape(), y)
+            } else if same_type::<T, f64>() {
+                let mut y = crate::uninitialized_vec(x.len());
+                let p = $param.to_f64().unwrap();
+                $vmd_op(
+                    x.len() as MklInt,
+                    x.as_ptr() as *const f64,
+                    p,
+                    y.as_mut_ptr() as *mut f64,
+                );
+                NdArray::from_shape_vec_unchecked(x.shape(), y)
+            } else {
+                $ctx.input(0).mapv(|a| a.$std_name($param))
+            }
+        };
+        $ctx.append_output(ret);
+    };
+}
+
 impl<T: Float> op::Op<T> for Abs {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
-        let ret = ctx.input(0).map(|x| x.abs());
-        ctx.append_output(ret);
+        #[cfg(feature = "mkl")]
+        {
+            elem_wise_vm_or_std!(vsAbs, vdAbs, |a| a.abs(), ctx);
+        }
+        #[cfg(not(feature = "mkl"))]
+        {
+            let ret = ctx.input(0).map(|a| a.abs());
+            ctx.append_output(ret);
+        }
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -222,8 +296,15 @@ impl<T: Float> op::Op<T> for NegOp {
 
 impl<T: Float> op::Op<T> for Square {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
-        let ret = ctx.input(0).map(|&x| x * x);
-        ctx.append_output(ret);
+        #[cfg(feature = "mkl")]
+        {
+            elem_wise_vm_or_std!(vsSqr, vdSqr, |a| a * a, ctx);
+        }
+        #[cfg(not(feature = "mkl"))]
+        {
+            let ret = ctx.input(0).mapv(|a| a * a);
+            ctx.append_output(ret);
+        }
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -232,16 +313,44 @@ impl<T: Float> op::Op<T> for Square {
     }
 }
 
-impl<T: Float> op::Op<T> for Reciprocal {
+impl<T: Float> op::Op<T> for Inv {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
-        let ret = ctx.input(0).map(|x| x.recip());
-        ctx.append_output(ret);
+        #[cfg(feature = "mkl")]
+        {
+            elem_wise_vm_or_std!(vsInv, vdInv, |a| a.recip(), ctx);
+        }
+        #[cfg(not(feature = "mkl"))]
+        {
+            let ret = ctx.input(0).map(|a| a.recip());
+            ctx.append_output(ret);
+        }
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
         ctx.append_input_grad(Some(
             ctx.graph().neg(&ctx.graph().square(ctx.output())) * ctx.output_grad(),
         ));
+    }
+}
+
+impl<T: Float> op::Op<T> for InvSqrt {
+    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
+        #[cfg(feature = "mkl")]
+        {
+            elem_wise_vm_or_std!(vsInvSqrt, vdInvSqrt, |a| a.sqrt().recip(), ctx);
+        }
+        #[cfg(not(feature = "mkl"))]
+        {
+            let ret = ctx.input(0).map(|a| a.sqrt().recip());
+            ctx.append_output(ret);
+        }
+    }
+
+    fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
+        let g = ctx.graph();
+        let a = g.scalar(T::from(-0.5).unwrap());
+        let b = g.pow(ctx.input(0), T::from(-1.5).unwrap());
+        ctx.append_input_grad(Some(a * b * ctx.output_grad()));
     }
 }
 
@@ -264,8 +373,15 @@ impl<T: Float> op::Op<T> for Sign {
 
 impl<T: Float> op::Op<T> for Floor {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
-        let ret = ctx.input(0).map(|x| x.floor());
-        ctx.append_output(ret);
+        #[cfg(feature = "mkl")]
+        {
+            elem_wise_vm_or_std!(vsFloor, vdFloor, |a| a.floor(), ctx);
+        }
+        #[cfg(not(feature = "mkl"))]
+        {
+            let ret = ctx.input(0).map(|a| a.floor());
+            ctx.append_output(ret);
+        }
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -275,8 +391,15 @@ impl<T: Float> op::Op<T> for Floor {
 
 impl<T: Float> op::Op<T> for Ceil {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
-        let ret = ctx.input(0).map(|x| x.ceil());
-        ctx.append_output(ret);
+        #[cfg(feature = "mkl")]
+        {
+            elem_wise_vm_or_std!(vsCeil, vdCeil, |a| a.ceil(), ctx);
+        }
+        #[cfg(not(feature = "mkl"))]
+        {
+            let ret = ctx.input(0).map(|a| a.ceil());
+            ctx.append_output(ret);
+        }
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -290,7 +413,7 @@ impl<T: Float> op::Op<T> for Transpose {
         let perm_len = perm.len();
         let x = ctx.input(0);
         if x.ndim() != perm_len {
-            ctx.append_error(op::OpError::IncompatibleShape(
+            ctx.set_error(op::OpError::IncompatibleShape(
                 "transpose: inputs's ndim and axes's length must match".to_string(),
             ));
             return;
@@ -327,6 +450,78 @@ impl<T: Float> op::Op<T> for Transpose {
     }
 }
 
+#[cfg(feature = "mkl")]
+pub(crate) fn inplace_add_impl<F: Float>(mut a: NdArray<F>, b: &NdArray<F>) -> NdArray<F> {
+    unsafe {
+        if same_type::<F, f32>() {
+            vsAdd(
+                a.len() as MklInt,
+                a.as_ptr() as *const f32,
+                b.as_ptr() as *const f32,
+                a.as_mut_ptr() as *mut f32,
+            );
+            return a;
+        } else if same_type::<F, f64>() {
+            vdAdd(
+                a.len() as MklInt,
+                a.as_ptr() as *const f64,
+                b.as_ptr() as *const f64,
+                a.as_mut_ptr() as *mut f64,
+            );
+            return a;
+        } else {
+            a += b;
+        }
+    }
+    a
+}
+
+#[cfg(feature = "mkl")]
+pub(crate) fn fast_inplace_exp_impl<F: Float>(x: &mut NdArray<F>) {
+    unsafe {
+        if same_type::<F, f32>() {
+            vsExp(
+                x.len() as MklInt,
+                x.as_ptr() as *const f32,
+                x.as_mut_ptr() as *mut f32,
+            );
+            return;
+        } else if same_type::<F, f64>() {
+            vdExp(
+                x.len() as MklInt,
+                x.as_ptr() as *const f64,
+                x.as_mut_ptr() as *mut f64,
+            );
+            return;
+        } else {
+            x.mapv_inplace(move |a| a.exp());
+        }
+    }
+}
+
+#[cfg(feature = "mkl")]
+pub(crate) fn fast_inplace_ln_impl<F: Float>(x: &mut NdArray<F>) {
+    unsafe {
+        if same_type::<F, f32>() {
+            vsLn(
+                x.len() as MklInt,
+                x.as_ptr() as *const f32,
+                x.as_mut_ptr() as *mut f32,
+            );
+            return;
+        } else if same_type::<F, f64>() {
+            vdLn(
+                x.len() as MklInt,
+                x.as_ptr() as *const f64,
+                x.as_mut_ptr() as *mut f64,
+            );
+            return;
+        } else {
+            x.mapv_inplace(move |a| a.ln());
+        }
+    }
+}
+
 pub fn logsumexp_forward<T: Float>(x: &NdArrayView<T>, axis: isize, keep_dims: bool) -> NdArray<T> {
     let axis = if axis < 0 {
         (x.ndim() as isize + axis) as usize
@@ -344,7 +539,7 @@ pub fn logsumexp_forward<T: Float>(x: &NdArrayView<T>, axis: isize, keep_dims: b
 
     let max_fn = T::max;
     let min_val = T::min_value();
-    let ref max = x
+    let max = &x
         .fold_axis(ndarray::Axis(axis), min_val, move |&a, &b| max_fn(a, b))
         .into_shape(ndarray::IxDyn(reduced_shape))
         .unwrap();
@@ -352,7 +547,14 @@ pub fn logsumexp_forward<T: Float>(x: &NdArrayView<T>, axis: isize, keep_dims: b
     let exp = {
         // subtract `max` to prevent overflow of exp
         let mut tmp = x - max;
-        tmp.mapv_inplace(|a| a.exp());
+        #[cfg(feature = "mkl")]
+        {
+            fast_inplace_exp_impl(&mut tmp);
+        }
+        #[cfg(not(feature = "mkl"))]
+        {
+            tmp.mapv_inplace(move |a| a.exp());
+        }
         tmp
     };
 
@@ -362,11 +564,17 @@ pub fn logsumexp_forward<T: Float>(x: &NdArrayView<T>, axis: isize, keep_dims: b
         .into_shape(ndarray::IxDyn(reduced_shape))
         .unwrap();
 
-    use std::f64;
-    let e = T::from(f64::consts::E).unwrap();
-    sum.mapv_inplace(move |a| a.log(e));
-    sum += max;
-    sum
+    #[cfg(feature = "mkl")]
+    {
+        fast_inplace_ln_impl(&mut sum);
+        inplace_add_impl(sum, max)
+    }
+    #[cfg(not(feature = "mkl"))]
+    {
+        sum.mapv_inplace(move |a| a.ln());
+        sum += max;
+        sum
+    }
 }
 
 impl<T: Float> op::Op<T> for LogSumExp {
@@ -386,9 +594,15 @@ impl<T: Float> op::Op<T> for LogSumExp {
 
 impl<T: Float> op::Op<T> for Pow<T> {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
-        let a = self.a;
-        let ret = ctx.input(0).map(move |x| x.powf(a));
-        ctx.append_output(ret);
+        #[cfg(feature = "mkl")]
+        {
+            elem_wise_vm_with_param_or_std!(vsPowx, vdPowx, powf, self.a, ctx);
+        }
+        #[cfg(not(feature = "mkl"))]
+        {
+            let ret = ctx.input(0).map(|a| a.powf(self.a));
+            ctx.append_output(ret);
+        }
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -401,8 +615,15 @@ impl<T: Float> op::Op<T> for Pow<T> {
 
 impl<T: Float> op::Op<T> for Sqrt {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
-        let ret = ctx.input(0).map(|a| a.sqrt());
-        ctx.append_output(ret);
+        #[cfg(feature = "mkl")]
+        {
+            elem_wise_vm_or_std!(vsSqrt, vdSqrt, |a| a.sqrt(), ctx);
+        }
+        #[cfg(not(feature = "mkl"))]
+        {
+            let ret = ctx.input(0).map(|a| a.sqrt());
+            ctx.append_output(ret);
+        }
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -413,10 +634,55 @@ impl<T: Float> op::Op<T> for Sqrt {
     }
 }
 
-impl<T: Float> op::Op<T> for Log<T> {
+impl<T: Float> op::Op<T> for Log10 {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
-        let ret = ctx.input(0).map(move |a| a.log(self.a));
-        ctx.append_output(ret);
+        #[cfg(feature = "mkl")]
+        {
+            elem_wise_vm_or_std!(vsLog10, vdLog10, |a| a.log10(), ctx);
+        }
+        #[cfg(not(feature = "mkl"))]
+        {
+            let ret = ctx.input(0).map(|a| a.log10());
+            ctx.append_output(ret);
+        }
+    }
+
+    fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
+        let log10 = ctx.graph().scalar(T::from(10.).unwrap().ln());
+        ctx.append_input_grad(Some(ctx.output_grad() / (log10 * ctx.input(0))));
+    }
+}
+
+impl<T: Float> op::Op<T> for Log2 {
+    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
+        #[cfg(feature = "mkl")]
+        {
+            elem_wise_vm_or_std!(vsLog2, vdLog2, |a| a.log2(), ctx);
+        }
+        #[cfg(not(feature = "mkl"))]
+        {
+            let ret = ctx.input(0).map(|a| a.log2());
+            ctx.append_output(ret);
+        }
+    }
+
+    fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
+        let log2 = ctx.graph().scalar((T::one() + T::one()).ln());
+        ctx.append_input_grad(Some(ctx.output_grad() / (log2 * ctx.input(0))));
+    }
+}
+
+impl<T: Float> op::Op<T> for Ln {
+    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
+        #[cfg(feature = "mkl")]
+        {
+            elem_wise_vm_or_std!(vsLn, vdLn, |a| a.ln(), ctx);
+        }
+        #[cfg(not(feature = "mkl"))]
+        {
+            let ret = ctx.input(0).map(|a| a.ln());
+            ctx.append_output(ret);
+        }
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -426,61 +692,137 @@ impl<T: Float> op::Op<T> for Log<T> {
 
 impl<T: Float> op::Op<T> for Exp {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
-        let ret = ctx.input(0).map(|a| a.exp());
-        ctx.append_output(ret);
+        #[cfg(feature = "mkl")]
+        {
+            elem_wise_vm_or_std!(vsExp, vdExp, |a| a.exp(), ctx);
+        }
+        #[cfg(not(feature = "mkl"))]
+        {
+            let ret = ctx.input(0).map(|a| a.exp());
+            ctx.append_output(ret);
+        }
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
-        ctx.append_input_grad(Some(ctx.output() / ctx.output_grad()));
+        ctx.append_input_grad(Some(ctx.output() * ctx.output_grad()));
+    }
+}
+
+impl<T: Float> op::Op<T> for Exp2 {
+    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
+        #[cfg(feature = "mkl")]
+        {
+            elem_wise_vm_or_std!(vsExp2, vdExp2, |a| a.exp2(), ctx);
+        }
+        #[cfg(not(feature = "mkl"))]
+        {
+            let ret = ctx.input(0).map(|a| a.exp2());
+            ctx.append_output(ret);
+        }
+    }
+
+    fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
+        let g = ctx.graph();
+        let log2 = (T::one() + T::one()).ln();
+        let log2 = g.scalar(log2);
+        ctx.append_input_grad(Some(log2 * ctx.output() * ctx.output_grad()));
+    }
+}
+
+impl<T: Float> op::Op<T> for Exp10 {
+    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
+        let _10 = T::from(10).unwrap();
+        #[cfg(feature = "mkl")]
+        {
+            elem_wise_vm_or_std!(vsExp10, vdExp10, |a| _10.powf(a), ctx);
+        }
+        #[cfg(not(feature = "mkl"))]
+        {
+            let ret = ctx.input(0).map(move |&a| _10.powf(a));
+            ctx.append_output(ret);
+        }
+    }
+
+    fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
+        let log10 = ctx.graph().scalar(T::from(10.).unwrap().ln());
+        ctx.append_input_grad(Some(log10 * ctx.output() * ctx.output_grad()));
     }
 }
 
 impl<T: Float> op::Op<T> for Atanh {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
-        let ret = ctx.input(0).map(|a| a.atanh());
-        ctx.append_output(ret);
+        #[cfg(feature = "mkl")]
+        {
+            elem_wise_vm_or_std!(vsAtanh, vdAtanh, |a| a.atanh(), ctx);
+        }
+        #[cfg(not(feature = "mkl"))]
+        {
+            let ret = ctx.input(0).map(|a| a.atanh());
+            ctx.append_output(ret);
+        }
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
+        let g = ctx.graph();
         let x = ctx.input(0);
-        let one = ctx.graph().scalar(T::one());
-        let y = ctx.graph().reciprocal(one - ctx.graph().square(x));
+        let y = g.inv(1. - g.square(x));
         ctx.append_input_grad(Some(y * ctx.output_grad()));
     }
 }
 
 impl<T: Float> op::Op<T> for Acosh {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
-        let ret = ctx.input(0).map(|a| a.acosh());
-        ctx.append_output(ret);
+        #[cfg(feature = "mkl")]
+        {
+            elem_wise_vm_or_std!(vsAcosh, vdAcosh, |a| a.acosh(), ctx);
+        }
+        #[cfg(not(feature = "mkl"))]
+        {
+            let ret = ctx.input(0).map(|a| a.acosh());
+            ctx.append_output(ret);
+        }
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
+        let g = ctx.graph();
         let x = ctx.input(0);
-        let one = ctx.graph().scalar(T::one().neg());
-        let y = one / ctx.graph().sqrt(ctx.graph().square(x) + one);
+        let y = g.inv(g.sqrt(g.square(x) - g.scalar(T::one())));
         ctx.append_input_grad(Some(y * ctx.output_grad()));
     }
 }
 
 impl<T: Float> op::Op<T> for Asinh {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
-        let ret = ctx.input(0).map(|a| a.asinh());
-        ctx.append_output(ret);
+        #[cfg(feature = "mkl")]
+        {
+            elem_wise_vm_or_std!(vsAsinh, vdAsinh, |a| a.asinh(), ctx);
+        }
+        #[cfg(not(feature = "mkl"))]
+        {
+            let ret = ctx.input(0).map(|a| a.asinh());
+            ctx.append_output(ret);
+        }
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
+        let g = ctx.graph();
         let x = ctx.input(0);
-        let one = ctx.graph().scalar(T::one());
-        let y = one / ctx.graph().sqrt(x * x + one);
+        let y = g.inv(g.sqrt(g.square(x) + g.scalar(T::one())));
         ctx.append_input_grad(Some(y * ctx.output_grad()));
     }
 }
 
 impl<T: Float> op::Op<T> for Tanh {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
-        let ret = ctx.input(0).map(|a| a.tanh());
-        ctx.append_output(ret);
+        #[cfg(feature = "mkl")]
+        {
+            elem_wise_vm_or_std!(vsTanh, vdTanh, |a| a.tanh(), ctx);
+        }
+        #[cfg(not(feature = "mkl"))]
+        {
+            let ret = ctx.input(0).map(|a| a.tanh());
+            ctx.append_output(ret);
+        }
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -492,8 +834,15 @@ impl<T: Float> op::Op<T> for Tanh {
 
 impl<T: Float> op::Op<T> for Cosh {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
-        let ret = ctx.input(0).map(|a| a.cosh());
-        ctx.append_output(ret);
+        #[cfg(feature = "mkl")]
+        {
+            elem_wise_vm_or_std!(vsCosh, vdCosh, |a| a.cosh(), ctx);
+        }
+        #[cfg(not(feature = "mkl"))]
+        {
+            let ret = ctx.input(0).map(|a| a.cosh());
+            ctx.append_output(ret);
+        }
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -503,8 +852,15 @@ impl<T: Float> op::Op<T> for Cosh {
 
 impl<T: Float> op::Op<T> for Sinh {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
-        let ret = ctx.input(0).map(|a| a.sinh());
-        ctx.append_output(ret);
+        #[cfg(feature = "mkl")]
+        {
+            elem_wise_vm_or_std!(vsSinh, vdSinh, |a| a.sinh(), ctx);
+        }
+        #[cfg(not(feature = "mkl"))]
+        {
+            let ret = ctx.input(0).map(|a| a.sinh());
+            ctx.append_output(ret);
+        }
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -514,52 +870,78 @@ impl<T: Float> op::Op<T> for Sinh {
 
 impl<T: Float> op::Op<T> for Atan {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
-        let ret = ctx.input(0).map(|a| a.atan());
-        ctx.append_output(ret);
+        #[cfg(feature = "mkl")]
+        {
+            elem_wise_vm_or_std!(vsAtan, vdAtan, |a| a.atan(), ctx);
+        }
+        #[cfg(not(feature = "mkl"))]
+        {
+            let ret = ctx.input(0).map(|a| a.atan());
+            ctx.append_output(ret);
+        }
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
+        let g = ctx.graph();
         let x = ctx.input(0);
-        let y = ctx
-            .graph()
-            .reciprocal(ctx.graph().square(x) + ctx.graph().scalar(T::one()));
+        let y = g.inv(g.square(x) + g.scalar(T::one()));
         ctx.append_input_grad(Some(y * ctx.output_grad()));
     }
 }
 
 impl<T: Float> op::Op<T> for Acos {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
-        let ret = ctx.input(0).map(|a| a.acos());
-        ctx.append_output(ret);
+        #[cfg(feature = "mkl")]
+        {
+            elem_wise_vm_or_std!(vsAcos, vdAcos, |a| a.acos(), ctx);
+        }
+        #[cfg(not(feature = "mkl"))]
+        {
+            let ret = ctx.input(0).map(|a| a.acos());
+            ctx.append_output(ret);
+        }
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
+        let g = ctx.graph();
         let x = ctx.input(0);
-        let s = ctx.graph();
-        let y =
-            ctx.graph().scalar(T::one().neg()) / s.sqrt(ctx.graph().scalar(T::one()) - s.square(x));
+        let y = g.neg(g.inv_sqrt(1. - g.square(x)));
         ctx.append_input_grad(Some(y * ctx.output_grad()));
     }
 }
 
 impl<T: Float> op::Op<T> for Asin {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
-        let ret = ctx.input(0).map(|a| a.asin());
-        ctx.append_output(ret);
+        #[cfg(feature = "mkl")]
+        {
+            elem_wise_vm_or_std!(vsAsin, vdAsin, |a| a.asin(), ctx);
+        }
+        #[cfg(not(feature = "mkl"))]
+        {
+            let ret = ctx.input(0).map(|a| a.asin());
+            ctx.append_output(ret);
+        }
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
+        let g = ctx.graph();
         let x = ctx.input(0);
-        let y =
-            ctx.graph().scalar(T::one()) / ctx.graph().sqrt(ctx.graph().scalar(T::one()) - x * x);
+        let y = g.inv_sqrt(1. - g.square(x));
         ctx.append_input_grad(Some(y * ctx.output_grad()));
     }
 }
 
 impl<T: Float> op::Op<T> for Sin {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
-        let ret = ctx.input(0).map(|a| a.sin());
-        ctx.append_output(ret);
+        #[cfg(feature = "mkl")]
+        {
+            elem_wise_vm_or_std!(vsSin, vdSin, |a| a.sin(), ctx);
+        }
+        #[cfg(not(feature = "mkl"))]
+        {
+            let ret = ctx.input(0).map(|a| a.sin());
+            ctx.append_output(ret);
+        }
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -569,26 +951,39 @@ impl<T: Float> op::Op<T> for Sin {
 
 impl<T: Float> op::Op<T> for Cos {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
-        let ret = ctx.input(0).map(|a| a.cos());
-        ctx.append_output(ret);
+        #[cfg(feature = "mkl")]
+        {
+            elem_wise_vm_or_std!(vsCos, vdCos, |a| a.cos(), ctx);
+        }
+        #[cfg(not(feature = "mkl"))]
+        {
+            let ret = ctx.input(0).map(|a| a.cos());
+            ctx.append_output(ret);
+        }
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
-        ctx.append_input_grad(Some(
-            ctx.graph()
-                .neg(&(ctx.graph().sin(ctx.input(0)) * ctx.output_grad())),
-        ));
+        let g = ctx.graph();
+        ctx.append_input_grad(Some(g.neg(&(g.sin(ctx.input(0)) * ctx.output_grad()))));
     }
 }
 
 impl<T: Float> op::Op<T> for Tan {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
-        let ret = ctx.input(0).map(|a| a.tan());
-        ctx.append_output(ret);
+        #[cfg(feature = "mkl")]
+        {
+            elem_wise_vm_or_std!(vsTan, vdTan, |a| a.tan(), ctx);
+        }
+        #[cfg(not(feature = "mkl"))]
+        {
+            let ret = ctx.input(0).map(|a| a.tan());
+            ctx.append_output(ret);
+        }
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
-        let cos = ctx.graph().cos(&ctx.input(0));
-        ctx.append_input_grad(Some(ctx.output_grad() / ctx.graph().square(cos)));
+        let g = ctx.graph();
+        let cos = g.cos(&ctx.input(0));
+        ctx.append_input_grad(Some(ctx.output_grad() / g.square(cos)));
     }
 }
