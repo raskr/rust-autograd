@@ -4,7 +4,6 @@ use crate::ndarray_ext::NdArray;
 use crate::ndarray_ext::{get_batch_ptrs, get_batch_ptrs_mut};
 #[cfg(feature = "mkl")]
 use crate::ops::mkl_ffi::*;
-#[cfg(feature = "mkl")]
 use crate::same_type;
 use crate::tensor::Tensor;
 use crate::Float;
@@ -131,6 +130,15 @@ fn is_blas_2d(dim: &ndarray::Ix2, stride: &[isize], order: MemoryOrder) -> bool 
     true
 }
 
+// Read pointer to type `A` as type `B`.
+//
+// **Panics** if `A` and `B` are not the same type
+#[inline]
+fn cast_as<A: 'static + Copy, B: 'static + Copy>(a: &A) -> B {
+    assert!(same_type::<A, B>());
+    unsafe { ::std::ptr::read(a as *const _ as *const B) }
+}
+
 // mkl version of ndarray's mat_mul_impl
 #[cfg(feature = "mkl")]
 fn mat_mul_impl_blas<F: Float>(
@@ -207,12 +215,12 @@ fn mat_mul_impl_blas<F: Float>(
                             m as MklInt,               // m, rows of Op(a)
                             n as MklInt,               // n, cols of Op(b)
                             k as MklInt,               // k, cols of Op(a)
-                            crate::cast_as(&alpha),    // alpha
+                            cast_as(&alpha),           // alpha
                             lhs_.as_ptr() as *const _, // a
                             lhs_stride,                // lda
                             rhs_.as_ptr() as *const _, // b
                             rhs_stride,                // ldb
-                            crate::cast_as(&beta),     // beta
+                            cast_as(&beta),            // beta
                             c_.as_mut_ptr() as *mut _, // c
                             c_stride,                  // ldc
                         );
@@ -329,12 +337,12 @@ fn batch_mat_mul_impl<F: Float>(
                             [m as MklInt; GROUP_COUNT].as_ptr(),
                             [n as MklInt; GROUP_COUNT].as_ptr(),
                             [k as MklInt; GROUP_COUNT].as_ptr(),
-                            [crate::cast_as(&alpha); GROUP_COUNT].as_ptr(),             // alpha
+                            [cast_as(&alpha); GROUP_COUNT].as_ptr(),             // alpha
                             get_batch_ptrs(batch_size, lhs_.as_ptr(), lhs_.len()).as_ptr(), // a array
                             [lhs_stride; GROUP_COUNT].as_ptr(),
                             get_batch_ptrs(batch_size, rhs_.as_ptr(), rhs_.len()).as_ptr(), // b array
                             [rhs_stride; GROUP_COUNT].as_ptr(),
-                            [crate::cast_as(&beta); GROUP_COUNT].as_ptr(),               // alpha
+                            [cast_as(&beta); GROUP_COUNT].as_ptr(),               // alpha
                             get_batch_ptrs_mut(batch_size, c_.as_mut_ptr(), c_.len()).as_mut_ptr(), // c array
                             [c_stride; GROUP_COUNT].as_ptr(),
                             GROUP_COUNT as MklInt,
@@ -373,14 +381,14 @@ fn mat_mul_impl_slow<F: Float>(
                         m,
                         k,
                         n,
-                        crate::cast_as(&alpha),
+                        cast_as(&alpha),
                         ap as *const _,
                         lhs.strides()[0],
                         lhs.strides()[1],
                         bp as *const _,
                         rhs.strides()[0],
                         rhs.strides()[1],
-                        crate::cast_as(&beta),
+                        cast_as(&beta),
                         cp as *mut _,
                         rsc,
                         csc,
@@ -465,14 +473,14 @@ fn batch_mat_mul_impl_slow<F: Float>(
                             m,
                             k,
                             n,
-                            crate::cast_as(&alpha),
+                            cast_as(&alpha),
                             ap as *const _,
                             rsa,
                             csa,
                             bp as *const _,
                             rsb,
                             csb,
-                            crate::cast_as(&beta),
+                            cast_as(&beta),
                             cp as *mut _,
                             rsc,
                             csc,

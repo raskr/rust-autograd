@@ -234,21 +234,6 @@ pub(crate) use crate::ndarray_ext::ArrRepr;
 
 pub use crate::graph::{with, Graph};
 
-#[inline]
-pub(crate) unsafe fn uninitialized_vec<T>(size: usize) -> Vec<T> {
-    let mut buf = Vec::with_capacity(size);
-    buf.set_len(size);
-    buf
-}
-
-// Read pointer to type `A` as type `B`.
-//
-// **Panics** if `A` and `B` are not the same type
-#[inline]
-pub(crate) fn cast_as<A: 'static + Copy, B: 'static + Copy>(a: &A) -> B {
-    unsafe { ::std::ptr::read(a as *const _ as *const B) }
-}
-
 /// Error during tensor's evaluation.
 #[derive(Debug, PartialEq)]
 pub enum EvalError {

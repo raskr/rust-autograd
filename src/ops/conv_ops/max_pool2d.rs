@@ -33,8 +33,8 @@ macro_rules! impl_max_pool {
             stride: usize,
         ) -> (Vec<T>, Vec<T>) {
             let all_len_y = batch * ch * yh * yw;
-            let mut indices = uninitialized_vec(all_len_y);
-            let mut output = uninitialized_vec(all_len_y);
+            let mut indices = Vec::with_capacity(all_len_y);
+            let mut output = Vec::with_capacity(all_len_y);
             for b in 0..batch {
                 for c in 0..ch {
                     let c_base = xh * (c + b * ch);
@@ -77,6 +77,8 @@ macro_rules! impl_max_pool {
                     }
                 }
             }
+            output.set_len(all_len_y);
+            indices.set_len(all_len_y);
             (output, indices)
         }
     };
@@ -143,14 +145,15 @@ macro_rules! impl_max_pool_grad_grad {
             batch: usize,
             mut argmax: *const $t,
         ) -> Vec<T> {
-            let mut ret = uninitialized_vec(batch * c * yh * yw);
+            let len = yh * yw * c * batch;
+            let mut ret = Vec::with_capacity(len);
             let mut ggy = ret.as_mut_ptr();
-            let until = yh * yw * c * batch;
-            for _ in 0..until {
+            for _ in 0..len {
                 *ggy = *ggx.offset(*argmax as isize);
                 ggy = ggy.offset(1);
                 argmax = argmax.offset(1);
             }
+            ret.set_len(len);
             ret
         }
     };
@@ -299,6 +302,7 @@ impl<T: Float> crate::op::Op<T> for MaxPool2DGradGrad {
         let argmax = &ctx.input(1);
         let ggy = unsafe {
             let ggy = if same_type::<T, f32>() {
+                // ggy を返してくる．
                 max_pool_grad_grad_f32(ggx, yh, yw, c, batch, argmax.as_ptr() as *const f32)
             } else if same_type::<T, f64>() {
                 max_pool_grad_grad_f64(ggx, yh, yw, c, batch, argmax.as_ptr() as *const f64)

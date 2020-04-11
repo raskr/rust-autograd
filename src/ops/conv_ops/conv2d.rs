@@ -26,7 +26,6 @@ pub struct Conv2DWithCols {
 fn fast_col_x_filter_kernel<F: Float>(
     cols: &[F],
     filter: &[F],
-    y: &mut [F],
     xch: usize,
     ych: usize,
     yh: usize,
@@ -34,7 +33,9 @@ fn fast_col_x_filter_kernel<F: Float>(
     kh: usize,
     kw: usize,
     batch_size: usize,
-) {
+) -> Vec<F> {
+    let y_len = batch_size * ych * yh * yw;
+    let mut y = Vec::with_capacity(y_len);
     // params for blas gemm
     let m = ych as MklInt;
     let n = (yh * yw) as MklInt;
@@ -56,7 +57,7 @@ fn fast_col_x_filter_kernel<F: Float>(
                     get_batch_ptrs(batch_size, cols.as_ptr(), cols.len()).as_ptr(), // b array
                     [n; GROUP_COUNT].as_ptr(),
                     [0.; GROUP_COUNT].as_ptr(),
-                    get_batch_ptrs_mut(batch_size, y.as_mut_ptr(), y.len()).as_mut_ptr(), // c array
+                    get_batch_ptrs_mut(batch_size, y.as_mut_ptr(), y_len).as_mut_ptr(), // c array
                     [n ; GROUP_COUNT].as_ptr(),
                     GROUP_COUNT as MklInt,
                     [batch_size as MklInt; GROUP_COUNT].as_ptr()
@@ -66,13 +67,16 @@ fn fast_col_x_filter_kernel<F: Float>(
     }}
     kernel_call_def!(f32, cblas_sgemm_batch);
     kernel_call_def!(f64, cblas_dgemm_batch);
+    unsafe {
+        y.set_len(y_len);
+    }
+    y
 }
 
 #[cfg(not(feature = "mkl"))]
 fn slow_col_x_filter_kernel<F: Float>(
     cols: &[F],
     filter: &[F],
-    y: &mut [F],
     xch: usize,
     ych: usize,
     yh: usize,
@@ -80,8 +84,9 @@ fn slow_col_x_filter_kernel<F: Float>(
     kh: usize,
     kw: usize,
     batch_size: usize,
-) {
+) -> Vec<F> {
     let size_per_batch_y = ych * yh * yw;
+    let mut y = Vec::with_capacity(batch_size * size_per_batch_y);
     let m = ych;
     let n = yh * yw;
     let k = xch * kh * kw;
@@ -96,7 +101,7 @@ fn slow_col_x_filter_kernel<F: Float>(
                     unsafe {
                         // for each batch
                         let cols_target: *const F = &cols[i * size_per_batch_cols];
-                        let y_target = &y[i * size_per_batch_y] as *const F as *mut F;
+                        let y_target = y.get_unchecked(i * size_per_batch_y) as *const F as *mut F;
                         matrixmultiply::$f(
                             m,
                             k,
@@ -120,6 +125,10 @@ fn slow_col_x_filter_kernel<F: Float>(
     }
     kernel_call_def!(f32, sgemm);
     kernel_call_def!(f64, dgemm);
+    unsafe {
+        y.set_len(batch_size * size_per_batch_y);
+    }
+    y
 }
 
 struct Conv2DParams {
@@ -245,8 +254,6 @@ fn conv2d_impl<F: Float>(
     );
 
     unsafe {
-        let size_per_batch_y = ych * yh * yw;
-        let mut y = uninitialized_vec(batch_size * size_per_batch_y);
         let f;
         #[cfg(feature = "mkl")]
         {
@@ -256,19 +263,9 @@ fn conv2d_impl<F: Float>(
         {
             f = slow_col_x_filter_kernel;
         }
-        f(
-            cols.as_slice(),
-            w_p,
-            y.as_mut_slice(),
-            xch,
-            ych,
-            yh,
-            yw,
-            kh,
-            kw,
-            batch_size,
-        );
-        let y = NdArray::from_shape_vec_unchecked(IxDyn(&[batch_size, ych, yh, yw]), y);
+        let y = f(cols.as_slice(), w_p, xch, ych, yh, yw, kh, kw, batch_size);
+        // panic
+        let y = NdArray::from_shape_vec(IxDyn(&[batch_size, ych, yh, yw]), y).unwrap();
         let cols =
             NdArray::from_shape_vec_unchecked(IxDyn(&[batch_size, xch, kw, kh, yh, yw]), cols);
         Ok((y, cols))
@@ -282,7 +279,6 @@ fn conv2d_with_cols_impl<F: Float>(cols: &NdArrayView<F>, w: &NdArrayView<F>) ->
     let (ych, xch, kh, kw) = { (k_shape[0], k_shape[1], k_shape[2], k_shape[3]) };
     let (yh, yw) = (cols_shape[4], cols_shape[5]);
     let batch_size = cols_shape[0];
-    let size_per_batch_y = ych * yh * yw;
 
     // Prepare buffers
     let copied_w = ndarray_ext::copy_if_not_standard(w);
@@ -291,31 +287,27 @@ fn conv2d_with_cols_impl<F: Float>(cols: &NdArrayView<F>, w: &NdArrayView<F>) ->
     } else {
         w.as_slice().unwrap()
     };
-    unsafe {
-        let mut y = uninitialized_vec(batch_size * size_per_batch_y);
-        let f;
-        #[cfg(feature = "mkl")]
-        {
-            f = fast_col_x_filter_kernel;
-        }
-        #[cfg(not(feature = "mkl"))]
-        {
-            f = slow_col_x_filter_kernel;
-        }
-        f(
-            cols.as_slice().unwrap(),
-            w_slice,
-            y.as_mut_slice(),
-            xch,
-            ych,
-            yh,
-            yw,
-            kh,
-            kw,
-            batch_size,
-        );
-        NdArray::from_shape_vec(ndarray::IxDyn(&[batch_size, ych, yh, yw]), y).unwrap()
+    let f;
+    #[cfg(feature = "mkl")]
+    {
+        f = fast_col_x_filter_kernel;
     }
+    #[cfg(not(feature = "mkl"))]
+    {
+        f = slow_col_x_filter_kernel;
+    }
+    let y = f(
+        cols.as_slice().unwrap(),
+        w_slice,
+        xch,
+        ych,
+        yh,
+        yw,
+        kh,
+        kw,
+        batch_size,
+    );
+    unsafe { NdArray::from_shape_vec_unchecked(ndarray::IxDyn(&[batch_size, ych, yh, yw]), y) }
 }
 
 impl<T: Float> crate::op::Op<T> for Conv2D {
@@ -444,7 +436,8 @@ fn conv2d_filter_grad_impl<F: Float>(
     let gy = copied_gy.map(|inner| inner.as_ptr()).unwrap_or(gy.as_ptr());
 
     unsafe {
-        let mut gw = uninitialized_vec::<F>(ych * xch * kh * kw);
+        let gw_len = ych * xch * kh * kw;
+        let mut gw = Vec::with_capacity(gw_len);
         let gw_head: *mut F = gw.as_mut_ptr();
 
         #[cfg(feature = "mkl")]
@@ -513,6 +506,7 @@ fn conv2d_filter_grad_impl<F: Float>(
             kernel_call_def!(f64, dgemm);
         }
 
+        gw.set_len(gw_len);
         NdArray::from_shape_vec_unchecked(k_shape, gw)
     }
 }

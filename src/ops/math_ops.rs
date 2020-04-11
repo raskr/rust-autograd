@@ -211,20 +211,22 @@ macro_rules! elem_wise_vm_or_std {
         let x = $ctx.input(0);
         let ret = unsafe {
             if same_type::<T, f32>() {
-                let mut y = crate::uninitialized_vec(x.len());
+                let mut y = Vec::with_capacity(x.len());
                 $vms_op(
                     x.len() as MklInt,
                     x.as_ptr() as *const f32,
                     y.as_mut_ptr() as *mut f32,
                 );
+                y.set_len(x.len());
                 NdArray::from_shape_vec_unchecked(x.shape(), y)
             } else if same_type::<T, f64>() {
-                let mut y = crate::uninitialized_vec(x.len());
+                let mut y = Vec::with_capacity(x.len());
                 $vmd_op(
                     x.len() as MklInt,
                     x.as_ptr() as *const f64,
                     y.as_mut_ptr() as *mut f64,
                 );
+                y.set_len(x.len());
                 NdArray::from_shape_vec_unchecked(x.shape(), y)
             } else {
                 $ctx.input(0).mapv($closure)
@@ -240,7 +242,7 @@ macro_rules! elem_wise_vm_with_param_or_std {
         let x = $ctx.input(0);
         let ret = unsafe {
             if same_type::<T, f32>() {
-                let mut y = crate::uninitialized_vec(x.len());
+                let mut y = Vec::with_capacity(x.len());
                 let p = $param.to_f32().unwrap();
                 $vms_op(
                     x.len() as MklInt,
@@ -248,9 +250,10 @@ macro_rules! elem_wise_vm_with_param_or_std {
                     p,
                     y.as_mut_ptr() as *mut f32,
                 );
+                y.set_len(x.len());
                 NdArray::from_shape_vec_unchecked(x.shape(), y)
             } else if same_type::<T, f64>() {
-                let mut y = crate::uninitialized_vec(x.len());
+                let mut y = Vec::with_capacity(x.len());
                 let p = $param.to_f64().unwrap();
                 $vmd_op(
                     x.len() as MklInt,
@@ -258,6 +261,7 @@ macro_rules! elem_wise_vm_with_param_or_std {
                     p,
                     y.as_mut_ptr() as *mut f64,
                 );
+                y.set_len(x.len());
                 NdArray::from_shape_vec_unchecked(x.shape(), y)
             } else {
                 $ctx.input(0).mapv(|a| a.$std_name($param))
@@ -422,7 +426,7 @@ impl<T: Float> op::Op<T> for Transpose {
         }
 
         let ret = unsafe {
-            let mut dims = crate::uninitialized_vec::<usize>(perm_len);
+            let mut dims = Vec::with_capacity(perm_len);
             for (i, d) in perm.iter().enumerate() {
                 let d = d.to_usize().unwrap();
                 if self.invert_axes {
@@ -431,6 +435,7 @@ impl<T: Float> op::Op<T> for Transpose {
                     *dims.get_unchecked_mut(i) = d;
                 }
             }
+            dims.set_len(perm_len);
             x.permuted_axes(dims.as_slice())
         };
 

@@ -21,12 +21,14 @@ macro_rules! bin_op_same_shape {
     ($vms_op:ident, $vmd_op:ident, $std_op:tt, $a:expr, $b:expr) => {
         unsafe {
             if same_type::<T, f32>() {
-                let mut y = crate::uninitialized_vec($a.len());
+                let mut y = Vec::with_capacity($a.len());
                 $vms_op($a.len() as MklInt, $a.as_ptr() as *const f32, $b.as_ptr() as *const f32, y.as_mut_ptr() as *mut f32);
+                y.set_len($a.len());
                 NdArray::from_shape_vec_unchecked($a.shape(), y)
             } else if same_type::<T, f64>() {
-                let mut y = crate::uninitialized_vec($a.len());
+                let mut y = Vec::with_capacity($a.len());
                 $vmd_op($a.len() as MklInt, $a.as_ptr() as *const f64, $b.as_ptr() as *const f64, y.as_mut_ptr() as *mut f64);
+                y.set_len($a.len());
                 NdArray::from_shape_vec_unchecked($a.shape(), y)
             } else {
                 $a $std_op $b

@@ -33,6 +33,7 @@ impl<F: Float> crate::op::Op<F> for AdamOp<F> {
 
         // Make hat
         let m_hat = {
+            // t is not null
             let t_val = unsafe { *t.as_ptr() };
             let rhs = F::one() / (F::one() - b2.powf(t_val));
             let v_hat = new_v.mapv(move |new_v_elem| new_v_elem * rhs);

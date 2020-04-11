@@ -4,16 +4,16 @@ use crate::tensor::{Tensor, TensorInternal};
 use crate::Float;
 use crate::FxHashMap;
 use crate::Graph;
-use std::cell::UnsafeCell;
 use std::cmp::Ordering;
 use std::collections::binary_heap::BinaryHeap;
 
-struct GradInfo<'a, 'b, T: Float + 'a> {
+// Info of gradient of a `Tensor`.
+struct GradInfo<'t, 'g, T: Float + 't> {
     has_gradient: bool,
     grad_called: bool,
-    computed_grads: UnsafeCell<InputArray<Tensor<'b, T>>>,
-    accumulated_grad: UnsafeCell<Option<Tensor<'b, T>>>,
-    default_grad: Option<&'a TensorInternal<T>>,
+    computed_grads: InputArray<Tensor<'g, T>>,
+    accumulated_grad: Option<Tensor<'g, T>>,
+    default_grad: Option<&'t TensorInternal<T>>,
 }
 
 impl<'t, 'g, T: Float> GradInfo<'t, 'g, T> {
@@ -21,37 +21,31 @@ impl<'t, 'g, T: Float> GradInfo<'t, 'g, T> {
     fn new(has_gradient: bool, default_grad: Option<&'t TensorInternal<T>>) -> GradInfo<'t, 'g, T> {
         GradInfo {
             has_gradient,
-            computed_grads: UnsafeCell::new(InputArray::new()),
+            computed_grads: InputArray::new(),
             grad_called: false,
-            accumulated_grad: UnsafeCell::new(None),
+            accumulated_grad: None,
             default_grad,
         }
     }
 
     #[inline]
-    fn push_grad(&self, g: Tensor<'g, T>) {
-        unsafe {
-            (&mut *self.computed_grads.get()).push(g);
-        }
+    fn push_grad(&mut self, g: Tensor<'g, T>) {
+        self.computed_grads.push(g);
     }
 
-    fn accumulate_then_get(&self, s: &'g Graph<T>) -> Tensor<'g, T> {
-        unsafe {
-            if let Some(ret) = *self.accumulated_grad.get() {
-                // accumulation completed
-                ret
-            } else {
-                let before_acc = &*self.computed_grads.get();
-                if before_acc.len() > 1 {
-                    // accumulate
-                    let accumulated = s.add_n(before_acc.as_slice());
-                    *self.accumulated_grad.get() = Some(accumulated);
-                    accumulated
-                } else {
-                    // accumulation is not required
-                    before_acc[0]
-                }
-            }
+    #[inline]
+    fn accumulate_then_get(&mut self, s: &'g Graph<T>) -> Tensor<'g, T> {
+        if let Some(acc) = self.accumulated_grad {
+            return acc;
+        }
+        let before_acc = &self.computed_grads;
+        if before_acc.len() == 1 {
+            before_acc[0]
+        } else {
+            // accumulation is required
+            let accumulated = s.add_n(before_acc.as_slice());
+            self.accumulated_grad = Some(accumulated);
+            accumulated
         }
     }
 }
@@ -75,18 +69,17 @@ fn is_wrt<T: Float>(node: &TensorInternal<T>, wrt: &[&TensorInternal<T>]) -> boo
     wrt.contains(&node)
 }
 
-// Marks `has_gradient` if each node is on the gradient propagation path.
-// Map keys of return value are tensor ids.
+// Go backward from `ys` and collect nodes until reach `wrt` for backprop.
 //
 // Strategy
 //   1. Record all nodes that are reachable from `ys` into `ret`.
 //   2. Mark the path between `ys` and `xs` as `has_gradient`.
 fn get_between_nodes<'t, 'g, T: Float>(
-    s: &'g Graph<T>,
+    g: &'g Graph<T>,
     ys: &[&'t TensorInternal<T>],
     wrt: &[&'t TensorInternal<T>],
 ) -> FxHashMap<usize, GradInfo<'t, 'g, T>> {
-    // Randomly accessible by use of each node's lookup key.
+    // Randomly accessible by use of each node's id.
     let mut ret = FxHashMap::<usize, GradInfo<T>>::default();
 
     // Builds GradInfo while performing depth-first-search.
@@ -97,14 +90,14 @@ fn get_between_nodes<'t, 'g, T: Float>(
     while let Some((node, should_visit)) = dfs_stack.pop() {
         if should_visit {
             let marker =
-                node.is_differentiable && (is_wrt(node, wrt) || has_marked_child(s, node, &ret));
+                node.is_differentiable && (is_wrt(node, wrt) || has_marked_child(g, node, &ret));
             ret.insert(node.id(), GradInfo::new(marker, None));
         } else {
             // Put self on the stack top (should visit next time)
             dfs_stack.push((node, true));
             // Push children as necessary
             for child in node.get_backprop_inputs() {
-                let child = child.get(s);
+                let child = child.get(g);
                 if ret.get(&node.id()).is_none() {
                     if child.is_source() || !child.is_differentiable() {
                         // Add to result, but don't allow any more recursive search
@@ -163,7 +156,7 @@ pub(crate) fn symbolic_gradients<'t, 'g, T: Float>(
     // Starts with `ys`.
     while let Some(y) = heap.pop() {
         let gxs = {
-            let info: &GradInfo<_> = between_nodes.get(&y.tsr.id()).unwrap();
+            let info = between_nodes.get_mut(&y.tsr.id()).unwrap();
             let gy = if let Some(def) = info.default_grad {
                 g.scoped(def)
             } else {
@@ -198,7 +191,7 @@ pub(crate) fn symbolic_gradients<'t, 'g, T: Float>(
     let mut ret = Vec::with_capacity(wrt.len());
     for x in wrt {
         let msg1: &str = "Not differentiable with given tensor(s).";
-        let info = between_nodes.get(&x.id()).expect(msg1);
+        let info = between_nodes.get_mut(&x.id()).expect(msg1);
         if !info.has_gradient {
             panic!(msg1);
         }

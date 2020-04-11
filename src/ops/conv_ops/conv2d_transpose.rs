@@ -120,11 +120,11 @@ fn conv2d_transpose_impl<F: Float>(
     let copied_w = ndarray_ext::copy_if_not_standard(w);
     let gy_ptr = copied_gy.map(|inner| inner.as_ptr()).unwrap_or(gy.as_ptr());
     let w_ptr = copied_w.map(|inner| inner.as_ptr()).unwrap_or(w.as_ptr());
+    let col_len = batch_size * size_per_batch_col;
 
-    #[cfg(feature = "mkl")]
-    let mut col = unsafe { uninitialized_vec(batch_size * size_per_batch_col) };
+    let mut col = Vec::with_capacity(col_len);
     #[cfg(not(feature = "mkl"))]
-    let col = unsafe { uninitialized_vec(batch_size * size_per_batch_col) };
+    {}
 
     let gx = unsafe {
         #[cfg(feature = "mkl")]
@@ -147,7 +147,7 @@ fn conv2d_transpose_impl<F: Float>(
                             get_batch_ptrs(batch_size, gy_ptr, gy.len()).as_ptr(), // b array
                             [n as MklInt; GROUP_COUNT].as_ptr(),
                             [0.; GROUP_COUNT].as_ptr(),
-                            get_batch_ptrs_mut(batch_size, col.as_mut_ptr(), col.len())
+                            get_batch_ptrs_mut(batch_size, col.as_mut_ptr(), col_len)
                                 .as_mut_ptr(), // c array
                             [n as MklInt; GROUP_COUNT].as_ptr(),
                             GROUP_COUNT as MklInt,
@@ -158,13 +158,17 @@ fn conv2d_transpose_impl<F: Float>(
             }
             kernel_call_def!(f32, cblas_sgemm_batch);
             kernel_call_def!(f64, cblas_dgemm_batch);
+            col.set_len(col_len);
         }
 
         #[cfg(not(feature = "mkl"))]
         {
             let w_slice = slice::from_raw_parts(w_ptr, w.len());
             let gy_slice = slice::from_raw_parts(gy_ptr, gy.len());
-            let col_ref = &col[0];
+            let col_ref = {
+                col.set_len(col_len);
+                &col[0]
+            };
             let size_per_batch_gy = ych * yh * yw;
             let (rsa, csa) = (1, m);
             let (rsb, csb) = (n, 1);
@@ -325,7 +329,8 @@ fn conv2d_transpose_filter_grad_impl<F: Float>(
         dilation_w as i32,
     );
 
-    let mut gw = unsafe { uninitialized_vec(k_shape[0] * k_shape[1] * k_shape[2] * k_shape[3]) };
+    let gw_size = k_shape[0] * k_shape[1] * k_shape[2] * k_shape[3];
+    let mut gw = Vec::with_capacity(gw_size);
     let gw_head = gw.as_mut_ptr();
 
     #[cfg(feature = "mkl")]
@@ -404,7 +409,10 @@ fn conv2d_transpose_filter_grad_impl<F: Float>(
         kernel_call_def!(f32, sgemm);
         kernel_call_def!(f64, dgemm);
     }
-    unsafe { NdArray::from_shape_vec_unchecked(k_shape, gw) }
+    unsafe {
+        gw.set_len(gw_size);
+        NdArray::from_shape_vec_unchecked(k_shape, gw)
+    }
 }
 
 impl<T: Float> crate::op::Op<T> for Conv2DTransposeFilterGrad {

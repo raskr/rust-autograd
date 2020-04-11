@@ -2,7 +2,6 @@ use crate::ndarray_ext;
 use crate::ndarray_ext::{NdArray, NdArrayView};
 use crate::op;
 use crate::same_type;
-use crate::uninitialized_vec;
 use crate::Float;
 use crate::Tensor;
 use ndarray;
@@ -95,7 +94,7 @@ fn im2col_batch<T: Float>(
     let size_per_batch_y = (xch * kw * kh * yh * yw) as usize;
 
     unsafe {
-        let mut ret = uninitialized_vec::<T>(batch_size * size_per_batch_y);
+        let mut ret = Vec::with_capacity(batch_size * size_per_batch_y);
         // parallelize outer loop
         (0..batch_size).into_par_iter().for_each(|i| {
             let mut x: *const T = x.get_unchecked(i * xch as usize * channel_size) as *const _;
@@ -130,6 +129,7 @@ fn im2col_batch<T: Float>(
                 x = x.add(channel_size);
             }
         });
+        ret.set_len(batch_size * size_per_batch_y);
         ret
     }
 }
