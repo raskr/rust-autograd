@@ -285,10 +285,11 @@ pub mod array_gen {
             let size: usize = shape.iter().cloned().product();
             let mut rng = self.rng.lock().unwrap();
             unsafe {
-                let mut buf = crate::uninitialized_vec(size);
+                let mut buf = Vec::with_capacity(size);
                 for i in 0..size {
                     *buf.get_unchecked_mut(i) = T::from(dist.sample(&mut *rng)).unwrap();
                 }
+                buf.set_len(size);
                 NdArray::from_shape_vec(shape, buf).unwrap()
             }
         }
@@ -349,11 +350,12 @@ pub mod array_gen {
             let mut rng = self.rng.lock().unwrap();
             let size: usize = shape.iter().cloned().product();
             unsafe {
-                let mut buf = crate::uninitialized_vec(size);
+                let mut buf = Vec::with_capacity(size);
                 for i in 0..size {
                     let val = dist.sample(&mut *rng);
                     *buf.get_unchecked_mut(i) = T::from(i32::from(val < p)).unwrap();
                 }
+                buf.set_len(size);
                 NdArray::from_shape_vec(shape, buf).unwrap()
             }
         }
