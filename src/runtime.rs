@@ -5,7 +5,6 @@ use crate::tensor::{Tensor, TensorInternal};
 use crate::FxHashMap;
 use crate::{Float, Graph};
 use std::cell::UnsafeCell;
-use std::mem;
 use std::sync::{RwLockReadGuard, RwLockWriteGuard};
 
 const NUM_MAX_EVAL_BUF: usize = 8;
@@ -121,13 +120,14 @@ impl<'feed, F: Float> Feed<'feed, F> {
         }
     }
 }
-
+#[derive(Copy, Clone)]
 enum ValueType {
     Owned,
     View,
     Empty,
 }
 
+#[derive(Copy, Clone)]
 struct ValueInfo {
     ty: ValueType,
     // key to lookup output
@@ -142,14 +142,16 @@ impl ValueInfo {
 }
 
 struct OutputStorage<'view, F: Float> {
+    // - storage itself is not shared between threads
+    // - items in the storage never gone while evaluation loop.
     inner: UnsafeCell<OutputStorageInner<'view, F>>,
 }
 
 struct OutputStorageInner<'view, F: Float> {
     // Each of NdArray is Some right up until eval's ret-val extraction phase.
     // In that phase, each of entry is replaced with None to avoid copying the entire vector.
-    owned: Vec<Option<NdArray<F>>>,
-    borrowed: Vec<NdArrayView<'view, F>>,
+    value_storage: Vec<Option<NdArray<F>>>,
+    view_storage: Vec<NdArrayView<'view, F>>,
 }
 
 impl<'tensor, 'view, 'lock, F: Float> OutputStorage<'view, F> {
@@ -157,38 +159,69 @@ impl<'tensor, 'view, 'lock, F: Float> OutputStorage<'view, F> {
     fn new() -> Self {
         OutputStorage {
             inner: UnsafeCell::new(OutputStorageInner {
-                owned: Vec::new(),
-                borrowed: Vec::new(),
+                value_storage: Vec::new(),
+                view_storage: Vec::new(),
             }),
         }
     }
 
     #[inline]
-    fn owned_mut(&self) -> &mut Vec<Option<NdArray<F>>> {
-        unsafe { &mut (*self.inner.get()).owned }
+    unsafe fn inner(&self) -> &OutputStorageInner<'view, F> {
+        &*self.inner.get()
     }
 
     #[inline]
-    fn owned(&self) -> &[Option<NdArray<F>>] {
-        unsafe { &(*self.inner.get()).owned }
+    unsafe fn inner_mut(&self) -> &mut OutputStorageInner<'view, F> {
+        &mut *self.inner.get()
     }
 
     #[inline]
-    fn view_mut(&self) -> &mut Vec<NdArrayView<'view, F>> {
-        unsafe { &mut (*self.inner.get()).borrowed }
+    fn push_owned(&self, val: NdArray<F>) -> usize {
+        unsafe {
+            let s = &mut self.inner_mut().value_storage;
+            let ret = s.len();
+            s.push(Some(val));
+            ret
+        }
     }
 
     #[inline]
-    fn view(&self) -> &[NdArrayView<'view, F>] {
-        unsafe { &(*self.inner.get()).borrowed }
+    fn push_view(&self, view: NdArrayView<'view, F>) -> usize {
+        unsafe {
+            let s = &mut self.inner_mut().view_storage;
+            let ret = s.len();
+            s.push(view);
+            ret
+        }
     }
-}
 
-fn validate_feed_shapes<F: Float>(feeds: &[Feed<F>], g: &Graph<F>) {
-    for feed in feeds {
-        let shape = feed.value.shape();
-        g.access_node(feed.placeholder_id)
-            .validate_feed_shape(shape);
+    #[inline]
+    fn get_from_view(&self, i: usize) -> NdArrayView<'view, F> {
+        unsafe { self.inner().view_storage[i].clone() }
+    }
+
+    #[inline]
+    fn get_from_owned(&self, i: usize) -> NdArrayView<F> {
+        unsafe { self.inner().value_storage[i].as_ref().unwrap().view() }
+    }
+
+    #[inline]
+    fn take_from_owned(&self, i: usize) -> NdArray<F> {
+        unsafe { self.inner_mut().value_storage[i].take().unwrap() }
+    }
+
+    #[inline]
+    fn get(&'view self, node: &TensorInternal<F>, vi: ValueInfo) -> NdArrayView<'view, F> {
+        match vi.ty {
+            ValueType::Owned => self.get_from_owned(vi.key),
+            ValueType::View => self.get_from_view(vi.key),
+            ValueType::Empty => {
+                panic!(
+                    "Attempting to use {}'s output which is empty.",
+                    node.op.name()
+                );
+            }
+        }
     }
 }
 
@@ -216,16 +249,14 @@ fn install_compute_results<'view, F: Float>(
     for y in results {
         match y {
             Some(Ok(crate::ArrRepr::Owned(val))) => {
-                storage.owned_mut().push(Some(val));
-                value_info_list.push(ValueInfo::new(ValueType::Owned, storage.owned().len() - 1));
+                let key = storage.push_owned(val);
+                value_info_list.push(ValueInfo::new(ValueType::Owned, key));
             }
             Some(Ok(crate::ArrRepr::View(val))) => {
-                storage.view_mut().push(val);
-                value_info_list.push(ValueInfo::new(ValueType::View, storage.view().len() - 1));
+                let key = storage.push_view(val);
+                value_info_list.push(ValueInfo::new(ValueType::View, key));
             }
             Some(Err(e)) => {
-                // error is set at the head of list
-                // value_info_list[0] = ValueInfo::new(ValueType::ComputeFailed(e), /*dummy = */ 0);
                 return Err(e);
             }
             None => {
@@ -245,7 +276,7 @@ fn aggregate_op_inputs<'ret, 'tensor: 'ret, 'slice: 'ret, 'feed: 'slice, F: Floa
     node_info_map: &FxHashMap<usize, Result<op::OutputArray<ValueInfo>, op::OpError>>,
     feeds: &'slice [Feed<'feed, F>],
     storage: &'ret OutputStorage<'ret, F>,
-    input_values: &mut InputArray<OpInput<'ret, F>>,
+    input_values: &mut InputArray<OpInput<'ret, F>>, // target
     read_guards: &mut InputArray<RwLockReadGuard<'tensor, NdArray<F>>>, // guard storage for variable arrays
     write_guards: &mut InputArray<RwLockWriteGuard<'tensor, NdArray<F>>>, // guard storage for variable arrays
 ) -> Result<(), op::OpError> {
@@ -253,7 +284,7 @@ fn aggregate_op_inputs<'ret, 'tensor: 'ret, 'slice: 'ret, 'feed: 'slice, F: Floa
 
     for (in_node, &in_idx) in node.in_edges.iter().zip(&node.input_indices) {
         // `in_idx` is not 0 only when `in_node` is multi-output op and `node` selects nth value from it using `Graph::nth_tensor`.
-        let input_inner: &TensorInternal<F> = in_node.get_inner(g);
+        let input_inner: &TensorInternal<F> = in_node.get(g);
         let x = if input_inner.is_placeholder {
             Ok(OpInput::new(retrieve_feed(feeds, in_node.id)))
         } else if let Some(ref lock) = input_inner.variable_array {
@@ -279,21 +310,7 @@ fn aggregate_op_inputs<'ret, 'tensor: 'ret, 'slice: 'ret, 'feed: 'slice, F: Floa
             // Search the value of input nodes.
             match &node_info_map.get(&in_node.id).unwrap() {
                 Err(e) => Err(e.clone()),
-                Ok(vi_list) => {
-                    let vi = &vi_list[in_idx];
-                    match vi.ty {
-                        ValueType::Owned => Ok(OpInput::new(
-                            storage.owned()[vi.key].as_ref().unwrap().view(),
-                        )),
-                        ValueType::View => Ok(OpInput::new(storage.view()[vi.key].clone())),
-                        ValueType::Empty => {
-                            panic!(
-                                "Attempting to use {}'s output which is empty.",
-                                input_inner.op.name()
-                            );
-                        }
-                    }
-                }
+                Ok(vi_list) => Ok(OpInput::new(storage.get(input_inner, vi_list[in_idx]))),
             }
         };
         match x {
@@ -336,8 +353,6 @@ impl<F: Float> Graph<F> {
     where
         A: AsRef<Tensor<'scope, F>> + Copy,
     {
-        validate_feed_shapes(feeds, self);
-
         let mut node_info_map: FxHashMap<usize, Result<op::OutputArray<ValueInfo>, op::OpError>> =
             FxHashMap::default();
 
@@ -374,9 +389,7 @@ impl<F: Float> Graph<F> {
                     let mut ctx = ComputeContext::new(node, xs);
                     node.op.compute(&mut ctx);
                     let ys = ctx.extract_outputs();
-                    if ys.is_empty() {
-                        panic!("Bad op implementation: empty return value");
-                    }
+                    debug_assert!(!ys.is_empty(), "Bad op implementation: empty return value");
                     // register compute result
                     install_compute_results(ys, &storage)
                 });
@@ -386,7 +399,7 @@ impl<F: Float> Graph<F> {
                 dfs_stack.push((node, true));
                 // Push children if needed
                 for child in &node.in_edges {
-                    let child = child.get(self).scoped_inner();
+                    let child = child.get(self);
                     if !would_not_visit(child, &node_info_map) {
                         dfs_stack.push((child, false));
                     }
@@ -404,16 +417,20 @@ impl<F: Float> Graph<F> {
                 Ok(retrieve_feed(feeds, t.id()).to_owned())
             } else {
                 match &node_info_map.get(&t.id()).unwrap() {
-                    Ok(value_info_list) => {
-                        let info = &value_info_list[0];
-                        match &info.ty {
-                            ValueType::Owned => {
-                                Ok(mem::replace(&mut storage.owned_mut()[info.key], None).unwrap())
-                            }
-                            ValueType::View => Ok(storage.view()[info.key].to_owned()),
-                            ValueType::Empty => Err(crate::EvalError::Empty),
-                        }
-                    }
+                    Ok(value_info_list) => match value_info_list[0] {
+                        ValueInfo {
+                            ty: ValueType::Owned,
+                            key,
+                        } => Ok(storage.take_from_owned(key)),
+                        ValueInfo {
+                            ty: ValueType::View,
+                            key,
+                        } => Ok(storage.get_from_view(key).to_owned()),
+                        ValueInfo {
+                            ty: ValueType::Empty,
+                            key: _,
+                        } => Err(crate::EvalError::Empty),
+                    },
                     Err(e) => {
                         // convert to EvalError
                         Err(crate::EvalError::OpError(e.clone()))

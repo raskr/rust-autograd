@@ -46,24 +46,18 @@ use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 /// ```
 #[derive(Clone, Copy)]
 pub struct Tensor<'graph, F: Float> {
-    // pub(crate) inner: &'tensor TensorInternal<F>,
-    pub(crate) inner_: *const TensorInternal<F>,
+    pub(crate) id: usize,
     pub(crate) graph: &'graph Graph<F>,
 }
 
-impl<'graph, 'tensor, F: Float> Tensor<'graph, F> {
+impl<'graph, F: Float> Tensor<'graph, F> {
     #[inline]
-    pub(crate) fn inner(&self) -> &TensorInternal<F> {
-        unsafe { &*self.inner_ }
-    }
-
-    #[inline]
-    pub(crate) fn scoped_inner(&self) -> &'tensor TensorInternal<F> {
-        let id = self.inner().id;
-        self.graph.access_node(id)
+    pub(crate) fn inner<'t>(&self) -> &'t TensorInternal<F> {
+        self.graph.access_inner(self.id)
     }
 
     /// Returns the graph to which this tensor belongs.
+    #[inline]
     pub fn graph(&self) -> &'graph Graph<F> {
         self.graph
     }
@@ -82,7 +76,7 @@ impl<'graph, 'tensor, F: Float> Tensor<'graph, F> {
     ///
     /// See also [Graph::eval](../graph/struct.Graph.html#method.eval).
     pub fn eval<'v>(
-        &'tensor self,
+        &self,
         feeds: &'v [crate::runtime::Feed<'v, F>],
     ) -> Result<NdArray<F>, crate::EvalError> {
         let mut ret = self.graph.eval(&[self], feeds);
@@ -116,6 +110,7 @@ impl<'graph, 'tensor, F: Float> Tensor<'graph, F> {
             self.is_placeholder(),
             "Receiver of Tensor::given must be a placeholder."
         );
+        self.inner().validate_feed_shape(value.shape());
         crate::runtime::Feed::new(self.id(), value.into_dyn())
     }
 
@@ -156,10 +151,7 @@ impl<'graph, 'tensor, F: Float> Tensor<'graph, F> {
     // });
     // ```
     #[inline]
-    fn register_hook<H: crate::hook::Hook<F> + Send + Sync + 'static>(
-        self,
-        hook: H,
-    ) -> Tensor<'graph, F> {
+    fn register_hook<H: crate::hook::Hook<F> + 'static>(self, hook: H) -> Tensor<'graph, F> {
         Tensor::builder()
             .append_input(&self)
             .build(self.graph, crate::ops::hook_ops::HookOp::new(hook))
@@ -276,18 +268,27 @@ impl<'graph, 'tensor, F: Float> Tensor<'graph, F> {
     }
 
     /// Returns the id of this tensor in this graph.
-    #[inline]
+    #[inline(always)]
     pub fn id(&self) -> usize {
-        self.inner().id()
+        self.id
+    }
+
+    /// Returns the number of inputs of this tensor.
+    #[inline]
+    pub fn num_inputs(&self) -> usize {
+        self.inner().num_inputs()
     }
 
     #[inline]
     /// Returns true if this node has no incoming nodes.
     pub fn is_source(&self) -> bool {
-        self.inner().in_edges.is_empty()
+        self.inner().is_source()
     }
 
     #[inline]
+    /// Input nodes used when backprop.
+    ///
+    /// This is same as `inputs` in most cases.
     pub fn get_backprop_inputs(&self) -> &[Input] {
         self.inner().get_backprop_inputs()
     }
@@ -305,7 +306,7 @@ impl<'graph, 'tensor, F: Float> Tensor<'graph, F> {
     #[inline]
     pub fn get_variable_array(&self) -> Option<&Arc<RwLock<NdArray<F>>>> {
         let id = self.inner().id();
-        let inner = self.graph.access_node(id);
+        let inner = self.graph.access_inner(id);
         inner.variable_array.as_ref()
     }
 
@@ -344,11 +345,11 @@ impl<'b, T: Float> AsRef<Tensor<'b, T>> for Tensor<'b, T> {
     }
 }
 
-pub(crate) struct TensorInternal<T: Float> {
+pub(crate) struct TensorInternal<F: Float> {
     pub(crate) id: usize,
 
     // Operation to evaluate this tensor.
-    pub(crate) op: Box<dyn op::Op<T>>,
+    pub(crate) op: Box<dyn op::Op<F>>,
 
     // References to immediate predecessors.
     pub(crate) in_edges: op::InputArray<Input>,
@@ -362,12 +363,12 @@ pub(crate) struct TensorInternal<T: Float> {
     // An optional *persistent* NdArray.
     //
     // This is `Some` if this tensor is made from `ag::variable`.
-    pub(crate) variable_array: Option<Arc<RwLock<NdArray<T>>>>,
+    pub(crate) variable_array: Option<Arc<RwLock<NdArray<F>>>>,
 
     // An optional *persistent* NdArray.
     //
     // This is `Some` if this tensor is made from `ag::constant`.
-    pub(crate) constant_array: Option<Arc<NdArray<T>>>,
+    pub(crate) constant_array: Option<Arc<NdArray<F>>>,
 
     // This tensor is placeholder or not.
     pub(crate) is_placeholder: bool,
@@ -391,17 +392,37 @@ pub(crate) struct TensorInternal<T: Float> {
     pub(crate) known_shape: Option<KnownShape>,
 }
 
-impl<T: Float> TensorInternal<T> {
+impl<F: Float> TensorInternal<F> {
+    #[inline]
+    pub fn tensor<'g>(&self, graph: &'g Graph<F>) -> Tensor<'g, F> {
+        Tensor {
+            id: self.id,
+            graph,
+        }
+    }
+
     #[inline(always)]
     pub fn id(&self) -> usize {
         self.id
+    }
+
+    #[inline]
+    /// Returns true if this node has no incoming nodes.
+    pub(crate) fn is_source(&self) -> bool {
+        self.in_edges.is_empty()
+    }
+
+    /// Returns the number of inputs of this tensor.
+    #[inline]
+    pub(crate) fn num_inputs(&self) -> usize {
+        self.in_edges.len()
     }
 
     /// Returns a reference to the persistent constant array.
     ///
     /// Note that this is `Some` if this tensor derived from `ag::constant`; otherwise `None`
     #[inline]
-    pub(crate) fn get_variable_array_inner(&self) -> Option<*const RwLock<NdArray<T>>> {
+    pub(crate) fn get_variable_array_inner(&self) -> Option<*const RwLock<NdArray<F>>> {
         match &self.variable_array {
             Some(ref inner) => Some(&**inner),
             None => None,
@@ -412,7 +433,7 @@ impl<T: Float> TensorInternal<T> {
     ///
     /// Note that this is `Some` if this tensor derived from `ag::constant`; otherwise `None`
     #[inline]
-    pub(crate) fn get_constant_array_inner(&self) -> Option<&NdArray<T>> {
+    pub(crate) fn get_constant_array_inner(&self) -> Option<&NdArray<F>> {
         match &self.constant_array {
             Some(ref inner) => Some(&**inner),
             None => None,
@@ -423,7 +444,7 @@ impl<T: Float> TensorInternal<T> {
     ///
     /// Note that this is `Some` if this tensor derived from `ag::variable`; otherwise `None`.
     #[inline]
-    pub(crate) fn lock_variable_array(&self) -> Option<RwLockReadGuard<NdArray<T>>> {
+    pub(crate) fn lock_variable_array(&self) -> Option<RwLockReadGuard<NdArray<F>>> {
         if let Some(ref arr) = self.variable_array {
             Some(arr.read().unwrap())
         } else {
@@ -435,7 +456,7 @@ impl<T: Float> TensorInternal<T> {
     ///
     /// Note that this is `Some` if this tensor derived from `ag::variable`; otherwise `None`
     #[inline]
-    pub(crate) fn lock_variable_array_mut(&self) -> Option<RwLockWriteGuard<NdArray<T>>> {
+    pub(crate) fn lock_variable_array_mut(&self) -> Option<RwLockWriteGuard<NdArray<F>>> {
         if let Some(ref arr) = self.variable_array {
             Some(arr.write().unwrap())
         } else {
@@ -445,7 +466,7 @@ impl<T: Float> TensorInternal<T> {
 
     /// Returns a cloned persistent array.
     #[inline]
-    pub(crate) fn clone_persistent_array(&self) -> Option<NdArray<T>> {
+    pub(crate) fn clone_persistent_array(&self) -> Option<NdArray<F>> {
         if let Some(ref arr) = self.variable_array {
             Some((*arr.read().unwrap()).clone())
         } else if let Some(ref arr) = self.constant_array {
@@ -464,6 +485,7 @@ impl<T: Float> TensorInternal<T> {
 
     #[inline]
     pub(crate) fn validate_feed_shape(&self, shape: &[usize]) {
+        debug_assert!(self.is_placeholder);
         if !self.known_shape.as_ref().unwrap().validate(shape) {
             panic!(
                 "Shape error: placeholder required {:?}, but got {:?}",
@@ -502,6 +524,7 @@ impl<T: Float> fmt::Debug for TensorInternal<T> {
 impl<T: Float> Eq for TensorInternal<T> {}
 
 impl<T: Float> PartialEq for TensorInternal<T> {
+    #[inline(always)]
     fn eq(&self, other: &TensorInternal<T>) -> bool {
         // compare addresses on the heap
         self.id() == other.id()
@@ -537,19 +560,25 @@ impl<T: Float> fmt::Display for TensorInternal<T> {
 pub struct Input {
     pub(crate) id: usize,
     pub(crate) mut_usage: bool,
-    pub(crate) is_placeholder: bool,
 }
 
-impl<'tensor, 'graph> Input {
+impl<'graph> Input {
     /// Instantiates a new immutable `Input` object.
     ///
     /// Run-time value of `val` is passed as an `ndarray::ArrayView` in `Op::compute`.
     #[inline]
-    pub fn new<T: Float>(val: &Tensor<'graph, T>) -> Input {
+    pub fn new<F: Float>(val: &Tensor<'graph, F>) -> Input {
         Input {
             id: val.id(),
             mut_usage: false,
-            is_placeholder: val.is_placeholder(),
+        }
+    }
+
+    #[inline]
+    pub(crate) fn new_raw<F: Float>(val: &TensorInternal<F>) -> Input {
+        Input {
+            id: val.id,
+            mut_usage: false,
         }
     }
 
@@ -557,26 +586,30 @@ impl<'tensor, 'graph> Input {
     ///
     /// Run-time value of `val` is passed as an `ArrayViewMut` in `Op::compute`.
     #[inline]
-    pub fn new_mut<T: Float>(val: &Tensor<'graph, T>) -> Input {
+    pub fn new_mut<F: Float>(val: &Tensor<'graph, F>) -> Input {
         Input {
             id: val.id(),
             mut_usage: true,
-            is_placeholder: val.is_placeholder(),
         }
     }
 
     #[inline]
-    pub(crate) fn get<'b, T: Float>(&self, graph: &'b Graph<T>) -> Tensor<'b, T> {
-        let inner = graph.access_node(self.id);
-        Tensor {
-            inner_: inner as *const _,
-            graph,
+    #[allow(dead_code)]
+    pub(crate) fn new_mut_raw<F: Float>(val: &TensorInternal<F>) -> Input {
+        Input {
+            id: val.id,
+            mut_usage: true,
         }
     }
 
     #[inline]
-    pub(crate) fn get_inner<T: Float>(&self, graph: &Graph<T>) -> &TensorInternal<T> {
-        graph.access_node(self.id)
+    pub(crate) fn get_scoped<F: Float>(&self, graph: &'graph Graph<F>) -> Tensor<'graph, F> {
+        graph.access(self.id)
+    }
+
+    #[inline]
+    pub(crate) fn get<F: Float>(&self, graph: &Graph<F>) -> &TensorInternal<F> {
+        graph.access_inner(self.id)
     }
 }
 
@@ -606,13 +639,13 @@ impl<'tensor, 'graph> Input {
 ///         .build(g, DummyOp {a: 42.});
 /// });
 /// ```
-pub struct TensorBuilder<T: Float> {
+pub struct TensorBuilder<F: Float> {
     shape: Option<usize>,
     in_edges: op::InputArray<Input>,
     can_have_gradient: bool,
     is_placeholder: bool,
-    constant_array: Option<Arc<NdArray<T>>>,
-    variable_array: Option<Arc<RwLock<NdArray<T>>>>,
+    constant_array: Option<Arc<NdArray<F>>>,
+    variable_array: Option<Arc<RwLock<NdArray<F>>>>,
     input_indices: Option<op::InputArray<usize>>,
     backprop_inputs: Option<op::InputArray<Input>>,
     known_shape: Option<KnownShape>,
@@ -625,7 +658,6 @@ pub(crate) struct KnownShape {
 }
 
 impl KnownShape {
-    #[inline]
     pub(crate) fn new(shape: Vec<isize>) -> Self {
         let mut is_fully_defined = true;
         for &a in &shape {
@@ -679,21 +711,21 @@ fn test_build() {
     });
 }
 
-impl<'tensor, 'graph, T: Float> TensorBuilder<T> {
+impl<'graph, F: Float> TensorBuilder<F> {
     #[inline]
-    pub(crate) fn set_known_shape(mut self, s: Vec<isize>) -> TensorBuilder<T> {
+    pub(crate) fn set_known_shape(mut self, s: Vec<isize>) -> TensorBuilder<F> {
         self.known_shape = Some(KnownShape::new(s));
         self
     }
 
     #[inline]
-    pub(crate) fn set_shape(mut self, s: &Tensor<'graph, T>) -> TensorBuilder<T> {
+    pub(crate) fn set_shape(mut self, s: &Tensor<'graph, F>) -> TensorBuilder<F> {
         self.shape = Some(s.id());
         self
     }
 
     #[inline]
-    pub fn set_differentiable(mut self, differentiable: bool) -> TensorBuilder<T> {
+    pub fn set_differentiable(mut self, differentiable: bool) -> TensorBuilder<F> {
         self.can_have_gradient = differentiable;
         self
     }
@@ -701,14 +733,22 @@ impl<'tensor, 'graph, T: Float> TensorBuilder<T> {
     #[inline]
     /// Sets input tensors.
     /// See also [Input](struct.Input.html).
-    pub fn set_inputs(mut self, a: &[Input]) -> TensorBuilder<T> {
+    pub fn set_inputs(mut self, a: &[Input]) -> TensorBuilder<F> {
         self.in_edges = op::InputArray::from(a);
         self
     }
 
     #[inline]
+    /// Sets input tensors (vector).
+    /// See also [Input](struct.Input.html).
+    pub fn set_inputs_vec(mut self, a: Vec<Input>) -> TensorBuilder<F> {
+        self.in_edges = op::InputArray::from_vec(a);
+        self
+    }
+
+    #[inline]
     /// Sets read-only input tensors.
-    pub(crate) fn set_ro_inputs(mut self, a: &[&Tensor<T>]) -> TensorBuilder<T> {
+    pub(crate) fn set_ro_inputs(mut self, a: &[&Tensor<F>]) -> TensorBuilder<F> {
         for &x in a {
             self.in_edges.push(Input::new(x));
         }
@@ -716,31 +756,31 @@ impl<'tensor, 'graph, T: Float> TensorBuilder<T> {
     }
 
     #[inline]
-    pub(crate) fn append_input(mut self, val: &Tensor<T>) -> TensorBuilder<T> {
+    pub(crate) fn append_input(mut self, val: &Tensor<F>) -> TensorBuilder<F> {
         self.in_edges.push(Input::new(val));
         self
     }
 
     #[inline]
-    pub(crate) fn set_is_placeholder(mut self, a: bool) -> TensorBuilder<T> {
+    pub(crate) fn set_is_placeholder(mut self, a: bool) -> TensorBuilder<F> {
         self.is_placeholder = a;
         self
     }
 
     #[inline]
-    pub(crate) fn set_constant_array(mut self, a: Arc<NdArray<T>>) -> TensorBuilder<T> {
+    pub(crate) fn set_constant_array(mut self, a: Arc<NdArray<F>>) -> TensorBuilder<F> {
         self.constant_array = Some(a);
         self
     }
 
     #[inline]
-    pub(crate) fn set_variable_array(mut self, a: Arc<RwLock<NdArray<T>>>) -> TensorBuilder<T> {
+    pub(crate) fn set_variable_array(mut self, a: Arc<RwLock<NdArray<F>>>) -> TensorBuilder<F> {
         self.variable_array = Some(a);
         self
     }
 
     #[inline]
-    pub(crate) fn set_input_indices(mut self, a: &[usize]) -> TensorBuilder<T> {
+    pub(crate) fn set_input_indices(mut self, a: &[usize]) -> TensorBuilder<F> {
         self.input_indices = Some(op::InputArray::from_slice(a));
         self
     }
@@ -749,23 +789,22 @@ impl<'tensor, 'graph, T: Float> TensorBuilder<T> {
     /// Sets inputs for backprop.
     ///
     /// Not required unless backprop-inputs are differs from normal-case inputs
-    pub fn set_backprop_inputs(mut self, a: &[Input]) -> TensorBuilder<T> {
+    pub fn set_backprop_inputs(mut self, a: &[Input]) -> TensorBuilder<F> {
         self.backprop_inputs = Some(op::InputArray::from(a));
         self
     }
 
-    #[inline]
     /// Finalizes this builder and creates a tensor with given `Op` in the graph.
-    pub fn build<O>(self, graph: &'graph Graph<T>, op: O) -> Tensor<'graph, T>
+    pub fn build<O>(self, graph: &'graph Graph<F>, op: O) -> Tensor<'graph, F>
     where
-        O: op::Op<T> + 'static,
+        O: op::Op<F> + 'static,
     {
         let rank = if self.in_edges.is_empty() {
             0
         } else {
             self.in_edges
                 .iter()
-                .map(|a| a.get(graph).inner().top_rank)
+                .map(|a| a.get(graph).top_rank)
                 .max()
                 .map(|a| a + 1)
                 .unwrap_or(0)
@@ -799,7 +838,7 @@ impl<'tensor, 'graph, T: Float> TensorBuilder<T> {
             known_shape: self.known_shape,
         };
         Tensor {
-            inner_: graph.install(new),
+            id: graph.install(new),
             graph,
         }
     }

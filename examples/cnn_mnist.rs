@@ -11,6 +11,8 @@ use std::time::Instant;
 
 type Tensor<'graph> = ag::Tensor<'graph, f32>;
 
+mod mnist_data;
+
 // This is a toy convolutional network for MNIST.
 // Got 0.987 test accuracy in 350 sec on 2.7GHz Intel Core i5.
 //
@@ -54,7 +56,7 @@ fn get_permutation(size: usize) -> Vec<usize> {
 }
 
 fn main() {
-    let ((x_train, y_train), (x_test, y_test)) = dataset::load();
+    let ((x_train, y_train), (x_test, y_test)) = mnist_data::load();
 
     let max_epoch = 5;
     let batch_size = 200isize;
@@ -105,78 +107,4 @@ fn main() {
             accuracy.eval(&[x.given(x_test.view()), y.given(y_test.view())])
         );
     });
-}
-
-pub mod dataset {
-    extern crate ndarray;
-    use std::fs::File;
-    use std::io;
-    use std::io::Read;
-    use std::mem;
-    use std::path::Path;
-
-    type NdArray = ndarray::Array<f32, ndarray::IxDyn>;
-
-    /// load mnist dataset as "ndarray" objects.
-    ///
-    /// labels are sparse (vertical vector).
-    pub fn load() -> ((NdArray, NdArray), (NdArray, NdArray)) {
-        // load dataset as `Vec`s
-        let (train_x, num_image_train): (Vec<f32>, usize) =
-            load_images("data/mnist/train-images-idx3-ubyte");
-        let (train_y, num_label_train): (Vec<f32>, usize) =
-            load_labels("data/mnist/train-labels-idx1-ubyte");
-        let (test_x, num_image_test): (Vec<f32>, usize) =
-            load_images("data/mnist/t10k-images-idx3-ubyte");
-        let (test_y, num_label_test): (Vec<f32>, usize) =
-            load_labels("data/mnist/t10k-labels-idx1-ubyte");
-
-        // Vec to ndarray
-        let as_arr = NdArray::from_shape_vec;
-        let x_train = as_arr(ndarray::IxDyn(&[num_image_train, 1, 28, 28]), train_x).unwrap();
-        let y_train = as_arr(ndarray::IxDyn(&[num_label_train, 1]), train_y).unwrap();
-        let x_test = as_arr(ndarray::IxDyn(&[num_image_test, 1, 28, 28]), test_x).unwrap();
-        let y_test = as_arr(ndarray::IxDyn(&[num_label_test, 1]), test_y).unwrap();
-        ((x_train, y_train), (x_test, y_test))
-    }
-
-    fn load_images<P: AsRef<Path>>(path: P) -> (Vec<f32>, usize) {
-        let ref mut buf_reader = io::BufReader::new(
-            File::open(path).expect("Please run ./download_mnist.sh beforehand"),
-        );
-        let magic = u32::from_be(read_u32(buf_reader));
-        if magic != 2051 {
-            panic!("Invalid magic number. expected 2051, got {}", magic)
-        }
-        let num_image = u32::from_be(read_u32(buf_reader)) as usize;
-        let rows = u32::from_be(read_u32(buf_reader)) as usize;
-        let cols = u32::from_be(read_u32(buf_reader)) as usize;
-        assert!(rows == 28 && cols == 28);
-
-        // read images
-        let mut buf: Vec<u8> = vec![0u8; num_image * rows * cols];
-        let _ = buf_reader.read_exact(buf.as_mut());
-        let ret = buf.into_iter().map(|x| (x as f32) / 255.).collect();
-        (ret, num_image)
-    }
-
-    fn load_labels<P: AsRef<Path>>(path: P) -> (Vec<f32>, usize) {
-        let ref mut buf_reader = io::BufReader::new(File::open(path).unwrap());
-        let magic = u32::from_be(read_u32(buf_reader));
-        if magic != 2049 {
-            panic!("Invalid magic number. Got expect 2049, got {}", magic);
-        }
-        let num_label = u32::from_be(read_u32(buf_reader)) as usize;
-        // read labels
-        let mut buf: Vec<u8> = vec![0u8; num_label];
-        let _ = buf_reader.read_exact(buf.as_mut());
-        let ret: Vec<f32> = buf.into_iter().map(|x| x as f32).collect();
-        (ret, num_label)
-    }
-
-    fn read_u32<T: Read>(reader: &mut T) -> u32 {
-        let mut buf: [u8; 4] = [0, 0, 0, 0];
-        let _ = reader.read_exact(&mut buf);
-        unsafe { mem::transmute(buf) }
-    }
 }

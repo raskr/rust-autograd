@@ -176,8 +176,8 @@ impl<'v, T: Float> OpInput<'v, T> {
 ///     fn grad(&self, ctx: &mut ag::op::GradientContext<T>) { /* ... */ }
 /// }
 /// ```
-pub struct ComputeContext<'k, 'v, T: Float> {
-    node: &'k TensorInternal<T>,
+pub struct ComputeContext<'t, 'v, T: Float> {
+    node: &'t TensorInternal<T>,
     // Input arrays
     xs: InputArray<OpInput<'v, T>>,
     // Output arrays
@@ -328,7 +328,7 @@ pub struct GradientContext<'g, T: Float> {
     gy: Tensor<'g, T>,
     y: Tensor<'g, T>,
     graph: &'g crate::graph::Graph<T>,
-    gxs: Option<InputArray<Option<Tensor<'g, T>>>>,
+    gxs: InputArray<Option<Tensor<'g, T>>>,
 }
 
 impl<'g, T: Float> GradientContext<'g, T> {
@@ -341,13 +341,16 @@ impl<'g, T: Float> GradientContext<'g, T> {
             gy,
             y,
             graph,
-            gxs: None,
+            gxs: InputArray::new(),
         }
     }
 
     pub(crate) fn extract_input_grads(self) -> InputArray<Option<Tensor<'g, T>>> {
+        debug_assert!(
+            !self.gxs.is_empty(),
+            "Bad Op impl: GradientContext::set_input_grads was not called"
+        );
         self.gxs
-            .expect("Bad Op impl: GradientContext::set_input_grads was not called")
     }
 
     /// Returns the symbolic gradient of the op's output.
@@ -370,7 +373,7 @@ impl<'g, T: Float> GradientContext<'g, T> {
             .in_edges
             .get(i)
             .expect("bad Op::grad impl")
-            .get(self.graph)
+            .get_scoped(self.graph)
     }
 
     /// Returns the number of inputs.
@@ -392,9 +395,6 @@ impl<'g, T: Float> GradientContext<'g, T> {
     /// Note that `Op::grad` must call this function as many as `num_inputs()`.
     #[inline]
     pub fn append_input_grad(&mut self, gx: Option<Tensor<'g, T>>) {
-        if self.gxs.is_none() {
-            self.gxs = Some(InputArray::new());
-        }
-        self.gxs.as_mut().unwrap().push(gx);
+        self.gxs.push(gx);
     }
 }

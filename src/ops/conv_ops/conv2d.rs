@@ -399,7 +399,7 @@ impl<T: Float> crate::op::Op<T> for Conv2DWithCols {
         let gw = Tensor::builder()
             .set_ro_inputs(&[&cols, &gy, &w])
             .set_backprop_inputs(&[
-                Input::new(&y.get_backprop_inputs()[0].get(s)),
+                Input::new_raw(&y.get_backprop_inputs()[0].get(s)),
                 Input::new(&gy),
             ])
             .build(
@@ -540,7 +540,7 @@ impl<T: Float> crate::op::Op<T> for Conv2DFilterGrad {
         let ggy = Tensor::builder()
             .set_ro_inputs(&[&cols, &ggw])
             .set_backprop_inputs(&[
-                Input::new(&y.get_backprop_inputs()[0].get(s)),
+                Input::new_raw(&y.get_backprop_inputs()[0].get(s)),
                 Input::new(&ggw),
             ])
             .build(

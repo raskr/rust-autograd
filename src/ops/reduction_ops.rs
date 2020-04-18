@@ -423,7 +423,7 @@ impl<T: Float> op::Op<T> for ArgMax {
 impl<T: Float> op::Op<T> for ReduceGradCommon {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         //  broadcast `gy` into `target_shape`
-        let gy = &ctx.input(0);
+        let gy = ctx.input(0);
         let target_shape = ndarray_ext::as_shape(&ctx.input(1)); // x's shape
 
         if gy.shape() == target_shape.as_slice() {
@@ -432,41 +432,29 @@ impl<T: Float> op::Op<T> for ReduceGradCommon {
 
         let x_is_scalar = ndarray_ext::is_scalar_shape(gy.shape());
 
-        let ret = {
-            let mut gy_view = gy.view();
+        // make broadcast dims if needed
+        if self.should_make_broadcast_dims || x_is_scalar {
+            let axes = &ctx.input(2);
 
-            // make broadcast dims if needed
-            if self.should_make_broadcast_dims || x_is_scalar {
-                let axes = &ctx.input(2);
-
-                // convert axes to usize vec
-                let mut axes = if self.sparse_axes {
-                    ndarray_ext::sparse_to_dense(axes)
-                } else {
-                    ndarray_ext::normalize_negative_axes(axes, target_shape.len())
-                };
-
-                let mut gy_shape = gy.shape().to_vec();
-                axes.sort();
-                for &axis in axes.iter() {
-                    assert!(
-                        axis <= gy_shape.len(),
-                        "Bad gradient. You may passed a non-scalar value to `ag::grad`?"
-                    );
-                    gy_shape.insert(axis, 1);
-                }
-                gy_view = gy_view.into_shape(gy_shape).unwrap()
-            }
-
-            // do broadcast
-            if let Some(ret) = gy_view.broadcast(target_shape) {
-                ret.to_owned()
+            // convert axes to usize vec
+            let mut axes = if self.sparse_axes {
+                ndarray_ext::sparse_to_dense(axes)
             } else {
-                panic!("Bad gradient. You may passed a non-scalar value to `ag::grad`?")
-            }
-        };
+                ndarray_ext::normalize_negative_axes(axes, target_shape.len())
+            };
 
-        ctx.append_output(ret);
+            let mut gy_shape = gy.shape().to_vec();
+            axes.sort();
+            for &axis in axes.iter() {
+                gy_shape.insert(axis, 1);
+            }
+            // do broadcast
+            let a = gy.into_shape(gy_shape).unwrap();
+            ctx.append_output(a.broadcast(target_shape).unwrap().to_owned())
+        } else {
+            // do broadcast
+            ctx.append_output(gy.broadcast(target_shape).unwrap().to_owned())
+        }
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {

@@ -23,26 +23,44 @@ autograd = { version = "1.0.0", features = ["mkl"] }
 ### Lazy, lightweight tensor evaluation
 Computation graphs are created on the fly (a.k.a. *define-by-run*), but are not evaluated until `eval` is called.
 This mechanism balances better performance and flexibility.
+```rust
+use autograd as ag;
+
+ag::with(|g: &mut ag::Graph<_>| {
+    let a: ag::Tensor<f32> = g.ones(&[60]);
+    let b: ag::Tensor<f32> = g.ones(&[24]);
+    let c: ag::Tensor<f32> = g.reshape(a, &[3, 4, 5]);
+    let d: ag::Tensor<f32> = g.reshape(b, &[4, 3, 2]);
+    let e: ag::Tensor<f32> = g.tensordot(c, d, &[1, 0], &[0, 1]);
+    e.eval(&[]);  // Getting `ndarray::Array` here.
+});
+```
+
+### Reverse-mode automatic differentiation
+There are a lot of [built-in operations](https://docs.rs/autograd/1.0.0/autograd/struct.Graph.html)
+that support *higher-order* derivatives, and
+you can also [define your own differentiable ops](https://docs.rs/autograd/1.0.0/autograd/op/trait.Op.html) with ndarrays easily.
+
+Here we are just computing partial derivatives of `z = 2x^2 + 3y + 1`.
  ```rust
- use autograd as ag;
+ag::with(|g: &mut ag::Graph<_>| {
+    let x = g.placeholder(&[]);
+    let y = g.placeholder(&[]);
+    let z = 2.*x*x + 3.*y + 1.;
 
- ag::with(|g: &mut ag::Graph<_>| {
-     let x = g.placeholder(&[]);
-     let y = g.placeholder(&[]);
-     let z = 2.*x*x + 3.*y + 1.;
+    // dz/dy
+    let gy = &g.grad(&[z], &[y])[0];
+    println!("{:?}", gy.eval(&[]));   // => Ok(3.)
 
-     // dz/dy
-     let gy = &g.grad(&[z], &[y])[0];
-     println!("{:?}", gy.eval(&[]));   // => Ok(3.)
+    // dz/dx (requires to fill the placeholder `x`)
+    let gx = &g.grad(&[z], &[x])[0];
+    let feed = ag::ndarray::arr0(2.);
+    println!("{:?}", gx.eval(&[x.given(feed.view())]));  // => Ok(8.)
 
-     // dz/dx (requires to fill the placeholder `x`)
-     let gx = &g.grad(&[z], &[x])[0];
-     let feed = ag::ndarray::arr0(2.);
-     println!("{:?}", gx.eval(&[x.given(feed.view())]));  // => Ok(8.)
-     // ddz/dx (differentiates `z` again)
-     let ggx = &g.grad(&[gx], &[x])[0];
-     println!("{:?}", ggx.eval(&[]));  // => Ok(4.)
- });
+    // ddz/dx (differentiates `z` again)
+    let ggx = &g.grad(&[gx], &[x])[0];
+    println!("{:?}", ggx.eval(&[]));  // => Ok(4.)
+});
  ```
 
  ### Neural networks

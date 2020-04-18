@@ -776,9 +776,8 @@ fn conv2d() {
 #[test]
 fn max_pool2d() {
     with(|graph| {
-        let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-        let x = graph.variable(rng.standard_normal(&[2, 2, 3, 3]));
-        let y = graph.max_pool2d(x, 2, 0, 1);
+        let x = graph.variable(ndarray::Array::linspace(0., 1., 9));
+        let y = graph.max_pool2d(graph.reshape(x, &[1, 1, 3, 3]), 2, 0, 1);
         let g = graph.grad(&[y], &[x]);
         ag::test_helper::check_theoretical_grads(y, &g, &[x], &[], 1e-3, 1e-2);
     });
@@ -787,12 +786,13 @@ fn max_pool2d() {
 #[test]
 fn max_pool2d_grad() {
     with(|graph| {
-        let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-        let arr_x = rng.standard_normal(&[2, 2, 3, 3]);
-        let arr_gx = rng.standard_normal(&[2, 2, 2, 2]);
-        let x = graph.variable(arr_x);
-        let y = graph.max_pool2d(x, 2, 0, 1);
-        let gy = graph.variable(arr_gx);
+        let x = graph.variable(ndarray::Array::linspace(0., 1., 36));
+        let y = graph.max_pool2d(graph.reshape(x, &[2, 2, 3, 3]), 2, 0, 1);
+        let gy = graph.variable(
+            ndarray::Array::linspace(0., 1., 16)
+                .into_shape(ndarray::IxDyn(&[2, 2, 2, 2]))
+                .unwrap(),
+        );
         unsafe {
             let g = graph.grad_with_default(&[y], &[x], &[gy])[0];
             let gg = graph.grad(&[g], &[gy])[0];

@@ -2,7 +2,7 @@
 use ndarray;
 
 use crate::ndarray_ext::{ArrayRng, NdArray};
-use crate::tensor::{AsTensor, Tensor, TensorInternal};
+use crate::tensor::{AsTensor, Tensor, Input};
 use crate::Float;
 use rand::Rng;
 
@@ -26,7 +26,7 @@ mod xent_ops;
 // -- Ops to manipulate `Tensor` object --
 // ---------------------------------------
 
-impl<'tensor, 'graph, F: Float> Tensor<'graph, F> {
+impl<'graph, F: Float> Tensor<'graph, F> {
     /// Gets the `i` th float value of this tensor.
     ///
     /// Index `i` can be negative.
@@ -47,15 +47,7 @@ impl<'tensor, 'graph, F: Float> Tensor<'graph, F> {
     }
 }
 
-impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
-    #[inline]
-    pub(crate) fn scoped(&'graph self, x: &'tensor TensorInternal<F>) -> Tensor<'graph, F> {
-        Tensor {
-            inner_: x as *const _,
-            graph: self,
-        }
-    }
-
+impl<'graph, F: Float> crate::graph::Graph<F> {
     /// Symbolic gradient tensors of `xs` in the same order as `xs`'s
     ///
     /// # Arguments
@@ -130,9 +122,9 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
         B: AsRef<Tensor<'graph, F>> + Copy,
         C: AsRef<Tensor<'graph, F>> + Copy,
     {
-        let xs: Vec<_> = xs.iter().map(|x| x.as_ref().scoped_inner()).collect();
-        let ys: Vec<_> = ys.iter().map(|y| y.as_ref().scoped_inner()).collect();
-        let ys_grads: Vec<_> = ys_grads.iter().map(|x| x.as_ref().scoped_inner()).collect();
+        let xs: Vec<_> = xs.iter().map(|x| x.as_ref().inner()).collect();
+        let ys: Vec<_> = ys.iter().map(|y| y.as_ref().inner()).collect();
+        let ys_grads: Vec<_> = ys_grads.iter().map(|x| x.as_ref().inner()).collect();
         crate::gradient::symbolic_gradients(ys.as_slice(), xs.as_slice(), ys_grads.as_slice(), self)
     }
 
@@ -163,7 +155,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
     ///    assert_eq!(j[1].eval(&[]).unwrap().shape(), &[4*3, 2*3]);
     /// });
     /// ```
-    pub fn jacobians<A: 'tensor, B: 'tensor>(
+    pub fn jacobians<A, B>(
         &'graph self,
         y_: A,
         xs_: &[B],
@@ -174,13 +166,13 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
         B: AsRef<Tensor<'graph, F>> + Copy,
     {
         let y = y_.as_ref();
-        let xs: Vec<_> = xs_.iter().map(|x| x.as_ref().scoped_inner()).collect();
+        let xs: Vec<_> = xs_.iter().map(|x| x.as_ref().inner()).collect();
         let mut vec_vec = Vec::with_capacity(objective_len);
-        let gy = self.scalar(F::one()).scoped_inner();
+        let gy = self.scalar(F::one()).inner();
         for i in 0..objective_len as isize {
             vec_vec.push({
                 crate::gradient::symbolic_gradients(
-                    &[y.access_elem(i).scoped_inner()],
+                    &[y.access_elem(i).inner()],
                     xs.as_slice(),
                     &[gy],
                     self,
@@ -204,7 +196,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
     }
 
     /// (Experimental) Computes hessian vector product
-    pub fn _hessian_vector_product<A, B, C: 'tensor>(
+    pub fn _hessian_vector_product<A, B, C>(
         &'graph self,
         ys: &[A],
         xs: &[B],
@@ -295,11 +287,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
         A: AsRef<Tensor<'graph, F>> + Copy,
     {
         if let Some(id) = x.as_ref().inner().shape {
-            let inner = self.access_node(id);
-            Tensor {
-                inner_: inner as *const _,
-                graph: self,
-            }
+            self.access(id)
         } else {
             Tensor::builder()
                 .append_input(x.as_ref())
@@ -1448,7 +1436,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
     /// In common, `alpha` is around 0.1 ~ 0.2.
     ///
     /// See http://web.stanford.edu/~awni/papers/relu_hybrid_icml2013_final.pdf
-    pub fn leaky_relu<A: 'tensor>(&'graph self, x: A, alpha: F) -> Tensor<'graph, F>
+    pub fn leaky_relu<A>(&'graph self, x: A, alpha: F) -> Tensor<'graph, F>
     where
         A: AsRef<Tensor<'graph, F>> + Copy,
     {
@@ -1904,11 +1892,8 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
     {
         assert_ne!(tensors.len(), 0);
         let op = array_ops::Concat { axis };
-        let mut b = Tensor::builder();
-        for t in tensors {
-            b = b.append_input(t.as_ref());
-        }
-        b.build(self, op)
+        let vec: Vec<_> = tensors.iter().map(|t| Input::new(t.as_ref())).collect();
+        Tensor::builder().set_inputs_vec(vec).build(self, op)
     }
 
     /// Gathers subviews from the input tensor.
@@ -2000,7 +1985,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
     ///    assert_eq!(e1.as_ref().unwrap().shape(), &[3, 4]);
     /// });
     /// ```
-    pub fn normalize<A: 'tensor, AT>(&'graph self, _x: A, _axes: &AT) -> Tensor<'graph, F>
+    pub fn normalize<A, AT>(&'graph self, _x: A, _axes: &AT) -> Tensor<'graph, F>
     where
         A: AsRef<Tensor<'graph, F>> + Copy,
         AT: AsTensor<'graph, F>,
@@ -2033,12 +2018,7 @@ impl<'tensor, 'graph: 'tensor, F: Float> crate::graph::Graph<F> {
     ///    assert_eq!(norm.eval(&[]).unwrap().shape(), &[3, 4]);
     /// });
     /// ```
-    pub fn batch_norm<A: 'tensor, B: 'tensor, C: 'tensor>(
-        &'graph self,
-        x: A,
-        scale: B,
-        shift: C,
-    ) -> Tensor<'graph, F>
+    pub fn batch_norm<A, B, C>(&'graph self, x: A, scale: B, shift: C) -> Tensor<'graph, F>
     where
         A: AsRef<Tensor<'graph, F>> + Copy,
         B: AsRef<Tensor<'graph, F>> + Copy,

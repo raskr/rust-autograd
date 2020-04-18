@@ -1,11 +1,11 @@
+use crate::ndarray;
 use crate::ndarray_ext;
+#[cfg(feature = "mkl")]
+use crate::ndarray_ext::NdArrayViewMut;
 use crate::ndarray_ext::{NdArray, NdArrayView};
 use crate::op;
 use crate::tensor::{Input, Tensor};
 use crate::Float;
-#[cfg(feature = "mkl")]
-use crate::ndarray_ext::NdArrayViewMut;
-use crate::ndarray;
 use std::iter::FromIterator;
 
 pub struct ExpandDims;
@@ -184,7 +184,11 @@ impl<T: Float> op::Op<T> for Reshape {
                 if let Ok(a) = copy.into_shape(ndarray::IxDyn(target.as_slice())) {
                     ctx.append_output(a);
                 } else {
-                    panic!("Reshape failed: {:?} vs {:?}", x.shape(), target);
+                    ctx.set_error(op::OpError::IncompatibleShape(format!(
+                        "reshape failed: {:?} vs {:?}",
+                        x.shape(),
+                        target
+                    )));
                 }
             }
         } else if let Ok(a) =

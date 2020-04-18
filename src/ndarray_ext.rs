@@ -154,13 +154,14 @@ pub(crate) fn copy_if_not_standard<T: Float>(x: &NdArrayView<T>) -> Option<NdArr
 #[inline]
 pub(crate) fn deep_copy<T: Float>(x: &NdArrayView<T>) -> NdArray<T> {
     let vec = x.iter().cloned().collect::<Vec<_>>();
-    NdArray::from_shape_vec(x.shape(), vec).unwrap()
+    // tested
+    unsafe { NdArray::from_shape_vec_unchecked(x.shape(), vec) }
 }
 
 #[inline]
 pub(crate) fn scalar_shape<T: Float>() -> NdArray<T> {
-    // safe unwrap
-    NdArray::from_shape_vec(ndarray::IxDyn(&[0]), vec![]).unwrap()
+    // tested
+    unsafe { NdArray::from_shape_vec_unchecked(ndarray::IxDyn(&[0]), vec![]) }
 }
 
 #[inline]
@@ -290,7 +291,7 @@ pub mod array_gen {
                     *buf.get_unchecked_mut(i) = T::from(dist.sample(&mut *rng)).unwrap();
                 }
                 buf.set_len(size);
-                NdArray::from_shape_vec(shape, buf).unwrap()
+                NdArray::from_shape_vec_unchecked(shape, buf)
             }
         }
 

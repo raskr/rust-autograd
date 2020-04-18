@@ -122,8 +122,7 @@ macro_rules! impl_max_pool_grad {
         ) -> Vec<T> {
             let mut ret = vec![T::zero(); batch * c * xh * xw];
             let gx = ret.as_mut_ptr();
-            let until = yh * yw * c * batch;
-            for _ in 0..until {
+            for _ in 0..yh * yw * c * batch {
                 unsafe {
                     *gx.offset(*argmax as isize) += *gy;
                     argmax = argmax.offset(1);

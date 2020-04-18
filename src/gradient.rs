@@ -104,14 +104,11 @@ fn get_between_nodes<'t, 'g, T: Float>(
                         // because there will be no `wrt` nodes in this direction....
                         ret.insert(
                             child.id(),
-                            GradInfo::new(
-                                child.is_differentiable() && is_wrt(child.inner(), wrt),
-                                None,
-                            ),
+                            GradInfo::new(child.is_differentiable() && is_wrt(child, wrt), None),
                         );
                     } else {
                         // Recurse
-                        dfs_stack.push((child.scoped_inner(), false));
+                        dfs_stack.push((child, false));
                     }
                 }
             }
@@ -158,12 +155,12 @@ pub(crate) fn symbolic_gradients<'t, 'g, T: Float>(
         let gxs = {
             let info = between_nodes.get_mut(&y.tsr.id()).unwrap();
             let gy = if let Some(def) = info.default_grad {
-                g.scoped(def)
+                def.tensor(g)
             } else {
                 info.accumulate_then_get(g)
             };
             // Call Op::grad
-            let mut ctx = GradientContext::new(gy, g.scoped(y.tsr), g);
+            let mut ctx = GradientContext::new(gy, y.tsr.tensor(g), g);
             y.tsr.op.grad(&mut ctx);
             let gxs = ctx.extract_input_grads();
             debug_assert_eq!(y.tsr.in_edges.len(), gxs.len());
@@ -180,7 +177,7 @@ pub(crate) fn symbolic_gradients<'t, 'g, T: Float>(
                     // update heap
                     if !x.is_source() && !x_info.grad_called {
                         x_info.grad_called = true;
-                        heap.push(x.scoped_inner().wrapped());
+                        heap.push(x.wrapped());
                     }
                 }
             }

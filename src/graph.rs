@@ -1,6 +1,6 @@
 //! Defining things related to `ag::Graph`.
 
-use crate::{tensor::TensorInternal, Float};
+use crate::{tensor::Tensor, tensor::TensorInternal, Float};
 use std::cell::UnsafeCell;
 use std::fmt;
 
@@ -40,34 +40,27 @@ pub struct Graph<F: Float> {
     node_set: UnsafeCell<Vec<TensorInternal<F>>>,
 }
 
-impl<'a, 'b, F: Float> Graph<F> {
-    pub(crate) fn install(&'b self, mut node: TensorInternal<F>) -> &'a TensorInternal<F> {
+impl<'t, 'g, F: Float> Graph<F> {
+    pub(crate) fn install(&'g self, mut node: TensorInternal<F>) -> usize {
         unsafe {
             let inner = &mut *self.node_set.get();
             let id = inner.len();
             node.id = id;
             inner.push(node);
-            inner.get_unchecked(id)
+            id
         }
     }
 
-    // `i` must be an id generated internally.
-    pub(crate) fn access_node(&self, i: usize) -> &'a TensorInternal<F> {
-        unsafe {
-            let inner = &*self.node_set.get();
-            // `i` is always smaller than graph size.
-            inner.get_unchecked(i)
-        }
-    }
-
-    // Removes all tensors (nodes) in this graph.
-    //
-    // Be careful not to remove tensors that will be needed later.
+    // `i` must be an id returned by Graph::install
     #[allow(dead_code)]
-    fn clear(&mut self) {
-        unsafe {
-            (&mut *self.node_set.get()).clear();
-        }
+    pub(crate) fn access(&self, i: usize) -> Tensor<F> {
+        unsafe { (*self.node_set.get()).get_unchecked(i).tensor(self) }
+    }
+
+    // `i` must be an id returned by Graph::install
+    #[inline]
+    pub(crate) fn access_inner(&self, i: usize) -> &'t TensorInternal<F> {
+        unsafe { (*self.node_set.get()).get_unchecked(i) }
     }
 }
 
