@@ -1850,6 +1850,17 @@ impl<'graph, F: Float> crate::graph::Graph<F> {
     ///    assert_eq!(b.eval(&[]).unwrap().shape(), &[4, 2]);
     /// });
     /// ```
+    ///
+    /// ```
+    /// use autograd as ag;
+    ///
+    /// ag::with(|g| {
+    ///    let a: ag::Tensor<f32> = g.zeros(&[4, 4]);
+    ///    let b = g.slice(a, &[0, 0], &[-2, 2]); // numpy equivalent is a[:-1, :2]
+    ///
+    ///    assert_eq!(b.eval(&[]).unwrap().shape(), &[3, 2]);
+    /// });
+    /// ```
     pub fn slice<A>(&'graph self, x: A, starts: &[isize], ends: &[isize]) -> Tensor<'graph, F>
     where
         A: AsRef<Tensor<'graph, F>> + Copy,
@@ -1859,8 +1870,13 @@ impl<'graph, F: Float> crate::graph::Graph<F> {
         let starts_ends = starts.iter().zip(ends.iter());
 
         let indices = starts_ends
-            .map(|(s, e)| {
-                let slice = ndarray::Slice::new(*s, if *e == -1 { None } else { Some(*e) }, 1);
+            .map(|(s, &e)| {
+                let e = if e == -1 {
+                    None
+                } else {
+                    Some(if e < -1 { e + 1 } else { e })
+                };
+                let slice = ndarray::Slice::new(*s, e, 1);
                 ndarray::SliceOrIndex::from(slice)
             })
             .collect::<Vec<ndarray::SliceOrIndex>>();
