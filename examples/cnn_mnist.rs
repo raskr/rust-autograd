@@ -60,8 +60,14 @@ fn main() {
 
     let max_epoch = 5;
     let batch_size = 200isize;
-    let num_samples = x_train.shape()[0];
-    let num_batches = num_samples / batch_size as usize;
+    let num_train_samples = x_train.shape()[0];
+    let num_test_samples = x_test.shape()[0];
+    let num_batches = num_train_samples / batch_size as usize;
+
+    let (x_train, x_test) = (
+        x_train.into_shape(ndarray::IxDyn(&[num_train_samples, 1, 28, 28])).unwrap(),
+        x_test.into_shape(ndarray::IxDyn(&[num_test_samples, 1, 28, 28])).unwrap(),
+    );
 
     ag::with(|g| {
         let rng = ag::ndarray_ext::ArrayRng::<f32>::default();

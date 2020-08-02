@@ -8,7 +8,10 @@ type NdArray = ndarray::Array<f32, ndarray::IxDyn>;
 
 /// load mnist dataset as "ndarray" objects.
 ///
-/// labels are sparse (vertical vector).
+/// Returns ((x_train, y_train), (x_test, y_test)).
+///
+/// Shape of x_train and x_test: (num_samples, 28)
+/// Shape of y_train and y_test: (num_samples, 1)
 pub fn load() -> ((NdArray, NdArray), (NdArray, NdArray)) {
     // load dataset as `Vec`s
     let (train_x, num_image_train): (Vec<f32>, usize) =
