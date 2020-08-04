@@ -1507,7 +1507,7 @@ impl<'graph, F: Float> crate::graph::Graph<F> {
     /// When y.shape != t.shape.
     ///
     /// # Returns
-    /// Loss tensor with same shape as inputs'graph shapes
+    /// Loss tensor with same shape as inputs's shapes
     pub fn sigmoid_cross_entropy<A, B>(&'graph self, y: A, t: B) -> Tensor<'graph, F>
     where
         A: AsRef<Tensor<'graph, F>> + Copy,
@@ -1836,10 +1836,10 @@ impl<'graph, F: Float> crate::graph::Graph<F> {
     ///
     /// # Arguments
     /// * `x` - Tensor with arbitrary shape.
-    /// * `starts` - Start indices for each dimensions
-    /// * `ends` - End indices for each dimensions.
-    /// `-1` representing the last index is acceptable for each dimension.
+    /// * `starts` - Inclusive start indices for each dimension.
+    /// * `ends` - **Inclusive** end indices for each dimension.
     ///
+    /// NOTE: Negative values in `starts` and `ends` are counted from the back of the axis.
     /// ```
     /// use autograd as ag;
     ///

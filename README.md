@@ -19,6 +19,9 @@ autograd = { version = "1.0.0", features = ["mkl"] }
 ```
 `mkl` feature is recommended to speedup linalg operations using [Intel MKL](https://software.intel.com/en-us/mkl).
 
+#### rustc version
+Tested with rustc 1.38 ..= 1.42
+
 ## Features
 ### Lazy, lightweight tensor evaluation
 Computation graphs are created on the fly (a.k.a. *define-by-run*), but are not evaluated until `eval` is called.
