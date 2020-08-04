@@ -4,11 +4,13 @@ env: TYPE=default RUST_BACKTRACE=1
 
 rust:
   - "1.38.0"
+  - "1.42.0"
   - stable
   - nightly
 
 jobs:
   allow_failures:
+    - rust: stable
     - rust: nightly
 
 os:
