@@ -13,9 +13,10 @@ Moreover, the core of this crate is quite small compared to others (due to being
 therefore it might be reasonable for those who are not familiar with how this kind of library works.
 
 ## Installation
+
 ``` toml
 [dependencies]
-autograd = { version = "1.0.0", features = ["mkl"] }
+autograd = { version = "1.0.1", features = ["mkl"] }
 ```
 `mkl` feature is recommended to speedup linalg operations using [Intel MKL](https://software.intel.com/en-us/mkl).
 
@@ -40,9 +41,9 @@ ag::with(|g: &mut ag::Graph<_>| {
 ```
 
 ### Reverse-mode automatic differentiation
-There are a lot of [built-in operations](https://docs.rs/autograd/1.0.0/autograd/struct.Graph.html)
+There are a lot of [built-in operations](https://docs.rs/autograd/1.0.1/autograd/struct.Graph.html)
 that support *higher-order* derivatives, and
-you can also [define your own differentiable ops](https://docs.rs/autograd/1.0.0/autograd/op/trait.Op.html) with ndarrays easily.
+you can also [define your own differentiable ops](https://docs.rs/autograd/1.0.1/autograd/op/trait.Op.html) with ndarrays easily.
 
 Here we are just computing partial derivatives of `z = 2x^2 + 3y + 1`.
  ```rust
