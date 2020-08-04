@@ -41,3 +41,15 @@ fn slice() {
         assert_eq!(b.eval(&[]).unwrap().shape(), &[4, 2]);
     });
 }
+
+#[test]
+fn slice_negative() {
+    ag::with(|g| {
+        let ref a: ag::Tensor<f32> = g.zeros(&[4, 4]);
+        let ref b = g.slice(a, &[0, 0], &[-2, 2]); // numpy equivalent is a[:-1, :2]
+        assert_eq!(b.eval(&[]).unwrap().shape(), &[3, 2]);
+
+        let ref b = g.slice(a, &[0, 0], &[-3, 2]); // numpy equivalent is a[:-1, :2]
+        assert_eq!(b.eval(&[]).unwrap().shape(), &[2, 2]);
+    });
+}
