@@ -1836,8 +1836,8 @@ impl<'graph, F: Float> crate::graph::Graph<F> {
     ///
     /// # Arguments
     /// * `x` - Tensor with arbitrary shape.
-    /// * `starts` - Inclusive start indices for each dimension.
-    /// * `ends` - **Inclusive** end indices for each dimension.
+    /// * `starts` - Inclusive start indices for the dimensions.
+    /// * `ends` - End indices for the dimensions. **Each index is inclusive if it is negative and exclusive if it's not.**
     ///
     /// NOTE: Negative values in `starts` and `ends` are counted from the back of the axis.
     /// ```
