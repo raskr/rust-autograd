@@ -1087,6 +1087,30 @@ impl<'graph, F: Float> crate::graph::Graph<F> {
             .build(self, op)
     }
 
+    /// Compute population variance along specified axes.
+    ///
+    /// Elements of `axes` can be negative.
+    ///
+    /// ```
+    /// use ndarray::array;
+    /// use autograd as ag;
+    /// use ag::tensor::Constant;
+    ///
+    /// ag::with(|g| {
+    ///    let x = g.constant(array![[1., 1.], [2., 2.]]);
+    ///    let y = g.reduce_variance(&x, &[1], false);
+    ///    assert_eq!(y.eval(&[]), Ok(array![0., 0.].into_dyn()));
+    /// });
+    /// ```
+    pub fn reduce_variance<A, AT>(&'graph self, x: A, axes: &AT, keep_dims: bool) -> Tensor<'graph, F>
+        where
+            A: AsRef<Tensor<'graph, F>> + Copy,
+            AT: AsTensor<'graph, F>,
+    {
+        let x = x.as_ref();
+        self.reduce_mean(self.square(x - self.reduce_mean(x, axes, true)), axes, keep_dims)
+    }
+
     /// Reshapes the input tensor without copy.
     ///
     /// Only one element in `shape` can be `-1`.
