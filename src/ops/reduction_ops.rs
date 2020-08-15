@@ -41,6 +41,11 @@ pub struct ArgMax {
     pub keep_dim: bool,
 }
 
+pub struct ArgMin {
+    pub axis: isize,
+    pub keep_dim: bool,
+}
+
 pub struct ReduceGradCommon {
     pub should_make_broadcast_dims: bool,
     pub sparse_axes: bool,
@@ -349,69 +354,85 @@ fn min_max_grad<'g, T: Float>(
     ctx.append_input_grad(None);
 }
 
+fn argx_helper<T: Float>(x: &NdArrayView<T>,
+                         comp_fn: fn(T, T) -> T,
+                         default_val: T,
+                         keep_dim: bool,
+                         axis: isize
+) -> NdArray<T> {
+    let axis = ndarray_ext::normalize_negative_axis(axis, x.ndim());
+    let x_shape = x.shape();
+    // 1. Make binary mask tensor (maximums are 1s)
+    let mut mask = {
+        let maxed = x.fold_axis(ndarray::Axis(axis), default_val, move |&a, &b| comp_fn(a, b));
+        let mut mask = x.to_owned();
+        let mut found = ndarray::Array::<bool, ndarray::IxDyn>::from_elem(maxed.shape(), false);
+        for mut sub in mask.axis_iter_mut(ndarray::Axis(axis)) {
+            ndarray::Zip::from(&mut sub)
+                .and(&mut found)
+                .and(&maxed)
+                .apply(|r, f, m| {
+                    let z = r == m && !*f;
+                    *f = z;
+                    *r = T::from(z as i32).unwrap();
+                });
+        }
+        mask
+    };
+
+    // 2. Reshape the mask to 2-ranked. e.g. (2, 3, 4) -> (8, 3) (let `axis` be 1)
+    let mask = {
+        // move the `axis` to first, and put remaining together on the 2nd axis
+        let reduction_len = x_shape[axis];
+        ndarray_ext::roll_axis(&mut mask, ndarray::Axis(0), ndarray::Axis(axis));
+        let shape2d = (reduction_len, mask.len() / reduction_len);
+        let mut mask = mask.into_shape(shape2d).unwrap();
+        mask.swap_axes(0, 1);
+        mask
+    };
+
+    // 3. Make the indices (vertical vector)
+    let indices = {
+        let cols = mask.shape()[1];
+        ndarray::Array::range(T::zero(), T::from(cols).unwrap(), T::one())
+            .into_shape((cols, 1))
+            .unwrap()
+    };
+
+    // 4. Dot product between mask and index-tensor
+    let mat = mask.dot(&indices);
+
+    // 5. Reshape it
+    let mut final_shape = x_shape.to_vec();
+    if keep_dim {
+        final_shape[axis] = 1;
+    } else {
+        final_shape.remove(axis);
+    }
+    // unwrap is safe (95% confidence...)
+    mat.into_dyn()
+        .into_shape(ndarray::IxDyn(final_shape.as_slice()))
+        .unwrap()
+}
+
+impl<T: Float> op::Op<T> for ArgMin {
+    // cf. https://github.com/tensorflow/compiler/tf2xla/kernels/index_ops.cc
+    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
+        let x = &ctx.input(0);
+        let result = argx_helper(x, T::min, T::max_value(), self.keep_dim, self.axis);
+        ctx.append_output(result);
+    }
+
+    fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
+        ctx.append_input_grad(None)
+    }
+}
+
 impl<T: Float> op::Op<T> for ArgMax {
     // cf. https://github.com/tensorflow/compiler/tf2xla/kernels/index_ops.cc
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         let x = &ctx.input(0);
-        let axis = ndarray_ext::normalize_negative_axis(self.axis, x.ndim());
-        let x_shape = x.shape();
-
-        // 1. Make binary mask tensor (maximums are 1s)
-        let mut mask = {
-            let max_fn = T::max;
-            let min_val = T::min_value();
-            let maxed = x.fold_axis(ndarray::Axis(axis), min_val, move |&a, &b| max_fn(a, b));
-            let mut mask = x.to_owned();
-            let mut found = ndarray::Array::<bool, ndarray::IxDyn>::from_elem(maxed.shape(), false);
-            for mut sub in mask.axis_iter_mut(ndarray::Axis(axis)) {
-                ndarray::Zip::from(&mut sub)
-                    .and(&mut found)
-                    .and(&maxed)
-                    .apply(|r, f, m| {
-                        let z = r == m && !*f;
-                        *f = z;
-                        *r = T::from(z as i32).unwrap();
-                    });
-            }
-            mask
-        };
-
-        // 2. Reshape the mask to 2-ranked. e.g. (2, 3, 4) -> (8, 3) (let `axis` be 1)
-        let mask = {
-            // move the `axis` to first, and put remaining together on the 2nd axis
-            let reduction_len = x_shape[axis];
-            ndarray_ext::roll_axis(&mut mask, ndarray::Axis(0), ndarray::Axis(axis));
-            let shape2d = (reduction_len, mask.len() / reduction_len);
-            let mut mask = mask.into_shape(shape2d).unwrap();
-            mask.swap_axes(0, 1);
-            mask
-        };
-
-        // 3. Make the indices (vertical vector)
-        let indices = {
-            let cols = mask.shape()[1];
-            ndarray::Array::range(T::zero(), T::from(cols).unwrap(), T::one())
-                .into_shape((cols, 1))
-                .unwrap()
-        };
-
-        // 4. Dot product between mask and index-tensor
-        let mat = mask.dot(&indices);
-
-        // 5. Reshape it
-        let result = {
-            let mut final_shape = x_shape.to_vec();
-            if self.keep_dim {
-                final_shape[axis] = 1;
-            } else {
-                final_shape.remove(axis);
-            }
-            // unwrap is safe (95% confidence...)
-            mat.into_dyn()
-                .into_shape(ndarray::IxDyn(final_shape.as_slice()))
-                .unwrap()
-        };
-
+        let result = argx_helper(x, T::max, T::min_value(), self.keep_dim, self.axis);
         ctx.append_output(result);
     }
 

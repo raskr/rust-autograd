@@ -800,6 +800,30 @@ impl<'graph, F: Float> crate::graph::Graph<F> {
             .build(self, math_ops::NotEqual)
     }
 
+    /// Takes argmin along specified axis.
+    ///
+    /// `axis` can be negative.
+    ///
+    /// ```
+    /// use ndarray::array;
+    /// use autograd as ag;
+    /// use ag::tensor::Constant;
+    ///
+    /// ag::with(|g| {
+    ///    let x = g.constant(array![[3., 4.], [6., 5.]]);
+    ///    let y = g.argmin(x, 1, false);
+    ///
+    ///    assert_eq!(y.eval(&[]), Ok(array![0., 1.].into_dyn()));
+    /// });
+    /// ```
+    pub fn argmin<A>(&'graph self, x: A, axis: isize, keep_dim: bool) -> Tensor<'graph, F>
+        where
+            A: AsRef<Tensor<'graph, F>> + Copy,
+    {
+        let op = reduction_ops::ArgMin { axis, keep_dim };
+        Tensor::builder().append_input(x.as_ref()).build(self, op)
+    }
+
     /// Takes argmax along specified axis.
     ///
     /// `axis` can be negative.
