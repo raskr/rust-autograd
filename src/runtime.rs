@@ -218,7 +218,7 @@ impl<'tensor, 'view, 'lock, F: Float> OutputStorage<'view, F> {
             ValueType::Empty => {
                 panic!(
                     "Attempting to use {}'s output which is empty.",
-                    node.op.name()
+                    node.get_op().name()
                 );
             }
         }
@@ -284,11 +284,11 @@ fn aggregate_op_inputs<'ret, 'tensor: 'ret, 'slice: 'ret, 'feed: 'slice, F: Floa
 
     for (in_node, &in_idx) in node.in_edges.iter().zip(&node.input_indices) {
         // `in_idx` is not 0 only when `in_node` is multi-output op and `node` selects nth value from it using `Graph::nth_tensor`.
-        let input_inner: &TensorInternal<F> = in_node.get(g);
-        let x = if input_inner.is_placeholder {
-            Ok(OpInput::new(retrieve_feed(feeds, in_node.id)))
-        } else if let Some(ref lock) = input_inner.variable_array {
-            unsafe {
+        let x = unsafe {
+            let input_inner: &TensorInternal<F> = in_node.get_internal(g);
+            if input_inner.is_placeholder {
+                Ok(OpInput::new(retrieve_feed(feeds, in_node.id)))
+            } else if let Some(ref lock) = input_inner.variable_array {
                 if in_node.mut_usage {
                     write_guards.push(lock.write().unwrap());
                     let inserted = write_guards.len() - 1;
@@ -303,14 +303,14 @@ fn aggregate_op_inputs<'ret, 'tensor: 'ret, 'slice: 'ret, 'feed: 'slice, F: Floa
                         (*(&mut read_guards[inserted] as *mut RwLockReadGuard<NdArray<F>>)).view(),
                     ))
                 }
-            }
-        } else if let Some(ref arr) = input_inner.get_constant_array_inner() {
-            Ok(OpInput::new(arr.view()))
-        } else {
-            // Search the value of input nodes.
-            match &node_info_map.get(&in_node.id).unwrap() {
-                Err(e) => Err(e.clone()),
-                Ok(vi_list) => Ok(OpInput::new(storage.get(input_inner, vi_list[in_idx]))),
+            } else if let Some(arr) = input_inner.get_constant_array_inner() {
+                Ok(OpInput::new(arr.view()))
+            } else {
+                // Search the value of input nodes.
+                match &node_info_map.get(&in_node.id).unwrap() {
+                    Err(e) => Err(e.clone()),
+                    Ok(vi_list) => Ok(OpInput::new(storage.get(input_inner, vi_list[in_idx]))),
+                }
             }
         };
         match x {
@@ -360,48 +360,51 @@ impl<F: Float> Graph<F> {
         let storage = OutputStorage::new();
 
         let mut dfs_stack = Vec::<(&TensorInternal<F>, bool)>::with_capacity(100);
-        for t in tensors.iter() {
-            dfs_stack.push((t.as_ref().inner(), false));
-        }
+        unsafe {
+            for t in tensors.iter() {
+                dfs_stack.push((t.as_ref().inner(), false));
+            }
 
-        while let Some((node, is_parent)) = dfs_stack.pop() {
-            if is_parent {
-                if would_not_visit(node, &node_info_map) {
-                    continue;
-                }
+            while let Some((node, is_parent)) = dfs_stack.pop() {
+                if is_parent {
+                    if would_not_visit(node, &node_info_map) {
+                        continue;
+                    }
 
-                // Aggregate input values for `node`. if any of the inputs failed, it's a total failure.
-                let mut xs = InputArray::new();
-                let (mut write_guards, mut read_guards) = (InputArray::new(), InputArray::new());
-                let input_status = aggregate_op_inputs(
-                    node,
-                    self,
-                    &node_info_map,
-                    feeds,
-                    &storage,
-                    &mut xs,
-                    &mut read_guards,
-                    &mut write_guards,
-                );
+                    // Aggregate input values for `node`. if any of the inputs failed, it's a total failure.
+                    let mut xs = InputArray::new();
+                    let (mut write_guards, mut read_guards) =
+                        (InputArray::new(), InputArray::new());
+                    let input_status = aggregate_op_inputs(
+                        node,
+                        self,
+                        &node_info_map,
+                        feeds,
+                        &storage,
+                        &mut xs,
+                        &mut read_guards,
+                        &mut write_guards,
+                    );
 
-                // run compute if `node`'s inputs were not failed
-                let installed_node_info = input_status.and_then(|()| {
-                    let mut ctx = ComputeContext::new(node, xs);
-                    node.op.compute(&mut ctx);
-                    let ys = ctx.extract_outputs();
-                    debug_assert!(!ys.is_empty(), "Bad op implementation: empty return value");
-                    // register compute result
-                    install_compute_results(ys, &storage)
-                });
-                node_info_map.insert(node.id(), installed_node_info);
-            } else {
-                // Update dfs stack
-                dfs_stack.push((node, true));
-                // Push children if needed
-                for child in &node.in_edges {
-                    let child = child.get(self);
-                    if !would_not_visit(child, &node_info_map) {
-                        dfs_stack.push((child, false));
+                    // run compute if `node`'s inputs were not failed
+                    let installed_node_info = input_status.and_then(|()| {
+                        let mut ctx = ComputeContext::new(node, xs);
+                        node.get_op().compute(&mut ctx);
+                        let ys = ctx.extract_outputs();
+                        debug_assert!(!ys.is_empty(), "Bad op implementation: empty return value");
+                        // register compute result
+                        install_compute_results(ys, &storage)
+                    });
+                    node_info_map.insert(node.id(), installed_node_info);
+                } else {
+                    // Update dfs stack
+                    dfs_stack.push((node, true));
+                    // Push children if needed
+                    for child in &node.in_edges {
+                        let child = child.get_internal(self);
+                        if !would_not_visit(child, &node_info_map) {
+                            dfs_stack.push((child, false));
+                        }
                     }
                 }
             }

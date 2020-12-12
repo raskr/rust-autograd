@@ -2,7 +2,7 @@
 use ndarray;
 
 use crate::ndarray_ext::{ArrayRng, NdArray};
-use crate::tensor::{AsTensor, Tensor, Input};
+use crate::tensor::{AsTensor, Input, Tensor};
 use crate::Float;
 use rand::Rng;
 
@@ -122,9 +122,9 @@ impl<'graph, F: Float> crate::graph::Graph<F> {
         B: AsRef<Tensor<'graph, F>> + Copy,
         C: AsRef<Tensor<'graph, F>> + Copy,
     {
-        let xs: Vec<_> = xs.iter().map(|x| x.as_ref().inner()).collect();
-        let ys: Vec<_> = ys.iter().map(|y| y.as_ref().inner()).collect();
-        let ys_grads: Vec<_> = ys_grads.iter().map(|x| x.as_ref().inner()).collect();
+        let xs: Vec<_> = xs.iter().map(|x| x.as_ref().id).collect();
+        let ys: Vec<_> = ys.iter().map(|y| y.as_ref().id).collect();
+        let ys_grads: Vec<_> = ys_grads.iter().map(|x| x.as_ref().id).collect();
         crate::gradient::symbolic_gradients(ys.as_slice(), xs.as_slice(), ys_grads.as_slice(), self)
     }
 
@@ -166,21 +166,14 @@ impl<'graph, F: Float> crate::graph::Graph<F> {
         B: AsRef<Tensor<'graph, F>> + Copy,
     {
         let y = y_.as_ref();
-        let xs: Vec<_> = xs_.iter().map(|x| x.as_ref().inner()).collect();
+        // let xs: Vec<_> = xs_.iter().map(|x| x.as_ref().inner()).collect();
         let mut vec_vec = Vec::with_capacity(objective_len);
-        let gy = self.scalar(F::one()).inner();
+        // let gy = self.scalar(F::one()).inner();
         for i in 0..objective_len as isize {
-            vec_vec.push({
-                crate::gradient::symbolic_gradients(
-                    &[y.access_elem(i).inner()],
-                    xs.as_slice(),
-                    &[gy],
-                    self,
-                )
-            });
+            vec_vec.push(self.grad(&[y.access_elem(i)], xs_));
         }
 
-        let len = xs.len();
+        let len = xs_.len();
         let mut ret = Vec::with_capacity(len);
         // post process gradients
         for i in 0..len {
@@ -286,13 +279,15 @@ impl<'graph, F: Float> crate::graph::Graph<F> {
     where
         A: AsRef<Tensor<'graph, F>> + Copy,
     {
-        if let Some(id) = x.as_ref().inner().shape {
-            self.access(id)
-        } else {
-            Tensor::builder()
-                .append_input(x.as_ref())
-                .set_differentiable(false)
-                .build(self, array_ops::Shape)
+        unsafe {
+            if let Some(id) = x.as_ref().inner().shape {
+                self.tensor(id)
+            } else {
+                Tensor::builder()
+                    .append_input(x.as_ref())
+                    .set_differentiable(false)
+                    .build(self, array_ops::Shape)
+            }
         }
     }
 
@@ -817,8 +812,8 @@ impl<'graph, F: Float> crate::graph::Graph<F> {
     /// });
     /// ```
     pub fn argmin<A>(&'graph self, x: A, axis: isize, keep_dim: bool) -> Tensor<'graph, F>
-        where
-            A: AsRef<Tensor<'graph, F>> + Copy,
+    where
+        A: AsRef<Tensor<'graph, F>> + Copy,
     {
         let op = reduction_ops::ArgMin { axis, keep_dim };
         Tensor::builder().append_input(x.as_ref()).build(self, op)
@@ -1126,13 +1121,22 @@ impl<'graph, F: Float> crate::graph::Graph<F> {
     ///    assert_eq!(y.eval(&[]), Ok(array![0., 0.].into_dyn()));
     /// });
     /// ```
-    pub fn reduce_variance<A, AT>(&'graph self, x: A, axes: &AT, keep_dims: bool) -> Tensor<'graph, F>
-        where
-            A: AsRef<Tensor<'graph, F>> + Copy,
-            AT: AsTensor<'graph, F>,
+    pub fn reduce_variance<A, AT>(
+        &'graph self,
+        x: A,
+        axes: &AT,
+        keep_dims: bool,
+    ) -> Tensor<'graph, F>
+    where
+        A: AsRef<Tensor<'graph, F>> + Copy,
+        AT: AsTensor<'graph, F>,
     {
         let x = x.as_ref();
-        self.reduce_mean(self.square(x - self.reduce_mean(x, axes, true)), axes, keep_dims)
+        self.reduce_mean(
+            self.square(x - self.reduce_mean(x, axes, true)),
+            axes,
+            keep_dims,
+        )
     }
 
     /// Reshapes the input tensor without copy.

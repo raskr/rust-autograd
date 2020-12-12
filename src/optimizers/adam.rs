@@ -123,7 +123,7 @@ pub struct AdamState<F: Float> {
     var2state: crate::FxHashMap<usize, StateArrays<F>>,
 }
 
-impl<'t, 's: 't, F: Float> AdamState<F> {
+impl<F: Float> AdamState<F> {
     /// Creates a new state object for an adam optimizer.
     ///
     /// `variables` should be variable arrays fed to `autograd::variable`.

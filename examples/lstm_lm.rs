@@ -72,7 +72,7 @@ pub fn main() {
         let w_pred = s.variable(rng.random_uniform(&[vec_dim, vocab_size], 0., 0.01));
 
         // Compute cross entropy losses for each LSTM step
-        let losses: Vec<ag::Tensor<_>> = (0..max_sent-1)
+        let losses: Vec<ag::Tensor<_>> = (0..max_sent - 1)
             .map(|i| {
                 let cur_id = s.slice(sentences, &[0, i], &[-1, i + 1]);
                 let next_id = s.slice(sentences, &[0, i + 1], &[-1, i + 2]);

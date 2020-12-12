@@ -51,8 +51,12 @@ pub struct Tensor<'graph, F: Float> {
 }
 
 impl<'graph, F: Float> Tensor<'graph, F> {
+    pub(crate) fn input_tensor(&self, i: usize, g: &'graph Graph<F>) -> Option<Tensor<'graph, F>> {
+        unsafe { self.inner().in_edges.get(i).map(|x| x.as_tensor(g)) }
+    }
+
     #[inline]
-    pub(crate) fn inner<'t>(&self) -> &'t TensorInternal<F> {
+    pub(crate) unsafe fn inner<'t>(&self) -> &'t TensorInternal<F> {
         self.graph.access_inner(self.id)
     }
 
@@ -60,6 +64,12 @@ impl<'graph, F: Float> Tensor<'graph, F> {
     #[inline]
     pub fn graph(&self) -> &'graph Graph<F> {
         self.graph
+    }
+
+    /// Returns a mutable ref of the graph to which this tensor belongs.
+    #[inline]
+    pub fn graph_mut(&mut self) -> &'graph Graph<F> {
+        &mut self.graph
     }
 
     /// Evaluates this tensor as an `ndarray::Array<F, ndarray::IxDyn>`.
@@ -110,7 +120,9 @@ impl<'graph, F: Float> Tensor<'graph, F> {
             self.is_placeholder(),
             "Receiver of Tensor::given must be a placeholder."
         );
-        self.inner().validate_feed_shape(value.shape());
+        unsafe {
+            self.inner().validate_feed_shape(value.shape());
+        }
         crate::runtime::Feed::new(self.id(), value.into_dyn())
     }
 
@@ -276,65 +288,78 @@ impl<'graph, F: Float> Tensor<'graph, F> {
     /// Returns the number of inputs of this tensor.
     #[inline]
     pub fn num_inputs(&self) -> usize {
-        self.inner().num_inputs()
+        unsafe { self.inner().num_inputs() }
+    }
+
+    /// Returns the number of inputs of this tensor.
+    #[inline]
+    pub fn num_backprop_inputs(&self) -> usize {
+        unsafe {
+            let inner = self.inner();
+            inner
+                .backprop_inputs
+                .as_ref()
+                .unwrap_or(&inner.in_edges)
+                .len()
+        }
     }
 
     #[inline]
     /// Returns true if this node has no incoming nodes.
     pub fn is_source(&self) -> bool {
-        self.inner().is_source()
+        unsafe { self.inner().is_source() }
     }
 
     #[inline]
     /// Input nodes used when backprop.
     ///
-    /// This is same as `inputs` in most cases.
-    pub fn get_backprop_inputs(&self) -> &[Input] {
-        self.inner().get_backprop_inputs()
+    pub fn get_backprop_input(&self, idx: usize) -> Input {
+        unsafe { self.inner().get_backprop_inputs()[idx].clone() }
     }
 
     #[inline]
     pub fn is_placeholder(&self) -> bool {
-        self.inner().is_placeholder
+        unsafe { self.inner().is_placeholder }
     }
 
     #[inline]
     pub fn clone_persistent_array(&self) -> Option<NdArray<F>> {
-        self.inner().clone_persistent_array()
+        unsafe { self.inner().clone_persistent_array() }
     }
 
     #[inline]
     pub fn get_variable_array(&self) -> Option<&Arc<RwLock<NdArray<F>>>> {
-        let id = self.inner().id();
-        let inner = self.graph.access_inner(id);
-        inner.variable_array.as_ref()
+        unsafe {
+            // self.inner().variable_array.as_ref().map(|x| x.clone())
+            self.inner().variable_array.as_ref()
+        }
     }
 
     #[inline]
     pub fn get_variable_array_ptr(&self) -> Option<*const RwLock<NdArray<F>>> {
-        self.inner().get_variable_array_inner()
+        unsafe { self.inner().get_variable_array_inner() }
     }
 
     #[inline]
     pub fn lock_variable_array(&self) -> Option<RwLockReadGuard<NdArray<F>>> {
-        self.inner().lock_variable_array()
+        unsafe { self.inner().lock_variable_array() }
     }
 
     #[inline]
     pub fn lock_variable_array_mut(&self) -> Option<RwLockWriteGuard<NdArray<F>>> {
-        self.inner().lock_variable_array_mut()
+        unsafe { self.inner().lock_variable_array_mut() }
     }
 
     #[inline]
     pub fn is_differentiable(&self) -> bool {
-        self.inner().is_differentiable
+        unsafe { self.inner().is_differentiable }
     }
 
     /// True is this tensor was created by `Graph::variable`.
     #[inline]
     #[allow(dead_code)]
     pub(crate) fn is_variable(&self) -> bool {
-        self.inner().variable_array.is_some()
+        unsafe { self.inner().variable_array.is_some() }
     }
 }
 
@@ -349,7 +374,7 @@ pub(crate) struct TensorInternal<F: Float> {
     pub(crate) id: usize,
 
     // Operation to evaluate this tensor.
-    pub(crate) op: Box<dyn op::Op<F>>,
+    pub(crate) op: Option<Box<dyn op::Op<F>>>,
 
     // References to immediate predecessors.
     pub(crate) in_edges: op::InputArray<Input>,
@@ -393,12 +418,11 @@ pub(crate) struct TensorInternal<F: Float> {
 }
 
 impl<F: Float> TensorInternal<F> {
-    #[inline]
-    pub fn tensor<'g>(&self, graph: &'g Graph<F>) -> Tensor<'g, F> {
-        Tensor {
-            id: self.id,
-            graph,
-        }
+    /// Returns the Op of this tensor
+    pub fn get_op(&self) -> &Box<dyn op::Op<F>> {
+        self.op
+            .as_ref()
+            .expect("bad impl: Op is now stolen in gradient.rs")
     }
 
     #[inline(always)]
@@ -512,7 +536,7 @@ impl<T: Float> fmt::Debug for TensorInternal<T> {
         write!(
             f,
             "Node name: {}, id: {}, num of inputs: {}, in-edges: {:?}",
-            self.op.name(),
+            self.get_op().name(),
             self.id(),
             self.in_edges.len(),
             self.in_edges
@@ -548,7 +572,7 @@ impl<T: Float> AsRef<TensorInternal<T>> for TensorInternal<T> {
 
 impl<T: Float> fmt::Display for TensorInternal<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "name={}", self.op.name(),)
+        write!(f, "name={}", self.get_op().name(),)
     }
 }
 
@@ -574,14 +598,6 @@ impl<'graph> Input {
         }
     }
 
-    #[inline]
-    pub(crate) fn new_raw<F: Float>(val: &TensorInternal<F>) -> Input {
-        Input {
-            id: val.id,
-            mut_usage: false,
-        }
-    }
-
     /// Instantiates a new mutable `Input` object.
     ///
     /// Run-time value of `val` is passed as an `ArrayViewMut` in `Op::compute`.
@@ -594,21 +610,12 @@ impl<'graph> Input {
     }
 
     #[inline]
-    #[allow(dead_code)]
-    pub(crate) fn new_mut_raw<F: Float>(val: &TensorInternal<F>) -> Input {
-        Input {
-            id: val.id,
-            mut_usage: true,
-        }
+    pub fn as_tensor<F: Float>(&self, graph: &'graph Graph<F>) -> Tensor<'graph, F> {
+        graph.tensor(self.id)
     }
 
     #[inline]
-    pub(crate) fn get_scoped<F: Float>(&self, graph: &'graph Graph<F>) -> Tensor<'graph, F> {
-        graph.access(self.id)
-    }
-
-    #[inline]
-    pub(crate) fn get<F: Float>(&self, graph: &Graph<F>) -> &TensorInternal<F> {
+    pub(crate) unsafe fn get_internal<F: Float>(&self, graph: &Graph<F>) -> &TensorInternal<F> {
         graph.access_inner(self.id)
     }
 }
@@ -704,10 +711,12 @@ fn test_build() {
         let v: Tensor<f32> = s.zeros(&[2, 3]);
         let b: Tensor<f32> = s.zeros(&[4, 3]);
         let z = s.matmul(a, v) + b;
-        let mut vars = [a.inner(), v.inner(), b.inner(), z.inner()];
-        // `sort_by_key` don't reverse the order of `a` and `v`
-        vars.sort_by_key(|a| a.top_rank);
-        assert_eq!(vars, [a.inner(), v.inner(), b.inner(), z.inner()])
+        unsafe {
+            let mut vars = [a.inner(), v.inner(), b.inner(), z.inner()];
+            // `sort_by_key` don't reverse the order of `a` and `v`
+            vars.sort_by_key(|a| a.top_rank);
+            assert_eq!(vars, [a.inner(), v.inner(), b.inner(), z.inner()])
+        }
     });
 }
 
@@ -804,7 +813,7 @@ impl<'graph, F: Float> TensorBuilder<F> {
         } else {
             self.in_edges
                 .iter()
-                .map(|a| a.get(graph).top_rank)
+                .map(|a| unsafe { a.get_internal(graph).top_rank })
                 .max()
                 .map(|a| a + 1)
                 .unwrap_or(0)
@@ -824,7 +833,7 @@ impl<'graph, F: Float> TensorBuilder<F> {
         let new = TensorInternal {
             // `id` is set in `Graph::install`
             id: usize::default(),
-            op: Box::new(op),
+            op: Some(Box::new(op)),
             in_edges: self.in_edges,
             top_rank: rank,
             shape: self.shape,

@@ -339,7 +339,9 @@ impl<T: Float> op::Op<T> for Gather {
         let flat_indices = if self.should_normalize_negative_indices {
             ndarray_ext::normalize_negative_axes(indices, param_shape[axis])
         } else {
-            indices.map(|a| a.to_usize().expect("Invalid index value")).into_raw_vec()
+            indices
+                .map(|a| a.to_usize().expect("Invalid index value"))
+                .into_raw_vec()
         };
         let selected = param.select(ndarray::Axis(axis), flat_indices.as_slice());
         let ret = selected.into_shape(output_shape.as_slice()).unwrap();

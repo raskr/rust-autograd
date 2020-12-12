@@ -7,6 +7,7 @@ use crate::{Float, NdArray};
 use std::any::type_name;
 use std::fmt;
 use std::marker::PhantomData;
+use std::mem;
 
 // Properties for op's `compute` method.
 // Actual number of inout/output nodes are around 1~2 in most cases.
@@ -212,7 +213,7 @@ impl<'g, 't, 'v, T: Float> ComputeContext<'t, 'v, T> {
                 Some(ret) => ret,
                 None => panic!(
                     "Bad op impl of {}: input({})/input_mut({}) cannot be called twice",
-                    self.node.op.name(),
+                    self.node.get_op().name(),
                     i,
                     i
                 ),
@@ -220,7 +221,7 @@ impl<'g, 't, 'v, T: Float> ComputeContext<'t, 'v, T> {
             _ => {
                 panic!(
                     "Bad op impl of {}: cannot perform immutable borrowing for input({})",
-                    self.node.op.name(),
+                    self.node.get_op().name(),
                     i
                 );
             }
@@ -241,7 +242,7 @@ impl<'g, 't, 'v, T: Float> ComputeContext<'t, 'v, T> {
                 Some(ret) => ret,
                 None => panic!(
                     "Bad op impl of {}: input({})/input_mut({}) cannot be called twice",
-                    self.node.op.name(),
+                    self.node.get_op().name(),
                     i,
                     i
                 ),
@@ -249,7 +250,7 @@ impl<'g, 't, 'v, T: Float> ComputeContext<'t, 'v, T> {
             _ => {
                 panic!(
                     "Bad op impl of {}: cannot perform mutable borrowing for input({})",
-                    self.node.op.name(),
+                    self.node.get_op().name(),
                     i
                 );
             }
@@ -345,12 +346,22 @@ impl<'g, T: Float> GradientContext<'g, T> {
         }
     }
 
-    pub(crate) fn extract_input_grads(self) -> InputArray<Option<Tensor<'g, T>>> {
-        debug_assert!(
-            !self.gxs.is_empty(),
-            "Bad Op impl: GradientContext::set_input_grads was not called"
-        );
-        self.gxs
+    // Call Op::grad and return `gxs`
+    pub(crate) fn extract_input_grads(mut self) -> InputArray<Option<Tensor<'g, T>>> {
+        let id = self.y.id;
+        unsafe {
+            // steal op
+            let stolen = mem::replace(&mut self.graph().access_inner_mut(id).op, None).unwrap();
+            // call Op::grad
+            stolen.grad(&mut self);
+            // restore
+            mem::swap(&mut self.graph().access_inner_mut(id).op, &mut Some(stolen));
+            debug_assert!(
+                !self.gxs.is_empty(),
+                "Bad Op impl: GradientContext::set_input_grads was not called"
+            );
+            self.gxs
+        }
     }
 
     /// Returns the symbolic gradient of the op's output.
@@ -368,18 +379,16 @@ impl<'g, T: Float> GradientContext<'g, T> {
     /// Grabs the `i` th symbolic input.
     #[inline]
     pub fn input(&self, i: usize) -> Tensor<'g, T> {
-        self.y
-            .inner()
-            .in_edges
-            .get(i)
-            .expect("bad Op::grad impl")
-            .get_scoped(self.graph)
+        return self
+            .y
+            .input_tensor(i, self.graph)
+            .expect("bad Op::grad impl");
     }
 
     /// Returns the number of inputs.
     #[inline]
     pub fn num_inputs(&self) -> usize {
-        self.y.inner().in_edges.len()
+        unsafe { self.y.inner().in_edges.len() }
     }
 
     /// Returns a graph object that is usable for tensor computations in the context.

@@ -65,8 +65,12 @@ fn main() {
     let num_batches = num_train_samples / batch_size as usize;
 
     let (x_train, x_test) = (
-        x_train.into_shape(ndarray::IxDyn(&[num_train_samples, 1, 28, 28])).unwrap(),
-        x_test.into_shape(ndarray::IxDyn(&[num_test_samples, 1, 28, 28])).unwrap(),
+        x_train
+            .into_shape(ndarray::IxDyn(&[num_train_samples, 1, 28, 28]))
+            .unwrap(),
+        x_test
+            .into_shape(ndarray::IxDyn(&[num_test_samples, 1, 28, 28]))
+            .unwrap(),
     );
 
     ag::with(|g| {

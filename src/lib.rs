@@ -128,7 +128,6 @@
 #[macro_use(s)]
 /// re-exported for convenience and version-compatibility
 pub extern crate ndarray;
-extern crate hashbrown;
 #[cfg(feature = "mkl")]
 extern crate intel_mkl_src;
 extern crate libc;
@@ -156,11 +155,12 @@ pub mod test_helper;
 
 use rustc_hash::FxHasher;
 use std::any::TypeId;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::hash::BuildHasherDefault;
 
-pub(crate) type FxHashMap<K, V> = hashbrown::HashMap<K, V, BuildHasherDefault<FxHasher>>;
-pub(crate) type FxHashSet<K> = hashbrown::HashSet<K, BuildHasherDefault<FxHasher>>;
+pub(crate) type FxHashMap<K, V> = HashMap<K, V, BuildHasherDefault<FxHasher>>;
+pub(crate) type FxHashSet<K> = HashSet<K, BuildHasherDefault<FxHasher>>;
 
 /// Primitive type in this crate, which is actually a decorated `num_traits::Float`.
 pub trait Float:

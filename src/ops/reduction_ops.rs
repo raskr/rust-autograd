@@ -354,17 +354,20 @@ fn min_max_grad<'g, T: Float>(
     ctx.append_input_grad(None);
 }
 
-fn argx_helper<T: Float>(x: &NdArrayView<T>,
-                         comp_fn: fn(T, T) -> T,
-                         default_val: T,
-                         keep_dim: bool,
-                         axis: isize
+fn argx_helper<T: Float>(
+    x: &NdArrayView<T>,
+    comp_fn: fn(T, T) -> T,
+    default_val: T,
+    keep_dim: bool,
+    axis: isize,
 ) -> NdArray<T> {
     let axis = ndarray_ext::normalize_negative_axis(axis, x.ndim());
     let x_shape = x.shape();
     // 1. Make binary mask tensor (maximums are 1s)
     let mut mask = {
-        let maxed = x.fold_axis(ndarray::Axis(axis), default_val, move |&a, &b| comp_fn(a, b));
+        let maxed = x.fold_axis(ndarray::Axis(axis), default_val, move |&a, &b| {
+            comp_fn(a, b)
+        });
         let mut mask = x.to_owned();
         let mut found = ndarray::Array::<bool, ndarray::IxDyn>::from_elem(maxed.shape(), false);
         for mut sub in mask.axis_iter_mut(ndarray::Axis(axis)) {

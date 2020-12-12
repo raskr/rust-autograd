@@ -57,3 +57,14 @@ fn test_hook() {
         println!("{:?}", ggx.eval(&[])); // => Some(4.)
     });
 }
+
+#[test]
+fn test_many_nodes() {
+    ag::with(|g: &mut ag::Graph<f64>| {
+        for _ in 0..10000 {
+            let x = g.placeholder(&[3]);
+            let z = 2.0 * x / 2.0 / 2.0;
+            g.grad(&[z], &[x])[0];
+        }
+    });
+}

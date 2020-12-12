@@ -52,15 +52,20 @@ impl<'t, 'g, F: Float> Graph<F> {
     }
 
     // `i` must be an id returned by Graph::install
-    #[allow(dead_code)]
-    pub(crate) fn access(&self, i: usize) -> Tensor<F> {
-        unsafe { (*self.node_set.get()).get_unchecked(i).tensor(self) }
+    #[inline]
+    pub(crate) unsafe fn access_inner(&self, i: usize) -> &'t TensorInternal<F> {
+        &(*self.node_set.get())[i]
     }
 
     // `i` must be an id returned by Graph::install
     #[inline]
-    pub(crate) fn access_inner(&self, i: usize) -> &'t TensorInternal<F> {
-        unsafe { (*self.node_set.get()).get_unchecked(i) }
+    pub(crate) unsafe fn access_inner_mut(&self, i: usize) -> &'t mut TensorInternal<F> {
+        &mut (*self.node_set.get())[i]
+    }
+
+    #[inline]
+    pub(crate) fn tensor(&'g self, id: usize) -> Tensor<'g, F> {
+        Tensor { id, graph: self }
     }
 }
 

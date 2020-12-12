@@ -109,7 +109,9 @@ pub(crate) fn normalize_negative_axes<T: Float>(axes: &NdArrayView<T>, ndim: usi
     let mut axes_ret: Vec<usize> = Vec::with_capacity(axes.len());
     for &axis in axes.iter() {
         let axis = if axis < T::zero() {
-            (T::from(ndim).unwrap() + axis).to_usize().expect("Invalid index value")
+            (T::from(ndim).unwrap() + axis)
+                .to_usize()
+                .expect("Invalid index value")
         } else {
             axis.to_usize().expect("Invalid index value")
         };
