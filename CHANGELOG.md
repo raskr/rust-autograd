@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.0.3
+### Fixed
+- Serious memory bug around gradient computation
+
 ## v1.0.2
 ### Fixed
 - Wrong documentation of `Graph::slice`
