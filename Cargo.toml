@@ -20,7 +20,7 @@ libc = "0.2"
 matrixmultiply = "0.2.2"
 intel-mkl-src = { version="0.2.5", optional = true, default-features = true }
 num-traits = "0.2"
-num = "0.2"
+num = "0.3"
 rustc-hash = "1.0.1"
 smallvec = "1.2.0"
 
