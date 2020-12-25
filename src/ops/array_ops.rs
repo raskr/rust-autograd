@@ -268,7 +268,12 @@ impl<T: Float> op::Op<T> for IndexOp {
         if let Some(ret) = flat_x.get(i) {
             ctx.append_output(ndarray::arr0(*ret).into_dyn());
         } else {
-            ctx.set_error(op::OpError::OutOfBounds("access_elem failed.".to_string()));
+            ctx.set_error(op::OpError::OutOfBounds(format!(
+                "access_elem: tried to access index {} in tensor of length {} (shape: {:?})",
+                i,
+                x.len(),
+                x.shape(),
+            )));
         }
     }
 
@@ -305,7 +310,12 @@ impl<T: Float> op::Op<T> for IndexOpGrad {
         {
             *a = gy[ndarray::IxDyn(&[])];
         } else {
-            ctx.set_error(op::OpError::OutOfBounds("access_elem failed.".to_string()));
+            ctx.set_error(op::OpError::OutOfBounds(format!(
+                "access_elem: tried to access index {} in tensor of length {} (shape: {:?})",
+                i,
+                x.len(),
+                x.shape(),
+            )));
             return;
         }
         ctx.append_output(result);
