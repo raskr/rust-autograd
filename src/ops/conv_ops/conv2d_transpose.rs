@@ -481,11 +481,11 @@ fn test_deconv() {
     )
     .unwrap();
 
-    crate::with::<f32, _>(|s| {
+    let out_val = crate::with(|s: &mut crate::Graph<f32>| {
         let w = s.ones(&[ych, xch, kh, kw]);
         let g = s.ones(&[batch_size, ych, yh, yw]);
         let out = s.conv2d_transpose(g, w, 0, 1);
-        let out_val = out.eval(&[]).unwrap();
-        out_val.all_close(&ans, 1e-3);
+        out.eval(&[]).unwrap()
     });
+    out_val.all_close(&ans, 1e-3);
 }

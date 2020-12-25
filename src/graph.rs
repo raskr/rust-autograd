@@ -85,13 +85,13 @@ impl<T: Float> fmt::Debug for Graph<T> {
 /// Creates a scope for a computation graph.
 ///
 /// This is the only way to create [Graph](struct.Graph.html) instances.
-pub fn with<F, FN>(f: FN)
+pub fn with<F, FN, R>(f: FN) -> R
 where
     F: Float,
-    FN: FnOnce(&mut Graph<F>) -> () + Send,
+    FN: FnOnce(&mut Graph<F>) -> R + Send,
 {
     let mut g = Graph {
         node_set: UnsafeCell::new(Vec::with_capacity(128)),
     };
-    f(&mut g);
+    f(&mut g)
 }
