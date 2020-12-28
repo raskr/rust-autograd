@@ -481,7 +481,7 @@ fn test_deconv() {
     )
     .unwrap();
 
-    let out_val = crate::with(|s: &mut crate::Graph<f32>| {
+    let out_val = crate::run(|s: &mut crate::Graph<f32>| {
         let w = s.ones(&[ych, xch, kh, kw]);
         let g = s.ones(&[batch_size, ych, yh, yw]);
         let out = s.conv2d_transpose(g, w, 0, 1);

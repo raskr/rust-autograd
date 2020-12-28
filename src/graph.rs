@@ -84,14 +84,43 @@ impl<T: Float> fmt::Debug for Graph<T> {
 
 /// Creates a scope for a computation graph.
 ///
-/// This is the only way to create [Graph](struct.Graph.html) instances.
-pub fn with<F, FN, R>(f: FN) -> R
+/// This is the preferred way to create [Graph](struct.Graph.html) instances.
+///
+/// ```
+/// use autograd as ag;
+/// use ag::ndarray;
+/// let grad = ag::run(|g| {
+///     let x = g.placeholder(&[]);
+///     let y = g.placeholder(&[]);
+///     let z = 2.*x*x + 3.*y + 1.;
+///
+///     // dz/dx (symbolic):
+///     let grad = &g.grad(&[z], &[x])[0];
+///
+///     // Evaluate dz/dx when x=3:
+///     grad.eval(&[x.given(ndarray::arr0(3.0).view())]).unwrap()
+/// });
+/// assert_eq!(grad, ndarray::arr0(12.0).into_dyn());
+/// ```
+pub fn run<F, FN, R>(f: FN) -> R
 where
     F: Float,
-    FN: FnOnce(&mut Graph<F>) -> R + Send,
+    FN: FnOnce(&mut Graph<F>) -> R,
 {
     let mut g = Graph {
         node_set: UnsafeCell::new(Vec::with_capacity(128)),
     };
     f(&mut g)
+}
+
+/// Creates a scope for a computation graph.
+///
+/// Prefer to use [`run`] instead, as that is more flexible.
+/// This function is kept for backwards compatibility.
+pub fn with<F, FN>(f: FN)
+where
+    F: Float,
+    FN: FnOnce(&mut Graph<F>),
+{
+    run(f);
 }
