@@ -635,8 +635,8 @@ impl<T: Float> op::Op<T> for Sqrt {
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
         let x = ctx.input(0);
-        let half = ctx.graph().scalar(T::one());
-        let ret = half * ctx.graph().pow(x, T::one().neg());
+        let half = T::one() / (T::one() + T::one());
+        let ret = ctx.graph().scalar(half) * ctx.graph().pow(x, -half);
         ctx.append_input_grad(Some(ctx.output_grad() * ret));
     }
 }
