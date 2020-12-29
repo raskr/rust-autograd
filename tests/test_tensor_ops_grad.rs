@@ -182,6 +182,17 @@ fn pow() {
 }
 
 #[test]
+fn sqrt() {
+    with(|graph| {
+        let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
+        let v = graph.variable(rng.random_uniform(&[3], 0.9, 1.1));
+        let z = graph.sqrt(v);
+        let g = graph.grad(&[z], &[v]);
+        ag::test_helper::check_theoretical_grads(z, g.as_slice(), &[v], &[], 1e-3, 1e-3);
+    });
+}
+
+#[test]
 fn exp() {
     with(|graph| {
         let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
