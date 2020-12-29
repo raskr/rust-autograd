@@ -232,7 +232,7 @@ pub use crate::tensor::Tensor;
 
 pub(crate) use crate::ndarray_ext::ArrRepr;
 
-pub use crate::graph::{with, Graph};
+pub use crate::graph::{run, with, Graph};
 
 /// Error during tensor's evaluation.
 #[derive(Debug, PartialEq)]
