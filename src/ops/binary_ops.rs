@@ -154,13 +154,16 @@ impl<T: Float> op::Op<T> for AddOp {
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
+        let g = ctx.graph();
         let x0 = ctx.input(0);
         let x1 = ctx.input(1);
+        let gy = ctx.output_grad();
         let shape0 = &ctx.graph().shape(x0);
         let shape1 = &ctx.graph().shape(x1);
-        let (gy1, gy2) = preprocess_gy(shape0, shape1, &ctx.output_grad(), ctx.graph());
+        let gy0 = reduce_if_necessary(shape0, &gy, g);
+        let gy1 = reduce_if_necessary(shape1, &gy, g);
+        ctx.append_input_grad(Some(gy0));
         ctx.append_input_grad(Some(gy1));
-        ctx.append_input_grad(Some(gy2));
     }
 }
 
@@ -208,13 +211,23 @@ impl<T: Float> op::Op<T> for MulOp {
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
+        let graph = ctx.graph();
         let x0 = ctx.input(0);
         let x1 = ctx.input(1);
-        let shape0 = &ctx.graph().shape(x0);
-        let shape1 = &ctx.graph().shape(x1);
-        let (gy1, gy2) = preprocess_gy(shape0, shape1, &ctx.output_grad(), ctx.graph());
-        ctx.append_input_grad(Some(gy1 * x1));
-        ctx.append_input_grad(Some(gy2 * x0));
+
+        let gy = ctx.output_grad();
+
+        let gx0 = gy * x1;
+        let gx1 = gy * x0;
+
+        let shape0 = &graph.shape(x0);
+        let shape1 = &graph.shape(x1);
+
+        let gx0 = reduce_if_necessary(shape0, &gx0, graph);
+        let gx1 = reduce_if_necessary(shape1, &gx1, graph);
+
+        ctx.append_input_grad(Some(gx0));
+        ctx.append_input_grad(Some(gx1));
     }
 }
 
@@ -252,17 +265,33 @@ impl<T: Float> op::Op<T> for DivOp {
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
-        let scope = ctx.graph();
+        let g = ctx.graph();
         let x0 = ctx.input(0);
         let x1 = ctx.input(1);
-        let shape0 = &scope.shape(x0);
-        let shape1 = &scope.shape(x1);
-        let (gy1, gy2) = preprocess_gy(shape0, shape1, &ctx.output_grad(), scope);
-        ctx.append_input_grad(Some(gy1 / x1));
-        ctx.append_input_grad(Some(
-            scope.neg(x0) * scope.pow(x1, T::from(-2.).unwrap()) * gy2,
-        ));
+        let shape0 = &g.shape(x0);
+        let shape1 = &g.shape(x1);
+        let gy = ctx.output_grad();
+
+        let gx0 = gy / x1;
+        let gx1 = g.neg(x0) * g.pow(x1, T::from(-2.).unwrap()) * gy;
+
+        let gx0 = reduce_if_necessary(shape0, &gx0, g);
+        let gx1 = reduce_if_necessary(shape1, &gx1, g);
+
+        ctx.append_input_grad(Some(gx0));
+        ctx.append_input_grad(Some(gx1));
     }
+}
+
+fn reduce_if_necessary<'g, T: Float>(
+    target_shape: &Tensor<'g, T>,
+    x: &Tensor<'g, T>,
+    graph: &'g Graph<T>,
+) -> Tensor<'g, T> {
+    Tensor::builder()
+        .set_ro_inputs(&[x, target_shape])
+        .set_shape(target_shape)
+        .build(graph, PreprocessBinOpGrad)
 }
 
 // Reduce gy if broadcast occurred in the forward path.

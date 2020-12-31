@@ -2,6 +2,8 @@ extern crate autograd as ag;
 extern crate ndarray;
 
 use ag::tensor::Variable;
+use ag::with;
+use ag::ndarray::array;
 
 #[test]
 fn scalar_add() {
@@ -147,3 +149,104 @@ fn expr7() {
         );
     });
 }
+
+#[test]
+fn scalar_tensor_add() {
+    with(|graph| {
+        let v = graph.variable(ndarray::arr0(1.));
+        let v2 = graph.variable(ndarray::arr1(&[1., 2., 3.]));
+        let a: ag::Tensor<f64> = v2 + v;
+        let g = graph.grad(&[a], &[v]);
+        assert_eq!((&g[0]).eval(&[]).unwrap().shape(), v.eval(&[]).unwrap().shape());
+        ag::test_helper::check_theoretical_grads(a, g.as_slice(), &[v], &[], 1e-3, 1e-3);
+    });
+}
+
+
+#[test]
+fn scalar_tensor_add2() {
+    with(|graph| {
+        let v = graph.variable(ndarray::arr0(1.));
+        let v2 = graph.variable(ndarray::arr1(&[1., 2., 3.]));
+        let a: ag::Tensor<f64> = v + v2;
+        let g = graph.grad(&[a], &[v]);
+        assert_eq!((&g[0]).eval(&[]).unwrap().shape(), v.eval(&[]).unwrap().shape());
+        ag::test_helper::check_theoretical_grads(a, g.as_slice(), &[v], &[], 1e-3, 1e-3);
+    });
+}
+
+#[test]
+fn scalar_tensor_sub() {
+    with(|graph| {
+        let v = graph.variable(ndarray::arr0(1.));
+        let v2 = graph.variable(ndarray::arr1(&[1., 2., 3.]));
+        let a: ag::Tensor<f64> = v2 - v;
+        let g = graph.grad(&[a], &[v]);
+        assert_eq!((&g[0]).eval(&[]).unwrap().shape(), v.eval(&[]).unwrap().shape());
+        ag::test_helper::check_theoretical_grads(a, g.as_slice(), &[v], &[], 1e-3, 1e-3);
+    });
+}
+
+
+#[test]
+fn scalar_tensor_sub2() {
+    with(|graph| {
+        let v = graph.variable(ndarray::arr0(1.));
+        let v2 = graph.variable(ndarray::arr1(&[1., 2., 3.]));
+        let a: ag::Tensor<f64> = v - v2;
+        let g = graph.grad(&[a], &[v]);
+        assert_eq!((&g[0]).eval(&[]).unwrap().shape(), v.eval(&[]).unwrap().shape());
+        ag::test_helper::check_theoretical_grads(a, g.as_slice(), &[v], &[], 1e-3, 1e-3);
+    });
+}
+
+#[test]
+fn scalar_tensor_mul() {
+    with(|graph| {
+        let v = graph.variable(ndarray::arr0(1.));
+        let v2 = graph.variable(ndarray::arr1(&[1., 2., 3.]));
+        let a: ag::Tensor<f64> = v2 * v;
+        let g = graph.grad(&[a], &[v]);
+        assert_eq!((&g[0]).eval(&[]).unwrap().shape(), v.eval(&[]).unwrap().shape());
+        ag::test_helper::check_theoretical_grads(a, g.as_slice(), &[v], &[], 1e-3, 1e-3);
+    });
+}
+
+
+#[test]
+fn scalar_tensor_mul2() {
+    with(|graph| {
+        let v = graph.variable(ndarray::arr0(1.));
+        let v2 = graph.variable(ndarray::arr1(&[1., 2., 3.]));
+        let a: ag::Tensor<f64> = v * v2;
+        let g = graph.grad(&[a], &[v]);
+        assert_eq!((&g[0]).eval(&[]).unwrap().shape(), v.eval(&[]).unwrap().shape());
+        ag::test_helper::check_theoretical_grads(a, g.as_slice(), &[v], &[], 1e-3, 1e-3);
+    });
+}
+
+#[test]
+fn scalar_tensor_div() {
+    with(|graph| {
+        let v = graph.variable(ndarray::arr0(1.));
+        let v2 = graph.variable(ndarray::arr1(&[1., 2., 3.]));
+        let a: ag::Tensor<f64> = v / v2;
+        let g = graph.grad(&[a], &[v]);
+        assert_eq!((&g[0]).eval(&[]).unwrap().shape(), v.eval(&[]).unwrap().shape());
+        ag::test_helper::check_theoretical_grads(a, g.as_slice(), &[v], &[], 1e-3, 1e-3);
+    });
+}
+
+
+#[test]
+fn scalar_tensor_div2() {
+    with(|graph| {
+        let v = graph.variable(ndarray::arr0(1.));
+        let v2 = graph.variable(ndarray::arr1(&[1., 2., 3.]));
+        let a: ag::Tensor<f64> = v2 / v;
+        let g = graph.grad(&[a], &[v]);
+        assert_eq!((&g[0]).eval(&[]).unwrap().shape(), v.eval(&[]).unwrap().shape());
+        ag::test_helper::check_theoretical_grads(a, g.as_slice(), &[v], &[], 1e-3, 1e-3);
+    });
+}
+

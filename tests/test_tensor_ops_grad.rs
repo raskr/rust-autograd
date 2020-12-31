@@ -2,7 +2,6 @@ extern crate autograd as ag;
 extern crate ndarray;
 use ag::tensor::Constant;
 use ag::tensor::Variable;
-
 use ag::with;
 
 #[test]
