@@ -13,8 +13,8 @@ pub struct AddOp;
 pub struct SubOp;
 pub struct MulOp;
 pub struct DivOp;
-pub struct PreprocessBinOpGrad;
-pub struct PreprocessBinOpGradGrad;
+pub struct MaybeReduce;
+pub struct MaybeBroadcast;
 
 #[cfg(feature = "mkl")]
 macro_rules! bin_op_same_shape {
@@ -37,40 +37,38 @@ macro_rules! bin_op_same_shape {
     };
 }
 
-impl<T: Float> op::Op<T> for PreprocessBinOpGrad {
-    // Computes x's gradient.
-    // Involves reduction as necessary.
-    // Inputs: [gy, target_shape]
+impl<T: Float> op::Op<T> for MaybeReduce {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
-        let gy = ctx.input(0);
-        let x_shape_ = crate::ndarray_ext::as_shape(&ctx.input(1));
-        let x_shape = x_shape_.as_slice();
-        let gy_shape = gy.shape();
+        let input = ctx.input(0);
+        let target_shape__ = crate::ndarray_ext::as_shape(&ctx.input(1));
+        let target_shape = target_shape__.as_slice();
+        let input_shape = input.shape();
 
-        if x_shape == gy_shape {
+        if target_shape == input_shape {
             // The case where forward path didn't cause broadcast.
-            ctx.append_output_view(gy.clone());
+            ctx.append_output_view(input.clone());
         } else {
-            // Broadcast occurred. We need reduction of `gy`.
-            // First, handle the case where x is scalar.
-            let x_is_scalar = crate::ndarray_ext::is_scalar_shape(x_shape);
-            let x_shape = if x_is_scalar {
-                vec![1; gy_shape.len()]
+            // Broadcast occurred. We need reduction of `input`.
+            // First, handle the case where `input` is scalar.
+            let target_shape_is_scalar = crate::ndarray_ext::is_scalar_shape(target_shape);
+            let target_shape_ = if target_shape_is_scalar {
+                vec![1; input_shape.len()]
             } else {
-                x_shape.to_vec()
+                target_shape.to_vec()
             };
+
             // Reduce each dim as necessary
             let mut folded: Option<NdArray<T>> = None;
-            for (i, (x_axis, gy_axis)) in x_shape.iter().zip(gy_shape).enumerate() {
+            for (i, (x_axis, gy_axis)) in target_shape_.iter().zip(input_shape).enumerate() {
                 if x_axis < gy_axis {
                     if *x_axis == 1 {
                         // `fold_axis` squashes the axis automatically.
-                        let axis = ndarray::Axis(if x_is_scalar { 0 } else { i });
+                        let axis = ndarray::Axis(if target_shape_is_scalar { 0 } else { i });
                         let ret = match folded {
                             Some(ref a) => a.fold_axis(axis.clone(), T::zero(), |&a, &b| a + b),
-                            None => gy.fold_axis(axis.clone(), T::zero(), |&a, &b| a + b),
+                            None => input.fold_axis(axis.clone(), T::zero(), |&a, &b| a + b),
                         };
-                        if x_is_scalar {
+                        if target_shape_is_scalar {
                             mem::swap(&mut folded, &mut Some(ret));
                         } else {
                             // Expands squashed axis.
@@ -90,46 +88,45 @@ impl<T: Float> op::Op<T> for PreprocessBinOpGrad {
                 // case of x_axis == gy_axis: nothing to do
             }
             // TODO
-            ctx.append_output(folded.unwrap());
+            let ret = folded.unwrap();
+            debug_assert_eq!(target_shape, ret.shape());
+            ctx.append_output(ret);
         };
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
+        let g = ctx.graph();
         let gx = Tensor::builder()
-            .set_ro_inputs(&[&ctx.output_grad(), &ctx.input(1)])
-            .build(ctx.graph(), PreprocessBinOpGradGrad);
+            .set_ro_inputs(&[&ctx.output_grad(), &g.shape(ctx.input(0))])
+            .build(g, MaybeBroadcast);
         ctx.append_input_grad(Some(gx));
         ctx.append_input_grad(None);
     }
 }
 
 // Do broadcast if necessary.
-// Inputs: [gy, target_shape]
-impl<T: Float> op::Op<T> for PreprocessBinOpGradGrad {
+impl<T: Float> op::Op<T> for MaybeBroadcast {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
         let target_shape_ = ctx.input(1);
         let target_shape_ = crate::ndarray_ext::as_shape(&target_shape_);
         let target_shape = target_shape_.as_slice();
 
-        let gy = ctx.input(0);
-        if gy.shape() == target_shape {
-            ctx.append_output_view(gy);
+        let raw_input = ctx.input(0);
+        if raw_input.shape() == target_shape {
+            ctx.append_output_view(raw_input);
             return;
         }
 
-        let gy_is_scalar = crate::ndarray_ext::is_scalar_shape(gy.shape());
-
-        let mut gy = gy;
-
         // make broadcast dims if needed
-        if gy_is_scalar {
-            for &axis in target_shape.iter() {
-                gy = crate::ndarray_ext::expand_dims_view(gy, axis);
-            }
-        }
+        let input_is_scalar = crate::ndarray_ext::is_scalar_shape(raw_input.shape());
+        let input = if input_is_scalar {
+            raw_input.into_shape(vec![1; target_shape.len()]).unwrap()
+        } else {
+            raw_input
+        };
 
         // do broadcast
-        if let Some(ret) = gy.broadcast(target_shape) {
+        if let Some(ret) = input.broadcast(target_shape) {
             ctx.append_output(ret.to_owned());
         } else {
             ctx.set_error(op::OpError::IncompatibleShape(
@@ -139,9 +136,8 @@ impl<T: Float> op::Op<T> for PreprocessBinOpGradGrad {
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
-        let gx = Tensor::builder()
-            .set_ro_inputs(&[&ctx.input(0), &ctx.output_grad()])
-            .build(ctx.graph(), PreprocessBinOpGrad);
+        let g = ctx.graph();
+        let gx = maybe_reduce(&g.shape(ctx.input(0)), &ctx.output_grad(), g);
         ctx.append_input_grad(Some(gx));
         ctx.append_input_grad(None);
     }
@@ -160,8 +156,8 @@ impl<T: Float> op::Op<T> for AddOp {
         let gy = ctx.output_grad();
         let shape0 = &ctx.graph().shape(x0);
         let shape1 = &ctx.graph().shape(x1);
-        let gy0 = reduce_if_necessary(shape0, &gy, g);
-        let gy1 = reduce_if_necessary(shape1, &gy, g);
+        let gy0 = maybe_reduce(shape0, &gy, g);
+        let gy1 = maybe_reduce(shape1, &gy, g);
         ctx.append_input_grad(Some(gy0));
         ctx.append_input_grad(Some(gy1));
     }
@@ -194,13 +190,16 @@ impl<T: Float> op::Op<T> for SubOp {
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
+        let g = ctx.graph();
         let x0 = ctx.input(0);
         let x1 = ctx.input(1);
         let shape0 = &ctx.graph().shape(x0);
         let shape1 = &ctx.graph().shape(x1);
-        let (gy1, gy2) = preprocess_gy(shape0, shape1, &ctx.output_grad(), ctx.graph());
-        ctx.append_input_grad(Some(gy1));
-        ctx.append_input_grad(Some(ctx.graph().neg(&gy2)));
+        let gy = &ctx.output_grad();
+        let gy0 = maybe_reduce(shape0, gy, g);
+        let gy1 = maybe_reduce(shape1, gy, g);
+        ctx.append_input_grad(Some(gy0));
+        ctx.append_input_grad(Some(g.neg(&gy1)));
     }
 }
 
@@ -215,16 +214,16 @@ impl<T: Float> op::Op<T> for MulOp {
         let x0 = ctx.input(0);
         let x1 = ctx.input(1);
 
+        let shape0 = &graph.shape(x0);
+        let shape1 = &graph.shape(x1);
+
         let gy = ctx.output_grad();
 
         let gx0 = gy * x1;
         let gx1 = gy * x0;
 
-        let shape0 = &graph.shape(x0);
-        let shape1 = &graph.shape(x1);
-
-        let gx0 = reduce_if_necessary(shape0, &gx0, graph);
-        let gx1 = reduce_if_necessary(shape1, &gx1, graph);
+        let gx0 = maybe_reduce(shape0, &gx0, graph);
+        let gx1 = maybe_reduce(shape1, &gx1, graph);
 
         ctx.append_input_grad(Some(gx0));
         ctx.append_input_grad(Some(gx1));
@@ -275,15 +274,15 @@ impl<T: Float> op::Op<T> for DivOp {
         let gx0 = gy / x1;
         let gx1 = g.neg(x0) * g.pow(x1, T::from(-2.).unwrap()) * gy;
 
-        let gx0 = reduce_if_necessary(shape0, &gx0, g);
-        let gx1 = reduce_if_necessary(shape1, &gx1, g);
+        let gx0 = maybe_reduce(shape0, &gx0, g);
+        let gx1 = maybe_reduce(shape1, &gx1, g);
 
         ctx.append_input_grad(Some(gx0));
         ctx.append_input_grad(Some(gx1));
     }
 }
 
-fn reduce_if_necessary<'g, T: Float>(
+fn maybe_reduce<'g, T: Float>(
     target_shape: &Tensor<'g, T>,
     x: &Tensor<'g, T>,
     graph: &'g Graph<T>,
@@ -291,27 +290,19 @@ fn reduce_if_necessary<'g, T: Float>(
     Tensor::builder()
         .set_ro_inputs(&[x, target_shape])
         .set_shape(target_shape)
-        .build(graph, PreprocessBinOpGrad)
+        .build(graph, MaybeReduce)
 }
 
-// Reduce gy if broadcast occurred in the forward path.
-fn preprocess_gy<'b, T: Float>(
-    shape0: &Tensor<'b, T>,
-    shape1: &Tensor<'b, T>,
-    gy: &Tensor<'b, T>,
-    c: &'b Graph<T>,
-) -> (Tensor<'b, T>, Tensor<'b, T>) {
-    let gy0 = Tensor::builder()
-        .set_ro_inputs(&[gy, shape0])
-        .set_shape(shape0)
-        .build(c, PreprocessBinOpGrad);
-    let gy1 = Tensor::builder()
-        .set_ro_inputs(&[gy, shape1])
-        .set_shape(shape1)
-        .build(c, PreprocessBinOpGrad);
-    (gy0, gy1)
+fn broadcast_if_necessary<'g, T: Float>(
+    target_shape: &Tensor<'g, T>,
+    x: &Tensor<'g, T>,
+    graph: &'g Graph<T>,
+) -> Tensor<'g, T> {
+    Tensor::builder()
+        .set_ro_inputs(&[x, target_shape])
+        .set_shape(target_shape)
+        .build(graph, MaybeBroadcast)
 }
-
 macro_rules! impl_bin_op_forward {
     ($forward_name:ident, $bin_op:tt, $vms_op:ident, $vmd_op:ident) => {
         fn $forward_name<'v, T: Float>(x0: &NdArrayView<'v, T>, x1: &NdArrayView<'v, T>) -> NdArray<T>

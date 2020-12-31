@@ -71,8 +71,8 @@ fn transpose_matmul() {
     with(|g| {
         let x = g.constant(array![[0., 1., 2.], [3., 4., 5.]]);
         let w = g.constant(array![[0., 1.], [2., 3.]]);
-        let x2 = g.transpose(x, &[1, 0]).show();
-        let mm = g.matmul(x2, w).show();
+        let x2 = g.transpose(x, &[1, 0]);
+        let mm = g.matmul(x2, w);
         assert_eq!(
             mm.eval(&[]).unwrap().as_slice().unwrap(),
             &[6., 9., 8., 13., 10., 17.]

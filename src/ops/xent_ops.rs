@@ -67,31 +67,43 @@ impl<T: Float> op::Op<T> for SparseSoftmaxCrossEntropy {
         {
             let t_shape = t.shape();
             if log_x.ndim() != 2 {
-                ctx.set_error(op::OpError::IncompatibleShape(
-                    "Bad first argument's shape".to_string(),
-                ));
+                ctx.set_error(op::OpError::IncompatibleShape(format!(
+                    "SparseSoftmaxCrossEntropy: given first argument's ndim is not 2: shape={:?}",
+                    log_x.shape()
+                )));
                 return;
             }
             let t_rank = t_shape.len();
             if t_rank == 2 {
+                // example label shape: [batch_size, 1]
                 if t_shape[1] != 1 {
                     ctx.set_error(op::OpError::IncompatibleShape(
-                        "Bad first argument's shape".to_string(),
+                        format!("SparseSoftmaxCrossEntropy: second argument's shape must be (batch_size, 1) or (batch_size,). given shape={:?}", t_shape)
                     ));
                     return;
                 }
             } else if t_rank != 1 {
+                // example label shape: [batch_size]
                 ctx.set_error(op::OpError::IncompatibleShape(
-                    "Bad first argument's shape".to_string(),
+                    format!("SparseSoftmaxCrossEntropy: second argument's shape must be (batch_size, 1) or (batch_size,). given shape={:?}", t_shape)
                 ));
                 return;
             }
         }
 
         let mut t_iter = t.iter();
+        // loops batch size times.
         let ret = log_x
             .map_axis(ndarray::Axis(1), move |row| {
-                -row[t_iter.next().unwrap().to_usize().unwrap()]
+                -*row
+                    .get(
+                        t_iter
+                            .next()
+                            .expect("Batch size mismatch: inputs vs labels")
+                            .to_usize()
+                            .expect("Invalid label value: can't cast to usize"),
+                    )
+                    .expect("Wrong label value")
             })
             .into_shape(ndarray::IxDyn(&[log_x.shape()[0], 1]))
             .unwrap();
