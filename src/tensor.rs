@@ -52,11 +52,11 @@ pub struct Tensor<'graph, F: Float> {
 
 impl<'graph, F: Float> Tensor<'graph, F> {
     pub(crate) fn input_tensor(&self, i: usize, g: &'graph Graph<F>) -> Option<Tensor<'graph, F>> {
-        unsafe { self.inner().in_edges.get(i).map(|x| x.as_tensor(g)) }
+        self.inner().in_edges.get(i).map(|x| x.as_tensor(g))
     }
 
     #[inline]
-    pub(crate) unsafe fn inner<'t>(&self) -> &'t TensorInternal<F> {
+    pub(crate) fn inner<'t>(&self) -> &'t TensorInternal<F> {
         self.graph.access_inner(self.id)
     }
 
@@ -120,9 +120,7 @@ impl<'graph, F: Float> Tensor<'graph, F> {
             self.is_placeholder(),
             "Receiver of Tensor::given must be a placeholder."
         );
-        unsafe {
-            self.inner().validate_feed_shape(value.shape());
-        }
+        self.inner().validate_feed_shape(value.shape());
         crate::runtime::Feed::new(self.id(), value.into_dyn())
     }
 
@@ -288,78 +286,74 @@ impl<'graph, F: Float> Tensor<'graph, F> {
     /// Returns the number of inputs of this tensor.
     #[inline]
     pub fn num_inputs(&self) -> usize {
-        unsafe { self.inner().num_inputs() }
+        self.inner().num_inputs()
     }
 
     /// Returns the number of inputs of this tensor.
     #[inline]
     pub fn num_backprop_inputs(&self) -> usize {
-        unsafe {
-            let inner = self.inner();
-            inner
-                .backprop_inputs
-                .as_ref()
-                .unwrap_or(&inner.in_edges)
-                .len()
-        }
+        let inner = self.inner();
+        inner
+            .backprop_inputs
+            .as_ref()
+            .unwrap_or(&inner.in_edges)
+            .len()
     }
 
     #[inline]
     /// Returns true if this node has no incoming nodes.
     pub fn is_source(&self) -> bool {
-        unsafe { self.inner().is_source() }
+        self.inner().is_source()
     }
 
     #[inline]
     /// Input nodes used when backprop.
     ///
     pub fn get_backprop_input(&self, idx: usize) -> Input {
-        unsafe { self.inner().get_backprop_inputs()[idx].clone() }
+        self.inner().get_backprop_inputs()[idx].clone()
     }
 
     #[inline]
     pub fn is_placeholder(&self) -> bool {
-        unsafe { self.inner().is_placeholder }
+        self.inner().is_placeholder
     }
 
     #[inline]
     pub fn clone_persistent_array(&self) -> Option<NdArray<F>> {
-        unsafe { self.inner().clone_persistent_array() }
+        self.inner().clone_persistent_array()
     }
 
     #[inline]
     pub fn get_variable_array(&self) -> Option<&Arc<RwLock<NdArray<F>>>> {
-        unsafe {
-            // self.inner().variable_array.as_ref().map(|x| x.clone())
-            self.inner().variable_array.as_ref()
-        }
+        // self.inner().variable_array.as_ref().map(|x| x.clone())
+        self.inner().variable_array.as_ref()
     }
 
     #[inline]
     pub fn get_variable_array_ptr(&self) -> Option<*const RwLock<NdArray<F>>> {
-        unsafe { self.inner().get_variable_array_inner() }
+        self.inner().get_variable_array_inner()
     }
 
     #[inline]
     pub fn lock_variable_array(&self) -> Option<RwLockReadGuard<NdArray<F>>> {
-        unsafe { self.inner().lock_variable_array() }
+        self.inner().lock_variable_array()
     }
 
     #[inline]
     pub fn lock_variable_array_mut(&self) -> Option<RwLockWriteGuard<NdArray<F>>> {
-        unsafe { self.inner().lock_variable_array_mut() }
+        self.inner().lock_variable_array_mut()
     }
 
     #[inline]
     pub fn is_differentiable(&self) -> bool {
-        unsafe { self.inner().is_differentiable }
+        self.inner().is_differentiable
     }
 
     /// True is this tensor was created by `Graph::variable`.
     #[inline]
     #[allow(dead_code)]
     pub(crate) fn is_variable(&self) -> bool {
-        unsafe { self.inner().variable_array.is_some() }
+        self.inner().variable_array.is_some()
     }
 }
 
@@ -615,7 +609,7 @@ impl<'graph> Input {
     }
 
     #[inline]
-    pub(crate) unsafe fn get_internal<F: Float>(&self, graph: &Graph<F>) -> &TensorInternal<F> {
+    pub(crate) fn get_internal<F: Float>(&self, graph: &Graph<F>) -> &TensorInternal<F> {
         graph.access_inner(self.id)
     }
 }
@@ -711,12 +705,10 @@ fn test_build() {
         let v: Tensor<f32> = s.zeros(&[2, 3]);
         let b: Tensor<f32> = s.zeros(&[4, 3]);
         let z = s.matmul(a, v) + b;
-        unsafe {
-            let mut vars = [a.inner(), v.inner(), b.inner(), z.inner()];
-            // `sort_by_key` don't reverse the order of `a` and `v`
-            vars.sort_by_key(|a| a.top_rank);
-            assert_eq!(vars, [a.inner(), v.inner(), b.inner(), z.inner()])
-        }
+        let mut vars = [a.inner(), v.inner(), b.inner(), z.inner()];
+        // `sort_by_key` don't reverse the order of `a` and `v`
+        vars.sort_by_key(|a| a.top_rank);
+        assert_eq!(vars, [a.inner(), v.inner(), b.inner(), z.inner()])
     });
 }
 
@@ -813,7 +805,7 @@ impl<'graph, F: Float> TensorBuilder<F> {
         } else {
             self.in_edges
                 .iter()
-                .map(|a| unsafe { a.get_internal(graph).top_rank })
+                .map(|a| a.get_internal(graph).top_rank )
                 .max()
                 .map(|a| a + 1)
                 .unwrap_or(0)

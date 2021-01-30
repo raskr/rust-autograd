@@ -239,7 +239,7 @@ impl<'t, T: Float> Tensor<'t, T> {
     fn to_node(&'t self) -> Node {
         Node {
             id: self.id,
-            rank: unsafe { self.inner().top_rank },
+            rank: self.inner().top_rank,
         }
     }
 }

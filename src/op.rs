@@ -349,19 +349,17 @@ impl<'g, T: Float> GradientContext<'g, T> {
     // Call Op::grad and return `gxs`
     pub(crate) fn extract_input_grads(mut self) -> InputArray<Option<Tensor<'g, T>>> {
         let id = self.y.id;
-        unsafe {
-            // steal op
-            let stolen = mem::replace(&mut self.graph().access_inner_mut(id).op, None).unwrap();
-            // call Op::grad
-            stolen.grad(&mut self);
-            // restore
-            mem::swap(&mut self.graph().access_inner_mut(id).op, &mut Some(stolen));
-            debug_assert!(
-                !self.gxs.is_empty(),
-                "Bad Op impl: GradientContext::set_input_grads was not called"
-            );
-            self.gxs
-        }
+        // steal op
+        let stolen = mem::replace(&mut self.graph().access_inner_mut(id).op, None).unwrap();
+        // call Op::grad
+        stolen.grad(&mut self);
+        // restore
+        mem::swap(&mut self.graph().access_inner_mut(id).op, &mut Some(stolen));
+        debug_assert!(
+            !self.gxs.is_empty(),
+            "Bad Op impl: GradientContext::set_input_grads was not called"
+        );
+        self.gxs
     }
 
     /// Returns the symbolic gradient of the op's output.
@@ -388,7 +386,7 @@ impl<'g, T: Float> GradientContext<'g, T> {
     /// Returns the number of inputs.
     #[inline]
     pub fn num_inputs(&self) -> usize {
-        unsafe { self.y.inner().in_edges.len() }
+        self.y.inner().in_edges.len()
     }
 
     /// Returns a graph object that is usable for tensor computations in the context.

@@ -93,7 +93,7 @@ impl<'graph, F: Float> crate::graph::Graph<F> {
             ys.push(self.reduce_sum_to_scalar(y));
         }
         let gys = vec![self.scalar(F::one()); len];
-        unsafe { self.grad_with_default(&ys, xs, &gys) }
+        self.grad_with_default(&ys, xs, &gys)
     }
 
     /// Computes `xs`'s gradients with `ys`'s already known gradients.
@@ -111,7 +111,7 @@ impl<'graph, F: Float> crate::graph::Graph<F> {
     ///
     /// # Returns
     /// Symbolic gradient tensors of `xs` in the same order as `xs`'graph.
-    pub unsafe fn grad_with_default<A, B, C>(
+    pub fn grad_with_default<A, B, C>(
         &'graph self,
         ys: &[A],
         xs: &[B],
@@ -279,15 +279,13 @@ impl<'graph, F: Float> crate::graph::Graph<F> {
     where
         A: AsRef<Tensor<'graph, F>> + Copy,
     {
-        unsafe {
-            if let Some(id) = x.as_ref().inner().shape {
-                self.tensor(id)
-            } else {
-                Tensor::builder()
-                    .append_input(x.as_ref())
-                    .set_differentiable(false)
-                    .build(self, array_ops::Shape)
-            }
+        if let Some(id) = x.as_ref().inner().shape {
+            self.tensor(id)
+        } else {
+            Tensor::builder()
+                .append_input(x.as_ref())
+                .set_differentiable(false)
+                .build(self, array_ops::Shape)
         }
     }
 

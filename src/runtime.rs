@@ -166,48 +166,44 @@ impl<'tensor, 'view, 'lock, F: Float> OutputStorage<'view, F> {
     }
 
     #[inline]
-    unsafe fn inner(&self) -> &OutputStorageInner<'view, F> {
-        &*self.inner.get()
+    fn inner(&self) -> &OutputStorageInner<'view, F> {
+        unsafe { &*self.inner.get() }
     }
 
     #[inline]
-    unsafe fn inner_mut(&self) -> &mut OutputStorageInner<'view, F> {
-        &mut *self.inner.get()
+    fn inner_mut(&self) -> &mut OutputStorageInner<'view, F> {
+        unsafe { &mut *self.inner.get() }
     }
 
     #[inline]
     fn push_owned(&self, val: NdArray<F>) -> usize {
-        unsafe {
-            let s = &mut self.inner_mut().value_storage;
-            let ret = s.len();
-            s.push(Some(val));
-            ret
-        }
+        let s = &mut self.inner_mut().value_storage;
+        let ret = s.len();
+        s.push(Some(val));
+        ret
     }
 
     #[inline]
     fn push_view(&self, view: NdArrayView<'view, F>) -> usize {
-        unsafe {
-            let s = &mut self.inner_mut().view_storage;
-            let ret = s.len();
-            s.push(view);
-            ret
-        }
+        let s = &mut self.inner_mut().view_storage;
+        let ret = s.len();
+        s.push(view);
+        ret
     }
 
     #[inline]
     fn get_from_view(&self, i: usize) -> NdArrayView<'view, F> {
-        unsafe { self.inner().view_storage[i].clone() }
+        self.inner().view_storage[i].clone()
     }
 
     #[inline]
     fn get_from_owned(&self, i: usize) -> NdArrayView<F> {
-        unsafe { self.inner().value_storage[i].as_ref().unwrap().view() }
+        self.inner().value_storage[i].as_ref().unwrap().view()
     }
 
     #[inline]
     fn take_from_owned(&self, i: usize) -> NdArray<F> {
-        unsafe { self.inner_mut().value_storage[i].take().unwrap() }
+        self.inner_mut().value_storage[i].take().unwrap()
     }
 
     #[inline]
@@ -360,51 +356,49 @@ impl<F: Float> Graph<F> {
         let storage = OutputStorage::new();
 
         let mut dfs_stack = Vec::<(&TensorInternal<F>, bool)>::with_capacity(100);
-        unsafe {
-            for t in tensors.iter() {
-                dfs_stack.push((t.as_ref().inner(), false));
-            }
+        for t in tensors.iter() {
+            dfs_stack.push((t.as_ref().inner(), false));
+        }
 
-            while let Some((node, is_parent)) = dfs_stack.pop() {
-                if is_parent {
-                    if would_not_visit(node, &node_info_map) {
-                        continue;
-                    }
+        while let Some((node, is_parent)) = dfs_stack.pop() {
+            if is_parent {
+                if would_not_visit(node, &node_info_map) {
+                    continue;
+                }
 
-                    // Aggregate input values for `node`. if any of the inputs failed, it's a total failure.
-                    let mut xs = InputArray::new();
-                    let (mut write_guards, mut read_guards) =
-                        (InputArray::new(), InputArray::new());
-                    let input_status = aggregate_op_inputs(
-                        node,
-                        self,
-                        &node_info_map,
-                        feeds,
-                        &storage,
-                        &mut xs,
-                        &mut read_guards,
-                        &mut write_guards,
-                    );
+                // Aggregate input values for `node`. if any of the inputs failed, it's a total failure.
+                let mut xs = InputArray::new();
+                let (mut write_guards, mut read_guards) =
+                    (InputArray::new(), InputArray::new());
+                let input_status = aggregate_op_inputs(
+                    node,
+                    self,
+                    &node_info_map,
+                    feeds,
+                    &storage,
+                    &mut xs,
+                    &mut read_guards,
+                    &mut write_guards,
+                );
 
-                    // run compute if `node`'s inputs were not failed
-                    let installed_node_info = input_status.and_then(|()| {
-                        let mut ctx = ComputeContext::new(node, xs);
-                        node.get_op().compute(&mut ctx);
-                        let ys = ctx.extract_outputs();
-                        debug_assert!(!ys.is_empty(), "Bad op implementation: empty return value");
-                        // register compute result
-                        install_compute_results(ys, &storage)
-                    });
-                    node_info_map.insert(node.id(), installed_node_info);
-                } else {
-                    // Update dfs stack
-                    dfs_stack.push((node, true));
-                    // Push children if needed
-                    for child in &node.in_edges {
-                        let child = child.get_internal(self);
-                        if !would_not_visit(child, &node_info_map) {
-                            dfs_stack.push((child, false));
-                        }
+                // run compute if `node`'s inputs were not failed
+                let installed_node_info = input_status.and_then(|()| {
+                    let mut ctx = ComputeContext::new(node, xs);
+                    node.get_op().compute(&mut ctx);
+                    let ys = ctx.extract_outputs();
+                    debug_assert!(!ys.is_empty(), "Bad op implementation: empty return value");
+                    // register compute result
+                    install_compute_results(ys, &storage)
+                });
+                node_info_map.insert(node.id(), installed_node_info);
+            } else {
+                // Update dfs stack
+                dfs_stack.push((node, true));
+                // Push children if needed
+                for child in &node.in_edges {
+                    let child = child.get_internal(self);
+                    if !would_not_visit(child, &node_info_map) {
+                        dfs_stack.push((child, false));
                     }
                 }
             }
