@@ -53,14 +53,18 @@ impl<'t, 'g, F: Float> Graph<F> {
 
     // `i` must be an id returned by Graph::install
     #[inline]
-    pub(crate) unsafe fn access_inner(&self, i: usize) -> &'t TensorInternal<F> {
-        &(*self.node_set.get())[i]
+    pub(crate) fn access_inner(&self, i: usize) -> &'t TensorInternal<F> {
+        unsafe {
+            &(*self.node_set.get())[i]
+        }
     }
 
     // `i` must be an id returned by Graph::install
     #[inline]
-    pub(crate) unsafe fn access_inner_mut(&self, i: usize) -> &'t mut TensorInternal<F> {
-        &mut (*self.node_set.get())[i]
+    pub(crate) fn access_inner_mut(&self, i: usize) -> &'t mut TensorInternal<F> {
+        unsafe {
+            &mut (*self.node_set.get())[i]
+        }
     }
 
     #[inline]
