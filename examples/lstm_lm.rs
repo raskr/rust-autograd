@@ -96,7 +96,7 @@ pub fn main() {
             grads.as_slice(),
             vars,
             &[sentences.given(
-                ndarray::arr2(&[[2., 3., 1.], [3., 0., 1.]])
+                ag::ndarray::arr2(&[[2., 3., 1.], [3., 0., 1.]])
                     .into_dyn()
                     .view(),
             )],
