@@ -65,13 +65,6 @@ pub(crate) fn as_shape<T: Float>(x: &NdArrayView<T>) -> Vec<usize> {
 }
 
 #[inline]
-pub(crate) fn expand_dims_view<T: Float>(x: NdArrayView<T>, axis: usize) -> NdArrayView<T> {
-    let mut shape = x.shape().to_vec();
-    shape.insert(axis, 1);
-    x.into_shape(shape).unwrap()
-}
-
-#[inline]
 pub(crate) fn expand_dims<T: Float>(x: NdArray<T>, axis: usize) -> NdArray<T> {
     let mut shape = x.shape().to_vec();
     shape.insert(axis, 1);
