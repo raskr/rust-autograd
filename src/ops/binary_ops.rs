@@ -293,16 +293,6 @@ fn maybe_reduce<'g, T: Float>(
         .build(graph, MaybeReduce)
 }
 
-fn broadcast_if_necessary<'g, T: Float>(
-    target_shape: &Tensor<'g, T>,
-    x: &Tensor<'g, T>,
-    graph: &'g Graph<T>,
-) -> Tensor<'g, T> {
-    Tensor::builder()
-        .set_ro_inputs(&[x, target_shape])
-        .set_shape(target_shape)
-        .build(graph, MaybeBroadcast)
-}
 macro_rules! impl_bin_op_forward {
     ($forward_name:ident, $bin_op:tt, $vms_op:ident, $vmd_op:ident) => {
         fn $forward_name<'v, T: Float>(x0: &NdArrayView<'v, T>, x1: &NdArrayView<'v, T>) -> NdArray<T>

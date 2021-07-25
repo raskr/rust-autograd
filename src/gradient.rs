@@ -194,7 +194,7 @@ pub(crate) fn symbolic_gradients<'t, 'g, T: Float>(
         let msg1: &str = "Not differentiable with given tensor(s).";
         let info = between_nodes.get_mut(x).expect(msg1);
         if !info.has_gradient {
-            panic!(msg1);
+            panic!("{}", msg1);
         }
         assert!(
             info.default_grad.is_none(),
