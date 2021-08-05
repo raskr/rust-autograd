@@ -2,7 +2,7 @@
 //!
 //! ## Motivation
 //! Machine learning is one of the field where Rust lagging behind other languages.
-//! The aim of this crate is to show that Rust has the capability to imprement efficient and full-featured dataflow graph naturally.
+//! The aim of this crate is to show that Rust has the capability to implement efficient and full-featured dataflow graph naturally.
 //! Moreover, the core of this crate is quite small compared to others (due to being implemented in pure Rust and ndarray),
 //! therefore it might be reasonable for those who are not familiar with how this kind of library works.
 //!
