@@ -376,7 +376,9 @@ fn argx_helper<T: Float>(
                 .and(&maxed)
                 .apply(|r, f, m| {
                     let z = r == m && !*f;
-                    *f = z;
+                    if z {
+                        *f = true;
+                    }
                     *r = T::from(z as i32).unwrap();
                 });
         }

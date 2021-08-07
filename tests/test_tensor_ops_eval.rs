@@ -25,6 +25,15 @@ fn argmax() {
 }
 
 #[test]
+fn argmax2() {
+    with(|g| {
+        let test = g.constant(array![84.0, 16.0, 0.04, 85.0, 16.0, 85.0]);
+        let max_dis_index = g.argmax(test, 0, false);
+        assert_eq!(max_dis_index.eval(&[]), Ok(ndarray::arr0(3.).into_dyn()));
+    });
+}
+
+#[test]
 fn argmax_with_multi_max_args() {
     with(|g| {
         let x = g.constant(array![1., 2., 3., 3.]);
