@@ -1,5 +1,5 @@
-extern crate autograd as ag;
-extern crate ndarray;
+use autograd as ag;
+use ndarray;
 
 use ag::tensor::Variable;
 use ag::Graph;

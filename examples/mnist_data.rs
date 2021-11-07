@@ -1,4 +1,4 @@
-extern crate ndarray;
+use ndarray;
 use std::fs::File;
 use std::io;
 use std::io::Read;

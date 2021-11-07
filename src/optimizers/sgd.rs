@@ -7,7 +7,7 @@ use crate::Graph;
 /// Vanilla SGD optimizer
 ///
 /// ```
-/// extern crate autograd as ag;
+/// use autograd as ag;
 ///
 /// let sgd = ag::optimizers::sgd::SGD { lr: 0.1 };
 /// // let update_ops = sgd.compute_updates(params, grads)

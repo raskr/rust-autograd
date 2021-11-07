@@ -11,7 +11,7 @@ use std::sync::{Arc, RwLock};
 /// This implementation is based on http://arxiv.org/abs/1412.6980v8.
 ///
 /// ```
-/// extern crate autograd as ag;
+/// use autograd as ag;
 /// use ag::tensor::Variable;
 /// use ag::ndarray_ext::into_shared;
 /// use std::sync::{Arc, RwLock};

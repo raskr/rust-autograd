@@ -1,5 +1,5 @@
-extern crate autograd as ag;
-extern crate ndarray;
+use autograd as ag;
+use ndarray;
 
 use ag::ndarray_ext as array;
 use ag::optimizers::adam;
