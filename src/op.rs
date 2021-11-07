@@ -301,7 +301,7 @@ impl<'g, 't, 'v, T: Float> ComputeContext<'t, 'v, T> {
 /// Context of an `Op`'s gradient propagation phase.
 ///
 /// This is passed to an `Op` through `Op::grad`.
-/// `Op::grad` should provide the gradients of its inputs by calling `GradientContext::set_input_grads`.
+/// `Op::grad` should provide the gradients of its inputs by calling `GradientContext::append_input_grad`.
 ///
 /// Use `graph()` to access `Graph` object for tensor computations.
 ///
@@ -358,7 +358,7 @@ impl<'g, T: Float> GradientContext<'g, T> {
             mem::swap(&mut self.graph().access_inner_mut(id).op, &mut Some(stolen));
             debug_assert!(
                 !self.gxs.is_empty(),
-                "Bad Op impl: GradientContext::set_input_grads was not called"
+                "Bad Op impl: GradientContext::append_input_grad was not called"
             );
             self.gxs
         }
