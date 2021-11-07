@@ -1,6 +1,6 @@
 [package]
 name = "autograd"
-version = "1.1.1"
+version = "2.0.0-rc0"
 authors = ["raskr <janne.dc.ib.sa@gmail.com>"]
 edition = "2018"
 
@@ -14,18 +14,29 @@ documentation = "https://docs.rs/autograd/"
 [dependencies]
 rand = "0.8.0"
 rand_distr = "0.4.0"
-ndarray = "0.12.1"
+ndarray = { version = "0.14.0", features = ["serde", "approx"] }
 rayon = "1.0"
 libc = "0.2"
 matrixmultiply = "0.2.2"
-intel-mkl-src = { version="0.2.5", optional = true, default-features = true }
 num-traits = "0.2"
 num = "0.3"
 rustc-hash = "1.0.1"
 smallvec = "1.2.0"
+uuid = { version = "0.8", features = ["v4"] }
+serde = "1.0.120"
+serde_derive = "1.0.120"
+serde_json = "1.0"
+approx = "0.4.0"
+# -- blas deps
+blas-src = { version = "0.8", optional = true, default-features = false }
+intel-mkl-src = { version = "0.5", optional = true, default-features = false }
+cblas-sys = { version = "0.1.4", optional = true, default-features = false }
 
 [features]
-mkl = ["intel-mkl-src"]
+blas = []
+intel-mkl = ["intel-mkl-src", "cblas-sys"]
+accelerate = ["blas-src/accelerate", "cblas-sys"]
+openblas = ["blas-src/openblas", "cblas-sys"]
 
 [lib]
 name = "autograd"
@@ -43,5 +54,6 @@ path = "examples/lstm_lm.rs"
 name = "cnn_mnist"
 path = "examples/cnn_mnist.rs"
 
-#[profile.release]
-#debug = true
+[[example]]
+name = "sine"
+path = "examples/sine.rs"

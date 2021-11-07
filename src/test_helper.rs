@@ -1,24 +1,29 @@
 //! Provides helper functions for testing.
-use crate::runtime::Feed;
+use crate::evaluation::Feeder;
 use crate::tensor::Tensor;
-use crate::{ndarray_ext, Float};
+use crate::tensor_ops::*;
+use crate::{ndarray_ext, Context, Float};
 
 /// Checks the validity of `gradients` with finite difference trick.
 /// For this test only, `variables` must be *shared* variables.
-pub fn check_theoretical_grads<'s: 't, 't, 'v, T: Float, A>(
+pub fn check_theoretical_grads<'g, 't, 'v, F: Float, A>(
     objective: A,
     gradients: &'t [A],
     variables: &'t [A],
-    feeds: &'v [Feed<'v, T>],
-    eps: T,
-    tol: T,
+    feeder: Feeder<'v, F>,
+    eps: F,
+    tol: F,
+    g: &'g Context<F>,
 ) where
-    A: AsRef<Tensor<'s, T>> + Copy,
+    A: AsRef<Tensor<'g, F>> + Copy,
 {
-    let graph = objective.as_ref().graph;
-    let objective = graph.reduce_sum_to_scalar(objective);
+    let objective = sum(objective);
     // backprop
-    let theoretical_grads = graph.eval(gradients, feeds);
+    let theoretical_grads = g
+        .evaluator()
+        .extend(gradients)
+        .set_feeder(feeder.clone())
+        .run();
 
     // for each variable nodes
     for (var_node, th_grad) in variables.iter().zip(theoretical_grads) {
@@ -35,27 +40,45 @@ pub fn check_theoretical_grads<'s: 't, 't, 'v, T: Float, A>(
         };
 
         // for each values
-        let v_len = var_node
-            .as_ref()
-            .lock_variable_array()
-            .expect("This is not a variable")
+        let v_len = g
+            .env()
+            .get_array_by_id(
+                var_node
+                    .as_ref()
+                    .get_variable_id()
+                    .expect("This is not a variable"),
+            )
+            .expect("variable array not found")
+            .borrow()
             .len();
 
         for i in 0..v_len as isize {
             let evacuated;
             // +
             unsafe {
-                let mut guard_mut = var_node
-                    .as_ref()
-                    .lock_variable_array_mut()
-                    .expect("This is not a variable");
+                let mut guard_mut = g
+                    .env()
+                    .get_array_by_id(
+                        var_node
+                            .as_ref()
+                            .get_variable_id()
+                            .expect("This is not a variable"),
+                    )
+                    .expect("variable array not found")
+                    .borrow_mut();
                 let head = guard_mut.as_mut_ptr();
                 evacuated = *head.offset(i);
                 *head.offset(i) = evacuated + eps;
             }
 
             // eval
-            let obj_pos_orig = objective.eval(feeds).unwrap();
+            let obj_pos_orig = g
+                .evaluator()
+                .push(objective)
+                .set_feeder(feeder.clone())
+                .run()
+                .remove(0)
+                .unwrap();
             let obj_pos = if obj_pos_orig.is_standard_layout() {
                 obj_pos_orig
             } else {
@@ -64,16 +87,29 @@ pub fn check_theoretical_grads<'s: 't, 't, 'v, T: Float, A>(
 
             // -
             unsafe {
-                let mut guard_mut = var_node
-                    .as_ref()
-                    .lock_variable_array_mut()
-                    .expect("This is not a variable");
+                let mut guard_mut = g
+                    .env()
+                    .get_array_by_id(
+                        var_node
+                            .as_ref()
+                            .get_variable_id()
+                            .expect("This is not a variable"),
+                    )
+                    .expect("variable array not found")
+                    .borrow_mut();
+
                 let head = guard_mut.as_mut_ptr();
                 *head.offset(i) = evacuated - eps;
             }
 
             // eval
-            let obj_neg_orig = objective.eval(feeds).unwrap();
+            let obj_neg_orig = g
+                .evaluator()
+                .push(objective)
+                .set_feeder(feeder.clone())
+                .run()
+                .remove(0)
+                .unwrap();
             let obj_neg = if obj_neg_orig.is_standard_layout() {
                 obj_neg_orig
             } else {
@@ -82,15 +118,21 @@ pub fn check_theoretical_grads<'s: 't, 't, 'v, T: Float, A>(
 
             // restore
             unsafe {
-                let mut guard_mut = var_node
-                    .as_ref()
-                    .lock_variable_array_mut()
-                    .expect("This is not a variable");
+                let mut guard_mut = g
+                    .env()
+                    .get_array_by_id(
+                        var_node
+                            .as_ref()
+                            .get_variable_id()
+                            .expect("This is not a variable"),
+                    )
+                    .expect("variable array not found")
+                    .borrow_mut();
                 let head = guard_mut.as_mut_ptr();
                 *head.offset(i) = evacuated;
             }
 
-            let two = T::one() + T::one();
+            let two = F::one() + F::one();
             let g_num = (obj_pos - obj_neg).scalar_sum() / (two * eps);
             let g_th = unsafe { *th_ptr.offset(i) };
 

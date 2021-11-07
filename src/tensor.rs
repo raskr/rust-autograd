@@ -1,15 +1,16 @@
 //! Defining things related to `ag::Tensor`.
-use crate::op;
 use crate::Float;
+use crate::{op, Context};
 use crate::{NdArray, NdArrayView};
 
-use crate::graph::Graph;
-use crate::op::GradientContext;
+use crate::graph::{AsGraph, Graph};
+use crate::op::{GradientContext, InputArray, OpError};
+use crate::variable::VariableID;
+use std::cell::{Ref, RefMut};
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 use std::ops::{Add, Div, Mul, Sub};
-use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 /// Lazy N-dimensional array.
 ///
@@ -23,41 +24,59 @@ use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 ///
 /// ```
 /// use autograd as ag;
+/// use ag::tensor_ops as T;
+/// use ag::prelude::*;
 ///
-/// ag::with(|graph| {  // `Graph` is necessary to create tensors.
-///     // `random` is just a symbolic object belongs to `graph`.
-///     let random: ag::Tensor<f64> = graph.standard_normal(&[2, 3]);
+/// let mut env = ag::VariableEnvironment::new();
+/// let v = env.slot().set(ag::ndarray_ext::ones(&[2, 3])); // variable array id
+///
+/// env.run(|ctx| {  // `Context` is necessary to create tensors.
+///     // `random` is just a symbolic object in this context
+///     let random: ag::Tensor<f64> = T::standard_normal(&[2, 3], ctx);
+///
+///     // Getting the tensor associated with a pre-registered variable array.
+///     let var = ctx.variable(v);
 ///
 ///     // This is ok since tensor's binary operators are overloaded!
-///     let mul = random * 3.;
+///     let mul = random * 3. + var;
 ///
 ///     // Evaluates the symbolic tensor as an ndarray::Array<T, IxDyn>.
 ///     type NdArray = ag::NdArray<f64>;
-///     let mul_val: Result<NdArray, ag::EvalError> = mul.eval(&[]);
+///     let mul_val: Result<NdArray, ag::EvalError> = mul.eval(ctx);
 ///
 ///     // Reshapes the tensor without copy (ArrayView is used internally).
-///     let reshaped = graph.reshape(random, &[6]);
+///     let reshaped = T::reshape(random, &[6]);
 ///
 ///     // Evaluating multiple tensors at once.
 ///     // Note that although `random` node is required two times in this computation graph,
-///     // it's evaluated only once since `eval()` is smart enough to avoid duplicated computations.
-///     let pair: Vec<Result<NdArray, _>> = graph.eval(&[mul, reshaped], &[]);
+///     // it's evaluated only once since `Evaluator` is smart enough to avoid duplicated computations.
+///     let pair: Vec<Result<NdArray, _>> = ctx.evaluator().extend(&[mul, reshaped]).run();
 /// });
 /// ```
 #[derive(Clone, Copy)]
 pub struct Tensor<'graph, F: Float> {
-    pub(crate) id: usize,
+    pub(crate) id: usize, // tensor id in the graph
     pub(crate) graph: &'graph Graph<F>,
 }
 
 impl<'graph, F: Float> Tensor<'graph, F> {
+    pub(crate) fn input_tensors(&self) -> Ref<InputArray<Input>> {
+        Ref::map(self.inner(), |x| &x.in_nodes)
+    }
+
+    // Returns the i-th input node of this tensor
     pub(crate) fn input_tensor(&self, i: usize, g: &'graph Graph<F>) -> Option<Tensor<'graph, F>> {
-        unsafe { self.inner().in_edges.get(i).map(|x| x.as_tensor(g)) }
+        self.inner().in_nodes.get(i).map(|x| x.as_tensor(g))
     }
 
     #[inline]
-    pub(crate) unsafe fn inner<'t>(&self) -> &'t TensorInternal<F> {
+    pub(crate) fn inner<'t>(&self) -> Ref<TensorInternal<F>> {
         self.graph.access_inner(self.id)
+    }
+
+    #[inline]
+    pub(crate) fn inner_mut<'t>(&self) -> RefMut<TensorInternal<F>> {
+        self.graph.access_inner_mut(self.id)
     }
 
     /// Returns the graph to which this tensor belongs.
@@ -77,106 +96,112 @@ impl<'graph, F: Float> Tensor<'graph, F> {
     /// ```
     /// use ndarray::array;
     /// use autograd as ag;
+    /// use ag::tensor_ops as T;
     ///
-    /// ag::with(|g| {
-    ///    let a = g.zeros(&[2]);
-    ///    assert_eq!(a.eval(&[]), Ok(array![0., 0.].into_dyn()));
+    /// ag::run(|c| {
+    ///    let a = T::zeros(&[2], c);
+    ///    assert_eq!(a.eval(c), Ok(array![0., 0.].into_dyn()));
     /// });
     /// ```
     ///
     /// See also [Graph::eval](../graph/struct.Graph.html#method.eval).
-    pub fn eval<'v>(
-        &self,
-        feeds: &'v [crate::runtime::Feed<'v, F>],
-    ) -> Result<NdArray<F>, crate::EvalError> {
-        let mut ret = self.graph.eval(&[self], feeds);
+    pub fn eval<'v>(&self, ctx: &Context<F>) -> Result<NdArray<F>, crate::EvalError> {
+        crate::graph::assert_same_graph(ctx, self.graph);
+        let mut ret = ctx.eval(&[self], &[], ctx.env_handle);
         debug_assert_eq!(ret.len(), 1);
         ret.remove(0)
     }
 
-    /// Retruns a `Feed` assigning a given value to this (placeholder) tensor.
+    /// Ensures that this tensor is evaluated after the arguments.
     ///
-    /// Ensure that the return value is passed to `ag::Eval`, `ag::eval` or `Tensor::eval`.
-    ///
-    /// ```
-    /// use ndarray::array;
-    /// use autograd as ag;
-    ///
-    /// ag::with(|g| {
-    ///     let x = g.placeholder(&[2]);
-    ///
-    ///     // Fills the placeholder with an ArrayView, then eval.
-    ///     let value = array![1., 1.];
-    ///     x.eval(&[
-    ///         x.given(value.view())
-    ///     ]);
-    /// });
-    /// ```
-    pub fn given<D>(self, value: ndarray::ArrayView<F, D>) -> crate::runtime::Feed<F>
+    /// You can use the return value instead of `self`.
+    /// Panics if `self` is a source node, such as a variable or placeholder.
+    #[inline]
+    pub(crate) fn depends_on<A>(
+        self, // self is consumed
+        on: &[A],
+    ) -> Tensor<'graph, F>
     where
-        D: ndarray::Dimension,
+        A: AsRef<Tensor<'graph, F>> + Copy,
     {
-        assert!(
-            self.is_placeholder(),
-            "Receiver of Tensor::given must be a placeholder."
-        );
-        unsafe {
-            self.inner().validate_feed_shape(value.shape());
-        }
-        crate::runtime::Feed::new(self.id(), value.into_dyn())
+        crate::tensor_ops::depends_on(self, on)
     }
 
-    #[inline]
     /// Creates a new [TensorBuilder](struct.TensorBuilder.html).
-    pub fn builder() -> TensorBuilder<F> {
+    #[inline]
+    pub fn builder(graph: &'graph impl AsGraph<F>) -> TensorBuilder<'graph, F> {
         // Starts with default values
         TensorBuilder {
+            graph: graph.as_graph(),
             shape: None,
-            in_edges: op::InputArray::new(),
+            in_nodes: op::InputArray::new(),
             can_have_gradient: true,
-            constant_array: None,
-            variable_array: None,
-            is_placeholder: false,
+            placeholder_name: None,
             input_indices: None,
             backprop_inputs: None,
             known_shape: None,
+            variable_id: None,
         }
     }
 
-    // Registers a hook on the receiver tensor.
-    //
-    // ```
-    // use autograd as ag;
-    //
-    // ag::with(|g| {
-    //     let a: ag::Tensor<f32> = g.zeros(&[4, 2]).register_hook(ag::hook::Show);
-    //     let b: ag::Tensor<f32> = g.ones(&[2, 3]).register_hook(ag::hook::ShowShape);
-    //     let c = g.matmul(a, b);
-    //
-    //     c.eval(&[]);
-    //     // [[0.0, 0.0],
-    //     // [0.0, 0.0],
-    //     // [0.0, 0.0],
-    //     // [0.0, 0.0]] shape=[4, 2], strides=[2, 1], layout=C (0x1)
-    //
-    //     // [2, 3]
-    // });
-    // ```
+    /// Applies the given function to `x` and creates a new tensor.
+    ///
+    /// Useful in cases where you need to create a tensor using a run-time value of `x`.
+    /// ```
+    /// use autograd as ag;
+    /// use ag::tensor_ops::*;
+    ///
+    /// ag::run(|g| {
+    ///     let x: ag::Tensor<f32> = standard_uniform(&[2, 3], g);
+    ///     let sin = x.map(|arr| arr.map(|elem| elem.sin()));
+    ///
+    ///     sin.eval(g);
+    /// });
+    /// ```
+    pub fn map(
+        &self,
+        f: fn(crate::ndarray_ext::NdArrayView<F>) -> NdArray<F>,
+    ) -> Tensor<'graph, F>
+    {
+        crate::tensor_ops::map(self, f)
+    }
+
+    /// Registers a hook on the receiver tensor.
+    ///
+    /// ```
+    /// use autograd as ag;
+    /// use ag::tensor_ops::*;
+    ///
+    /// ag::run(|g| {
+    ///     let a: ag::Tensor<f32> = zeros((&[4, 2]).register_hook(ag::hooks::Show), g);
+    ///     let b: ag::Tensor<f32> = g.ones(&[2, 3]).register_hook(ag::hooks::ShowShape);
+    ///     let c = g.matmul(a, b);
+    ///
+    ///     c.eval(g);
+    ///     // [[0.0, 0.0],
+    ///     // [0.0, 0.0],
+    ///     // [0.0, 0.0],
+    ///     // [0.0, 0.0]] shape=[4, 2], strides=[2, 1], layout=C (0x1)
+    ///
+    ///     // [2, 3]
+    /// });
+    /// ```
     #[inline]
-    fn register_hook<H: crate::hook::Hook<F> + 'static>(self, hook: H) -> Tensor<'graph, F> {
-        Tensor::builder()
-            .append_input(&self)
-            .build(self.graph, crate::ops::hook_ops::HookOp::new(hook))
+    pub fn register_hook<H: crate::hooks::Hook<F> + 'static>(self, hook: H) -> Tensor<'graph, F> {
+        Tensor::builder(self.graph)
+            .append_input(&self, false)
+            .build(crate::tensor_ops::hook_ops::HookOp::new(hook))
     }
 
     /// Sets a hook that displays the evaluation result of the receiver tensor to stderr.
     ///
     /// ```
     /// use autograd as ag;
+    /// use ag::tensor_ops::*;
     ///
-    /// ag::with(|g| {
-    ///     let a: ag::Tensor<f32> = g.zeros(&[4, 2]).show();
-    ///     a.eval(&[]);
+    /// ag::run(|g| {
+    ///     let a: ag::Tensor<f32> = zeros(&[4, 2], g).show();
+    ///     a.eval(g);
     ///     // [[0.0, 0.0],
     ///     // [0.0, 0.0],
     ///     // [0.0, 0.0],
@@ -185,17 +210,18 @@ impl<'graph, F: Float> Tensor<'graph, F> {
     /// ```
     #[inline]
     pub fn show(self) -> Tensor<'graph, F> {
-        self.register_hook(crate::hook::Show)
+        self.register_hook(crate::hooks::Show)
     }
 
     /// Sets a hook that displays the evaluation result of the receiver tensor to stderr, with given prefix.
     ///
     /// ```
     /// use autograd as ag;
+    /// use ag::tensor_ops::*;
     ///
-    /// ag::with(|g| {
-    ///     let a: ag::Tensor<f32> = g.zeros(&[4, 2]).show_with("My value:");
-    ///     a.eval(&[]);
+    /// ag::run(|g| {
+    ///     let a: ag::Tensor<f32> = zeros(&[4, 2], g).show_with("My value:");
+    ///     a.eval(g);
     ///     // My value:
     ///     // [[0.0, 0.0],
     ///     // [0.0, 0.0],
@@ -206,66 +232,72 @@ impl<'graph, F: Float> Tensor<'graph, F> {
     /// ```
     #[inline]
     pub fn show_with(self, what: &'static str) -> Tensor<'graph, F> {
-        self.register_hook(crate::hook::ShowWith(what))
+        self.register_hook(crate::hooks::ShowWith(what))
     }
 
     /// Sets a hook that displays the shape of the evaluated receiver tensor to stderr.
     ///
     /// ```
     /// use autograd as ag;
+    /// use ag::tensor_ops::*;
     ///
-    /// ag::with(|g| {
-    ///     let a: ag::Tensor<f32> = g.zeros(&[2, 3]).show_shape();
-    ///     a.eval(&[]);
+    /// ag::run(|g| {
+    ///     let a: ag::Tensor<f32> = zeros(&[2, 3], g).show_shape();
+    ///     a.eval(g);
     ///     // [2, 3]
     /// });
     /// ```
     #[inline]
     pub fn show_shape(self) -> Tensor<'graph, F> {
-        self.register_hook(crate::hook::ShowShape)
+        self.register_hook(crate::hooks::ShowShape)
     }
 
     /// Sets a hook that displays the shape of the evaluated receiver tensor to stderr, with given prefix.
     ///
     /// ```
     /// use autograd as ag;
+    /// use ag::tensor_ops::*;
     ///
-    /// ag::with(|g| {
-    ///     let a: ag::Tensor<f32> = g.zeros(&[2, 3]).show_shape_with("My shape:");
-    ///     a.eval(&[]);
+    /// ag::run(|g| {
+    ///     let a: ag::Tensor<f32> = zeros(&[2, 3], g).show_shape_with("My shape:");
+    ///     a.eval(g);
     ///     // My shape:
     ///     // [2, 3]
     /// });
     /// ```
     #[inline]
     pub fn show_shape_with(self, what: &'static str) -> Tensor<'graph, F> {
-        self.register_hook(crate::hook::ShowShapeWith(what))
+        self.register_hook(crate::hooks::ShowShapeWith(what))
     }
 
     /// Sets a hook that displays the given string after evaluation of the receiver tensor.
     ///
     /// ```
     /// use autograd as ag;
+    /// use ag::tensor_ops::*;
     ///
-    /// ag::with(|g| {
-    ///     let a: ag::Tensor<f32> = g.zeros(&[2, 3]).print("This is `a`");
-    ///     a.eval(&[]);
+    /// ag::run(|g| {
+    ///     let a: ag::Tensor<f32> = zeros(&[2, 3], g).print("This is `a`");
+    ///     a.eval(g);
     ///     // This is `a`
     /// });
     /// ```
     #[inline]
     pub fn print(self, what: &'static str) -> Tensor<'graph, F> {
-        self.register_hook(crate::hook::Print(what))
+        self.register_hook(crate::hooks::Print(what))
     }
 
     /// Sets a hook that calls the given closure after evaluation of the receiver tensor.
     ///
     /// ```
     /// use autograd as ag;
+    /// use ag::tensor_ops::*;
     ///
-    /// ag::with(|g| {
-    ///     let a: ag::Tensor<f32> = g.zeros(&[2, 3]).raw_hook(|arr| println!("{:?}", arr));
-    ///     a.eval(&[]);
+    /// ag::run(|g| {
+    ///     let a: ag::Tensor<f32> = zeros(&[2, 3], g)
+    ///         .raw_hook(|arr| println!("{:?}", arr));
+    ///
+    ///     a.eval(g);
     /// });
     /// ```
     #[inline]
@@ -273,7 +305,7 @@ impl<'graph, F: Float> Tensor<'graph, F> {
         self,
         f: FUN,
     ) -> Tensor<'graph, F> {
-        self.register_hook(crate::hook::Raw {
+        self.register_hook(crate::hooks::Raw {
             raw: f,
             phantom: PhantomData,
         })
@@ -288,78 +320,73 @@ impl<'graph, F: Float> Tensor<'graph, F> {
     /// Returns the number of inputs of this tensor.
     #[inline]
     pub fn num_inputs(&self) -> usize {
-        unsafe { self.inner().num_inputs() }
+        self.inner().num_inputs()
     }
 
     /// Returns the number of inputs of this tensor.
     #[inline]
     pub fn num_backprop_inputs(&self) -> usize {
-        unsafe {
-            let inner = self.inner();
-            inner
-                .backprop_inputs
-                .as_ref()
-                .unwrap_or(&inner.in_edges)
-                .len()
-        }
+        let inner = self.inner();
+        inner
+            .backprop_inputs
+            .as_ref()
+            .unwrap_or(&inner.in_nodes)
+            .len()
     }
 
     #[inline]
     /// Returns true if this node has no incoming nodes.
     pub fn is_source(&self) -> bool {
-        unsafe { self.inner().is_source() }
+        self.inner().is_source()
     }
 
     #[inline]
-    /// Input nodes used when backprop.
-    ///
-    pub fn get_backprop_input(&self, idx: usize) -> Input {
-        unsafe { self.inner().get_backprop_inputs()[idx].clone() }
+    pub(crate) fn get_variable_id(&self) -> Option<VariableID> {
+        self.inner().variable_id
+    }
+
+    #[inline]
+    /// Input node used when backprop.
+    pub fn get_backprop_input(&self, idx: usize) -> Tensor<'graph, F> {
+        self.graph
+            .tensor(self.inner().get_backprop_inputs()[idx].id)
     }
 
     #[inline]
     pub fn is_placeholder(&self) -> bool {
-        unsafe { self.inner().is_placeholder }
+        self.inner().placeholder_name.is_some()
     }
 
     #[inline]
-    pub fn clone_persistent_array(&self) -> Option<NdArray<F>> {
-        unsafe { self.inner().clone_persistent_array() }
+    pub fn placeholder_name(&self) -> Option<&str> {
+        self.inner().placeholder_name
     }
 
     #[inline]
-    pub fn get_variable_array(&self) -> Option<&Arc<RwLock<NdArray<F>>>> {
-        unsafe {
-            // self.inner().variable_array.as_ref().map(|x| x.clone())
-            self.inner().variable_array.as_ref()
+    pub fn validate_using_known_shape(&self, shape: &[usize]) {
+        if let Some(ref known_shape) = self.inner().known_shape {
+            if !known_shape.validate(shape) {
+                panic!(
+                    "Shape error: placeholder required {:?}, but got {:?}",
+                    known_shape.get(),
+                    shape
+                );
+            }
+        } else {
+            panic!("This is not a placeholder");
         }
     }
 
     #[inline]
-    pub fn get_variable_array_ptr(&self) -> Option<*const RwLock<NdArray<F>>> {
-        unsafe { self.inner().get_variable_array_inner() }
-    }
-
-    #[inline]
-    pub fn lock_variable_array(&self) -> Option<RwLockReadGuard<NdArray<F>>> {
-        unsafe { self.inner().lock_variable_array() }
-    }
-
-    #[inline]
-    pub fn lock_variable_array_mut(&self) -> Option<RwLockWriteGuard<NdArray<F>>> {
-        unsafe { self.inner().lock_variable_array_mut() }
-    }
-
-    #[inline]
     pub fn is_differentiable(&self) -> bool {
-        unsafe { self.inner().is_differentiable }
+        self.inner().is_differentiable
     }
 
     /// True is this tensor was created by `Graph::variable`.
     #[inline]
-    #[allow(dead_code)]
+    #[allow(unused)]
     pub(crate) fn is_variable(&self) -> bool {
-        unsafe { self.inner().variable_array.is_some() }
+        self.inner().is_variable()
     }
 }
 
@@ -371,38 +398,26 @@ impl<'b, T: Float> AsRef<Tensor<'b, T>> for Tensor<'b, T> {
 }
 
 pub(crate) struct TensorInternal<F: Float> {
+    /// Tensor ID. Unique in the graph which this tensor belongs to.
     pub(crate) id: usize,
 
-    // Operation to evaluate this tensor.
+    /// Operation to evaluate this tensor.
     pub(crate) op: Option<Box<dyn op::Op<F>>>,
 
-    // References to immediate predecessors.
-    pub(crate) in_edges: op::InputArray<Input>,
+    /// References to immediate predecessors.
+    pub(crate) in_nodes: op::InputArray<Input>,
 
-    // The rank number for topological ordering in a graph.
-    pub(crate) top_rank: usize,
+    /// The rank number for topological ordering in a graph.
+    pub(crate) topo_rank: usize,
 
-    // *Symbolic* shape of this tensor.
+    /// *Symbolic* shape of this tensor.
     pub(crate) shape: Option<usize>,
 
-    // An optional *persistent* NdArray.
-    //
-    // This is `Some` if this tensor is made from `ag::variable`.
-    pub(crate) variable_array: Option<Arc<RwLock<NdArray<F>>>>,
+    /// placeholder name
+    pub(crate) placeholder_name: Option<&'static str>,
 
-    // An optional *persistent* NdArray.
-    //
-    // This is `Some` if this tensor is made from `ag::constant`.
-    pub(crate) constant_array: Option<Arc<NdArray<F>>>,
-
-    // This tensor is placeholder or not.
-    pub(crate) is_placeholder: bool,
-
-    // This is true if this tensor can have gradient for any objectives.
+    /// This is true if this tensor can have gradient for any objectives.
     pub(crate) is_differentiable: bool,
-
-    // This is `Some` if this tensor is made from `ag::constant` or `ag::variable`.
-    pub(crate) has_persistent_array: bool,
 
     /// Input indices of arrays used in `compute`
     pub(crate) input_indices: op::InputArray<usize>,
@@ -415,6 +430,9 @@ pub(crate) struct TensorInternal<F: Float> {
     /// Static shape of this tensor.
     /// Each dim size is *signed* for placeholders.
     pub(crate) known_shape: Option<KnownShape>,
+
+    /// ID to lookup variable array in VariableEnvironment
+    pub(crate) variable_id: Option<VariableID>,
 }
 
 impl<F: Float> TensorInternal<F> {
@@ -433,71 +451,19 @@ impl<F: Float> TensorInternal<F> {
     #[inline]
     /// Returns true if this node has no incoming nodes.
     pub(crate) fn is_source(&self) -> bool {
-        self.in_edges.is_empty()
+        self.in_nodes.is_empty()
+    }
+
+    #[inline]
+    /// Returns true if this node has no incoming nodes.
+    pub(crate) fn is_variable(&self) -> bool {
+        self.variable_id.is_some()
     }
 
     /// Returns the number of inputs of this tensor.
     #[inline]
     pub(crate) fn num_inputs(&self) -> usize {
-        self.in_edges.len()
-    }
-
-    /// Returns a reference to the persistent constant array.
-    ///
-    /// Note that this is `Some` if this tensor derived from `ag::constant`; otherwise `None`
-    #[inline]
-    pub(crate) fn get_variable_array_inner(&self) -> Option<*const RwLock<NdArray<F>>> {
-        match &self.variable_array {
-            Some(ref inner) => Some(&**inner),
-            None => None,
-        }
-    }
-
-    /// Returns a reference to the persistent constant array.
-    ///
-    /// Note that this is `Some` if this tensor derived from `ag::constant`; otherwise `None`
-    #[inline]
-    pub(crate) fn get_constant_array_inner(&self) -> Option<&NdArray<F>> {
-        match &self.constant_array {
-            Some(ref inner) => Some(&**inner),
-            None => None,
-        }
-    }
-
-    /// Locks the persistent variable tensor and returns the handle.
-    ///
-    /// Note that this is `Some` if this tensor derived from `ag::variable`; otherwise `None`.
-    #[inline]
-    pub(crate) fn lock_variable_array(&self) -> Option<RwLockReadGuard<NdArray<F>>> {
-        if let Some(ref arr) = self.variable_array {
-            Some(arr.read().unwrap())
-        } else {
-            None
-        }
-    }
-
-    /// Returns a mutable reference to the persistent array.
-    ///
-    /// Note that this is `Some` if this tensor derived from `ag::variable`; otherwise `None`
-    #[inline]
-    pub(crate) fn lock_variable_array_mut(&self) -> Option<RwLockWriteGuard<NdArray<F>>> {
-        if let Some(ref arr) = self.variable_array {
-            Some(arr.write().unwrap())
-        } else {
-            None
-        }
-    }
-
-    /// Returns a cloned persistent array.
-    #[inline]
-    pub(crate) fn clone_persistent_array(&self) -> Option<NdArray<F>> {
-        if let Some(ref arr) = self.variable_array {
-            Some((*arr.read().unwrap()).clone())
-        } else if let Some(ref arr) = self.constant_array {
-            Some((**arr).clone())
-        } else {
-            None
-        }
+        self.in_nodes.len()
     }
 
     /// True if the op of this tensor is differentiable
@@ -508,25 +474,13 @@ impl<F: Float> TensorInternal<F> {
     }
 
     #[inline]
-    pub(crate) fn validate_feed_shape(&self, shape: &[usize]) {
-        debug_assert!(self.is_placeholder);
-        if !self.known_shape.as_ref().unwrap().validate(shape) {
-            panic!(
-                "Shape error: placeholder required {:?}, but got {:?}",
-                self.known_shape.as_ref().unwrap().get(),
-                shape
-            );
-        }
-    }
-
-    #[inline]
     /// Input nodes used when backprop.
     ///
     /// This is same as `inputs` in most cases.
     pub(crate) fn get_backprop_inputs(&self) -> &[Input] {
         self.backprop_inputs
             .as_ref()
-            .unwrap_or(&self.in_edges)
+            .unwrap_or(&self.in_nodes)
             .as_slice()
     }
 }
@@ -538,8 +492,8 @@ impl<T: Float> fmt::Debug for TensorInternal<T> {
             "Node name: {}, id: {}, num of inputs: {}, in-edges: {:?}",
             self.get_op().name(),
             self.id(),
-            self.in_edges.len(),
-            self.in_edges
+            self.in_nodes.len(),
+            self.in_nodes
         )
     }
 }
@@ -581,7 +535,7 @@ impl<T: Float> fmt::Display for TensorInternal<T> {
 /// Use `new` to create an immutable input, or `new_mut` to create a modifiable one.
 /// See also [TensorBuilder](struct.TensorBuilder.html).
 #[derive(Clone, Debug)]
-pub struct Input {
+pub(crate) struct Input {
     pub(crate) id: usize,
     pub(crate) mut_usage: bool,
 }
@@ -589,34 +543,24 @@ pub struct Input {
 impl<'graph> Input {
     /// Instantiates a new immutable `Input` object.
     ///
-    /// Run-time value of `val` is passed as an `ndarray::ArrayView` in `Op::compute`.
+    /// Run-time value of `val` is passed as an `ndarray::ArrayView` or `ndarray::ArrayViewMut`
+    /// in `Op::compute` depending on `mut_usage`.
     #[inline]
-    pub fn new<F: Float>(val: &Tensor<'graph, F>) -> Input {
+    pub(crate) fn new<F: Float>(val: &Tensor<'graph, F>, mut_usage: bool) -> Input {
         Input {
             id: val.id(),
-            mut_usage: false,
+            mut_usage,
         }
     }
 
-    /// Instantiates a new mutable `Input` object.
-    ///
-    /// Run-time value of `val` is passed as an `ArrayViewMut` in `Op::compute`.
-    #[inline]
-    pub fn new_mut<F: Float>(val: &Tensor<'graph, F>) -> Input {
-        Input {
-            id: val.id(),
-            mut_usage: true,
-        }
-    }
-
-    #[inline]
-    pub fn as_tensor<F: Float>(&self, graph: &'graph Graph<F>) -> Tensor<'graph, F> {
+    #[inline(always)]
+    pub(crate) fn as_tensor<F: Float>(&self, graph: &'graph Graph<F>) -> Tensor<'graph, F> {
         graph.tensor(self.id)
     }
 
     #[inline]
-    pub(crate) unsafe fn get_internal<F: Float>(&self, graph: &Graph<F>) -> &TensorInternal<F> {
-        graph.access_inner(self.id)
+    pub(crate) fn variable_id<F: Float>(&self, graph: &Graph<F>) -> Option<VariableID> {
+        graph.access_inner(self.id).variable_id
     }
 }
 
@@ -625,57 +569,59 @@ impl<'graph> Input {
 /// This structure is required only when constructing user-defined `Op`.
 /// ```
 /// use autograd as ag;
-/// use ag::tensor::Input;
+/// use ag::op::{Op, OpError, ComputeContext, GradientContext};
+    /// use ag::tensor_ops::*;
 ///
 /// struct DummyOp {
 ///    a: f32
 /// }
 ///
-/// impl ag::op::Op<f32> for DummyOp {
-///     fn compute(&self, _: &mut ag::op::ComputeContext<f32>) {}
-///     fn grad(&self, _: &mut ag::op::GradientContext<f32>) {}
+/// impl Op<f32> for DummyOp {
+///     fn compute(&self, _: &mut ComputeContext<f32>) -> Result<(), OpError> { Ok(()) }
+///     fn grad(&self, _: &mut GradientContext<f32>) {}
 /// }
 ///
-/// ag::with(|g: &mut ag::Graph<f32>| {
-///     let input = &g.zeros(&[0]);
-///     let my_output: ag::Tensor<_> = ag::Tensor::builder()
-///         .set_inputs(&[
-///             Input::new(input), // immutable input
-///             Input::new_mut(input) // mutable input
-///         ])
-///         .build(g, DummyOp {a: 42.});
+/// ag::run(|g: &mut ag::Context<f32>| {
+///     let input = &zeros((&[0]), g);
+///     let my_output: ag::Tensor<_> = ag::Tensor::builder(g)
+///         .append_input(input, false) // immutable input
+///         .append_input(input, true)  // mutable input
+///         .build(DummyOp {a: 42.});
 /// });
 /// ```
-pub struct TensorBuilder<F: Float> {
+pub struct TensorBuilder<'g, F: Float> {
+    graph: &'g Graph<F>,
     shape: Option<usize>,
-    in_edges: op::InputArray<Input>,
+    in_nodes: op::InputArray<Input>,
     can_have_gradient: bool,
-    is_placeholder: bool,
-    constant_array: Option<Arc<NdArray<F>>>,
-    variable_array: Option<Arc<RwLock<NdArray<F>>>>,
     input_indices: Option<op::InputArray<usize>>,
     backprop_inputs: Option<op::InputArray<Input>>,
     known_shape: Option<KnownShape>,
+    variable_id: Option<VariableID>,
+    placeholder_name: Option<&'static str>,
 }
 
+const NUM_MAX_KNOWN_SHAPE_SIZE: usize = 4;
+
 pub(crate) struct KnownShape {
-    shape: Vec<isize>,
+    shape: SmallVec<[isize; NUM_MAX_KNOWN_SHAPE_SIZE]>,
     #[allow(dead_code)]
     is_fully_defined: bool,
 }
 
 impl KnownShape {
-    pub(crate) fn new(shape: Vec<isize>) -> Self {
+    pub(crate) fn new(shape: &[isize]) -> Self {
         let mut is_fully_defined = true;
-        for &a in &shape {
+        for &a in shape {
             if a == -1 {
                 is_fully_defined = false;
             } else if a <= -1 || a == 0 {
                 panic!("Given shape ({:?}) contains invalid dim size(s)", &shape);
             }
         }
+
         Self {
-            shape,
+            shape: SmallVec::from(shape),
             is_fully_defined,
         }
     }
@@ -705,115 +651,106 @@ impl KnownShape {
 }
 
 #[test]
-fn test_build() {
-    crate::with(|s| {
-        let a: Tensor<f32> = s.zeros(&[4, 2]);
-        let v: Tensor<f32> = s.zeros(&[2, 3]);
-        let b: Tensor<f32> = s.zeros(&[4, 3]);
-        let z = s.matmul(a, v) + b;
-        unsafe {
-            let mut vars = [a.inner(), v.inner(), b.inner(), z.inner()];
-            // `sort_by_key` don't reverse the order of `a` and `v`
-            vars.sort_by_key(|a| a.top_rank);
-            assert_eq!(vars, [a.inner(), v.inner(), b.inner(), z.inner()])
-        }
+fn test_topo_order() {
+    use crate::tensor_ops as T;
+    crate::run(|g| {
+        let a: Tensor<f32> = T::zeros(&[4, 2], g);
+        let v: Tensor<f32> = T::zeros(&[2, 3], g);
+        let b: Tensor<f32> = T::zeros(&[4, 3], g);
+        let z = T::matmul(a, v) + b;
+        let mut vars = [a.inner(), v.inner(), b.inner(), z.inner()];
+        // `sort_by_key` don't reverse the order of `a` and `v`
+        vars.sort_by_key(|a| a.topo_rank);
+        assert_eq!(vars[0].id, a.id);
+        assert_eq!(vars[1].id, v.id);
+        assert_eq!(vars[2].id, b.id);
+        assert_eq!(vars[3].id, z.id);
     });
 }
 
-impl<'graph, F: Float> TensorBuilder<F> {
+impl<'graph, F: Float> TensorBuilder<'graph, F> {
     #[inline]
-    pub(crate) fn set_known_shape(mut self, s: Vec<isize>) -> TensorBuilder<F> {
+    pub(crate) fn set_variable(mut self, s: VariableID) -> TensorBuilder<'graph, F> {
+        self.variable_id = Some(s);
+        self
+    }
+
+    #[inline]
+    pub(crate) fn set_known_shape(mut self, s: &[isize]) -> TensorBuilder<'graph, F> {
         self.known_shape = Some(KnownShape::new(s));
         self
     }
 
     #[inline]
-    pub(crate) fn set_shape(mut self, s: &Tensor<'graph, F>) -> TensorBuilder<F> {
+    pub(crate) fn set_shape(mut self, s: &Tensor<'graph, F>) -> TensorBuilder<'graph, F> {
         self.shape = Some(s.id());
         self
     }
 
     #[inline]
-    pub fn set_differentiable(mut self, differentiable: bool) -> TensorBuilder<F> {
+    pub fn set_differentiable(mut self, differentiable: bool) -> TensorBuilder<'graph, F> {
         self.can_have_gradient = differentiable;
         self
     }
 
     #[inline]
-    /// Sets input tensors.
-    /// See also [Input](struct.Input.html).
-    pub fn set_inputs(mut self, a: &[Input]) -> TensorBuilder<F> {
-        self.in_edges = op::InputArray::from(a);
+    /// Appends input tensor.
+    ///
+    /// `bool` indicates whether this tensor should be treated as mutable input or not.
+    pub fn append_input<T: AsRef<Tensor<'graph, F>>>(
+        mut self,
+        tensor: T,
+        mut_usage: bool,
+    ) -> TensorBuilder<'graph, F> {
+        let t = tensor.as_ref();
+        crate::graph::assert_same_graph(t.graph, self.graph);
+        self.in_nodes.push(Input::new(t, mut_usage));
         self
     }
 
     #[inline]
-    /// Sets input tensors (vector).
-    /// See also [Input](struct.Input.html).
-    pub fn set_inputs_vec(mut self, a: Vec<Input>) -> TensorBuilder<F> {
-        self.in_edges = op::InputArray::from_vec(a);
+    pub(crate) fn set_placeholder_name(mut self, a: &'static str) -> TensorBuilder<'graph, F> {
+        self.placeholder_name = Some(a);
         self
     }
 
     #[inline]
-    /// Sets read-only input tensors.
-    pub(crate) fn set_ro_inputs(mut self, a: &[&Tensor<F>]) -> TensorBuilder<F> {
-        for &x in a {
-            self.in_edges.push(Input::new(x));
-        }
-        self
-    }
-
-    #[inline]
-    pub(crate) fn append_input(mut self, val: &Tensor<F>) -> TensorBuilder<F> {
-        self.in_edges.push(Input::new(val));
-        self
-    }
-
-    #[inline]
-    pub(crate) fn set_is_placeholder(mut self, a: bool) -> TensorBuilder<F> {
-        self.is_placeholder = a;
-        self
-    }
-
-    #[inline]
-    pub(crate) fn set_constant_array(mut self, a: Arc<NdArray<F>>) -> TensorBuilder<F> {
-        self.constant_array = Some(a);
-        self
-    }
-
-    #[inline]
-    pub(crate) fn set_variable_array(mut self, a: Arc<RwLock<NdArray<F>>>) -> TensorBuilder<F> {
-        self.variable_array = Some(a);
-        self
-    }
-
-    #[inline]
-    pub(crate) fn set_input_indices(mut self, a: &[usize]) -> TensorBuilder<F> {
+    pub(crate) fn set_input_indices(mut self, a: &[usize]) -> TensorBuilder<'graph, F> {
         self.input_indices = Some(op::InputArray::from_slice(a));
         self
     }
 
     #[inline]
-    /// Sets inputs for backprop.
+    /// Append the given tensor to the backprop-input-list.
     ///
     /// Not required unless backprop-inputs are differs from normal-case inputs
-    pub fn set_backprop_inputs(mut self, a: &[Input]) -> TensorBuilder<F> {
-        self.backprop_inputs = Some(op::InputArray::from(a));
+    pub fn append_backprop_input<T: AsRef<Tensor<'graph, F>>>(
+        mut self,
+        a: T,
+    ) -> TensorBuilder<'graph, F> {
+        crate::graph::assert_same_graph(a.as_ref().graph, self.graph);
+        if let Some(ref mut inputs) = self.backprop_inputs {
+            inputs.push(Input::new(a.as_ref(), false));
+        } else {
+            let mut inputs = InputArray::new();
+            inputs.push(Input::new(a.as_ref(), false));
+            self.backprop_inputs = Some(inputs);
+        }
         self
     }
 
     /// Finalizes this builder and creates a tensor with given `Op` in the graph.
-    pub fn build<O>(self, graph: &'graph Graph<F>, op: O) -> Tensor<'graph, F>
+    pub fn build<O>(self, op: O) -> Tensor<'graph, F>
     where
         O: op::Op<F> + 'static,
     {
-        let rank = if self.in_edges.is_empty() {
+        let graph = self.graph;
+        let rank = if self.in_nodes.is_empty() {
             0
         } else {
-            self.in_edges
+            self.in_nodes
                 .iter()
-                .map(|a| unsafe { a.get_internal(graph).top_rank })
+                .map(|a| graph.access_inner(a.id).topo_rank)
                 .max()
                 .map(|a| a + 1)
                 .unwrap_or(0)
@@ -822,29 +759,27 @@ impl<'graph, F: Float> TensorBuilder<F> {
         let input_indices = if let Some(a) = self.input_indices {
             assert_eq!(
                 a.len(),
-                self.in_edges.len(),
+                self.in_nodes.len(),
                 "input_indices.len() must match inputs length"
             );
             a
         } else {
-            smallvec::smallvec!(0; self.in_edges.len())
+            smallvec::smallvec!(0; self.in_nodes.len())
         };
 
         let new = TensorInternal {
             // `id` is set in `Graph::install`
             id: usize::default(),
             op: Some(Box::new(op)),
-            in_edges: self.in_edges,
-            top_rank: rank,
+            in_nodes: self.in_nodes,
+            topo_rank: rank,
             shape: self.shape,
-            has_persistent_array: self.variable_array.is_some() || self.constant_array.is_some(),
-            variable_array: self.variable_array,
-            constant_array: self.constant_array,
-            is_placeholder: self.is_placeholder,
             is_differentiable: self.can_have_gradient,
             input_indices,
             backprop_inputs: self.backprop_inputs,
             known_shape: self.known_shape,
+            variable_id: self.variable_id,
+            placeholder_name: self.placeholder_name,
         };
         Tensor {
             id: graph.install(new),
@@ -856,26 +791,32 @@ impl<'graph, F: Float> TensorBuilder<F> {
 pub(crate) struct Dummy;
 
 impl<T: Float> crate::op::Op<T> for Dummy {
-    fn compute(&self, _: &mut crate::op::ComputeContext<T>) {}
+    fn compute(&self, _: &mut crate::op::ComputeContext<T>) -> Result<(), OpError> {
+        Ok(())
+    }
     fn grad(&self, _: &mut GradientContext<T>) {}
 }
 
-// -- std::ops::{Add, Sub, Mul, Div} implementations --
+use crate::evaluation::PlaceholderKey;
+use crate::tensor_ops as T;
+use smallvec::SmallVec;
+
+// -- std::tensor_ops::{Add, Sub, Mul, Div} implementations --
 macro_rules! impl_bin_op_between_tensor_and_float_trait {
     ($trt:ident, $func:ident, $op:ident) => {
         // Tensor op Float
-        impl<'b, T: Float> $trt<T> for Tensor<'b, T> {
-            type Output = Tensor<'b, T>;
-            fn $func(self, rhs: T) -> Self::Output {
-                self.graph.$func(&self, &self.graph.scalar(rhs))
+        impl<'b, F: Float> $trt<F> for Tensor<'b, F> {
+            type Output = Tensor<'b, F>;
+            fn $func(self, rhs: F) -> Self::Output {
+                T::$func(&self, &T::scalar(rhs, self.graph))
             }
         }
 
         // &Tensor op Float
-        impl<'l, 'b, T: Float> $trt<T> for &'l Tensor<'b, T> {
-            type Output = Tensor<'b, T>;
-            fn $func(self, rhs: T) -> Self::Output {
-                self.graph.$func(self, &self.graph.scalar(rhs))
+        impl<'l, 'b, F: Float> $trt<F> for &'l Tensor<'b, F> {
+            type Output = Tensor<'b, F>;
+            fn $func(self, rhs: F) -> Self::Output {
+                T::$func(self, &T::scalar(rhs, self.graph))
             }
         }
     };
@@ -884,20 +825,18 @@ macro_rules! impl_bin_op_between_tensor_and_float_trait {
 macro_rules! impl_bin_op_between_tensor_and_primitive {
     ($trt:ident, $func:ident, $op:ident, $scalar_type:ty) => {
         // primitive op Tensor
-        impl<'r, 'b, T: Float> $trt<Tensor<'b, T>> for $scalar_type {
-            type Output = Tensor<'b, T>;
-            fn $func(self, rhs: Tensor<'b, T>) -> Self::Output {
-                rhs.graph
-                    .$func(&rhs.graph.scalar(T::from(self).unwrap()), &rhs)
+        impl<'r, 'b, F: Float> $trt<Tensor<'b, F>> for $scalar_type {
+            type Output = Tensor<'b, F>;
+            fn $func(self, rhs: Tensor<'b, F>) -> Self::Output {
+                T::$func(&T::scalar(F::from(self).unwrap(), rhs.graph), &rhs)
             }
         }
 
         // primitive op &Tensor
-        impl<'r, 'b, T: Float> $trt<&'r Tensor<'b, T>> for $scalar_type {
-            type Output = Tensor<'b, T>;
-            fn $func(self, rhs: &'r Tensor<'b, T>) -> Self::Output {
-                rhs.graph
-                    .$func(&rhs.graph.scalar(T::from(self).unwrap()), rhs)
+        impl<'r, 'b, F: Float> $trt<&'r Tensor<'b, F>> for $scalar_type {
+            type Output = Tensor<'b, F>;
+            fn $func(self, rhs: &'r Tensor<'b, F>) -> Self::Output {
+                T::$func(&T::scalar(F::from(self).unwrap(), rhs.graph), rhs)
             }
         }
     };
@@ -921,35 +860,35 @@ impl_bin_op_between_tensor_and_primitive!(Div, div, DivOp, f32);
 macro_rules! impl_bin_op_between_tensors {
     ($trt:ident, $func:ident, $op:ident) => {
         // Tensor op Tensor
-        impl<'b, T: Float> $trt for Tensor<'b, T> {
-            type Output = Tensor<'b, T>;
-            fn $func(self, rhs: Tensor<'b, T>) -> Self::Output {
-                self.graph.$func(&self, &rhs)
+        impl<'b, F: Float> $trt for Tensor<'b, F> {
+            type Output = Tensor<'b, F>;
+            fn $func(self, rhs: Tensor<'b, F>) -> Self::Output {
+                T::$func(&self, &rhs)
             }
         }
 
         // Tensor op &Tensor
-        impl<'r, 'b, T: Float> $trt<&'r Tensor<'b, T>> for Tensor<'b, T> {
-            type Output = Tensor<'b, T>;
-            fn $func(self, rhs: &'r Tensor<'b, T>) -> Self::Output {
-                self.graph.$func(&self, rhs)
+        impl<'r, 'b, F: Float> $trt<&'r Tensor<'b, F>> for Tensor<'b, F> {
+            type Output = Tensor<'b, F>;
+            fn $func(self, rhs: &'r Tensor<'b, F>) -> Self::Output {
+                T::$func(&self, rhs)
             }
         }
 
         // &Tensor op Tensor
-        impl<'l, 'b, T: Float> $trt<Tensor<'b, T>> for &'l Tensor<'b, T> {
-            type Output = Tensor<'b, T>;
-            fn $func(self, rhs: Tensor<'b, T>) -> Self::Output {
-                self.graph.$func(self, &rhs)
+        impl<'l, 'b, F: Float> $trt<Tensor<'b, F>> for &'l Tensor<'b, F> {
+            type Output = Tensor<'b, F>;
+            fn $func(self, rhs: Tensor<'b, F>) -> Self::Output {
+                T::$func(self, &rhs)
             }
         }
 
         // &Tensor op &Tensor
         // lifetime of the two tensors are unrelated
-        impl<'l, 'r, 'b, T: Float> $trt<&'r Tensor<'b, T>> for &'l Tensor<'b, T> {
-            type Output = Tensor<'b, T>;
-            fn $func(self, rhs: &'r Tensor<'b, T>) -> Self::Output {
-                self.graph.$func(self, rhs)
+        impl<'l, 'r, 'b, F: Float> $trt<&'r Tensor<'b, F>> for &'l Tensor<'b, F> {
+            type Output = Tensor<'b, F>;
+            fn $func(self, rhs: &'r Tensor<'b, F>) -> Self::Output {
+                T::$func(self, rhs)
             }
         }
     };
@@ -961,28 +900,28 @@ impl_bin_op_between_tensors!(Mul, mul, MulOp);
 impl_bin_op_between_tensors!(Div, div, DivOp);
 
 /// Implementors can be converted to `Tensor`.
-pub trait AsTensor<'graph, T: Float> {
-    fn as_tensor(&self, graph: &'graph Graph<T>) -> Tensor<'graph, T>;
+pub trait AsTensor<'graph, F: Float> {
+    fn as_tensor(&self, graph: &'graph impl AsGraph<F>) -> Tensor<'graph, F>;
 }
 
-impl<'graph, T: Float> AsTensor<'graph, T> for Tensor<'graph, T> {
-    fn as_tensor(&self, _: &'graph Graph<T>) -> Tensor<'graph, T> {
+impl<'graph, F: Float> AsTensor<'graph, F> for Tensor<'graph, F> {
+    fn as_tensor(&self, _: &'graph impl AsGraph<F>) -> Tensor<'graph, F> {
         *self
     }
 }
 
 macro_rules! impl_as_tensor_for_array {
     ($num_elems:expr) => {
-        impl<'graph, T: Float, I: crate::Int> AsTensor<'graph, T> for [I; $num_elems] {
-            fn as_tensor(&self, graph: &'graph Graph<T>) -> Tensor<'graph, T> {
+        impl<'graph, F: Float, I: crate::Int> AsTensor<'graph, F> for [I; $num_elems] {
+            fn as_tensor(&self, graph: &'graph impl AsGraph<F>) -> Tensor<'graph, F> {
                 let vec = self
                     .iter()
-                    .map(|&a| T::from(a).unwrap())
-                    .collect::<Vec<T>>();
+                    .map(|&a| F::from(a).unwrap())
+                    .collect::<Vec<F>>();
 
                 // unwrap is safe
                 let arr = NdArray::from_shape_vec(ndarray::IxDyn(&[self.len()]), vec).unwrap();
-                graph.convert_to_tensor(arr)
+                T::convert_to_tensor(arr, graph.as_graph())
             }
         }
     };
@@ -997,137 +936,3 @@ impl_as_tensor_for_array!(5);
 impl_as_tensor_for_array!(6);
 impl_as_tensor_for_array!(7);
 impl_as_tensor_for_array!(8);
-
-/// Trait to create constant tensors.
-pub trait Constant<'scope, F: Float, Src: Sized> {
-    /// Creates a (persistent) constant tensor from an `NdArray`, or `Arc<NdArray>` to prevent move.
-    ///
-    /// ```
-    /// use std::sync::Arc;
-    /// use ndarray::{self, array, IxDyn, Ix1, Array};
-    /// use autograd as ag;
-    /// // import the trait
-    /// use ag::tensor::Constant;
-    ///
-    /// let v1: Array<f64, Ix1> = array![2.];
-    /// let v2: Arc<Array<f64, IxDyn>> = Arc::new(array![2.].into_dyn());
-    ///
-    /// ag::with(|g| {
-    ///    // instantiate from NdArray
-    ///    let v1: ag::Tensor<f64> = g.constant(v1);
-    ///    // instantiate from `Arc<NdArray>` that allows ref-count.
-    ///    let v2: ag::Tensor<f64> = g.constant(v2.clone());
-    ///    let y: ag::Tensor<f64> = 3. * v1 * v2;
-    ///
-    ///    assert_eq!(12., y.eval(&[]).unwrap()[0]);
-    /// });
-    /// ```
-    fn constant(&'scope self, arr: Src) -> Tensor<'scope, F>;
-}
-
-/// Trait to create variable tensors.
-pub trait Variable<'scope, F: Float, Src: Sized> {
-    /// Creates a shared variable tensor from an `NdArray`, or `Arc<RwLock<NdArray>>` to prevent move.
-    ///
-    /// A shared variable can be mutated with gradient descent methods
-    /// implemented in `autograd::gradient_descent_ops`.
-    /// For the usages, see https://github.com/perrier1034/rust-autograd/tree/master/examples.
-    /// ```
-    /// use std::sync::{Arc, RwLock};
-    /// use ndarray::{self, array, IxDyn, Ix1, Array};
-    /// use autograd as ag;
-    /// // import the trait
-    /// use ag::tensor::Variable;
-    ///
-    /// let v1: Array<f64, Ix1> = array![2.];
-    /// let v2: Arc<RwLock<Array<f64, IxDyn>>> = ag::ndarray_ext::into_shared(array![2.]);
-    ///
-    /// ag::with(|g| {
-    ///    // Instantiate from an NdArray
-    ///    let v1: ag::Tensor<f64> = g.variable(v1);
-    ///    // Instantiate from an Arc<RwLock<NdArray>>
-    ///    let v2: ag::Tensor<f64> = g.variable(v2);
-    ///    let y: ag::Tensor<f64> = 3. * v1 * v2;
-    ///
-    ///    assert_eq!(12., y.eval(&[]).unwrap()[0]);
-    /// });
-    /// ```
-    fn variable(&'scope self, arr: Src) -> Tensor<'scope, F>;
-}
-
-// method overload 1
-impl<'graph, F: Float> Constant<'graph, F, Arc<ndarray::Array<F, ndarray::IxDyn>>>
-    for crate::graph::Graph<F>
-{
-    #[inline]
-    fn constant(&'graph self, arr: Arc<ndarray::Array<F, ndarray::IxDyn>>) -> Tensor<'graph, F> {
-        Tensor::builder()
-            .set_constant_array(arr)
-            .build(self, crate::ops::basic_source_ops::Const)
-    }
-}
-
-// method overload 2
-macro_rules! impl_constant_dim {
-    ($d:ty) => {
-        impl<'graph, F: Float> Constant<'graph, F, ndarray::Array<F, $d>>
-            for crate::graph::Graph<F>
-        {
-            #[inline]
-            fn constant(&'graph self, arr: ndarray::Array<F, $d>) -> Tensor<'graph, F> {
-                Tensor::builder()
-                    .set_constant_array(Arc::new(arr.into_dyn()))
-                    .build(self, crate::ops::basic_source_ops::Const)
-            }
-        }
-    };
-}
-
-// method overload 1
-impl<'graph, F: Float> Variable<'graph, F, Arc<RwLock<ndarray::Array<F, ndarray::IxDyn>>>>
-    for crate::graph::Graph<F>
-{
-    #[inline]
-    fn variable(
-        &'graph self,
-        arr: Arc<RwLock<ndarray::Array<F, ndarray::IxDyn>>>,
-    ) -> Tensor<'graph, F> {
-        Tensor::builder()
-            .set_variable_array(arr)
-            .build(self, crate::ops::basic_source_ops::Variable)
-    }
-}
-
-// method overload 2
-macro_rules! impl_variable_dim {
-    ($d:ty) => {
-        impl<'graph, F: Float> Variable<'graph, F, ndarray::Array<F, $d>>
-            for crate::graph::Graph<F>
-        {
-            #[inline]
-            fn variable(&'graph self, arr: ndarray::Array<F, $d>) -> Tensor<'graph, F> {
-                Tensor::builder()
-                    .set_variable_array(Arc::new(RwLock::new(arr.into_dyn())))
-                    .build(self, crate::ops::basic_source_ops::Variable)
-            }
-        }
-    };
-}
-
-impl_constant_dim!(ndarray::Ix0);
-impl_constant_dim!(ndarray::Ix1);
-impl_constant_dim!(ndarray::Ix2);
-impl_constant_dim!(ndarray::Ix3);
-impl_constant_dim!(ndarray::Ix4);
-impl_constant_dim!(ndarray::Ix5);
-impl_constant_dim!(ndarray::Ix6);
-impl_constant_dim!(ndarray::IxDyn);
-
-impl_variable_dim!(ndarray::Ix0);
-impl_variable_dim!(ndarray::Ix1);
-impl_variable_dim!(ndarray::Ix2);
-impl_variable_dim!(ndarray::Ix3);
-impl_variable_dim!(ndarray::Ix4);
-impl_variable_dim!(ndarray::Ix5);
-impl_variable_dim!(ndarray::Ix6);
-impl_variable_dim!(ndarray::IxDyn);

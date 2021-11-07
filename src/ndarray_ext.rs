@@ -1,9 +1,11 @@
 //! A small extension of [ndarray](https://github.com/rust-ndarray/ndarray)
 //!
 //! Mainly provides `array_gen`, which is a collection of array generator functions.
-use crate::Float;
 use ndarray;
-use std::sync::{Arc, RwLock};
+
+// expose array_gen
+pub use crate::array_gen::*;
+use crate::Float;
 
 /// alias for `ndarray::Array<T, IxDyn>`
 pub type NdArray<T> = ndarray::Array<T, ndarray::IxDyn>;
@@ -14,54 +16,10 @@ pub type NdArrayView<'a, T> = ndarray::ArrayView<'a, T, ndarray::IxDyn>;
 /// alias for `ndarray::ArrayViewMut<T, IxDyn>`
 pub type NdArrayViewMut<'a, T> = ndarray::ArrayViewMut<'a, T, ndarray::IxDyn>;
 
-// expose array_gen
-pub use crate::array_gen::*;
-
-/// `Op::compute`'s output
-#[derive(Clone)]
-pub(crate) enum ArrRepr<'v, T: Float> {
-    /// Represents `ndarray::Array<T: Float, ndarray::IxDyn>`
-    Owned(NdArray<T>),
-
-    /// Represents `ndarray::ArrayView<'a, T: Float, ndarray::IxDyn>`
-    View(NdArrayView<'v, T>),
-}
-
-/// Helper to feed ndarrays into variable tensors.
-///
-/// Converts the input array into `ndarray::Array<F, ndarray::IxDyn>`
-/// and then simply wraps it with `Arc<RwLock<...>>`.
-///
-/// ```
-/// use autograd as ag;
-/// use ag::ndarray_ext as array;
-/// use ag::tensor::Variable;
-/// use ndarray;
-/// use std::sync::{Arc, RwLock};
-///
-/// type NdArray = ndarray::Array<f32, ndarray::IxDyn>;
-///
-/// let w_arr: Arc<RwLock<NdArray>> = array::into_shared(array::ones(&[28 * 28, 10]));
-/// ag::with(|g| {
-///     let w = g.variable(w_arr.clone());
-/// });
-///
-/// ```
-#[inline]
-pub fn into_shared<F: Float, D: ndarray::Dimension>(
-    arr: ndarray::Array<F, D>,
-) -> Arc<RwLock<NdArray<F>>> {
-    Arc::new(RwLock::new(arr.into_dyn()))
-}
-
 #[inline]
 /// This works well only for small arrays
 pub(crate) fn as_shape<T: Float>(x: &NdArrayView<T>) -> Vec<usize> {
-    let mut target = Vec::with_capacity(x.len());
-    for &a in x.iter() {
-        target.push(a.to_usize().unwrap());
-    }
-    target
+    x.iter().map(|a| a.to_usize().unwrap()).collect()
 }
 
 #[inline]
@@ -138,15 +96,6 @@ pub(crate) fn is_fully_transposed(strides: &[ndarray::Ixs]) -> bool {
 }
 
 #[inline]
-pub(crate) fn copy_if_not_standard<T: Float>(x: &NdArrayView<T>) -> Option<NdArray<T>> {
-    if !x.is_standard_layout() {
-        Some(deep_copy(x))
-    } else {
-        None
-    }
-}
-
-#[inline]
 pub(crate) fn deep_copy<T: Float>(x: &NdArrayView<T>) -> NdArray<T> {
     let vec = x.iter().cloned().collect::<Vec<_>>();
     // tested
@@ -161,7 +110,7 @@ pub(crate) fn scalar_shape<T: Float>() -> NdArray<T> {
 
 #[inline]
 pub(crate) fn is_scalar_shape(shape: &[usize]) -> bool {
-    shape == [] || shape == [0]
+    shape.len() == 0 || shape == [0]
 }
 
 #[inline]
@@ -188,49 +137,17 @@ pub(crate) fn shape_of<T: Float>(x: &NdArray<T>) -> NdArray<T> {
     NdArray::from_shape_vec(ndarray::IxDyn(&[rank]), shape).unwrap()
 }
 
-#[cfg(feature = "mkl")]
-#[inline]
-pub(crate) fn get_batch_ptrs_mut<A: Float, B>(
-    batch_size: usize,
-    head: *mut A,
-    whole_size: usize,
-) -> Vec<*mut B> {
-    let size_per_sample = whole_size / batch_size;
-    let mut ret = Vec::with_capacity(batch_size);
-    for i in 0..batch_size {
-        unsafe {
-            ret.push(head.offset((i * size_per_sample) as isize) as *mut B);
-        }
-    }
-    ret
-}
-
-#[cfg(feature = "mkl")]
-#[inline]
-pub(crate) fn get_batch_ptrs<A: Float, B>(
-    batch_size: usize,
-    head: *const A,
-    whole_size: usize,
-) -> Vec<*const B> {
-    let size_per_sample = whole_size / batch_size;
-    let mut ret = Vec::with_capacity(batch_size);
-    for i in 0..batch_size {
-        unsafe {
-            ret.push(head.offset((i * size_per_sample) as isize) as *const B);
-        }
-    }
-    ret
-}
-
 /// A collection of array generator functions.
 pub mod array_gen {
-    use super::*;
+    use std::marker::PhantomData;
+    use std::sync::Mutex;
+
     use rand::distributions::Distribution;
     use rand::rngs::ThreadRng;
     use rand::{self, Rng};
     use rand_distr;
-    use std::marker::PhantomData;
-    use std::sync::Mutex;
+
+    use super::*;
 
     /// Helper structure to create ndarrays whose elements are pseudorandom numbers.
     ///

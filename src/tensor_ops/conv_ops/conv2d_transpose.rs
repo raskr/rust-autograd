@@ -1,4 +1,5 @@
 use super::*;
+use crate::tensor_ops::*;
 
 pub struct Conv2DTranspose {
     pub pad: usize,
@@ -114,113 +115,128 @@ fn conv2d_transpose_impl<F: Float>(
     let n = yh * yw;
     let m = kh * kw * xch;
 
-    let size_per_batch_col = xch * kh * kw * yh * yw;
+    let copied_gy;
+    let copied_w;
+    let gy_slice;
+    let w_slice;
 
-    let copied_gy = ndarray_ext::copy_if_not_standard(&gy);
-    let copied_w = ndarray_ext::copy_if_not_standard(w);
-    let gy_ptr = copied_gy.map(|inner| inner.as_ptr()).unwrap_or(gy.as_ptr());
-    let w_ptr = copied_w.map(|inner| inner.as_ptr()).unwrap_or(w.as_ptr());
-    let col_len = batch_size * size_per_batch_col;
+    if let Some(gy) = gy.as_slice() {
+        gy_slice = gy;
+    } else {
+        copied_gy = ndarray_ext::deep_copy(gy);
+        unsafe {
+            gy_slice = slice::from_raw_parts(copied_gy.as_ptr(), copied_gy.len());
+        }
+    }
 
-    let mut col = Vec::with_capacity(col_len);
-    #[cfg(not(feature = "mkl"))]
-    {}
+    if let Some(w) = w.as_slice() {
+        w_slice = w;
+    } else {
+        copied_w = ndarray_ext::deep_copy(w);
+        unsafe {
+            w_slice = slice::from_raw_parts(copied_w.as_ptr(), copied_w.len());
+        }
+    }
+
+    let gy_size_per_batch = gy.len() / batch_size;
+    let cols_size_per_batch = xch * kh * kw * yh * yw;
+    let ret_size_per_batch = (xch * xh * xw) as usize;
+
+    let cols_size = batch_size * cols_size_per_batch;
+    let ret_size = batch_size * ret_size_per_batch;
+
+    let mut cols: Vec<F> = Vec::with_capacity(cols_size);
+    unsafe {
+        cols.set_len(cols_size);
+    }
+    let mut ret = vec![F::zero(); ret_size]; // = gx
+
+    let a = gy_slice.par_iter().step_by(gy_size_per_batch);
+    let b = cols.par_iter_mut().step_by(cols_size_per_batch);
+    let c = ret.par_iter_mut().step_by(ret_size_per_batch);
 
     let gx = unsafe {
-        #[cfg(feature = "mkl")]
-        {
-            const GROUP_COUNT: usize = 1; // Fixed
-
-            macro_rules! kernel_call_def {
-                ($ty:ty, $f:ident) => {
-                    if crate::same_type::<$ty, F>() {
-                        $f(
-                            CBLAS_ROW_MAJOR,
-                            [CblasTrans; GROUP_COUNT].as_ptr(),
-                            [CblasNoTrans; GROUP_COUNT].as_ptr(),
-                            [m as MklInt; GROUP_COUNT].as_ptr(),
-                            [n as MklInt; GROUP_COUNT].as_ptr(),
-                            [k as MklInt; GROUP_COUNT].as_ptr(),
-                            [1.; GROUP_COUNT].as_ptr(),
-                            vec![w_ptr as *const _; batch_size].as_ptr(), // a array
-                            [m as MklInt; GROUP_COUNT].as_ptr(),
-                            get_batch_ptrs(batch_size, gy_ptr, gy.len()).as_ptr(), // b array
-                            [n as MklInt; GROUP_COUNT].as_ptr(),
-                            [0.; GROUP_COUNT].as_ptr(),
-                            get_batch_ptrs_mut(batch_size, col.as_mut_ptr(), col_len)
-                                .as_mut_ptr(), // c array
-                            [n as MklInt; GROUP_COUNT].as_ptr(),
-                            GROUP_COUNT as MklInt,
-                            [batch_size as MklInt; GROUP_COUNT].as_ptr(),
-                        );
+        a.zip_eq(b)
+            .zip_eq(c)
+            .for_each(move |((gy_ptr, cols), ret)| {
+                #[cfg(feature = "blas")]
+                {
+                    macro_rules! kernel_call_def {
+                        ($ty:ty, $f:ident) => {
+                            if crate::same_type::<$ty, F>() {
+                                $f(
+                                    CblasRowMajor,
+                                    CblasTrans,
+                                    CblasNoTrans,
+                                    m as BlasIF,                    // m, rows of Op(a)
+                                    n as BlasIF,                    // n, cols of Op(b)
+                                    k as BlasIF,                    // k, cols of Op(a)
+                                    1.,                             // alpha
+                                    w_slice.as_ptr() as *const _,   // a
+                                    m as BlasIF,                    // lda
+                                    gy_ptr as *const F as *const _, // b
+                                    n as BlasIF,                    // ldb
+                                    0.,                             // beta
+                                    cols as *mut F as *mut _,       // c
+                                    n as BlasIF,                    // ldc
+                                );
+                            }
+                        };
                     }
-                };
-            }
-            kernel_call_def!(f32, cblas_sgemm_batch);
-            kernel_call_def!(f64, cblas_dgemm_batch);
-            col.set_len(col_len);
-        }
+                    kernel_call_def!(f32, cblas_sgemm);
+                    kernel_call_def!(f64, cblas_dgemm);
+                }
 
-        #[cfg(not(feature = "mkl"))]
-        {
-            let w_slice = slice::from_raw_parts(w_ptr, w.len());
-            let gy_slice = slice::from_raw_parts(gy_ptr, gy.len());
-            let col_ref = {
-                col.set_len(col_len);
-                &col[0]
-            };
-            let size_per_batch_gy = ych * yh * yw;
-            let (rsa, csa) = (1, m);
-            let (rsb, csb) = (n, 1);
-            let (rsc, csc) = (n, 1);
-            macro_rules! kernel_call_def {
-                ($ty:ty, $f:ident) => {
-                    if same_type::<F, $ty>() {
-                        (0..batch_size).into_par_iter().for_each(|i| {
-                            let w = w_slice.as_ptr();
-                            let gy_region_head = gy_slice.as_ptr().add(i * size_per_batch_gy);
-                            let col_region_head = col_ref as *const F as *mut F;
-                            let col_region_head = col_region_head.add(i * size_per_batch_col);
-                            matrixmultiply::$f(
-                                m,
-                                k,
-                                n,
-                                1.,
-                                w as *const _,
-                                rsa as isize,
-                                csa as isize,
-                                gy_region_head as *const _,
-                                rsb as isize,
-                                csb as isize,
-                                0.,
-                                col_region_head as *mut _,
-                                rsc as isize,
-                                csc as isize,
-                            );
-                        });
+                #[cfg(not(feature = "blas"))]
+                {
+                    let (rsa, csa) = (1, m);
+                    let (rsb, csb) = (n, 1);
+                    let (rsc, csc) = (n, 1);
+                    macro_rules! kernel_call_def {
+                        ($ty:ty, $f:ident) => {
+                            if same_type::<F, $ty>() {
+                                matrixmultiply::$f(
+                                    m,
+                                    k,
+                                    n,
+                                    1.,
+                                    w_slice.as_ptr() as *const _,
+                                    rsa as isize,
+                                    csa as isize,
+                                    gy_ptr as *const F as *const _,
+                                    rsb as isize,
+                                    csb as isize,
+                                    0.,
+                                    cols as *mut F as *mut _,
+                                    rsc as isize,
+                                    csc as isize,
+                                );
+                            }
+                        };
                     }
-                };
-            }
-            kernel_call_def!(f32, sgemm);
-            kernel_call_def!(f64, dgemm);
-        }
+                    kernel_call_def!(f32, sgemm);
+                    kernel_call_def!(f64, dgemm);
+                }
 
-        col2im_batch(
-            col.as_slice(),
-            batch_size,
-            xch as i32,
-            xh as i32,
-            xw as i32,
-            kh as i32,
-            kw as i32,
-            pad_h as i32,
-            pad_w as i32,
-            stride_h as i32,
-            stride_w as i32,
-            dilation_h as i32,
-            dilation_w as i32,
-        )
+                col2im(
+                    cols as *const _,
+                    ret as *mut _,
+                    xch as i32,
+                    xh as i32,
+                    xw as i32,
+                    kh as i32,
+                    kw as i32,
+                    pad_h as i32,
+                    pad_w as i32,
+                    stride_h as i32,
+                    stride_w as i32,
+                    dilation_h as i32,
+                    dilation_w as i32,
+                );
+            });
+        ret
     };
+
     // return gx
     unsafe {
         Ok(NdArray::from_shape_vec_unchecked(
@@ -231,7 +247,7 @@ fn conv2d_transpose_impl<F: Float>(
 }
 
 impl<T: Float> crate::op::Op<T> for Conv2DTranspose {
-    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
+    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) -> Result<(), crate::op::OpError> {
         let gy = &ctx.input(0); // (batch, ych, yh, yw)
         let w = &ctx.input(1); // (ych, xch, kh, kw)
         let gx = conv2d_transpose_impl(
@@ -247,38 +263,37 @@ impl<T: Float> crate::op::Op<T> for Conv2DTranspose {
         match gx {
             Ok(gx) => {
                 ctx.append_output(gx);
+                Ok(())
             }
             Err(e) => {
-                ctx.set_error(e);
+                return Err(e);
             }
         }
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
-        let s = ctx.graph();
         let x = ctx.input(0);
         let w = ctx.input(1);
         let gy = ctx.output_grad();
 
-        let gx = Tensor::builder().set_ro_inputs(&[&gy, &w]).build(
-            s,
-            super::conv2d::Conv2D {
+        let gx = Tensor::builder(ctx.graph())
+            .append_input(&gy, false)
+            .append_input(&w, false)
+            .build(super::conv2d::Conv2D {
                 pad: self.pad,
                 stride: self.stride,
                 dilation: self.dilation,
-            },
-        );
+            });
 
-        let gw = Tensor::builder()
-            .set_ro_inputs(&[&gy, &x, &s.stop_gradient(w)])
-            .build(
-                s,
-                Conv2DTransposeFilterGrad {
-                    pad: self.pad,
-                    stride: self.stride,
-                    dilation: self.dilation,
-                },
-            );
+        let gw = Tensor::builder(ctx.graph())
+            .append_input(&gy, false)
+            .append_input(&x, false)
+            .append_input(&stop_gradient(w), false)
+            .build(Conv2DTransposeFilterGrad {
+                pad: self.pad,
+                stride: self.stride,
+                dilation: self.dilation,
+            });
 
         ctx.append_input_grad(Some(gx));
         ctx.append_input_grad(Some(gw));
@@ -333,7 +348,7 @@ fn conv2d_transpose_filter_grad_impl<F: Float>(
     let mut gw = Vec::with_capacity(gw_size);
     let gw_head = gw.as_mut_ptr();
 
-    #[cfg(feature = "mkl")]
+    #[cfg(feature = "blas")]
     {
         // sgemm params
         let m = ych;
@@ -348,20 +363,20 @@ fn conv2d_transpose_filter_grad_impl<F: Float>(
                             let x_region_head = &x[i * size_per_batch_x] as *const F;
                             let gy_col_region_ptr = &gy_cols[i * size_per_batch_cols] as *const F;
                             $f(
-                                CBLAS_ROW_MAJOR,
+                                CblasRowMajor,
                                 CblasNoTrans,
                                 CblasTrans,
-                                m as MklInt,
-                                n as MklInt,
-                                k as MklInt,
+                                m as BlasIF,
+                                n as BlasIF,
+                                k as BlasIF,
                                 1.,
                                 x_region_head as *const $ty,
-                                k as MklInt, // a array
+                                k as BlasIF, // a array
                                 gy_col_region_ptr as *const $ty,
-                                k as MklInt, // b array
+                                k as BlasIF, // b array
                                 if i == 0 { 0. } else { 1. },
                                 gw_head as *mut $ty, // c array
-                                n as MklInt,
+                                n as BlasIF,
                             );
                         }
                     }
@@ -372,7 +387,7 @@ fn conv2d_transpose_filter_grad_impl<F: Float>(
         kernel_call_def!(f64, cblas_dgemm);
     }
 
-    #[cfg(not(feature = "mkl"))]
+    #[cfg(not(feature = "blas"))]
     {
         let (m, n, k) = (ych, kh * kw * xch, yh * yw);
         let (rsa, csa) = (k, 1);
@@ -416,7 +431,7 @@ fn conv2d_transpose_filter_grad_impl<F: Float>(
 }
 
 impl<T: Float> crate::op::Op<T> for Conv2DTransposeFilterGrad {
-    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
+    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) -> Result<(), crate::op::OpError> {
         let gy = &ctx.input(0);
         let x = &ctx.input(1);
         let w = &ctx.input(2);
@@ -432,31 +447,31 @@ impl<T: Float> crate::op::Op<T> for Conv2DTransposeFilterGrad {
             self.stride,
         );
         ctx.append_output(gw);
+        Ok(())
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
-        let s = ctx.graph();
         let gy = ctx.input(0);
         let gw = ctx.output_grad();
         let x = ctx.input(1);
 
-        let ggy = Tensor::builder().set_ro_inputs(&[&x, &gw]).build(
-            s,
-            Conv2DTranspose {
+        let ggy = Tensor::builder(ctx.graph())
+            .append_input(&x, false)
+            .append_input(&gw, false)
+            .build(Conv2DTranspose {
                 pad: self.pad,
                 stride: self.stride,
                 dilation: self.dilation,
-            },
-        );
+            });
 
-        let ggx = Tensor::builder().set_ro_inputs(&[&gy, &gw]).build(
-            s,
-            super::conv2d::Conv2D {
+        let ggx = Tensor::builder(ctx.graph())
+            .append_input(&gy, false)
+            .append_input(&gw, false)
+            .build(super::conv2d::Conv2D {
                 pad: self.pad,
                 stride: self.stride,
                 dilation: self.dilation,
-            },
-        );
+            });
 
         ctx.append_input_grad(Some(ggy));
         ctx.append_input_grad(Some(ggx));
@@ -466,6 +481,8 @@ impl<T: Float> crate::op::Op<T> for Conv2DTransposeFilterGrad {
 
 #[test]
 fn test_deconv() {
+    use crate::tensor_ops as T;
+
     let (kh, kw) = (2, 2);
     let (xch, ych) = (3, 2);
     let (yh, yw) = (2, 2);
@@ -481,11 +498,12 @@ fn test_deconv() {
     )
     .unwrap();
 
-    let out_val = crate::run(|s: &mut crate::Graph<f32>| {
-        let w = s.ones(&[ych, xch, kh, kw]);
-        let g = s.ones(&[batch_size, ych, yh, yw]);
-        let out = s.conv2d_transpose(g, w, 0, 1);
-        out.eval(&[]).unwrap()
+    let mut ctx = crate::VariableEnvironment::new();
+    let out_val = ctx.run(|graph| {
+        let w = T::ones(&[ych, xch, kh, kw], graph);
+        let g = T::ones(&[batch_size, ych, yh, yw], graph);
+        let out = T::conv2d_transpose(g, w, 0, 1);
+        out.eval(graph).unwrap()
     });
     out_val.all_close(&ans, 1e-3);
 }

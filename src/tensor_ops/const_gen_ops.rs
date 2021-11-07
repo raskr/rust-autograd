@@ -14,8 +14,9 @@ pub struct Scalar<T: Float> {
 }
 
 impl<T: Float> op::Op<T> for Scalar<T> {
-    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
+    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) -> Result<(), crate::op::OpError> {
         ctx.append_output(ndarray::arr0(self.val).into_dyn());
+        Ok(())
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -24,7 +25,7 @@ impl<T: Float> op::Op<T> for Scalar<T> {
 }
 
 impl<T: Float> op::Op<T> for Zeros {
-    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
+    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) -> Result<(), crate::op::OpError> {
         let shape = &ctx.input(0);
         let ret = if let Some(a) = shape.as_slice() {
             ndarray_ext::zeros(
@@ -43,6 +44,7 @@ impl<T: Float> op::Op<T> for Zeros {
             )
         };
         ctx.append_output(ret);
+        Ok(())
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -51,7 +53,7 @@ impl<T: Float> op::Op<T> for Zeros {
 }
 
 impl<T: Float> op::Op<T> for Ones {
-    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
+    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) -> Result<(), crate::op::OpError> {
         let shape = &ctx.input(0);
         let ret = if let Some(a) = shape.as_slice() {
             ndarray_ext::ones(
@@ -70,6 +72,7 @@ impl<T: Float> op::Op<T> for Ones {
             )
         };
         ctx.append_output(ret);
+        Ok(())
     }
 
     fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
@@ -78,8 +81,9 @@ impl<T: Float> op::Op<T> for Ones {
 }
 
 impl<T: Float> op::Op<T> for ConvertToTensor<T> {
-    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) {
+    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) -> Result<(), crate::op::OpError> {
         ctx.append_output(self.arr.clone());
+        Ok(())
     }
 
     fn grad(&self, _: &mut crate::op::GradientContext<T>) {}

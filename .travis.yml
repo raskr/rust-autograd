@@ -3,15 +3,9 @@ language: rust
 env: TYPE=default RUST_BACKTRACE=1
 
 rust:
-  - "1.38.0"
   - "1.42.0"
   - stable
   - nightly
-
-jobs:
-  allow_failures:
-    - rust: stable
-    - rust: nightly
 
 os:
   - linux
@@ -19,11 +13,8 @@ os:
 
 sudo: false
 
-cache: cargo
-
-install:
-  - cargo build -v
-
+# cargo test --doc with shared lib is broken https://github.com/rust-lang/cargo/issues/8531#ref-pullrequest-719728963
 script:
   - cargo test -v
-  - cargo test -v --features mkl
+  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then cargo test -v --features blas --features accelerate; fi
+  - cargo test --lib -v --features blas --features intel-mkl

@@ -2,11 +2,11 @@ use crate::ndarray_ext;
 use crate::ndarray_ext::{NdArray, NdArrayView};
 use crate::op;
 use crate::same_type;
+use crate::tensor_ops::*;
 use crate::Float;
 use crate::Tensor;
 use ndarray;
-#[allow(unused_imports)]
-use rayon::iter::*;
+use rayon::prelude::*;
 use std::f32;
 use std::slice;
 
@@ -15,12 +15,12 @@ pub mod conv2d;
 #[macro_use]
 pub mod conv2d_transpose;
 pub mod max_pool2d;
-#[cfg(feature = "mkl")]
-use crate::ndarray_ext::{get_batch_ptrs, get_batch_ptrs_mut};
-#[cfg(feature = "mkl")]
-use crate::ops::mkl_ffi::{
-    cblas_dgemm, cblas_dgemm_batch, cblas_sgemm, cblas_sgemm_batch, CblasTranspose::CblasNoTrans,
-    CblasTranspose::CblasTrans, MklInt, CBLAS_ROW_MAJOR,
+#[cfg(feature = "blas")]
+use crate::tensor_ops::blas_ffi::*;
+#[cfg(feature = "blas")]
+use cblas_sys::{
+    CBLAS_LAYOUT::CblasRowMajor,
+    CBLAS_TRANSPOSE::{CblasNoTrans, CblasTrans},
 };
 
 #[test]
@@ -70,7 +70,59 @@ fn test_im2col_batch() {
     )
 }
 
-#[allow(unused_mut)]
+fn im2col<T: Float>(
+    mut x_ptr: *const T, // 4-dimensional
+    mut ret_ptr: *mut T, // 4-dimensional (result)
+    xch: i32,            // number of channels of x
+    xh: i32,
+    xw: i32, // x (input) height, width
+    kh: i32,
+    kw: i32, // kernel height, width
+    ph: i32,
+    pw: i32, // padding height, width
+    sh: i32,
+    sw: i32, // stride height, width
+    dh: i32,
+    dw: i32, // dilation height, width
+) {
+    use std::ptr;
+    let yh = (xh + 2 * ph - (dh * (kh - 1) + 1)) / sh + 1;
+    let yw = (xw + 2 * pw - (dw * (kw - 1) + 1)) / sw + 1;
+    let channel_size = (xh * xw) as usize;
+
+    unsafe {
+        for _ in 0..xch {
+            for cur_kh in 0..kh {
+                let y_start: i32 = cur_kh * dh - ph;
+                for cur_kw in 0..kw {
+                    let x_start = cur_kw * dw - ph;
+                    let mut y_offset = y_start;
+                    for _ in 0..yh {
+                        if (y_offset as u32) < (xh as u32) {
+                            let mut x_offset = x_start;
+                            let cache = y_offset * xw;
+                            for j in 0..yw {
+                                if (x_offset as u32) < (xw as u32) {
+                                    *ret_ptr.offset(j as isize) =
+                                        *x_ptr.offset((cache + x_offset) as isize);
+                                } else {
+                                    *ret_ptr.offset(j as isize) = T::zero();
+                                }
+                                x_offset += sw;
+                            }
+                        } else {
+                            ptr::write_bytes(ret_ptr, 0, yw as usize);
+                        }
+                        ret_ptr = ret_ptr.offset(yw as isize);
+                        y_offset += sh;
+                    }
+                }
+            }
+            x_ptr = x_ptr.add(channel_size);
+        }
+    }
+}
+
 fn im2col_batch<T: Float>(
     x: &[T],           // 4-dimensional
     batch_size: usize, // x.shape[0]
@@ -86,58 +138,47 @@ fn im2col_batch<T: Float>(
     dh: i32,
     dw: i32, // dilation height, width
 ) -> Vec<T> {
-    use std::ptr;
-
     let yh = (xh + 2 * ph - (dh * (kh - 1) + 1)) / sh + 1;
     let yw = (xw + 2 * pw - (dw * (kw - 1) + 1)) / sw + 1;
     let channel_size = (xh * xw) as usize;
+
+    let size_per_batch_x = xch as usize * channel_size;
     let size_per_batch_y = (xch * kw * kh * yh * yw) as usize;
 
+    let mut ret = Vec::with_capacity(batch_size * size_per_batch_y);
     unsafe {
-        let mut ret = Vec::with_capacity(batch_size * size_per_batch_y);
-        // parallelize outer loop
-        (0..batch_size).into_par_iter().for_each(|i| {
-            let mut x: *const T = x.get_unchecked(i * xch as usize * channel_size) as *const _;
-            let mut ret = ret.get_unchecked(i * size_per_batch_y) as *const T as *mut T;
-            for _ in 0..xch {
-                for cur_kh in 0..kh {
-                    let y_start: i32 = cur_kh * dh - ph;
-                    for cur_kw in 0..kw {
-                        let x_start = cur_kw * dw - ph;
-                        let mut y_offset = y_start;
-                        for _ in 0..yh {
-                            if (y_offset as u32) < (xh as u32) {
-                                let mut x_offset = x_start;
-                                let cache = y_offset * xw;
-                                for j in 0..yw {
-                                    if (x_offset as u32) < (xw as u32) {
-                                        *ret.offset(j as isize) =
-                                            *x.offset((cache + x_offset) as isize);
-                                    } else {
-                                        *ret.offset(j as isize) = T::zero();
-                                    }
-                                    x_offset += sw;
-                                }
-                            } else {
-                                ptr::write_bytes(ret, 0, yw as usize);
-                            }
-                            ret = ret.offset(yw as isize);
-                            y_offset += sh;
-                        }
-                    }
-                }
-                x = x.add(channel_size);
-            }
-        });
         ret.set_len(batch_size * size_per_batch_y);
-        ret
     }
+
+    let a = x.par_iter().step_by(size_per_batch_x);
+    let b = ret.par_iter_mut().step_by(size_per_batch_y);
+
+    // parallelize
+    a.zip_eq(b).for_each(move |(x, ret)| {
+        im2col(
+            x as *const _,
+            ret as *mut _,
+            xch,
+            xh,
+            xw,
+            kh,
+            kw,
+            ph,
+            pw,
+            sh,
+            sw,
+            dh,
+            dw,
+        );
+    });
+
+    ret
 }
 
-fn col2im_batch<T: Float>(
-    x: &[T],           // 6-dimensional cols
-    batch_size: usize, // x.shape[0]
-    xch: i32,          // number of channels of x
+fn col2im<T: Float>(
+    mut x_ptr: *const T, // 6-dimensional cols
+    mut ret_ptr: *mut T, // 4-dimensional
+    xch: i32,            // number of channels of x
     xh: i32,
     xw: i32, // x (input) height, width
     kh: i32,
@@ -148,19 +189,12 @@ fn col2im_batch<T: Float>(
     sw: i32, // stride height, width
     dh: i32,
     dw: i32, // dilation height, width
-) -> Vec<T> {
+) {
     let yh = (xh + 2 * ph - (dh * (kh - 1) + 1)) / sh + 1;
     let yw = (xw + 2 * pw - (dw * (kw - 1) + 1)) / sw + 1;
     let channel_size = xh * xw;
-    let size_per_batch_x = xch * kh * kw * yh * yw;
 
-    // 4-dimensional
-    let ret = vec![T::zero(); batch_size * (xch * xh * xw) as usize];
-
-    // parallelize outer loop
-    (0..batch_size).into_par_iter().for_each(|i| unsafe {
-        let mut x: *const T = x.get_unchecked(i * size_per_batch_x as usize) as *const T;
-        let mut ret = ret.get_unchecked(i * (xch * xh * xw) as usize) as *const T as *mut T;
+    unsafe {
         for _ in 0..xch {
             for ky in 0..kh {
                 let y_start = ky * dh - ph;
@@ -173,18 +207,17 @@ fn col2im_batch<T: Float>(
                             let cache = y_offset * xw;
                             for j in 0..yw as isize {
                                 if (x_offset as u32) < (xw as u32) {
-                                    *ret.add((cache + x_offset) as usize) += *x.offset(j);
+                                    *ret_ptr.add((cache + x_offset) as usize) += *x_ptr.offset(j);
                                 }
                                 x_offset += sw;
                             }
                         }
-                        x = x.add(yw as usize);
+                        x_ptr = x_ptr.add(yw as usize);
                         y_offset += sh;
                     }
                 }
             }
-            ret = ret.add(channel_size as usize);
+            ret_ptr = ret_ptr.add(channel_size as usize);
         }
-    });
-    ret
+    }
 }

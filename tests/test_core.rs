@@ -1,18 +1,22 @@
 extern crate autograd as ag;
 extern crate ndarray;
 
+use ag::tensor_ops::{map, reshape};
+use ag::{tensor_ops as T, NdArray};
+
 struct MultiOutputOp;
 
 impl ag::op::Op<f32> for MultiOutputOp {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "MultiOutputOp"
     }
 
-    fn compute(&self, ctx: &mut ag::op::ComputeContext<f32>) {
+    fn compute(&self, ctx: &mut ag::op::ComputeContext<f32>) -> Result<(), ag::op::OpError> {
         let a = ag::ndarray_ext::zeros(&[2, 3]);
         let b = ag::ndarray_ext::zeros(&[1, 3]);
         ctx.append_output(a);
         ctx.append_output(b);
+        Ok(())
     }
 
     fn grad(&self, ctx: &mut ag::op::GradientContext<f32>) {
@@ -23,48 +27,57 @@ impl ag::op::Op<f32> for MultiOutputOp {
 
 #[test]
 fn test_nth_tensor() {
-    ag::with(|g| {
-        let a = ag::Tensor::builder().build(g, MultiOutputOp);
-        let b = g.nth_tensor(a, 1);
-        let c = g.exp(b);
-        g.eval(&[c], &[]);
+    let mut ctx = ag::VariableEnvironment::new();
+    ctx.run(|g| {
+        let a = ag::Tensor::builder(g).build(MultiOutputOp);
+        let b = T::nth_tensor(a, 1);
+        let c = T::exp(b);
+        c.eval(g);
     });
 }
 
 #[test]
 fn test_hook() {
-    ag::with(|g| {
-        let a: ag::Tensor<f32> = g.ones(&[4, 2]).show();
-        let b: ag::Tensor<f32> = g.zeros(&[2, 3]).show_shape();
-        let c = g.matmul(a, b).print("aaa");
-        g.eval(&[c], &[]);
+    let mut ctx = ag::VariableEnvironment::new();
+    ctx.run(|g| {
+        let a: ag::Tensor<f64> = T::ones(&[4, 2], g).show();
+        let b: ag::Tensor<f64> = T::zeros(&[2, 3], g).show_shape();
+        let c = T::matmul(a, b).print("aaa");
+        c.eval(g);
     });
-    ag::with(|g: &mut ag::Graph<_>| {
-        let x = g.placeholder(&[]);
-        let y = g.placeholder(&[]);
+    ctx.run(|g| {
+        let x = g.placeholder("x", &[]);
+        let y = g.placeholder("x", &[]);
         let z = 2. * x * x + 3. * y + 1.;
 
         // dz/dy
-        let gy = &g.grad(&[z], &[y])[0];
-        println!("{:?}", gy.eval(&[])); // => Some(3.)
+        let gy = &T::grad(&[z], &[y])[0];
+        println!("{:?}", gy.eval(g)); // => Some(3.)
 
         // dz/dx (requires to fill the placeholder `x`)
-        let gx = &g.grad(&[z], &[x])[0];
-        println!("{:?}", gx.eval(&[x.given(ag::ndarray::arr0(2.).view())])); // => Some(8.)
+        let gx = &T::grad(&[z], &[x])[0];
+        let gx_value = g
+            .evaluator()
+            .push(gx)
+            .feed(x, ag::ndarray::arr0(2.).view())
+            .run();
+        println!("{:?}", gx_value[0]); // => Some(8.)
 
         // ddz/dx (differentiates `z` again)
-        let ggx = &g.grad(&[gx], &[x])[0];
-        println!("{:?}", ggx.eval(&[])); // => Some(4.)
+        let ggx = &T::grad(&[gx], &[x])[0];
+        println!("{:?}", ggx.eval(g)); // => Some(4.)
     });
 }
 
 #[test]
-fn test_many_nodes() {
-    ag::with(|g: &mut ag::Graph<f64>| {
+#[should_panic]
+fn test_too_many_nodes() {
+    let mut ctx = ag::VariableEnvironment::new();
+    ctx.run(|g| {
         for _ in 0..10000 {
-            let x = g.placeholder(&[3]);
+            let x = g.placeholder("x", &[3]);
             let z = 2.0 * x / 2.0 / 2.0;
-            g.grad(&[z], &[x])[0];
+            T::grad(&[z], &[x])[0];
         }
     });
 }
