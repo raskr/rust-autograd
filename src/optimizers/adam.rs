@@ -8,7 +8,7 @@ use std::sync::{Arc, RwLock};
 
 /// Adam optimizer
 ///
-/// This implementation is based on http://arxiv.org/abs/1412.6980v8.
+/// This implementation is based on https://arxiv.org/abs/1412.6980v8.
 ///
 /// ```
 /// use autograd as ag;
