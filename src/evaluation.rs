@@ -68,7 +68,7 @@ pub struct Evaluator<'view, 'graph, 'e, 'n, 'c, F: Float> {
 /// See the example: [crate::optimizers::momentum_sgd::MomentumSGD]
 #[derive(Clone)]
 pub struct Feeder<'view, F: Float> {
-    feeds: Vec<crate::evaluation::Feed<'view, F>>,
+    feeds: Vec<Feed<'view, F>>,
 }
 
 impl<'view, F: Float> Feeder<'view, F> {

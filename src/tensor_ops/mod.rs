@@ -100,7 +100,7 @@ where
     let len = ys_.len();
     let mut ys = Vec::with_capacity(len);
     for y in ys_ {
-        ys.push(sum(y));
+        ys.push(sum_all(y));
     }
     let gys = vec![scalar(F::one(), g); len];
     unsafe { grad_with_default(&ys, xs, &gys) }
@@ -1077,11 +1077,11 @@ where
 ///
 /// ag::run(|g| {
 ///    let x = convert_to_tensor(array![[2., 4.], [3., 1.]], g);
-///    let y = sum(&x);
+///    let y = sum_all(&x);
 ///    assert_eq!(y.eval(g), Ok(ndarray::arr0(10.).into_dyn()));
 /// });
 /// ```
-pub fn sum<'graph, A, F: Float>(x: A) -> Tensor<'graph, F>
+pub fn sum_all<'graph, A, F: Float>(x: A) -> Tensor<'graph, F>
 where
     A: AsRef<Tensor<'graph, F>> + Copy,
 {
@@ -1090,6 +1090,26 @@ where
     Tensor::builder(g)
         .append_input(x.as_ref(), false)
         .build(reduction_ops::ReduceSumToScalar)
+}
+
+/// Average all the elements.
+///
+/// ```
+/// use ndarray::array;
+/// use autograd as ag;
+/// use ag::tensor_ops::*;
+///
+/// ag::run(|g| {
+///    let x = convert_to_tensor(array![[2., 4.], [3., 1.]], g);
+///    let y = mean_all(&x);
+///    assert_eq!(y.eval(g), Ok(ndarray::arr0(2.5).into_dyn()));
+/// });
+/// ```
+pub fn mean_all<'graph, A, F: Float>(x: A) -> Tensor<'graph, F>
+    where
+        A: AsRef<Tensor<'graph, F>> + Copy,
+{
+    sum_all(x) / size(x)
 }
 
 /// Takes sumation along specified axes.
@@ -1752,6 +1772,17 @@ where
         .append_input(y.as_ref(), false)
         .append_input(t.as_ref(), false)
         .build(op)
+}
+
+/// Computes mean squared error
+///
+/// Note that the mean axis is the last one.
+pub fn mean_squared_error<'graph, A, B, F: Float>(y: A, t: B) -> Tensor<'graph, F>
+    where
+        A: AsRef<Tensor<'graph, F>> + Copy,
+        B: AsRef<Tensor<'graph, F>> + Copy,
+{
+    reduce_mean(square(y.as_ref() - t.as_ref()), &[-1], false)
 }
 
 /// Matrix multiplication.
@@ -2926,7 +2957,12 @@ impl<'g, F: Float> Tensor<'g, F> {
     }
     /// Same as [tensor_ops::sum_all](sum_all)
     #[inline]
-    pub fn sum_all<AT: AsTensor<'g, F>>(&self, axes: &AT, keep_dims: bool) -> Tensor<'g, F> {
-        sum(self)
+    pub fn sum_all<AT: AsTensor<'g, F>>(&self) -> Tensor<'g, F> {
+        sum_all(self)
+    }
+    /// Same as [tensor_ops::mean_all](mean_all)
+    #[inline]
+    pub fn mean_all<AT: AsTensor<'g, F>>(&self) -> Tensor<'g, F> {
+        mean_all(self)
     }
 }

@@ -10,12 +10,9 @@ use crate::{Context, Float, NdArray, VariableEnvironment};
 ///
 /// ```
 /// use autograd as ag;
-<<<<<<< Updated upstream
-=======
 /// use ag::prelude::*;
 /// use ag::optimizers;
 /// use ag::optimizers::sgd::SGD;
->>>>>>> Stashed changes
 ///
 /// type Tensor<'g> = ag::Tensor<'g, f64>;
 /// let mut env = ag::VariableEnvironment::new();

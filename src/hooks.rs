@@ -60,30 +60,30 @@ impl<T: Float, FUN: Fn(&NdArrayView<T>) -> () + Send + Sync> Hook<T> for Raw<T, 
 
 impl<T: Float> Hook<T> for Print {
     fn call(&self, _: &crate::ndarray_ext::NdArrayView<T>) {
-        eprintln!("{}", self.0);
+        println!("{}", self.0);
     }
 }
 
 impl<T: Float> Hook<T> for Show {
     fn call(&self, arr: &crate::ndarray_ext::NdArrayView<T>) {
-        eprintln!("{:?}", arr);
+        println!("{:?}", arr);
     }
 }
 
 impl<T: Float> Hook<T> for ShowWith {
     fn call(&self, arr: &crate::ndarray_ext::NdArrayView<T>) {
-        eprintln!("{} {:?}", self.0, arr);
+        println!("{} {:?}", self.0, arr);
     }
 }
 
 impl<T: Float> Hook<T> for ShowShape {
     fn call(&self, arr: &crate::ndarray_ext::NdArrayView<T>) {
-        eprintln!("{:?}", arr.shape());
+        println!("{:?}", arr.shape());
     }
 }
 
 impl<T: Float> Hook<T> for ShowShapeWith {
     fn call(&self, arr: &crate::ndarray_ext::NdArrayView<T>) {
-        eprintln!("{}\n{:?}", self.0, arr.shape());
+        println!("{}\n{:?}", self.0, arr.shape());
     }
 }

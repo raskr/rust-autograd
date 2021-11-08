@@ -173,9 +173,9 @@ impl<'graph, F: Float> Tensor<'graph, F> {
     /// use ag::tensor_ops::*;
     ///
     /// ag::run(|g| {
-    ///     let a: ag::Tensor<f32> = zeros((&[4, 2]).register_hook(ag::hooks::Show), g);
-    ///     let b: ag::Tensor<f32> = g.ones(&[2, 3]).register_hook(ag::hooks::ShowShape);
-    ///     let c = g.matmul(a, b);
+    ///     let a: ag::Tensor<f32> = zeros(&[4, 2], g).register_hook(ag::hooks::Show);
+    ///     let b: ag::Tensor<f32> = ones(&[2, 3], g).register_hook(ag::hooks::ShowShape);
+    ///     let c = matmul(a, b);
     ///
     ///     c.eval(g);
     ///     // [[0.0, 0.0],
@@ -193,7 +193,7 @@ impl<'graph, F: Float> Tensor<'graph, F> {
             .build(crate::tensor_ops::hook_ops::HookOp::new(hook))
     }
 
-    /// Sets a hook that displays the evaluation result of the receiver tensor to stderr.
+    /// Sets a hook that displays the evaluation result of the receiver tensor to stdout.
     ///
     /// ```
     /// use autograd as ag;
@@ -213,7 +213,7 @@ impl<'graph, F: Float> Tensor<'graph, F> {
         self.register_hook(crate::hooks::Show)
     }
 
-    /// Sets a hook that displays the evaluation result of the receiver tensor to stderr, with given prefix.
+    /// Sets a hook that displays the evaluation result of the receiver tensor to stdout, with given prefix.
     ///
     /// ```
     /// use autograd as ag;
@@ -235,7 +235,7 @@ impl<'graph, F: Float> Tensor<'graph, F> {
         self.register_hook(crate::hooks::ShowWith(what))
     }
 
-    /// Sets a hook that displays the shape of the evaluated receiver tensor to stderr.
+    /// Sets a hook that displays the shape of the evaluated receiver tensor to stdout.
     ///
     /// ```
     /// use autograd as ag;
@@ -252,7 +252,7 @@ impl<'graph, F: Float> Tensor<'graph, F> {
         self.register_hook(crate::hooks::ShowShape)
     }
 
-    /// Sets a hook that displays the shape of the evaluated receiver tensor to stderr, with given prefix.
+    /// Sets a hook that displays the shape of the evaluated receiver tensor to stdout, with given prefix.
     ///
     /// ```
     /// use autograd as ag;

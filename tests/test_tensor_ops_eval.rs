@@ -30,10 +30,10 @@ fn argmax() {
 
 #[test]
 fn argmax2() {
-    with(|g| {
-        let test = g.constant(array![84.0, 16.0, 0.04, 85.0, 16.0, 85.0]);
-        let max_dis_index = g.argmax(test, 0, false);
-        assert_eq!(max_dis_index.eval(&[]), Ok(ndarray::arr0(3.).into_dyn()));
+    ag::run(|g| {
+        let test = T::convert_to_tensor(array![84.0, 16.0, 0.04, 85.0, 16.0, 85.0], g);
+        let max_dis_index = T::argmax(test, 0, false);
+        assert_eq!(max_dis_index.eval(g), Ok(ndarray::arr0(3.).into_dyn()));
     });
 }
 

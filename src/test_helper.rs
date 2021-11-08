@@ -17,7 +17,7 @@ pub fn check_theoretical_grads<'g, 't, 'v, F: Float, A>(
 ) where
     A: AsRef<Tensor<'g, F>> + Copy,
 {
-    let objective = sum(objective);
+    let objective = sum_all(objective);
     // backprop
     let theoretical_grads = g
         .evaluator()

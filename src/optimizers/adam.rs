@@ -12,14 +12,8 @@ use crate::{Context, Float, NdArray, VariableEnvironment};
 ///
 /// ```
 /// use autograd as ag;
-<<<<<<< Updated upstream
-/// use ag::tensor::Variable;
-/// use ag::ndarray_ext::into_shared;
-/// use std::sync::{Arc, RwLock};
-=======
 ///
 /// use ag::prelude::*;
->>>>>>> Stashed changes
 /// use ag::optimizers::adam;
 /// use ag::variable::NamespaceTrait;
 ///

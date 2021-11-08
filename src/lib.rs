@@ -70,7 +70,7 @@
 //!         let b = ctx.variable("b");
 //!         let z = matmul(x, w) + b;
 //!         let mean_loss = reduce_mean(sparse_softmax_cross_entropy(z, &y), &[0], false);
-//!         let grads = &grad(&[&mean_loss], &[w, b]);
+//!         let grads = &grad(&[mean_loss], &[w, b]);
 //!
 //!         // let mut feeder = ag::Feeder::new();
 //!         // feeder.push(x, x_batch).push(y, y_batch);
