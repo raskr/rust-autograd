@@ -1,4 +1,4 @@
-//! A collection of functions to manipulate `autograd::Tensor` objects
+//! A collection of functions for manipulating `autograd::Tensor` objects
 use ndarray;
 
 use crate::ndarray_ext::{ArrayRng, NdArray};
@@ -11,10 +11,10 @@ mod array_ops;
 pub(crate) mod basic_source_ops;
 pub(crate) mod binary_ops;
 mod blas_ffi;
-pub mod const_gen_ops;
+pub(crate) mod const_gen_ops;
 mod conv_ops;
 pub(crate) mod dot_ops;
-pub mod gradient_descent_ops;
+pub(crate) mod gradient_descent_ops;
 mod gradient_ops;
 mod graph_ops;
 pub(crate) mod higher_order_ops;
@@ -54,14 +54,13 @@ impl<'graph, F: Float> Tensor<'graph, F> {
 
 /// Symbolic gradient tensors of `xs` in the same order as `xs`'s
 ///
-/// # Arguments
 /// * `ys` - Targets of differentiation that are arbitrary shapes.
 /// * `xs` - Tensors with which differentiate `ys`.
 ///
-/// # Example
-/// Partial derivatives of `z = 2x^2 + 3y + 1`.
+/// See the more useful helper: [crate::optimizers::grad_helper()]
 ///
 /// ```
+/// // Partial derivatives of `z = 2x^2 + 3y + 1`.
 /// use ndarray;
 /// use autograd as ag;
 /// use ag::tensor_ops as T;
@@ -2841,22 +2840,22 @@ where
         })
 }
 
-pub(crate) fn depends_on<'graph, A, F: Float>(
-    x: Tensor<'graph, F>, // original x is consumed
-    on: &[A],
+pub(crate) fn control_dependencies<'graph, A, F: Float>(
+    x: Tensor<'graph, F>,
+    deps: &[A],
 ) -> Tensor<'graph, F>
 where
     A: AsRef<Tensor<'graph, F>> + Copy,
 {
     let g = x.graph();
     if let Some(x_input) = x.input_tensor(0, g) {
-        let mut b = Tensor::builder(g).append_input(x_input, false);
+        let mut ctrl_deps = Tensor::builder(g).append_input(x_input, false);
         // requiring all deps
-        for dep in on {
-            b = b.append_input(dep.as_ref(), false);
+        for dep in deps {
+            ctrl_deps = ctrl_deps.append_input(dep.as_ref(), false);
         }
-        let new_x_input = b.build(graph_ops::ControlDependency);
-        x.inner_mut().in_nodes[0].id = new_x_input.id;
+        let new_x_input = ctrl_deps.build(graph_ops::ControlDependency);
+        g.access_inner_mut(x.id).in_nodes[0].id = new_x_input.id;
         x
     } else {
         panic!("Source tensor cannot depend on any other tensors.");

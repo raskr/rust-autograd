@@ -1,10 +1,10 @@
 //! Adam optimizer
-use crate::evaluation::Feeder;
+
 use crate::optimizers::Optimizer;
 use crate::tensor::Tensor;
 use crate::tensor_ops::gradient_descent_ops::adam;
 use crate::variable::VariableID;
-use crate::{Context, Float, NdArray, VariableEnvironment};
+use crate::{Context, Float, VariableEnvironment};
 
 /// Adam optimizer
 ///
@@ -14,7 +14,7 @@ use crate::{Context, Float, NdArray, VariableEnvironment};
 /// use autograd as ag;
 ///
 /// use ag::prelude::*;
-/// use ag::optimizers::adam;
+/// use ag::optimizers::Adam;
 /// use ag::variable::NamespaceTrait;
 ///
 /// // Define parameters to optimize.
@@ -26,7 +26,7 @@ use crate::{Context, Float, NdArray, VariableEnvironment};
 ///
 /// // Adam optimizer with default params.
 /// // State arrays are created in the "my_adam" namespace.
-/// let adam = adam::Adam::default("my_adam", env.default_namespace().current_var_ids(), &mut env);
+/// let adam = Adam::default("my_adam", env.default_namespace().current_var_ids(), &mut env);
 ///
 /// env.run(|g| {
 ///     let w = g.variable(w);
@@ -129,7 +129,7 @@ impl<F: Float> Optimizer<F> for Adam<F> {
         let mut ret = Vec::with_capacity(num_params);
         for i in 0..num_params {
             let param = params[i].as_ref();
-            let namespace = g.env().namespace(self.adam_namespace_id);
+            let namespace = g.namespace(self.adam_namespace_id);
             let var_id = param.get_variable_id().expect("Got non-variable tensor");
             let m = g.variable_by_name(&format!("{}m", var_id), &namespace);
             let v = g.variable_by_name(&format!("{}v", var_id), &namespace);

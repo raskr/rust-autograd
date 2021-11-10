@@ -498,7 +498,7 @@ fn test_deconv() {
     )
     .unwrap();
 
-    let mut ctx = crate::VariableEnvironment::new();
+    let ctx = crate::VariableEnvironment::new();
     let out_val = ctx.run(|graph| {
         let w = T::ones(&[ych, xch, kh, kw], graph);
         let g = T::ones(&[batch_size, ych, yh, yw], graph);

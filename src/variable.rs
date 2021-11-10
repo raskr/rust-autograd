@@ -14,7 +14,7 @@
 //! // Register variable arrays in the *default* namespace.
 //! // `set` method returns the id of the given array;
 //! let a: VariableID = env.set(ndarray_ext::zeros(&[1, 10]));
-//! // You can name an array and lookup it later
+//! // You can name arrays and lookup them later
 //! let b: VariableID = env.name("b")
 //!                        .set(ndarray_ext::zeros(&[1, 10]));
 //!
@@ -24,7 +24,7 @@
 //!     .name("c")
 //!     .set(ndarray_ext::zeros(&[1, 10]));
 //!
-//! // Create and run a graph with the env.
+//! // Create and run some graphs with the env.
 //! for epoch in 0..10 {
 //!     env.run(|ctx| {
 //!         // Lookup variable tensors.
@@ -76,7 +76,7 @@ use serde_json;
 use smallvec::alloc::fmt::Formatter;
 use std::borrow::Cow;
 use std::cell::RefCell;
-use std::collections::HashMap;
+
 use std::error::Error;
 use std::fs::File;
 use std::ops::Deref;

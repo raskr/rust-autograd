@@ -8,7 +8,7 @@ use ndarray::array;
 
 #[test]
 fn scalar_add() {
-    let mut ctx = ag::VariableEnvironment::new();
+    let ctx = ag::VariableEnvironment::new();
     ctx.run(|g| {
         let x = g.placeholder("x", &[]);
         let y = x + 2.;
@@ -19,7 +19,7 @@ fn scalar_add() {
 
 #[test]
 fn scalar_sub() {
-    let mut ctx = ag::VariableEnvironment::new();
+    let ctx = ag::VariableEnvironment::new();
     ctx.run(|g| {
         let x = g.placeholder("x", &[]);
         let y = x - 2.;
@@ -30,7 +30,7 @@ fn scalar_sub() {
 
 #[test]
 fn scalar_mul() {
-    let mut ctx = ag::VariableEnvironment::<f64>::new();
+    let ctx = ag::VariableEnvironment::<f64>::new();
     ctx.run(|g| {
         let x = g.placeholder("x", &[]);
         let y = 3. * x;
@@ -41,7 +41,7 @@ fn scalar_mul() {
 
 #[test]
 fn scalar_div() {
-    let mut ctx = ag::VariableEnvironment::new();
+    let ctx = ag::VariableEnvironment::new();
     ctx.run(|g| {
         let x = g.placeholder("x", &[]);
         let y = x / 3.;
@@ -52,7 +52,7 @@ fn scalar_div() {
 
 #[test]
 fn scalar_div2() {
-    let mut ctx = ag::VariableEnvironment::new();
+    let ctx = ag::VariableEnvironment::new();
     ctx.run(|g| {
         let x = g.placeholder("x", &[]);
         let y = x / 3. / 4.;
@@ -63,7 +63,7 @@ fn scalar_div2() {
 
 #[test]
 fn expr0() {
-    let mut ctx = ag::VariableEnvironment::<f64>::new();
+    let ctx = ag::VariableEnvironment::<f64>::new();
     ctx.run(|g| {
         let x = g.placeholder("x", &[]);
         let y = 3. * x;
@@ -74,7 +74,7 @@ fn expr0() {
 
 #[test]
 fn expr1() {
-    let mut ctx = ag::VariableEnvironment::new();
+    let ctx = ag::VariableEnvironment::new();
     ctx.run(|g| {
         let x = g.placeholder("x", &[]);
         let y = 3. * x + 2.;
@@ -85,7 +85,7 @@ fn expr1() {
 
 #[test]
 fn expr2() {
-    let mut ctx = ag::VariableEnvironment::new();
+    let ctx = ag::VariableEnvironment::new();
     ctx.run(|g| {
         let x = g.placeholder("x", &[]);
         let y = 3. * x * x;
@@ -101,7 +101,7 @@ fn expr2() {
 
 #[test]
 fn expr3() {
-    let mut ctx = ag::VariableEnvironment::new();
+    let ctx = ag::VariableEnvironment::new();
     ctx.run(|g| {
         let x = g.placeholder("x", &[]);
         let y = 3. * x * x + 2.;
@@ -117,7 +117,7 @@ fn expr3() {
 
 #[test]
 fn expr4() {
-    let mut ctx = ag::VariableEnvironment::new();
+    let ctx = ag::VariableEnvironment::new();
     ctx.run(|g| {
         let x = g.placeholder("x", &[]);
         let y = 3. * x * x + 2. * x + 1.;
@@ -133,7 +133,7 @@ fn expr4() {
 
 #[test]
 fn expr5() {
-    let mut ctx = ag::VariableEnvironment::new();
+    let ctx = ag::VariableEnvironment::new();
     ctx.run(|g| {
         let x1 = g.placeholder("x1", &[]);
         let x2 = g.placeholder("x2", &[]);
@@ -165,7 +165,7 @@ fn expr6() {
 
 #[test]
 fn differentiate_twice() {
-    let mut ctx = ag::VariableEnvironment::<f64>::new();
+    let ctx = ag::VariableEnvironment::<f64>::new();
     ctx.run(|g| {
         let x = g.placeholder("x", &[]);
         let y = x * x;
@@ -177,7 +177,7 @@ fn differentiate_twice() {
 
 #[test]
 fn expr7() {
-    let mut ctx = ag::VariableEnvironment::new();
+    let ctx = ag::VariableEnvironment::new();
     ctx.run(|g| {
         let x1 = g.placeholder("x1", &[]);
         let x2 = g.placeholder("x2", &[]);
@@ -187,7 +187,7 @@ fn expr7() {
         let gg1 = T::grad(&[g1], &[x1])[0];
         assert_eq!(3., g2.eval(g).unwrap()[ndarray::IxDyn(&[])]);
         assert_eq!(4., gg1.eval(g).unwrap()[ndarray::IxDyn(&[])]);
-        let mut eval = g
+        let eval = g
             .evaluator()
             .push(g1)
             .feed(x1, ndarray::arr0(2.).view())
@@ -198,7 +198,7 @@ fn expr7() {
 
 #[test]
 fn expr8() {
-    let mut env = ag::VariableEnvironment::new();
+    let env = ag::VariableEnvironment::new();
     env.run(|graph| {
         let x1 = graph.placeholder("x1", &[]);
         let y = x1 * x1 * x1 * x1;

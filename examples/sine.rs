@@ -32,7 +32,7 @@ fn main() {
             let y = matmul(h2, ctx.variable(w3));
             let mse = mean_all(square(y - t)); // mean squared error
             let ns = ctx.default_namespace();
-            let (vars, grads) = optimizers::grad_helper(mse, &ns);
+            let (vars, grads) = optimizers::grad_helper(&[mse], &ns);
             let update_op = opt.get_update_op(&vars, &grads, ctx);
 
             let results = ctx.evaluator()

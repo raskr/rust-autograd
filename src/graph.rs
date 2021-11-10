@@ -1,10 +1,10 @@
 //! Defining things related to `ag::Graph`.
 
 use crate::tensor::{Tensor, TensorInternal};
-use crate::tensor_ops as T;
-use crate::variable::{FullName, NamespaceTrait, VariableID, VariableNamespace};
+
+use crate::variable::{VariableID, VariableNamespace};
 use crate::{Float, FxHashMap, NdArray, VariableEnvironment};
-use smallvec::alloc::borrow::Cow;
+
 use std::cell::RefCell;
 use std::cell::{Ref, RefMut};
 use std::fmt;
@@ -165,19 +165,28 @@ impl<'g, 'env, 'name, F: Float> Context<'env, 'name, F> {
     /// `shape_[i]` must be a positive value, or -1 which means dynamic dim.
     ///
     /// ```
-    /// use ndarray;
     /// use autograd as ag;
     ///
-    /// ag::run(|ctx| {
-    ///     let x = ctx.placeholder("x", &[-1, 2]);
+    /// ag::run(|c| {
+    ///     // x1 and x2 represent the same value
+    ///     let x1 = c.placeholder("x", &[-1, 2]);
+    ///     let x2 = c.placeholder("x", &[-1, 2]);
+    ///     let sum = x1 + x2;
     ///
-    ///     // Fills placeholder, then eval
-    ///     let arr = ndarray::array![[1., 1.]].into_dyn();
-    ///     let ret = ctx.evaluator()
-    ///         .push(&x)
-    ///         .feed(x, arr.view())
+    ///     let arr = &ag::ndarray::array![[1., 1.]].into_dyn();
+    ///     let ret = c.evaluator()
+    ///         .push(&sum)
+    ///         .feed("x", arr.view()) // feed for x1 and x2
     ///         .run();
-    ///     assert_eq!(ret[0], Ok(arr));
+    ///     assert_eq!(ret[0], Ok(arr + arr));
+    ///
+    ///     // Same result
+    ///     let ret = c.evaluator()
+    ///         .push(sum)
+    ///         .feed(x1, arr.view())
+    ///         .feed(x2, arr.view())
+    ///         .run();
+    ///     assert_eq!(ret[0], Ok(arr + arr));
     /// });
     /// ```
     ///

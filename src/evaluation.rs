@@ -2,12 +2,12 @@
 use crate::ndarray::ArrayView;
 use crate::ndarray_ext::{NdArray, NdArrayView};
 use crate::op::{self, ComputeContext, InputArray, OpInput};
-use crate::smallvec::SmallVec;
+
 use crate::tensor::{Tensor, TensorInternal};
 use crate::variable::VariableID;
 use crate::{Context, FxHashMap, VariableEnvironment};
 use crate::{Float, Graph};
-use ndarray::ArcArray;
+
 use std::cell::{Ref, RefMut, UnsafeCell};
 
 /// Unique id for a placeholder tensor
@@ -65,7 +65,7 @@ pub struct Evaluator<'view, 'graph, 'e, 'n, 'c, F: Float> {
 /// Utility for feeding NdArrays to graphs at run-time
 ///
 /// Helpful when used with [optimizers::Optimizer::update](crate::optimizers::Optimizer::update).
-/// See the example: [crate::optimizers::momentum_sgd::MomentumSGD]
+/// See [crate::optimizers::momentum_sgd::MomentumSGD].
 #[derive(Clone)]
 pub struct Feeder<'view, F: Float> {
     feeds: Vec<Feed<'view, F>>,
@@ -77,7 +77,7 @@ impl<'view, F: Float> Feeder<'view, F> {
         Self { feeds: Vec::new() }
     }
 
-    /// Pushes ArrayView in this feeder
+    /// Pushes an `ArrayView` in this feeder
     #[inline]
     pub fn push<D>(&mut self, key: impl Placeholder, value: ArrayView<'view, F, D>) -> &mut Self
     where
@@ -540,7 +540,7 @@ fn would_not_visit<F: Float>(
 fn test_eval2() {
     use crate::tensor_ops as T;
 
-    let mut ctx = crate::VariableEnvironment::new();
+    let ctx = crate::VariableEnvironment::new();
     ctx.run(|g: &mut Context<f32>| {
         let a = T::ones(&[1, 1], g);
         let b = T::sigmoid(a);
@@ -552,7 +552,7 @@ fn test_eval2() {
 fn test_eval() {
     use crate::tensor_ops as T;
 
-    let mut ctx = VariableEnvironment::new();
+    let ctx = VariableEnvironment::new();
     ctx.run(|g| {
         let v: Tensor<f32> = g.placeholder("v", &[3, 2, 1]);
         let z = T::reduce_sum(T::squeeze(v, &[2]), &[0, 1], false);
@@ -582,7 +582,7 @@ fn test_variable_eval() {
 #[test]
 fn test_constant_eval() {
     use crate::tensor_ops::*;
-    let mut ctx = VariableEnvironment::new();
+    let ctx = VariableEnvironment::new();
     ctx.run(|g| {
         let arr = ndarray::arr1(&[0., 0., 0.]).into_dyn();
         assert_eq!(Ok(arr.clone()), convert_to_tensor(arr, g).eval(g));
@@ -591,10 +591,10 @@ fn test_constant_eval() {
 
 #[test]
 fn test_placeholder_eval() {
-    use crate::tensor_ops::*;
-    use ndarray::ShapeBuilder; // Needed for .strides() method
+    
+     // Needed for .strides() method
 
-    let mut ctx = VariableEnvironment::new();
+    let ctx = VariableEnvironment::new();
     ctx.run(|g| {
         let arr: NdArray<f32> = crate::ndarray_ext::ones(&[3, 2, 1]);
         let v = g.placeholder("v", &[3, 2, 1]);
@@ -606,14 +606,14 @@ fn test_placeholder_eval() {
 
 #[test]
 fn test_eval3() {
-    use crate::tensor_ops::*;
+    
 
-    let mut ctx = VariableEnvironment::new();
+    let ctx = VariableEnvironment::new();
     ctx.run(|g| {
         let v: Tensor<f32> = g.placeholder("v", &[3, 2, 1]);
         let v2: Tensor<f32> = g.placeholder("v2", &[3, 2, 1]);
         let b = v + v2;
-        let results = g
+        let _results = g
             .evaluator()
             .push(b)
             .feed(v, crate::ndarray_ext::ones(&[3, 2, 1]).view())

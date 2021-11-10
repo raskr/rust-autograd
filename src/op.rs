@@ -1,10 +1,10 @@
-//! Defining things related to `ag::op::Op`.
+//! Defining things related to `autograd::op::Op`.
 //!
 //! # Implementing differentiable operations
 //!
 //! Many of well-known ops are pre-defined in [crate::tensor_ops], but you can also
 //! implement custom ops by hand.
-//! See also See [crate::tensor::TensorBuilder].
+//! See also [crate::tensor::TensorBuilder].
 //!
 //! ```
 //! use ndarray;
@@ -31,9 +31,10 @@
 //!     }
 //!
 //!     fn grad(&self, ctx: &mut ag::op::GradientContext<T>) {
-//!         // Symbolic gradient of the input of Sigmoid
+//!         // Symbolic gradient of the output of Sigmoid
 //!         let gy = ctx.output_grad();
 //!         let y = ctx.output();
+//!         // Symbolic gradient of the input of Sigmoid
 //!         let gx = gy * (y - square(y));
 //!         ctx.append_input_grad(Some(gx));
 //!     }

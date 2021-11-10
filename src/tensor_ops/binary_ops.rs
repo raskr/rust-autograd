@@ -4,9 +4,6 @@ use crate::tensor::Tensor;
 use crate::tensor_ops::*;
 use crate::Float;
 use crate::Graph;
-/// Implement +, -, *, / operators for Tensor
-/// +=, -=, *=, /= are provided as methods of c.inplace_*.
-/// *=, /= don't propagate gradients.
 use ndarray;
 use std::mem;
 

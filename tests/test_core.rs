@@ -1,8 +1,8 @@
 extern crate autograd as ag;
 extern crate ndarray;
 
-use ag::tensor_ops::{map, reshape};
-use ag::{tensor_ops as T, NdArray};
+
+use ag::{tensor_ops as T};
 
 struct MultiOutputOp;
 
@@ -27,7 +27,7 @@ impl ag::op::Op<f32> for MultiOutputOp {
 
 #[test]
 fn test_nth_tensor() {
-    let mut ctx = ag::VariableEnvironment::new();
+    let ctx = ag::VariableEnvironment::new();
     ctx.run(|g| {
         let a = ag::Tensor::builder(g).build(MultiOutputOp);
         let b = T::nth_tensor(a, 1);
@@ -38,7 +38,7 @@ fn test_nth_tensor() {
 
 #[test]
 fn test_hook() {
-    let mut ctx = ag::VariableEnvironment::new();
+    let ctx = ag::VariableEnvironment::new();
     ctx.run(|g| {
         let a: ag::Tensor<f64> = T::ones(&[4, 2], g).show();
         let b: ag::Tensor<f64> = T::zeros(&[2, 3], g).show_shape();
@@ -72,7 +72,7 @@ fn test_hook() {
 #[test]
 #[should_panic]
 fn test_too_many_nodes() {
-    let mut ctx = ag::VariableEnvironment::new();
+    let ctx = ag::VariableEnvironment::new();
     ctx.run(|g| {
         for _ in 0..10000 {
             let x = g.placeholder("x", &[3]);

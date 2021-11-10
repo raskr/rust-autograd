@@ -6,24 +6,29 @@
 //! use ag::tensor_ops as T;
 //!
 //! ag::run(|ctx| {
-//! let a: ag::Tensor<f32> = T::zeros(&[4, 2], ctx).show();
-//! let b: ag::Tensor<f32> = T::ones(&[2, 3], ctx).show_shape();
-//! let c = T::matmul(a, b).show_with("MatMul:");
+//!    let a: ag::Tensor<f32> = T::zeros(&[4, 2], ctx).show();
+//!    let b: ag::Tensor<f32> = T::ones(&[2, 3], ctx).show_shape();
+//!    let c = T::matmul(a, b).show_prefixed("MatMul:");
 //!
-//! c.eval( ctx);
-//! // [[0.0, 0.0],
-//! // [0.0, 0.0],
-//! // [0.0, 0.0],
-//! // [0.0, 0.0]] shape=[4, 2], strides=[2, 1], layout=C (0x1)
-//! //
-//! // [2, 3]
-//! //
-//! // MatMul:
-//! //  [[0.0, 0.0, 0.0],
-//! //  [0.0, 0.0, 0.0],
-//! //  [0.0, 0.0, 0.0],
-//! //  [0.0, 0.0, 0.0]] shape=[4, 3], strides=[3, 1], layout=C (0x1), dynamic ndim=2
+//!    c.eval( ctx);
+//!    // [[0.0, 0.0],
+//!    // [0.0, 0.0],
+//!    // [0.0, 0.0],
+//!    // [0.0, 0.0]] shape=[4, 2], strides=[2, 1], layout=C (0x1)
+//!    //
+//!    // [2, 3]
+//!    //
+//!    // MatMul:
+//!    //  [[0.0, 0.0, 0.0],
+//!    //  [0.0, 0.0, 0.0],
+//!    //  [0.0, 0.0, 0.0],
+//!    //  [0.0, 0.0, 0.0]] shape=[4, 3], strides=[3, 1], layout=C (0x1), dynamic ndim=2
+//!
+//!    // raw hook
+//!    let a: ag::Tensor<f32> = T::zeros(&[4, 2], ctx)
+//!       .raw_hook(|x| println!("{:?}", x.shape()));
 //! });
+//!
 //! ```
 use super::*;
 use crate::ndarray_ext::NdArrayView;
@@ -40,11 +45,11 @@ pub struct Print(pub &'static str);
 
 pub struct Show;
 
-pub struct ShowWith(pub &'static str);
+pub struct ShowPrefixed(pub &'static str);
 
 pub struct ShowShape;
 
-pub struct ShowShapeWith(pub &'static str);
+pub struct ShowPrefixedShape(pub &'static str);
 
 // Calls the given function.
 pub struct Raw<T: Float, FUN: Fn(&NdArrayView<T>) -> () + Send + Sync> {
@@ -70,7 +75,7 @@ impl<T: Float> Hook<T> for Show {
     }
 }
 
-impl<T: Float> Hook<T> for ShowWith {
+impl<T: Float> Hook<T> for ShowPrefixed {
     fn call(&self, arr: &crate::ndarray_ext::NdArrayView<T>) {
         println!("{} {:?}", self.0, arr);
     }
@@ -82,7 +87,7 @@ impl<T: Float> Hook<T> for ShowShape {
     }
 }
 
-impl<T: Float> Hook<T> for ShowShapeWith {
+impl<T: Float> Hook<T> for ShowPrefixedShape {
     fn call(&self, arr: &crate::ndarray_ext::NdArrayView<T>) {
         println!("{}\n{:?}", self.0, arr.shape());
     }

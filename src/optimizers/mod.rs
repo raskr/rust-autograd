@@ -1,18 +1,24 @@
 //! A collection of gradient descent optimizers
 pub mod adam;
+pub mod adagrad;
 pub mod sgd;
 pub mod momentum_sgd;
 
 use crate::evaluation::Feeder;
 use crate::tensor::Tensor;
-use crate::variable::{VariableID, VariableNamespace};
-use crate::{Context, Float, NdArray, VariableEnvironment};
+use crate::variable::{VariableNamespace};
+use crate::{Context, Float};
+pub use sgd::SGD;
+pub use adam::Adam;
+pub use momentum_sgd::MomentumSGD;
+pub use adagrad::AdaGrad;
 
-/// Differentiates `loss` with all variables in the `namespace`
+/// Differentiates `losses` with all variables in the `namespace`
 ///
-/// Returns a tuple `(variables, gradients)`
+/// Returns a tuple `(variables, gradients)`.
+/// See also [crate::tensor_ops::grad()].
 pub fn grad_helper<'g, A, F: Float>(
-    loss: A,
+    losses: &[A],
     namespace: &'g VariableNamespace<F>,
 ) -> (Vec<Tensor<'g, F>>, Vec<Tensor<'g, F>>)
 where
@@ -20,11 +26,10 @@ where
 {
     use crate::tensor_ops as T;
 
-    let loss = loss.as_ref();
-    let g = loss.graph;
-    let variables: Vec<Tensor<F>> = g.var_tensors_by_name(namespace).map(|(a, b)| b).collect();
+    let g = losses[0].as_ref().graph;
+    let variables: Vec<Tensor<F>> = g.var_tensors_by_name(namespace).map(|(_a, b)| b).collect();
 
-    let grads = T::grad(&[loss.as_ref()], &variables);
+    let grads = T::grad(losses, &variables);
     (variables, grads)
 }
 
@@ -32,7 +37,7 @@ where
 pub trait Optimizer<F: Float> {
     /// Creates dummy tensors to update `variables`
     ///
-    /// It's not supposed to be called directly from the outside (use [get_update_op] instead).
+    /// It's not supposed to be called directly from the outside (use [Optimizer::get_update_op()] instead).
     fn compute_updates<'g, A, B>(
         &self,
         variables: &[A],

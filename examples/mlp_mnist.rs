@@ -6,12 +6,12 @@
 use autograd as ag;
 use ndarray;
 
-use ag::optimizers;
-use ag::optimizers::adam::Adam;
+
+use ag::optimizers::Adam;
 use ag::prelude::*;
 use ag::rand::seq::SliceRandom;
 use ag::tensor_ops as T;
-use ag::tensor_ops::zeros;
+
 use ag::{ndarray_ext as array, Context};
 use ndarray::s;
 use std::ops::Deref;

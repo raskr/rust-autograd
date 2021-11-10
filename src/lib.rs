@@ -46,7 +46,7 @@
 //! This crate has various low-level features inspired by tensorflow/theano to train neural networks.
 //! Since computation graphs require only bare minimum of heap allocations, the overhead is small, even for complex networks.
 //! ```rust
-//! // MNIST digits classification model with 0.918 accuracy
+//! // MNIST digits classification model
 //! use autograd as ag;
 //! use ag::optimizers::adam::Adam;
 //! use ag::tensor_ops::*;
@@ -131,7 +131,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use std::any::TypeId;
 use std::fmt;
 
-/// Primitive type in this crate, which is actually a decorated `num_traits::Float`.
+/// A primitive type in this crate, which is actually a decorated `num_traits::Float`.
 pub trait Float:
     num_traits::Float
     + num_traits::NumAssignOps

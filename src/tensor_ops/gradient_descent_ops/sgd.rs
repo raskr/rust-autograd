@@ -1,4 +1,4 @@
-use crate::{Float, NdArray};
+use crate::{Float};
 
 // mutable op
 pub(crate) struct SGDOp<F> {

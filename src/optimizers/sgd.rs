@@ -1,18 +1,17 @@
-//! Momentum SGD optimizer
-use crate::evaluation::Feeder;
+//! SGD optimizer
+
 use crate::optimizers::Optimizer;
 use crate::tensor::Tensor;
 use crate::tensor_ops::gradient_descent_ops::sgd;
-use crate::variable::VariableID;
-use crate::{Context, Float, NdArray, VariableEnvironment};
+
+use crate::{Context, Float};
 
 /// Gradient descent optimizer
 ///
 /// ```
 /// use autograd as ag;
 /// use ag::prelude::*;
-/// use ag::optimizers;
-/// use ag::optimizers::sgd::SGD;
+/// use ag::optimizers::SGD;
 ///
 /// type Tensor<'g> = ag::Tensor<'g, f64>;
 /// let mut env = ag::VariableEnvironment::new();

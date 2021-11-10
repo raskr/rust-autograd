@@ -90,7 +90,7 @@ fn main() {
     env.name("b3").set(array::zeros(&[1, 10]));
 
     // Prepare adam optimizer
-    let adam = optimizers::adam::Adam::default(
+    let adam = optimizers::Adam::default(
         "my_adam",
         env.default_namespace().current_var_ids(),
         &mut env, // mut env
@@ -110,7 +110,7 @@ fn main() {
                     let loss = T::sparse_softmax_cross_entropy(&logits, &y);
                     let mean_loss = T::reduce_mean(loss, &[0], false);
                     let ns = ctx.default_namespace();
-                    let (vars, grads) = optimizers::grad_helper(mean_loss, &ns);
+                    let (vars, grads) = optimizers::grad_helper(&[mean_loss], &ns);
 
                     let mut feeder = ag::Feeder::new();
                     feeder.push(x, x_batch).push(y, y_batch);

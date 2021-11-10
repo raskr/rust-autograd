@@ -155,11 +155,11 @@ pub mod array_gen {
     ///
     /// ```
     /// use autograd as ag;
-    /// use rand;
+    /// use rand::{self, prelude::StdRng, SeedableRng};
     ///
     /// type NdArray = ndarray::Array<f32, ndarray::IxDyn>;
     ///
-    /// let my_rng = ag::ndarray_ext::ArrayRng::new(rand::thread_rng());
+    /// let my_rng = ag::ndarray_ext::ArrayRng::new(StdRng::seed_from_u64(42));
     /// let random: NdArray = my_rng.standard_normal(&[2, 3]);
     ///
     /// // The default is `ThreadRng` (seed number is not fixed).

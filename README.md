@@ -49,7 +49,7 @@ ag::run(|ctx: &mut ag::Context<_>| {
  This crate has various low-level features inspired by tensorflow/theano to train neural networks.
  Since computation graphs require only bare minimum of heap allocations, the overhead is small, even for complex networks.
  ```rust
-// MNIST digits classification model with 0.918 accuracy
+// MNIST digits classification model
 use autograd as ag;
 use ag::optimizers::adam::Adam;
 use ag::tensor_ops::*;

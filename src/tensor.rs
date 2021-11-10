@@ -1,4 +1,4 @@
-//! Defining things related to `ag::Tensor`.
+//! Defining things related to `autograd::Tensor`.
 use crate::Float;
 use crate::{op, Context};
 use crate::{NdArray, NdArrayView};
@@ -6,7 +6,7 @@ use crate::{NdArray, NdArrayView};
 use crate::graph::{AsGraph, Graph};
 use crate::op::{GradientContext, InputArray, OpError};
 use crate::variable::VariableID;
-use std::cell::{Ref, RefMut};
+use std::cell::Ref;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
@@ -16,11 +16,9 @@ use std::ops::{Add, Div, Mul, Sub};
 ///
 /// `Tensor` is:
 ///
-/// - created by operations of a `Graph`.
-/// - not evaluated until `Tensor::eval`, `Graph::eval` or `Eval::run` is called.
-/// - cheap to `Copy` since it contains only refs to the owned internal objects.
-///
-/// The builtin operations for tensors are provided as [Graph's methods](../graph/struct.Graph.html).
+/// - created using `autograd::Context`.
+/// - not evaluated until `Tensor::eval`, `Evaluator::run`, or `Optimizer::update` is called.
+/// - cheap to `Copy` since it's just a symbol
 ///
 /// ```
 /// use autograd as ag;
@@ -74,21 +72,10 @@ impl<'graph, F: Float> Tensor<'graph, F> {
         self.graph.access_inner(self.id)
     }
 
-    #[inline]
-    pub(crate) fn inner_mut<'t>(&self) -> RefMut<TensorInternal<F>> {
-        self.graph.access_inner_mut(self.id)
-    }
-
     /// Returns the graph to which this tensor belongs.
     #[inline]
-    pub fn graph(&self) -> &'graph Graph<F> {
+    pub(crate) fn graph(&self) -> &'graph Graph<F> {
         self.graph
-    }
-
-    /// Returns a mutable ref of the graph to which this tensor belongs.
-    #[inline]
-    pub fn graph_mut(&mut self) -> &'graph Graph<F> {
-        &mut self.graph
     }
 
     /// Evaluates this tensor as an `ndarray::Array<F, ndarray::IxDyn>`.
@@ -104,7 +91,7 @@ impl<'graph, F: Float> Tensor<'graph, F> {
     /// });
     /// ```
     ///
-    /// See also [Graph::eval](../graph/struct.Graph.html#method.eval).
+    /// See also [Evaluator](../evaluation/struct.Evaluator.html).
     pub fn eval<'v>(&self, ctx: &Context<F>) -> Result<NdArray<F>, crate::EvalError> {
         crate::graph::assert_same_graph(ctx, self.graph);
         let mut ret = ctx.eval(&[self], &[], ctx.env_handle);
@@ -116,15 +103,42 @@ impl<'graph, F: Float> Tensor<'graph, F> {
     ///
     /// You can use the return value instead of `self`.
     /// Panics if `self` is a source node, such as a variable or placeholder.
+    ///
+    /// ```
+    /// use ndarray::array;
+    /// use autograd as ag;
+    /// use ag::tensor_ops as T;
+    /// use ag::prelude::*;
+    /// use ag::optimizers::SGD;
+    ///
+    /// let mut env = ag::VariableEnvironment::new();
+    /// let var = env.set(array![1., 1.]);
+    ///
+    /// env.run(|c| {
+    ///     let var = c.variable(var);
+    ///     let grad = T::ones(&[2], c);
+    ///     let mul1 = var * 2.;
+    ///     let update = SGD::new(1.0).get_update_op(&[var], &[grad], c); // update `w` to [[0., 0.]].
+    ///
+    ///     // We don't know if `mul1` becomes [2., 2.] or [0., 0.] because...
+    ///     // - the evaluation order of `mul1` and `update` is undefined, since they don't depend on each other
+    ///     // - or rather `update` will be pruned out of the graph
+    ///
+    ///     // mul2 always takes precedence over the update op so becomes [0., 0.]
+    ///     let mul2 = (var * 2.).depends_on(&[update]);
+    ///
+    ///     assert_eq!(mul2.eval(c), Ok(array![0., 0.].into_dyn()));
+    /// });
+    /// ```
     #[inline]
-    pub(crate) fn depends_on<A>(
-        self, // self is consumed
+    pub fn depends_on<A>(
+        self,
         on: &[A],
     ) -> Tensor<'graph, F>
     where
         A: AsRef<Tensor<'graph, F>> + Copy,
     {
-        crate::tensor_ops::depends_on(self, on)
+        crate::tensor_ops::control_dependencies(self, on)
     }
 
     /// Creates a new [TensorBuilder](struct.TensorBuilder.html).
@@ -213,14 +227,14 @@ impl<'graph, F: Float> Tensor<'graph, F> {
         self.register_hook(crate::hooks::Show)
     }
 
-    /// Sets a hook that displays the evaluation result of the receiver tensor to stdout, with given prefix.
+    /// Sets a hook that displays the evaluation result of the receiver tensor to stdout, with the given prefix.
     ///
     /// ```
     /// use autograd as ag;
     /// use ag::tensor_ops::*;
     ///
     /// ag::run(|g| {
-    ///     let a: ag::Tensor<f32> = zeros(&[4, 2], g).show_with("My value:");
+    ///     let a: ag::Tensor<f32> = zeros(&[4, 2], g).show_prefixed("My value:");
     ///     a.eval(g);
     ///     // My value:
     ///     // [[0.0, 0.0],
@@ -231,8 +245,8 @@ impl<'graph, F: Float> Tensor<'graph, F> {
     ///
     /// ```
     #[inline]
-    pub fn show_with(self, what: &'static str) -> Tensor<'graph, F> {
-        self.register_hook(crate::hooks::ShowWith(what))
+    pub fn show_prefixed(self, prefix: &'static str) -> Tensor<'graph, F> {
+        self.register_hook(crate::hooks::ShowPrefixed(prefix))
     }
 
     /// Sets a hook that displays the shape of the evaluated receiver tensor to stdout.
@@ -252,22 +266,22 @@ impl<'graph, F: Float> Tensor<'graph, F> {
         self.register_hook(crate::hooks::ShowShape)
     }
 
-    /// Sets a hook that displays the shape of the evaluated receiver tensor to stdout, with given prefix.
+    /// Sets a hook that displays the shape of the evaluated receiver tensor to stdout, with the given prefix.
     ///
     /// ```
     /// use autograd as ag;
     /// use ag::tensor_ops::*;
     ///
     /// ag::run(|g| {
-    ///     let a: ag::Tensor<f32> = zeros(&[2, 3], g).show_shape_with("My shape:");
+    ///     let a: ag::Tensor<f32> = zeros(&[2, 3], g).show_prefixed_shape("My shape:");
     ///     a.eval(g);
     ///     // My shape:
     ///     // [2, 3]
     /// });
     /// ```
     #[inline]
-    pub fn show_shape_with(self, what: &'static str) -> Tensor<'graph, F> {
-        self.register_hook(crate::hooks::ShowShapeWith(what))
+    pub fn show_prefixed_shape(self, prefix: &'static str) -> Tensor<'graph, F> {
+        self.register_hook(crate::hooks::ShowPrefixedShape(prefix))
     }
 
     /// Sets a hook that displays the given string after evaluation of the receiver tensor.
@@ -797,7 +811,7 @@ impl<T: Float> crate::op::Op<T> for Dummy {
     fn grad(&self, _: &mut GradientContext<T>) {}
 }
 
-use crate::evaluation::PlaceholderKey;
+
 use crate::tensor_ops as T;
 use smallvec::SmallVec;
 
