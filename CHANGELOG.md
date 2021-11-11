@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.1.1
+### Fixed
+- Argmin and Argmax return incorrect result when multiple min or max values are given. [#49](https://github.com/raskr/rust-autograd/pull/49)
+- Wrong sqrt gradient. [#37](https://github.com/raskr/rust-autograd/pull/37)
+### Other improvements
+- Small updates
+
 ## v1.1.0
 ### Fixed
 - Wrong gradient computation in the case that a target variable is scalar and its broadcast is involved: `Graph::grad(&[scalar * tensor], &[scalar])` [#38](https://github.com/raskr/rust-autograd/issues/38)
