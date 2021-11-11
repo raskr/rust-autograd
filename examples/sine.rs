@@ -22,11 +22,10 @@ fn main() {
     for _ in 0..max_epoch {
         env.run(|ctx| {
             // training data
-            let x = standard_uniform(&[batch_size, 1], ctx)
-                .map(|x| x.map(|x| x * 10.));
-            let t = x.map(|x| x.map(|x| x.sin()));
+            let x = standard_uniform(&[batch_size, 1], ctx) * 10.;
+            let t = sin(x);
 
-            // run nn
+            // define and run NN
             let h1 = tanh(matmul(x, ctx.variable(w1)));
             let h2 = tanh(matmul(h1, ctx.variable(w2)));
             let y = matmul(h2, ctx.variable(w3));
@@ -41,7 +40,7 @@ fn main() {
                 .run();
 
             println!("training loss: {}", results[0].as_ref().unwrap());
-            results[1].as_ref().unwrap(); // update op
+            results[1].as_ref().unwrap(); // check update op
         });
     }
 }
