@@ -47,6 +47,8 @@ pub struct LogSumExp {
 pub struct Transpose {
     pub invert_axes: bool,
 }
+pub struct Lgamma;
+pub struct Digamma;
 
 #[inline(always)]
 fn equal_fn<T: Float>(a: T, b: T) -> T {
@@ -1015,3 +1017,49 @@ impl<T: Float> op::Op<T> for Tan {
         ctx.append_input_grad(Some(ctx.output_grad() / square(cos)));
     }
 }
+
+use special::Gamma;
+
+// impl lgamma and digamma
+macro_rules! impl_gamma {
+    ($ty:ty, $digamma_fn:ident) => {
+        impl op::Op<$ty> for Digamma {
+            fn compute(
+                &self,
+                ctx: &mut op::ComputeContext<$ty>,
+            ) -> Result<(), op::OpError> {
+                let x = ctx.input(0);
+                let y = x.mapv(move |a| a.digamma());
+                ctx.append_output(y);
+                Ok(())
+            }
+
+            fn grad(&self, ctx: &mut op::GradientContext<$ty>) {
+                // no impl
+                ctx.append_input_grad(None);
+            }
+        }
+
+        impl op::Op<$ty> for Lgamma {
+            fn compute(
+                &self,
+                ctx: &mut op::ComputeContext<$ty>,
+            ) -> Result<(), op::OpError> {
+                let x = ctx.input(0);
+                let y = x.mapv(move |a| a.ln_gamma().0);
+                ctx.append_output(y);
+                Ok(())
+            }
+
+            fn grad(&self, ctx: &mut op::GradientContext<$ty>) {
+                let x = ctx.input(0);
+                let gy = ctx.output_grad();
+                let gx = gy * $digamma_fn(x);
+                ctx.append_input_grad(Some(gx));
+            }
+        }
+    };
+}
+
+impl_gamma!(f32, digamma_f32);
+impl_gamma!(f64, digamma_f64);

@@ -856,6 +856,27 @@ fn reciprocal() {
 }
 
 #[test]
+fn lgamma() {
+    let mut env = ag::VariableEnvironment::new();
+    let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
+    let v = env.slot().set(rng.random_uniform(&[2, 3], 1., 1.01));
+    env.run(|graph| {
+        let v = graph.variable(v);
+        let z = T::lgamma_f64(v);
+        let g = T::grad(&[z], &[v]);
+        ag::test_helper::check_theoretical_grads(
+            z,
+            g.as_slice(),
+            &[v],
+            ag::Feeder::new(),
+            1e-3,
+            1e-3,
+            graph,
+        );
+    });
+}
+
+#[test]
 fn transpose() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();

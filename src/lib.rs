@@ -113,6 +113,7 @@ extern crate uuid;
 #[macro_use]
 extern crate serde_derive;
 extern crate approx;
+extern crate special;
 
 pub mod evaluation;
 mod gradient;

@@ -470,6 +470,58 @@ where
         .build(math_ops::Atanh)
 }
 
+/// Elementwise lgamma function
+pub fn lgamma_f32<'graph, A>(x: A) -> Tensor<'graph, f32>
+    where
+        A: AsRef<Tensor<'graph, f32>> + Copy,
+{
+    let x = x.as_ref();
+    let g = x.graph();
+    Tensor::builder(g)
+        .append_input(x, false)
+        .build(math_ops::Lgamma)
+}
+
+/// Elementwise lgamma function
+pub fn lgamma_f64<'graph, A>(x: A) -> Tensor<'graph, f64>
+where
+    A: AsRef<Tensor<'graph, f64>> + Copy,
+{
+    let x = x.as_ref();
+    let g = x.graph();
+    Tensor::builder(g)
+        .append_input(x, false)
+        .build(math_ops::Lgamma)
+}
+
+/// Elementwise digamma function
+///
+/// NOTE: derivative not implemented
+pub fn digamma_f32<'graph, A>(x: A) -> Tensor<'graph, f32>
+    where
+        A: AsRef<Tensor<'graph, f32>> + Copy,
+{
+    let x = x.as_ref();
+    let g = x.graph();
+    Tensor::builder(g)
+        .append_input(x, false)
+        .build(math_ops::Digamma)
+}
+
+/// Elementwise digamma function
+///
+/// NOTE: derivative not implemented
+pub fn digamma_f64<'graph, A>(x: A) -> Tensor<'graph, f64>
+    where
+        A: AsRef<Tensor<'graph, f64>> + Copy,
+{
+    let x = x.as_ref();
+    let g = x.graph();
+    Tensor::builder(g)
+        .append_input(x, false)
+        .build(math_ops::Digamma)
+}
+
 #[doc(hidden)]
 /// Gets n th tensor in `x`.
 ///
@@ -482,7 +534,7 @@ where
     let x = x.as_ref();
     let g = x.graph();
     Tensor::builder(g)
-        .append_input(x.as_ref(), false)
+        .append_input(x, false)
         .set_input_indices(&[n])
         .build(activation_ops::Identity)
 }
