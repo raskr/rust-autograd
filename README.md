@@ -23,7 +23,7 @@ autograd = {"<version>", features = ["blas", "<blas-implementation-choise>"] }
 Here we are just computing partial derivatives of `z = 2x^2 + 3y + 1`.
  ```rust
 use autograd as ag;
-use ag::tensor_ops as T;
+use ag::tensor_ops::*;
 
 ag::run(|ctx: &mut ag::Context<_>| {
     let x = ctx.placeholder("x", &[]);
@@ -31,16 +31,16 @@ ag::run(|ctx: &mut ag::Context<_>| {
     let z = 2.*x*x + 3.*y + 1.;
 
     // dz/dy
-    let gy = &T::grad(&[z], &[y])[0];
+    let gy = &grad(&[z], &[y])[0];
     println!("{:?}", gy.eval(ctx));   // => Ok(3.)
 
     // dz/dx (requires to fill the placeholder `x`)
-    let gx = &T::grad(&[z], &[x])[0];
+    let gx = &grad(&[z], &[x])[0];
     let feed = ag::ndarray::arr0(2.);
     println!("{:?}", ctx.evaluator().push(gx).feed(x, feed.view()).run()[0]);  // => Ok(8.)
 
     // ddz/dx (differentiates `z` again)
-    let ggx = &T::grad(&[gx], &[x])[0];
+    let ggx = &grad(&[gx], &[x])[0];
     println!("{:?}", ggx.eval(ctx));  // => Ok(4.)
 });
  ```
