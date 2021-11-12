@@ -10,10 +10,10 @@ Tensors and differentiable operations backed by [ndarray](https://github.com/rus
 If you use basic linalg operations, especially matrix multiplications, `blas` feature would be important to speed them up. 
 ``` toml
 [dependencies]
-autograd = {"<version>", features = ["blas", "<blas-implementation-choise>"] }
+autograd = {"<version>", features = ["blas", "<blas-implementation-choice>"] }
 ```
 
-`<blas-implementation-choise>` must be one of the following (See also [blas-src](https://github.com/blas-lapack-rs/blas-src))
+`<blas-implementation-choice>` must be one of the following (See also [blas-src](https://github.com/blas-lapack-rs/blas-src))
 - `accelerate` macOS only
 - `intel-mkl` Intel/AMD CPU only. Includes Vector Mathematics (VM) ops
 - `openblas`
