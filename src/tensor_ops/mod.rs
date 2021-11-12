@@ -1676,8 +1676,6 @@ where
 /// Elementwise leaky relu.
 ///
 /// In common, `alpha` is around 0.1 ~ 0.2.
-///
-/// See <http://web.stanford.edu/~awni/papers/relu_hybrid_icml2013_final.pdf>.
 pub fn leaky_relu<'graph, A, F: Float>(x: A, alpha: F) -> Tensor<'graph, F>
 where
     A: AsRef<Tensor<'graph, F>> + Copy,
