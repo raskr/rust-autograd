@@ -15,13 +15,13 @@ type NdArray = ndarray::Array<f32, ndarray::IxDyn>;
 pub fn load() -> ((NdArray, NdArray), (NdArray, NdArray)) {
     // load dataset as `Vec`s
     let (train_x, num_image_train): (Vec<f32>, usize) =
-        load_images("data/mnist/train-images-idx3-ubyte");
+        load_images("/tmp/rust-autograd/data/mnist/train-images-idx3-ubyte");
     let (train_y, num_label_train): (Vec<f32>, usize) =
-        load_labels("data/mnist/train-labels-idx1-ubyte");
+        load_labels("/tmp/rust-autograd/data/mnist/train-labels-idx1-ubyte");
     let (test_x, num_image_test): (Vec<f32>, usize) =
-        load_images("data/mnist/t10k-images-idx3-ubyte");
+        load_images("/tmp/rust-autograd/data/mnist/t10k-images-idx3-ubyte");
     let (test_y, num_label_test): (Vec<f32>, usize) =
-        load_labels("data/mnist/t10k-labels-idx1-ubyte");
+        load_labels("/tmp/rust-autograd/data/mnist/t10k-labels-idx1-ubyte");
 
     // Vec to ndarray
     let as_arr = NdArray::from_shape_vec;

@@ -16,6 +16,8 @@ pub type NdArrayView<'a, T> = ndarray::ArrayView<'a, T, ndarray::IxDyn>;
 /// alias for `ndarray::ArrayViewMut<T, IxDyn>`
 pub type NdArrayViewMut<'a, T> = ndarray::ArrayViewMut<'a, T, ndarray::IxDyn>;
 
+use rand_xorshift;
+
 #[inline]
 /// This works well only for small arrays
 pub(crate) fn as_shape<T: Float>(x: &NdArrayView<T>) -> Vec<usize> {
@@ -140,18 +142,17 @@ pub(crate) fn shape_of<T: Float>(x: &NdArray<T>) -> NdArray<T> {
 /// A collection of array generator functions.
 pub mod array_gen {
     use std::marker::PhantomData;
-    use std::sync::Mutex;
-
     use rand::distributions::Distribution;
-    use rand::rngs::ThreadRng;
-    use rand::{self, Rng};
+    use rand::{self, Rng, SeedableRng};
     use rand_distr;
 
     use super::*;
+    use std::cell::RefCell;
+    use rand_xorshift::XorShiftRng;
 
     /// Helper structure to create ndarrays whose elements are pseudorandom numbers.
     ///
-    /// This is actually a wrapper of an arbitrary `rand::Rng`, the default is `rand::rngs::ThreadRng`.
+    /// This is actually a wrapper of an arbitrary `rand::Rng`, the default is `XorShiftRng`.
     ///
     /// ```
     /// use autograd as ag;
@@ -162,21 +163,29 @@ pub mod array_gen {
     /// let my_rng = ag::ndarray_ext::ArrayRng::new(StdRng::seed_from_u64(42));
     /// let random: NdArray = my_rng.standard_normal(&[2, 3]);
     ///
-    /// // The default is `ThreadRng` (seed number is not fixed).
+    /// // The default is `XorShiftRng` with the fixed seed
     /// let default = ag::ndarray_ext::ArrayRng::default();
     /// let random: NdArray = default.standard_normal(&[2, 3]);
     /// ```
-    pub struct ArrayRng<T: Float, R: Rng = ThreadRng> {
+    pub struct ArrayRng<T: Float, R: Rng = XorShiftRng> {
         phantom: PhantomData<T>,
-        rng: Mutex<R>,
+        rng: RefCell<R>,
+    }
+
+    const XORSHIFT_DEFAULT_SEED: [u8; 16] = [1,2,3,4, 5,6,7,8, 9,10,11,12, 13,14,15,16];
+
+    /// Returns the default rng with the fixed seed.
+    pub fn get_default_rng() -> XorShiftRng {
+        rand_xorshift::XorShiftRng::from_seed(XORSHIFT_DEFAULT_SEED)
     }
 
     impl<T: Float> Default for ArrayRng<T> {
-        /// Initialize with `rand::rngs::ThreadRng`.
+        /// Initialize with `rand_xorshift::XorShiftRng`.
         fn default() -> Self {
+            let rng = rand_xorshift::XorShiftRng::from_seed(XORSHIFT_DEFAULT_SEED);
             ArrayRng {
                 phantom: PhantomData,
-                rng: Mutex::new(rand::thread_rng()),
+                rng: RefCell::new(rng),
             }
         }
     }
@@ -186,7 +195,7 @@ pub mod array_gen {
         pub fn new(rng: R) -> Self {
             ArrayRng {
                 phantom: PhantomData,
-                rng: Mutex::new(rng),
+                rng: RefCell::new(rng),
             }
         }
 
@@ -196,7 +205,7 @@ pub mod array_gen {
             I: Distribution<f64>,
         {
             let size: usize = shape.iter().cloned().product();
-            let mut rng = self.rng.lock().unwrap();
+            let mut rng = self.rng.borrow_mut();
             unsafe {
                 let mut buf = Vec::with_capacity(size);
                 for i in 0..size {
@@ -260,7 +269,7 @@ pub mod array_gen {
         /// Creates an ndarray sampled from the bernoulli distribution with given params.
         pub fn bernoulli(&self, shape: &[usize], p: f64) -> ndarray::Array<T, ndarray::IxDyn> {
             let dist = rand_distr::Uniform::new(0., 1.);
-            let mut rng = self.rng.lock().unwrap();
+            let mut rng = self.rng.borrow_mut();
             let size: usize = shape.iter().cloned().product();
             unsafe {
                 let mut buf = Vec::with_capacity(size);

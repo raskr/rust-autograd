@@ -46,7 +46,7 @@
 //! This crate has various low-level features inspired by tensorflow/theano to train neural networks.
 //! Since computation graphs require only bare minimum of heap allocations, the overhead is small, even for complex networks.
 //! ```rust
-//! // MNIST digits classification model
+//! // MNIST digits classification model with multi-layer-perceptron
 //! use autograd as ag;
 //! use ag::optimizers::adam::Adam;
 //! use ag::tensor_ops::*;
@@ -105,6 +105,7 @@ extern crate num_traits;
 /// re-exported for convenience and version-compatibility
 pub extern crate rand;
 extern crate rand_distr;
+extern crate rand_xorshift;
 extern crate rayon;
 extern crate rustc_hash;
 extern crate serde_json;

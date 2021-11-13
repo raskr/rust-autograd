@@ -1,8 +1,9 @@
-//! This is a softmax regression with Adam optimizer for mnist.
-//! 0.918 test accuracy after 3 epochs, 0.11 sec/epoch on 2.7GHz Intel Core i5
+//! Demonstration of MNIST digits classification with multi-layer-perceptron
+//!
+//! With accelerate, got 0.918 test accuracy and 0.11 sec/epoch on Apple M1 (8core CPU, 16GB RAM).
 //!
 //! First, run "./download_mnist.sh" beforehand if you don't have dataset and then run
-//! "cargo run --example mlp_mnist --release --features mkl" in `examples` directory.
+//! "cargo run --example mlp_mnist --release --features blas,<blas-impl>".
 use autograd as ag;
 use ndarray;
 
@@ -43,7 +44,7 @@ fn inputs<'g>(g: &'g Context<f32>) -> (Tensor<'g>, Tensor<'g>) {
 
 fn get_permutation(size: usize) -> Vec<usize> {
     let mut perm: Vec<usize> = (0..size).collect();
-    perm.shuffle(&mut rand::thread_rng());
+    perm.shuffle(&mut ag::ndarray_ext::get_default_rng());
     perm
 }
 

@@ -157,8 +157,8 @@ where
 /// let mut env = ag::VariableEnvironment::new();
 ///
 /// let rng = ag::ndarray_ext::ArrayRng::<f32>::default();
-/// let a = env.slot().set(rng.standard_normal(&[4, 2]));
-/// let b = env.slot().set(rng.standard_normal(&[2, 3]));
+/// let a = env.set(rng.standard_normal(&[4, 2]));
+/// let b = env.set(rng.standard_normal(&[2, 3]));
 ///
 /// env.run(|g| {
 ///    let a = g.variable(a);
@@ -2333,14 +2333,12 @@ where
 /// use ag::prelude::*;
 ///
 /// let mut env = ag::VariableEnvironment::new();
-/// let scale = env.slot().set(ag::ndarray_ext::ones::<f32>(&[1, 4]));
-/// let shift = env.slot().set(ag::ndarray_ext::zeros::<f32>(&[1, 4]));
+/// let scale = env.set(ag::ndarray_ext::ones::<f32>(&[1, 4]));
+/// let shift = env.set(ag::ndarray_ext::zeros::<f32>(&[1, 4]));
 ///
 /// env.run(|g| {
 ///    let x = standard_normal(&[3, 4], g);
-///    let scale = g.variable(scale);
-///    let shift = g.variable(shift);
-///    let norm = batch_norm(x, scale, shift);
+///    let norm = batch_norm(x, g.variable(scale), g.variable(shift));
 ///
 ///    assert_eq!(norm.eval(g).unwrap().shape(), &[3, 4]);
 /// });
@@ -2869,6 +2867,46 @@ where
             pad,
             stride,
             size: pool_size,
+        })
+}
+
+/// Dropout
+///
+/// http://arxiv.org/abs/1207.0580
+///
+/// `XorShiftRng` is used internally.
+/// If you need to specify a seed value or use any other `Rng`, use `dropout_rng` instead.
+pub fn dropout<'graph, A, F: Float>(
+    x: A,
+    dropout_ratio: F,
+    train: bool,
+) -> Tensor<'graph, F>
+    where
+        A: AsRef<Tensor<'graph, F>> + Copy,
+{
+    dropout_rng(x, dropout_ratio, train, crate::ndarray_ext::get_default_rng())
+}
+
+/// Dropout
+///
+/// http://arxiv.org/abs/1207.0580
+pub fn dropout_rng<'graph, A, F: Float, R: Rng + 'static>(
+    x: A,
+    dropout_ratio: F,
+    train: bool,
+    rng: R
+) -> Tensor<'graph, F>
+    where
+        A: AsRef<Tensor<'graph, F>> + Copy,
+{
+    let x = x.as_ref();
+    let g = x.graph();
+    Tensor::builder(g)
+        .append_input(x.as_ref(), false)
+        .build(random_ops::Dropout {
+            train,
+            arr_rng: ArrayRng::new(rng),
+            dropout_ratio
         })
 }
 

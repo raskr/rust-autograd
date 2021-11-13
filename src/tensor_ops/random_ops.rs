@@ -212,3 +212,32 @@ impl<R: Rng, T: Float> op::Op<T> for Gamma<T, R> {
         ctx.append_input_grad(None);
     }
 }
+
+use crate::tensor_ops::*;
+
+pub struct Dropout<F: Float, R: Rng> {
+    pub arr_rng: ArrayRng<F, R>,
+    pub dropout_ratio: F,
+    pub train: bool
+}
+
+impl<R: Rng, F: Float> op::Op<F> for Dropout<F, R> {
+    fn compute(&self, ctx: &mut crate::op::ComputeContext<F>) -> Result<(), crate::op::OpError> {
+        let x = ctx.input(0);
+        if self.train {
+            let mask = self.arr_rng.bernoulli(x.shape(), (F::one() - self.dropout_ratio).to_f64().unwrap());
+            ctx.append_output(&mask * &x);
+            ctx.append_output(mask);
+        } else {
+            let coef = F::one() - self.dropout_ratio;
+            x.mapv(move |x| x * coef);
+        }
+        Ok(())
+    }
+
+    fn grad(&self, ctx: &mut crate::op::GradientContext<F>) {
+        let gy = ctx.output_grad();
+        let mask = nth_tensor(ctx.output(), 1);
+        ctx.append_input_grad(Some(gy * mask));
+    }
+}

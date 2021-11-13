@@ -17,15 +17,15 @@ pub struct AdaGrad<F: Float> {
 
 impl<'t, 'g, F: Float> AdaGrad<F> {
     pub fn default(
-        unique_namespace_id: &'static str,
+        adagrad_namespace_id: &'static str,
         var_id_list: impl IntoIterator<Item = VariableID>,
-        env_handle: &mut VariableEnvironment<F>,
+        env: &mut VariableEnvironment<F>,
     ) -> AdaGrad<F> {
         Self::new(
             F::from(0.01).unwrap(),
             var_id_list,
-            env_handle,
-            unique_namespace_id,
+            env,
+            adagrad_namespace_id,
         )
     }
 
@@ -70,9 +70,9 @@ impl<F: Float> Optimizer<F> for AdaGrad<F> {
         let mut ret = Vec::with_capacity(num_params);
         for i in 0..num_params {
             let param = params[i].as_ref();
-            let namespace = g.namespace(self.adagrad_namespace_id);
-            let var_id = param.get_variable_id().expect("Got non-variable tensor");
-            let h = g.variable_by_name(format!("{}", var_id), &namespace);
+            let param_id = param.get_variable_id().expect("Got non-variable tensor");
+            let ns = g.namespace(self.adagrad_namespace_id);
+            let h = g.variable_by_name(format!("{}", param_id), &ns);
 
             ret.push(
                 Tensor::builder(g)
