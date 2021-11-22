@@ -1,4 +1,4 @@
-name: Main
+name: build
 
 on: [push, pull_request]
 
@@ -32,13 +32,13 @@ jobs:
       continue-on-error: ${{ matrix.rust == 'nightly' }}
     - name: Run tests (ubuntu-latest)
       if: matrix.os == 'ubuntu-latest'
-      run: cargo test -v -blas,intel-mkl
+      run: cargo test -v --features blas,intel-mkl
       continue-on-error: ${{ matrix.rust == 'nightly' }}
     - name: Run tests (macos-latest)
       if: matrix.os == 'macos-latest'
-      run: cargo test -v -blas,accelerate
+      run: cargo test -v --features blas,accelerate
       continue-on-error: ${{ matrix.rust == 'nightly' }}
     - name: Run tests (windows-latest)
       if: matrix.os == 'windows-latest'
-      run: cargo test -v -blas,intel-mkl
+      run: cargo test -v --features blas,intel-mkl
       continue-on-error: ${{ matrix.rust == 'nightly' }}
