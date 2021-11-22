@@ -30,9 +30,15 @@ jobs:
     - name: Run tests
       run: cargo test -v
       continue-on-error: ${{ matrix.rust == 'nightly' }}
-    - name: Run tests (blas)
-      run:
-        if [ ${{ matrix.os == 'ubuntu-latest' }} ]; then cargo test -v -blas,intel-mkl; fi
-        if [ ${{ matrix.os == 'macos-latest' }} ]; then cargo test -v -blas,accelerate; fi
-        if [ ${{ matrix.os == 'windows-latest' }} ]; then cargo test -v -blas,intel-mkl; fi
+    - name: Run tests (ubuntu-latest)
+      if: matrix.os == 'ubuntu-latest'
+      run: cargo test -v -blas,intel-mkl
+      continue-on-error: ${{ matrix.rust == 'nightly' }}
+    - name: Run tests (macos-latest)
+      if: matrix.os == 'macos-latest'
+      run: cargo test -v -blas,accelerate
+      continue-on-error: ${{ matrix.rust == 'nightly' }}
+    - name: Run tests (windows-latest)
+      if: matrix.os == 'windows-latest'
+      run: cargo test -v -blas,intel-mkl
       continue-on-error: ${{ matrix.rust == 'nightly' }}
