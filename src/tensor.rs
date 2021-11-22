@@ -3,7 +3,7 @@ use crate::Float;
 use crate::{op, Context};
 use crate::{NdArray, NdArrayView};
 
-use crate::graph::{AsGraph, Graph};
+use crate::graph::{AsGraph, Graph, TensorID};
 use crate::op::{GradientContext, InputArray, OpError};
 use crate::variable::VariableID;
 use std::cell::Ref;
@@ -53,7 +53,7 @@ use std::ops::{Add, Div, Mul, Sub};
 /// ```
 #[derive(Clone, Copy)]
 pub struct Tensor<'graph, F: Float> {
-    pub(crate) id: usize, // tensor id in the graph
+    pub(crate) id: TensorID, // tensor id in the graph
     pub(crate) graph: &'graph Graph<F>,
 }
 
@@ -131,10 +131,7 @@ impl<'graph, F: Float> Tensor<'graph, F> {
     /// });
     /// ```
     #[inline]
-    pub fn depends_on<A>(
-        self,
-        on: &[A],
-    ) -> Tensor<'graph, F>
+    pub fn depends_on<A>(self, on: &[A]) -> Tensor<'graph, F>
     where
         A: AsRef<Tensor<'graph, F>> + Copy,
     {
@@ -175,8 +172,7 @@ impl<'graph, F: Float> Tensor<'graph, F> {
     pub fn map(
         &self,
         f: fn(crate::ndarray_ext::NdArrayView<F>) -> NdArray<F>,
-    ) -> Tensor<'graph, F>
-    {
+    ) -> Tensor<'graph, F> {
         crate::tensor_ops::map(self, f)
     }
 
@@ -584,7 +580,7 @@ impl<'graph> Input {
 /// ```
 /// use autograd as ag;
 /// use ag::op::{Op, OpError, ComputeContext, GradientContext};
-    /// use ag::tensor_ops::*;
+/// use ag::tensor_ops::*;
 ///
 /// struct DummyOp {
 ///    a: f32
@@ -810,7 +806,6 @@ impl<T: Float> crate::op::Op<T> for Dummy {
     }
     fn grad(&self, _: &mut GradientContext<T>) {}
 }
-
 
 use crate::tensor_ops as T;
 use smallvec::SmallVec;

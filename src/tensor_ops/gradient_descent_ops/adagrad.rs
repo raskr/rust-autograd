@@ -9,12 +9,12 @@ impl<F: Float> crate::op::Op<F> for AdaGradOp<F> {
         let param = ctx.input_mut(0);
         let grad = ctx.input(1);
         let mut h = ctx.input_mut(2);
-        h.zip_mut_with(&grad, |h, &g| *h += g*g);
+        h.zip_mut_with(&grad, |h, &g| *h += g * g);
         let eps = F::from(1e-7).unwrap();
         ndarray::Zip::from(param)
             .and(grad)
             .and(h)
-            .apply(move |p, &g, h| *p -= self.lr *g/(h.sqrt() + eps));
+            .apply(move |p, &g, h| *p -= self.lr * g / (h.sqrt() + eps));
 
         ctx.append_empty_output();
         Ok(())

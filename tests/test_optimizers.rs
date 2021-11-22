@@ -1,9 +1,9 @@
 extern crate autograd as ag;
 extern crate ndarray;
-use ag::{optimizers, VariableEnvironment};
 use ag::prelude::*;
 use ag::tensor_ops as T;
 use ag::variable::NamespaceTrait;
+use ag::{optimizers, VariableEnvironment};
 
 use ndarray::array;
 
@@ -43,12 +43,8 @@ fn test_momentum() {
 fn make_env() -> VariableEnvironment<'static, f64> {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    env
-        .name("w")
-        .set(rng.glorot_uniform(&[2, 2]));
-    env
-        .name("b")
-        .set(ag::ndarray_ext::zeros(&[1, 2]));
+    env.name("w").set(rng.glorot_uniform(&[2, 2]));
+    env.name("b").set(ag::ndarray_ext::zeros(&[1, 2]));
     env
 }
 

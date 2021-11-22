@@ -79,9 +79,7 @@ impl<F: Float> Optimizer<F> for AdaGrad<F> {
                     .append_input(param, true)
                     .append_input(grads[i].as_ref(), false)
                     .append_input(&h, true)
-                    .build(adagrad::AdaGradOp {
-                        lr: self.lr,
-                    }),
+                    .build(adagrad::AdaGradOp { lr: self.lr }),
             );
         }
         ret

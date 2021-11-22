@@ -85,7 +85,6 @@ pub fn check_theoretical_grads<'g, 't, 'v, F: Float, A>(
                 ndarray_ext::deep_copy(&obj_pos_orig.view())
             };
 
-            // -
             unsafe {
                 let mut guard_mut = g
                     .env()

@@ -591,8 +591,7 @@ fn test_constant_eval() {
 
 #[test]
 fn test_placeholder_eval() {
-    
-     // Needed for .strides() method
+    // Needed for .strides() method
 
     let ctx = VariableEnvironment::new();
     ctx.run(|g| {
@@ -606,8 +605,6 @@ fn test_placeholder_eval() {
 
 #[test]
 fn test_eval3() {
-    
-
     let ctx = VariableEnvironment::new();
     ctx.run(|g| {
         let v: Tensor<f32> = g.placeholder("v", &[3, 2, 1]);

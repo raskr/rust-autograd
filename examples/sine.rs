@@ -1,10 +1,10 @@
 //! Learning the sine function
 extern crate autograd as ag;
 
-use ag::prelude::*;
-use ag::tensor_ops::*;
 use ag::optimizers;
 use ag::optimizers::adam::Adam;
+use ag::prelude::*;
+use ag::tensor_ops::*;
 
 fn main() {
     let rng = ag::ndarray_ext::ArrayRng::<f32>::default();
@@ -34,10 +34,7 @@ fn main() {
             let (vars, grads) = optimizers::grad_helper(&[mse], &ns);
             let update_op = opt.get_update_op(&vars, &grads, ctx);
 
-            let results = ctx.evaluator()
-                .push(mse)
-                .push(update_op)
-                .run();
+            let results = ctx.evaluator().push(mse).push(update_op).run();
 
             println!("training loss: {}", results[0].as_ref().unwrap());
             results[1].as_ref().unwrap(); // check update op

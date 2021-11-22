@@ -1024,10 +1024,7 @@ use special::Gamma;
 macro_rules! impl_gamma {
     ($ty:ty, $digamma_fn:ident) => {
         impl op::Op<$ty> for Digamma {
-            fn compute(
-                &self,
-                ctx: &mut op::ComputeContext<$ty>,
-            ) -> Result<(), op::OpError> {
+            fn compute(&self, ctx: &mut op::ComputeContext<$ty>) -> Result<(), op::OpError> {
                 let x = ctx.input(0);
                 let y = x.mapv(move |a| a.digamma());
                 ctx.append_output(y);
@@ -1041,10 +1038,7 @@ macro_rules! impl_gamma {
         }
 
         impl op::Op<$ty> for Lgamma {
-            fn compute(
-                &self,
-                ctx: &mut op::ComputeContext<$ty>,
-            ) -> Result<(), op::OpError> {
+            fn compute(&self, ctx: &mut op::ComputeContext<$ty>) -> Result<(), op::OpError> {
                 let x = ctx.input(0);
                 let y = x.mapv(move |a| a.ln_gamma().0);
                 ctx.append_output(y);

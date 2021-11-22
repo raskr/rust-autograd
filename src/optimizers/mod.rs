@@ -1,22 +1,23 @@
 //! A collection of gradient descent optimizers
-pub mod adam;
 pub mod adagrad;
-pub mod sgd;
+pub mod adam;
 pub mod momentum_sgd;
+pub mod sgd;
 
 use crate::evaluation::Feeder;
+
 use crate::tensor::Tensor;
-use crate::variable::{VariableNamespace};
+use crate::variable::VariableNamespace;
 use crate::{Context, Float};
-pub use sgd::SGD;
+pub use adagrad::AdaGrad;
 pub use adam::Adam;
 pub use momentum_sgd::MomentumSGD;
-pub use adagrad::AdaGrad;
+pub use sgd::SGD;
 
-/// Differentiates `losses` with all variables in the `namespace`
+/// Differentiates `losses` with all the relevant variables in the `namespace`
 ///
 /// Returns a tuple `(variables, gradients)`.
-/// See also [crate::tensor_ops::grad()].
+/// This is a superior version of [crate::tensor_ops::grad()].
 pub fn grad_helper<'g, A, F: Float>(
     losses: &[A],
     namespace: &'g VariableNamespace<F>,
@@ -27,10 +28,22 @@ where
     use crate::tensor_ops as T;
 
     let g = losses[0].as_ref().graph;
-    let variables: Vec<Tensor<F>> = g.var_tensors_by_name(namespace).map(|(_a, b)| b).collect();
 
-    let grads = T::grad(losses, &variables);
-    (variables, grads)
+    let ys: Vec<_> = losses.into_iter().map(|y| T::sum_all(y)).collect();
+    let xs: Vec<_> = g.var_tensors_by_name(namespace).map(|(_a, b)| b).collect();
+    let mut gradients =
+        crate::gradient::compute_gradients(ys.as_slice(), xs.as_slice(), None, g);
+    let mut vars = Vec::with_capacity(xs.len());
+    let mut grads = Vec::with_capacity(xs.len());
+    for x in xs.iter() {
+        let gx = gradients.get(x);
+        if let Some(a) = gx {
+            vars.push(*x);
+            grads.push(a);
+        }
+    }
+
+    (vars, grads)
 }
 
 /// Trait for gradient descent optimizers

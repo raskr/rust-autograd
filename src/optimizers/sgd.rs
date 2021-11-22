@@ -33,12 +33,8 @@ pub struct SGD<F> {
 }
 
 impl<'t, 'g, F: Float> SGD<F> {
-    pub fn new(
-        alpha: F,
-    ) -> SGD<F> {
-        SGD {
-            alpha,
-        }
+    pub fn new(alpha: F) -> SGD<F> {
+        SGD { alpha }
     }
 }
 
@@ -61,9 +57,7 @@ impl<F: Float> Optimizer<F> for SGD<F> {
                 Tensor::builder(ctx)
                     .append_input(params[i].as_ref(), true)
                     .append_input(grads[i].as_ref(), false)
-                    .build(sgd::SGDOp {
-                        alpha: self.alpha,
-                    }),
+                    .build(sgd::SGDOp { alpha: self.alpha }),
             );
         }
         ret

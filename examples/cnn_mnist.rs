@@ -33,11 +33,7 @@ macro_rules! timeit {
     }};
 }
 
-fn conv_pool<'g>(
-    x: Tensor<'g>,
-    w: Tensor<'g>,
-    b: Tensor<'g>,
-) -> Tensor<'g> {
+fn conv_pool<'g>(x: Tensor<'g>, w: Tensor<'g>, b: Tensor<'g>) -> Tensor<'g> {
     let y1 = T::conv2d(x, w, 1, 1) + b;
     let y2 = T::relu(y1);
     T::max_pool2d(y2, 2, 0, 2)
@@ -96,7 +92,8 @@ fn main() {
 
                 env.run(|ctx| {
                     let logits = compute_logits(ctx);
-                    let loss = T::sparse_softmax_cross_entropy(logits, ctx.placeholder("y", &[-1, 1]));
+                    let loss =
+                        T::sparse_softmax_cross_entropy(logits, ctx.placeholder("y", &[-1, 1]));
                     let mean_loss = T::reduce_mean(loss, &[0], false);
                     let ns = ctx.default_namespace();
                     let (vars, grads) = optimizers::grad_helper(&[mean_loss], &ns);
@@ -114,7 +111,11 @@ fn main() {
     env.run(|ctx| {
         let logits = compute_logits(ctx);
         let predictions = T::argmax(logits, -1, true);
-        let accuracy = T::reduce_mean(&T::equal(predictions, ctx.placeholder("y", &[-1, 1])), &[0, 1], false);
+        let accuracy = T::reduce_mean(
+            &T::equal(predictions, ctx.placeholder("y", &[-1, 1])),
+            &[0, 1],
+            false,
+        );
         println!(
             "test accuracy: {:?}",
             ctx.evaluator()

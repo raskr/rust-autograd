@@ -1,8 +1,7 @@
 extern crate autograd as ag;
 extern crate ndarray;
 
-
-use ag::{tensor_ops as T};
+use ag::tensor_ops as T;
 
 struct MultiOutputOp;
 

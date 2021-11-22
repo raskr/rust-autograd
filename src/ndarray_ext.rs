@@ -141,14 +141,14 @@ pub(crate) fn shape_of<T: Float>(x: &NdArray<T>) -> NdArray<T> {
 
 /// A collection of array generator functions.
 pub mod array_gen {
-    use std::marker::PhantomData;
     use rand::distributions::Distribution;
     use rand::{self, Rng, SeedableRng};
     use rand_distr;
+    use std::marker::PhantomData;
 
     use super::*;
-    use std::cell::RefCell;
     use rand_xorshift::XorShiftRng;
+    use std::cell::RefCell;
 
     /// Helper structure to create ndarrays whose elements are pseudorandom numbers.
     ///
@@ -172,7 +172,7 @@ pub mod array_gen {
         rng: RefCell<R>,
     }
 
-    const XORSHIFT_DEFAULT_SEED: [u8; 16] = [1,2,3,4, 5,6,7,8, 9,10,11,12, 13,14,15,16];
+    const XORSHIFT_DEFAULT_SEED: [u8; 16] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
 
     /// Returns the default rng with the fixed seed.
     pub fn get_default_rng() -> XorShiftRng {

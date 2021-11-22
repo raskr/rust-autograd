@@ -2,6 +2,7 @@
 
 use crate::tensor::{Tensor, TensorInternal};
 
+use crate::tensor_ops as T;
 use crate::variable::{VariableID, VariableNamespace};
 use crate::{Float, FxHashMap, NdArray, VariableEnvironment};
 
@@ -10,7 +11,7 @@ use std::cell::{Ref, RefMut};
 use std::fmt;
 use std::ops::Deref;
 
-type TensorID = usize;
+pub type TensorID = usize;
 
 pub const NUM_NODES_WARN: usize = 50_000;
 pub const NUM_NODES_CRITICAL: usize = 500_000;
@@ -193,7 +194,6 @@ impl<'g, 'env, 'name, F: Float> Context<'env, 'name, F> {
     /// See also [crate::evaluation::Evaluator] example.
     #[inline]
     pub fn placeholder(&'g self, name: &'static str, shape_: &[isize]) -> Tensor<'g, F> {
-        use crate::tensor_ops as T;
         let b = Tensor::builder(self).set_placeholder_name(name);
         let rank = shape_.len();
         let b = if rank == 0 || -1 != shape_[0] {

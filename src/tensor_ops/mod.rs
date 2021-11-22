@@ -90,19 +90,23 @@ impl<'graph, F: Float> Tensor<'graph, F> {
 ///     assert_eq!(8., gx[0].as_ref().unwrap()[ndarray::IxDyn(&[])]);
 /// });
 /// ```
-pub fn grad<'graph, F: Float, A, B>(ys_: &[A], xs: &[B]) -> Vec<Tensor<'graph, F>>
+pub fn grad<'graph, F: Float, A, B>(ys: &[A], xs: &[B]) -> Vec<Tensor<'graph, F>>
 where
-    A: AsRef<Tensor<'graph, F>> + Copy,
-    B: AsRef<Tensor<'graph, F>> + Copy,
+    A: AsRef<Tensor<'graph, F>>,
+    B: AsRef<Tensor<'graph, F>>,
 {
-    let g = ys_[0].as_ref().graph();
-    let len = ys_.len();
-    let mut ys = Vec::with_capacity(len);
-    for y in ys_ {
-        ys.push(sum_all(y));
+    let g = ys[0].as_ref().graph();
+    let ys: Vec<_> = ys.into_iter().map(|y| sum_all(y)).collect();
+    let mut grads = crate::gradient::compute_gradients(ys.as_slice(), xs, None, g);
+    let mut ret = Vec::with_capacity(xs.len());
+    for (i, x) in xs.into_iter().enumerate() {
+        if let Some(gx) = grads.get(x) {
+            ret.push(gx);
+        } else {
+            panic!("Variable at {} not differentiable", i)
+        }
     }
-    let gys = vec![scalar(F::one(), g); len];
-    unsafe { grad_with_default(&ys, xs, &gys) }
+    ret
 }
 
 /// Computes `xs`'s gradients with `ys`'s already known gradients.
@@ -119,22 +123,27 @@ where
 /// * `ys_grads` - Already known gradients of `ys`.
 ///
 /// # Returns
-/// Symbolic gradient tensors of `xs` in the same order as `xs`'graph.
-pub unsafe fn grad_with_default<'graph, F: Float, A, B, C>(
+/// Gradient tensors of `xs` in the same order as `xs`'graph.
+pub unsafe fn grad_with_default<'graph, F: Float, A, B>(
     ys: &[A],
     xs: &[B],
-    ys_grads: &[C],
+    ys_grads: &[Tensor<'graph, F>],
 ) -> Vec<Tensor<'graph, F>>
 where
-    A: AsRef<Tensor<'graph, F>> + Copy,
-    B: AsRef<Tensor<'graph, F>> + Copy,
-    C: AsRef<Tensor<'graph, F>> + Copy,
+    A: AsRef<Tensor<'graph, F>>,
+    B: AsRef<Tensor<'graph, F>>,
 {
     let g = ys[0].as_ref().graph();
-    let xs: Vec<_> = xs.iter().map(|x| x.as_ref().id).collect();
-    let ys: Vec<_> = ys.iter().map(|y| y.as_ref().id).collect();
-    let ys_grads: Vec<_> = ys_grads.iter().map(|x| x.as_ref().id).collect();
-    crate::gradient::symbolic_gradients(ys.as_slice(), xs.as_slice(), ys_grads.as_slice(), g)
+    let mut grads = crate::gradient::compute_gradients(ys, xs, Some(ys_grads), g);
+    let mut ret = Vec::with_capacity(xs.len());
+    for (i, x) in xs.into_iter().enumerate() {
+        if let Some(gx) = grads.get(x) {
+            ret.push(gx);
+        } else {
+            panic!("Variable at {} not differentiable", i)
+        }
+    }
+    ret
 }
 
 /// Computes jacobians for variables.
@@ -176,8 +185,8 @@ pub fn jacobians<'graph, A, B, F: Float>(
     objective_len: usize,
 ) -> Vec<Tensor<'graph, F>>
 where
-    A: AsRef<Tensor<'graph, F>> + Copy,
-    B: AsRef<Tensor<'graph, F>> + Copy,
+    A: AsRef<Tensor<'graph, F>>,
+    B: AsRef<Tensor<'graph, F>>,
 {
     let y = y_.as_ref();
     let mut vec_vec = Vec::with_capacity(objective_len);
@@ -207,15 +216,15 @@ pub fn _hessian_vector_product<'graph, A, B, C, F: Float>(
     vectors: &[C],
 ) -> Vec<Tensor<'graph, F>>
 where
-    A: AsRef<Tensor<'graph, F>> + Copy,
-    B: AsRef<Tensor<'graph, F>> + Copy,
-    C: AsRef<Tensor<'graph, F>> + Copy,
+    A: AsRef<Tensor<'graph, F>>,
+    B: AsRef<Tensor<'graph, F>>,
+    C: AsRef<Tensor<'graph, F>>,
 {
     let grads = grad(ys, xs);
     let products = grads
         .into_iter()
         .zip(vectors)
-        .map(|(g, &v)| *g.as_ref() * *v.as_ref())
+        .map(|(g, v)| g.as_ref().clone() * v.as_ref().clone())
         .collect::<Vec<_>>();
     grad(products.as_slice(), xs)
 }
@@ -472,8 +481,8 @@ where
 
 /// Elementwise lgamma function
 pub fn lgamma_f32<'graph, A>(x: A) -> Tensor<'graph, f32>
-    where
-        A: AsRef<Tensor<'graph, f32>> + Copy,
+where
+    A: AsRef<Tensor<'graph, f32>> + Copy,
 {
     let x = x.as_ref();
     let g = x.graph();
@@ -498,8 +507,8 @@ where
 ///
 /// NOTE: derivative not implemented
 pub fn digamma_f32<'graph, A>(x: A) -> Tensor<'graph, f32>
-    where
-        A: AsRef<Tensor<'graph, f32>> + Copy,
+where
+    A: AsRef<Tensor<'graph, f32>> + Copy,
 {
     let x = x.as_ref();
     let g = x.graph();
@@ -512,8 +521,8 @@ pub fn digamma_f32<'graph, A>(x: A) -> Tensor<'graph, f32>
 ///
 /// NOTE: derivative not implemented
 pub fn digamma_f64<'graph, A>(x: A) -> Tensor<'graph, f64>
-    where
-        A: AsRef<Tensor<'graph, f64>> + Copy,
+where
+    A: AsRef<Tensor<'graph, f64>> + Copy,
 {
     let x = x.as_ref();
     let g = x.graph();
@@ -1157,8 +1166,8 @@ where
 /// });
 /// ```
 pub fn mean_all<'graph, A, F: Float>(x: A) -> Tensor<'graph, F>
-    where
-        A: AsRef<Tensor<'graph, F>> + Copy,
+where
+    A: AsRef<Tensor<'graph, F>> + Copy,
 {
     sum_all(x) / size(x)
 }
@@ -1827,9 +1836,9 @@ where
 ///
 /// Note that the mean axis is the last one.
 pub fn mean_squared_error<'graph, A, B, F: Float>(y: A, t: B) -> Tensor<'graph, F>
-    where
-        A: AsRef<Tensor<'graph, F>> + Copy,
-        B: AsRef<Tensor<'graph, F>> + Copy,
+where
+    A: AsRef<Tensor<'graph, F>> + Copy,
+    B: AsRef<Tensor<'graph, F>> + Copy,
 {
     reduce_mean(square(y.as_ref() - t.as_ref()), &[-1], false)
 }
@@ -2876,15 +2885,16 @@ where
 ///
 /// `XorShiftRng` is used internally.
 /// If you need to specify a seed value or use any other `Rng`, use `dropout_rng` instead.
-pub fn dropout<'graph, A, F: Float>(
-    x: A,
-    dropout_ratio: F,
-    train: bool,
-) -> Tensor<'graph, F>
-    where
-        A: AsRef<Tensor<'graph, F>> + Copy,
+pub fn dropout<'graph, A, F: Float>(x: A, dropout_ratio: F, train: bool) -> Tensor<'graph, F>
+where
+    A: AsRef<Tensor<'graph, F>> + Copy,
 {
-    dropout_rng(x, dropout_ratio, train, crate::ndarray_ext::get_default_rng())
+    dropout_rng(
+        x,
+        dropout_ratio,
+        train,
+        crate::ndarray_ext::get_default_rng(),
+    )
 }
 
 /// Dropout
@@ -2894,10 +2904,10 @@ pub fn dropout_rng<'graph, A, F: Float, R: Rng + 'static>(
     x: A,
     dropout_ratio: F,
     train: bool,
-    rng: R
+    rng: R,
 ) -> Tensor<'graph, F>
-    where
-        A: AsRef<Tensor<'graph, F>> + Copy,
+where
+    A: AsRef<Tensor<'graph, F>> + Copy,
 {
     let x = x.as_ref();
     let g = x.graph();
@@ -2906,7 +2916,7 @@ pub fn dropout_rng<'graph, A, F: Float, R: Rng + 'static>(
         .build(random_ops::Dropout {
             train,
             arr_rng: ArrayRng::new(rng),
-            dropout_ratio
+            dropout_ratio,
         })
 }
 
@@ -3039,7 +3049,11 @@ impl<'g, F: Float> Tensor<'g, F> {
     }
     /// Same as [tensor_ops::reduce_variance](reduce_variance)
     #[inline]
-    pub fn reduce_variance<AT: AsTensor<'g, F>>(&self, axes: &AT, keep_dims: bool) -> Tensor<'g, F> {
+    pub fn reduce_variance<AT: AsTensor<'g, F>>(
+        &self,
+        axes: &AT,
+        keep_dims: bool,
+    ) -> Tensor<'g, F> {
         reduce_variance(self, axes, keep_dims)
     }
     /// Same as [tensor_ops::sum_all](sum_all)

@@ -877,13 +877,13 @@ fn lgamma() {
 }
 
 #[test]
-fn droout() {
+fn dropout() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
     let v = env.slot().set(rng.random_uniform(&[2, 3], 1., 1.01));
     env.run(|graph| {
         let v = graph.variable(v);
-        let z = T::dropout(v, 0.5, true);
+        let z = T::dropout(v, 0.01, true);
         let g = T::grad(&[z], &[v]);
         ag::test_helper::check_theoretical_grads(
             z,

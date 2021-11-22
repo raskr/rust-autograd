@@ -1,4 +1,5 @@
 //! Defining things related to gradient computation.
+use crate::graph::{TensorID};
 use crate::op::{GradientContext, InputArray};
 use crate::tensor::Tensor;
 use crate::tensor_ops as T;
@@ -14,7 +15,7 @@ struct GradInfo<'graph, F: Float> {
     grad_called: bool,
     computed_grads: InputArray<Tensor<'graph, F>>,
     accumulated_grad: Option<Tensor<'graph, F>>,
-    default_grad: Option<usize>, // id
+    default_grad: Option<Tensor<'graph, F>>, // id
 }
 
 impl<'g, F: Float> GradInfo<'g, F> {
@@ -50,9 +51,9 @@ impl<'g, F: Float> GradInfo<'g, F> {
     }
 
     #[inline]
-    fn get_grad(&mut self, g: &'g Graph<F>) -> Tensor<'g, F> {
+    fn get_grad(&mut self) -> Tensor<'g, F> {
         if let Some(def) = self.default_grad {
-            g.tensor(def)
+            def
         } else {
             self.accumulate_then_get()
         }
@@ -71,8 +72,15 @@ fn has_marked_child<T: Float>(parent: Tensor<T>, path: &FxHashMap<usize, GradInf
 }
 
 #[inline]
-fn is_wrt(node: usize, wrt: &[usize]) -> bool {
-    wrt.contains(&node)
+fn is_wrt<'g, F: Float, A>(node: usize, wrt: &[A]) -> bool
+where A: AsRef<Tensor<'g, F>>
+{
+    for w in wrt {
+        if w.as_ref().id == node {
+            return true
+        }
+    }
+    false
 }
 
 // Go backward from `ys` and collect nodes until reach `wrt` for backprop.
@@ -80,11 +88,15 @@ fn is_wrt(node: usize, wrt: &[usize]) -> bool {
 // Strategy
 //   1. Record all nodes that are reachable from `ys` into `ret`.
 //   2. Mark the path between `ys` and `xs` as `has_gradient`.
-fn get_between_nodes<'t, 'g, F: Float>(
+fn get_between_nodes<'t, 'g, A, B, F: Float>(
     g: &'g Graph<F>,
-    ys: &[usize],
-    wrt: &[usize],
-) -> FxHashMap<usize, GradInfo<'g, F>> {
+    ys: &[A],
+    wrt: &[B],
+) -> FxHashMap<TensorID, GradInfo<'g, F>>
+where
+    A: AsRef<Tensor<'g, F>>,
+    B: AsRef<Tensor<'g, F>>,
+{
     // Randomly accessible by use of each node's id.
     let mut ret = FxHashMap::<usize, GradInfo<F>>::default();
 
@@ -92,7 +104,7 @@ fn get_between_nodes<'t, 'g, F: Float>(
     // `has_gradient` properties are filled at the same time.
 
     // dfs_stack: (node, should_visit)
-    let mut dfs_stack: Vec<(usize, bool)> = ys.iter().map(|&y| (y, false)).collect();
+    let mut dfs_stack: Vec<(TensorID, bool)> = ys.iter().map(|y| (y.as_ref().id, false)).collect();
     while let Some((node_id, should_visit)) = dfs_stack.pop() {
         let node = g.tensor(node_id);
         if should_visit {
@@ -124,36 +136,46 @@ fn get_between_nodes<'t, 'g, F: Float>(
     ret
 }
 
-/// Returns symbolic gradient tensors of `xs`.
+/// Returns gradient tensors of `xs`.
 ///
 /// This computes partial derivatives of `ys` with `xs` and returns the
 /// gradients. This is achieved by building a subgraph between `ys` and
 /// `xs` in reverse order from user's graph definition.
 /// `gys` are already known gradients of `ys`'s outputs.
 ///
-/// NOTE: Nodes that do not have gradients won't be included in the subgraph to avoid
-/// unnecessary computation.
-pub(crate) fn symbolic_gradients<'t, 'g, F: Float>(
-    ys: &[usize],
-    wrt: &[usize],
-    gys: &[usize],
+/// NOTE:
+/// Returned gradient is `None` if the corresponding variable is not differentiable.
+pub(crate) fn compute_gradients<'t, 'g, A, B, F: Float>(
+    ys: &[A],
+    wrt: &[B],
+    gys: Option<& [Tensor<'g, F>]>, // not generic for None arg
     g: &'g Graph<F>,
-) -> Vec<Tensor<'g, F>> {
-    assert_eq!(ys.len(), gys.len(), "`ys.len()` must match `gys.len()`");
-
+) -> GradientMap<'g, F>
+where
+    A: AsRef<Tensor<'g, F>>,
+    B: AsRef<Tensor<'g, F>>,
+{
     // Setup gradient path.
     // We lookup this with tensor id.
     let mut between_nodes = get_between_nodes(g, ys, wrt);
 
     // Set default grads.
-    for (y, gy) in ys.iter().zip(gys) {
-        between_nodes.get_mut(y).unwrap().default_grad = Some(*gy);
+    if let Some(gys) = gys {
+        assert_eq!(ys.len(), gys.len(), "`ys.len()` must match `gys.len()`");
+        for (y, gy) in ys.into_iter().zip(gys) {
+            between_nodes.get_mut(&y.as_ref().id).unwrap().default_grad = Some(gy.as_ref().clone());
+        }
+    } else {
+        let start_gy = T::scalar(F::one(), g);
+        for y in ys.into_iter() {
+            between_nodes.get_mut(&y.as_ref().id).unwrap().default_grad = Some(start_gy.clone());
+        }
     }
 
     // Prepare a heap with given ys.
     let mut heap = ys
         .iter()
-        .map(|&y| g.tensor(y).to_node())
+        .map(|y| y.as_ref().to_node())
         .collect::<BinaryHeap<Node>>();
 
     // Backprop.
@@ -162,7 +184,7 @@ pub(crate) fn symbolic_gradients<'t, 'g, F: Float>(
         let gxs = {
             let info = between_nodes.get_mut(&y.id).unwrap();
 
-            let gy = info.get_grad(g);
+            let gy = info.get_grad();
 
             // Call Op::grad (mutate the graph)
             let y_tensor = g.tensor(y.id);
@@ -189,22 +211,27 @@ pub(crate) fn symbolic_gradients<'t, 'g, F: Float>(
         }
     }
 
-    // Aggregate and return xs's gradients
-    let mut ret = Vec::with_capacity(wrt.len());
-    for x in wrt {
-        let msg1: &str = "Not differentiable with given tensor(s).";
-        let info = between_nodes.get_mut(x).expect(msg1);
-        if !info.has_gradient {
-            panic!("{}", msg1);
-        }
-        assert!(
-            info.default_grad.is_none(),
-            "Can't differentiate with objective itself"
-        );
-        ret.push(info.accumulate_then_get());
-    }
-    ret
+    GradientMap { inner: between_nodes }
 }
+
+// compute_gradients's return value
+pub(crate) struct GradientMap<'g, F: Float> {
+    inner: FxHashMap<TensorID, GradInfo<'g, F>>
+}
+
+impl<'g, F: Float> GradientMap<'g, F> {
+    #[inline]
+    pub(crate) fn get(&mut self, x: impl AsRef<Tensor<'g, F>>) -> Option<Tensor<'g, F>> {
+        if let Some(info) = self.inner.get_mut(&x.as_ref().id) {
+            if info.has_gradient && info.default_grad.is_none() {
+               return Some(info.accumulate_then_get())
+            }
+        }
+        // can't differentiate!
+        None
+    }
+}
+
 
 struct Node {
     id: usize,

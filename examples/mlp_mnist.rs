@@ -7,7 +7,6 @@
 use autograd as ag;
 use ndarray;
 
-
 use ag::optimizers::Adam;
 use ag::prelude::*;
 use ag::rand::seq::SliceRandom;

@@ -196,7 +196,7 @@ pub struct NamedDefaultVariableSlot<'env, 'name, F: Float, S: Into<String>> {
     name: S,
 }
 
-/// Manages variable arrays using those unique names.
+/// Manages variable arrays using their unique names.
 ///
 /// Each of the variables managed by autograd is always associated to a single namespace.
 /// See [variable](crate::variable).
@@ -379,7 +379,7 @@ impl<'env, 'name, F: Float> NamespaceTrait<F> for VariableNamespaceMut<'env, 'na
 }
 
 impl<'e: 'name, 'name, F: Float> VariableNamespace<'e, 'name, F> {
-    /// Returns an iterator of variable arrays and those names in this namespace
+    /// Returns an iterator of variable arrays and their names in this namespace
     #[allow(unused)]
     pub fn iter(&'name self) -> impl Iterator<Item = (&'name str, &RefCell<NdArray<F>>)> {
         iter(self)
@@ -387,7 +387,7 @@ impl<'e: 'name, 'name, F: Float> VariableNamespace<'e, 'name, F> {
 }
 
 impl<'e: 'name, 'name, F: Float> VariableNamespaceMut<'e, 'name, F> {
-    /// Returns an iterator of variable arrays and those names in this namespace
+    /// Returns an iterator of variable arrays and their names in this namespace
     #[allow(unused)]
     pub fn iter(&'name self) -> impl Iterator<Item = (&'name str, &RefCell<NdArray<F>>)> {
         iter(self)
@@ -537,7 +537,7 @@ impl<'env, 'name, F: Float> VariableEnvironment<'name, F> {
         }
     }
 
-    /// Returns an iterator of variable arrays and those ids in this env.
+    /// Returns an iterator of variable arrays and their ids in this env.
     #[allow(unused)]
     pub fn iter(&'env self) -> impl Iterator<Item = (VariableID, &RefCell<NdArray<F>>)> {
         self.array_list
@@ -735,7 +735,7 @@ impl<'t, 'g, F: Float> Graph<F> {
         }
     }
 
-    /// Get tensors with those variable ids.
+    /// Get tensors with their variable ids.
     ///
     /// See `VariableEnvironment` for the usages.
     pub fn var_tensors_by_id<'e: 'g>(
@@ -745,7 +745,7 @@ impl<'t, 'g, F: Float> Graph<F> {
         (0..env.array_list.len()).map(move |vid| (vid.into(), self.variable_by_id(vid.into())))
     }
 
-    /// Get tensors with those variable names in the specified namespace.
+    /// Get tensors and their variable names in the specified namespace.
     ///
     /// See `VariableEnvironment` for the usages.
     pub fn var_tensors_by_name<'e: 'name + 'g, 'name>(
@@ -792,6 +792,7 @@ fn compile_common_usages() {
 #[test]
 fn save_and_load() {
     use crate::approx::AbsDiffEq;
+    use std::collections::HashMap;
     use std::fs;
 
     let dir = "/tmp/autograd/test_save_and_load";

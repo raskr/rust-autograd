@@ -218,14 +218,16 @@ use crate::tensor_ops::*;
 pub struct Dropout<F: Float, R: Rng> {
     pub arr_rng: ArrayRng<F, R>,
     pub dropout_ratio: F,
-    pub train: bool
+    pub train: bool,
 }
 
 impl<R: Rng, F: Float> op::Op<F> for Dropout<F, R> {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<F>) -> Result<(), crate::op::OpError> {
         let x = ctx.input(0);
         if self.train {
-            let mask = self.arr_rng.bernoulli(x.shape(), (F::one() - self.dropout_ratio).to_f64().unwrap());
+            let mask = self
+                .arr_rng
+                .bernoulli(x.shape(), (F::one() - self.dropout_ratio).to_f64().unwrap());
             ctx.append_output(&mask * &x);
             ctx.append_output(mask);
         } else {
