@@ -7,6 +7,8 @@ jobs:
 
     name: Rust-${{ matrix.rust }}/${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    env:
+      RUST_BACKTRACE: 1
 
     strategy:
       matrix:
@@ -30,32 +32,32 @@ jobs:
       run: cargo test -v
       continue-on-error: ${{ matrix.rust == 'nightly' }}
 
-    - name: cargo test (blas=intel-mkl, ${{ matrix.os }})
+    - name: cargo test (blas=intel-mkl, ubuntu-latest)
       if: matrix.os == 'ubuntu-latest'
       run: cargo test --lib -v --features blas,intel-mkl
       continue-on-error: ${{ matrix.rust == 'nightly' }}
 
-    - name: cargo test (blas=openblas, ${{ matrix.os }})
+    - name: cargo test (blas=openblas, ubuntu-latest)
       if: matrix.os == 'ubuntu-latest'
       run: cargo test --lib -v --features blas,openblas
       continue-on-error: ${{ matrix.rust == 'nightly' }}
 
-    - name: cargo test (blas=accelerate, ${{ matrix.os }})
+    - name: cargo test (blas=accelerate, macos-10.15)
       if: matrix.os == 'macos-10.15'
       run: cargo test -v --features blas,accelerate
       continue-on-error: ${{ matrix.rust == 'nightly' }}
 
-    - name: cargo test (blas=accelerate, ${{ matrix.os }})
+    - name: cargo test (blas=accelerate, macos-11)
       if: matrix.os == 'macos-11'
       run: cargo test -v --features blas,accelerate
       continue-on-error: ${{ matrix.rust == 'nightly' }}
 
-    - name: cargo test (blas=intel-mkl, ${{ matrix.os }})
+    - name: cargo test (blas=intel-mkl, windows-latest)
       if: matrix.os == 'windows-latest'
       run: cargo test -v --lib --features blas,intel-mkl
       continue-on-error: ${{ matrix.rust == 'nightly' }}
 
-    - name: cargo test (blas=openblas, ${{ matrix.os }})
+    - name: cargo test (blas=openblas, windows-latest)
       if: matrix.os == 'windows-latest'
       run: cargo test -v --lib --features blas,openblas
-      continue-on-error: ${{ matrix.rust == 'nightly' }}
+      continue-on-error: true # error: Non-vcpkg builds are not supported on Windows. You must use the 'system' feature.
