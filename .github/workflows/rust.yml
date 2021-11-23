@@ -5,16 +5,15 @@ on: [push, pull_request]
 jobs:
   build:
 
-    name: Rust ${{ matrix.os }} ${{ matrix.rust }}
+    name: Rust-${{ matrix.rust }}/${{ matrix.os }}
     runs-on: ${{ matrix.os }}
 
     strategy:
       matrix:
         rust:
           - stable
-          - beta
           - nightly
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest, windows-latest, macos-10.15, macos-11]
 
     steps:
     - uses: actions/checkout@v2
@@ -25,20 +24,38 @@ jobs:
         profile: minimal
         toolchain: ${{ matrix.rust }}
         override: true
-    - name: Build
+    - name: cargo build
       run: cargo build -v
-    - name: Run tests
+    - name: cargo test
       run: cargo test -v
       continue-on-error: ${{ matrix.rust == 'nightly' }}
-    - name: Run tests (ubuntu-latest)
+
+    - name: cargo test (blas=intel-mkl, ${{ matrix.os }})
       if: matrix.os == 'ubuntu-latest'
       run: cargo test -v --features blas,intel-mkl
       continue-on-error: ${{ matrix.rust == 'nightly' }}
-    - name: Run tests (macos-latest)
-      if: matrix.os == 'macos-latest'
+
+    - name: cargo test (blas=openblas, ${{ matrix.os }})
+      if: matrix.os == 'ubuntu-latest'
+      run: cargo test -v --features blas,openblas
+      continue-on-error: ${{ matrix.rust == 'nightly' }}
+
+    - name: cargo test (blas=accelerate, ${{ matrix.os }})
+      if: matrix.os == 'macos-10.15'
       run: cargo test -v --features blas,accelerate
       continue-on-error: ${{ matrix.rust == 'nightly' }}
-    - name: Run tests (windows-latest)
+
+    - name: cargo test (blas=accelerate, ${{ matrix.os }})
+      if: matrix.os == 'macos-11'
+      run: cargo test -v --features blas,accelerate
+      continue-on-error: ${{ matrix.rust == 'nightly' }}
+
+    - name: cargo test (blas=intel-mkl, windows-latest)
       if: matrix.os == 'windows-latest'
       run: cargo test -v --features blas,intel-mkl
+      continue-on-error: ${{ matrix.rust == 'nightly' }}
+
+    - name: cargo test (blas=openblas, windows-latest)
+      if: matrix.os == 'windows-latest'
+      run: cargo test -v --features blas,openblas
       continue-on-error: ${{ matrix.rust == 'nightly' }}
