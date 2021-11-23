@@ -32,12 +32,12 @@ jobs:
 
     - name: cargo test (blas=intel-mkl, ${{ matrix.os }})
       if: matrix.os == 'ubuntu-latest'
-      run: cargo test -v --features blas,intel-mkl
+      run: cargo test --lib -v --features blas,intel-mkl
       continue-on-error: ${{ matrix.rust == 'nightly' }}
 
     - name: cargo test (blas=openblas, ${{ matrix.os }})
       if: matrix.os == 'ubuntu-latest'
-      run: cargo test -v --features blas,openblas
+      run: cargo test --lib -v --features blas,openblas
       continue-on-error: ${{ matrix.rust == 'nightly' }}
 
     - name: cargo test (blas=accelerate, ${{ matrix.os }})
@@ -50,12 +50,12 @@ jobs:
       run: cargo test -v --features blas,accelerate
       continue-on-error: ${{ matrix.rust == 'nightly' }}
 
-    - name: cargo test (blas=intel-mkl, windows-latest)
+    - name: cargo test (blas=intel-mkl, ${{ matrix.os }})
       if: matrix.os == 'windows-latest'
-      run: cargo test -v --features blas,intel-mkl
+      run: cargo test -v --lib --features blas,intel-mkl
       continue-on-error: ${{ matrix.rust == 'nightly' }}
 
-    - name: cargo test (blas=openblas, windows-latest)
+    - name: cargo test (blas=openblas, ${{ matrix.os }})
       if: matrix.os == 'windows-latest'
-      run: cargo test -v --features blas,openblas
+      run: cargo test -v --lib --features blas,openblas
       continue-on-error: ${{ matrix.rust == 'nightly' }}

@@ -1,6 +1,6 @@
 # autograd
 
-[![Build Status](https://travis-ci.org/raskr/rust-autograd.svg?branch=master)](https://travis-ci.org/raskr/rust-autograd)
+[![build](https://github.com/raskr/rust-autograd/actions/workflows/rust.yml/badge.svg)](https://github.com/raskr/rust-autograd/actions/workflows/rust.yml)
 [![Crates.io version](https://img.shields.io/crates/v/autograd.svg)](https://crates.io/crates/autograd)
 [![docs.rs](https://docs.rs/autograd/badge.svg)](https://docs.rs/autograd/)
 
