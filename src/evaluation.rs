@@ -443,8 +443,14 @@ impl<F: Float> Graph<F> {
                             match &node_info_map.get(&input.id).unwrap() {
                                 Err(e) => Err(e.clone()),
                                 Ok(vi_list) => {
-                                    let value_info = vi_list[in_idx];
-                                    Ok(OpInput::new(storage.get(value_info), Some(value_info.key)))
+                                    if let Some(&value_info) = vi_list.get(in_idx) {
+                                        Ok(OpInput::new(
+                                            storage.get(value_info),
+                                            Some(value_info.key),
+                                        ))
+                                    } else {
+                                        panic!("bad op impl: wrong number of output tensors")
+                                    }
                                 }
                             }
                         }

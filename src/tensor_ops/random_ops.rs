@@ -232,7 +232,7 @@ impl<R: Rng, F: Float> op::Op<F> for Dropout<F, R> {
             ctx.append_output(mask);
         } else {
             let coef = F::one() - self.dropout_ratio;
-            x.mapv(move |x| x * coef);
+            ctx.append_output(x.mapv(move |x| x * coef));
         }
         Ok(())
     }

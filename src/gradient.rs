@@ -1,5 +1,5 @@
 //! Defining things related to gradient computation.
-use crate::graph::{TensorID};
+use crate::graph::TensorID;
 use crate::op::{GradientContext, InputArray};
 use crate::tensor::Tensor;
 use crate::tensor_ops as T;
@@ -73,11 +73,12 @@ fn has_marked_child<T: Float>(parent: Tensor<T>, path: &FxHashMap<usize, GradInf
 
 #[inline]
 fn is_wrt<'g, F: Float, A>(node: usize, wrt: &[A]) -> bool
-where A: AsRef<Tensor<'g, F>>
+where
+    A: AsRef<Tensor<'g, F>>,
 {
     for w in wrt {
         if w.as_ref().id == node {
-            return true
+            return true;
         }
     }
     false
@@ -148,7 +149,7 @@ where
 pub(crate) fn compute_gradients<'t, 'g, A, B, F: Float>(
     ys: &[A],
     wrt: &[B],
-    gys: Option<& [Tensor<'g, F>]>, // not generic for None arg
+    gys: Option<&[Tensor<'g, F>]>, // not generic for None arg
     g: &'g Graph<F>,
 ) -> GradientMap<'g, F>
 where
@@ -211,12 +212,14 @@ where
         }
     }
 
-    GradientMap { inner: between_nodes }
+    GradientMap {
+        inner: between_nodes,
+    }
 }
 
 // compute_gradients's return value
 pub(crate) struct GradientMap<'g, F: Float> {
-    inner: FxHashMap<TensorID, GradInfo<'g, F>>
+    inner: FxHashMap<TensorID, GradInfo<'g, F>>,
 }
 
 impl<'g, F: Float> GradientMap<'g, F> {
@@ -224,14 +227,13 @@ impl<'g, F: Float> GradientMap<'g, F> {
     pub(crate) fn get(&mut self, x: impl AsRef<Tensor<'g, F>>) -> Option<Tensor<'g, F>> {
         if let Some(info) = self.inner.get_mut(&x.as_ref().id) {
             if info.has_gradient && info.default_grad.is_none() {
-               return Some(info.accumulate_then_get())
+                return Some(info.accumulate_then_get());
             }
         }
         // can't differentiate!
         None
     }
 }
-
 
 struct Node {
     id: usize,

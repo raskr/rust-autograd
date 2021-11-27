@@ -33,19 +33,21 @@ macro_rules! timeit {
     }};
 }
 
-fn conv_pool<'g>(x: Tensor<'g>, w: Tensor<'g>, b: Tensor<'g>) -> Tensor<'g> {
+fn conv_pool<'g>(x: Tensor<'g>, w: Tensor<'g>, b: Tensor<'g>, train: bool) -> Tensor<'g> {
     let y1 = T::conv2d(x, w, 1, 1) + b;
     let y2 = T::relu(y1);
-    T::max_pool2d(y2, 2, 0, 2)
+    let y3 = T::max_pool2d(y2, 2, 0, 2);
+    T::dropout(y3, 0.25, train)
 }
 
-fn compute_logits<'g>(c: &'g Context<f32>) -> Tensor<'g> {
+fn compute_logits<'g>(c: &'g Context<f32>, train: bool) -> Tensor<'g> {
     let x = c.placeholder("x", &[-1, 28 * 28]);
     let x = x.reshape(&[-1, 1, 28, 28]); // 2D -> 4D
-    let z1 = conv_pool(x, c.variable("w1"), c.variable("b1")); // map to 32 channel
-    let z2 = conv_pool(z1, c.variable("w2"), c.variable("b2")); // map to 64 channel
+    let z1 = conv_pool(x, c.variable("w1"), c.variable("b1"), train); // map to 32 channel
+    let z2 = conv_pool(z1, c.variable("w2"), c.variable("b2"), train); // map to 64 channel
     let z3 = T::reshape(z2, &[-1, 64 * 7 * 7]); // flatten
-    T::matmul(z3, c.variable("w3")) + c.variable("b3")
+    let z4 = T::matmul(z3, c.variable("w3")) + c.variable("b3");
+    T::dropout(z4, 0.25, train)
 }
 
 fn get_permutation(size: usize) -> Vec<usize> {
@@ -59,7 +61,7 @@ fn main() {
     let ((x_train, y_train), (x_test, y_test)) = mnist_data::load();
 
     let max_epoch = 5;
-    let batch_size = 200isize;
+    let batch_size = 128isize;
     let num_train_samples = x_train.shape()[0];
     let num_batches = num_train_samples / batch_size as usize;
 
@@ -84,6 +86,7 @@ fn main() {
 
     // Training loop
     for epoch in 0..max_epoch {
+        let mut loss_sum = 0f32;
         timeit!({
             for i in get_permutation(num_batches) {
                 let i = i as isize * batch_size;
@@ -91,25 +94,37 @@ fn main() {
                 let y_batch = y_train.slice(s![i..i + batch_size, ..]).into_dyn();
 
                 env.run(|ctx| {
-                    let logits = compute_logits(ctx);
+                    let logits = compute_logits(ctx, true);
                     let loss =
                         T::sparse_softmax_cross_entropy(logits, ctx.placeholder("y", &[-1, 1]));
                     let mean_loss = T::reduce_mean(loss, &[0], false);
                     let ns = ctx.default_namespace();
                     let (vars, grads) = optimizers::grad_helper(&[mean_loss], &ns);
+                    let update_op = adam.get_update_op(&vars, &grads, ctx);
 
-                    let mut feeder = ag::Feeder::new();
-                    feeder.push("x", x_batch).push("y", y_batch);
-                    adam.update(&vars, &grads, ctx, feeder);
+                    let eval_results = ctx
+                        .evaluator()
+                        .push(mean_loss)
+                        .push(update_op)
+                        .feed("x", x_batch)
+                        .feed("y", y_batch)
+                        .run();
+
+                    eval_results[1].as_ref().expect("parameter updates ok");
+                    loss_sum += eval_results[0].as_ref().unwrap()[0];
                 });
             }
-            println!("finish epoch {}", epoch);
+            println!(
+                "finish epoch {}, test loss: {}",
+                epoch,
+                loss_sum / num_batches as f32
+            );
         });
     }
 
     // -- test --
     env.run(|ctx| {
-        let logits = compute_logits(ctx);
+        let logits = compute_logits(ctx, false);
         let predictions = T::argmax(logits, -1, true);
         let accuracy = T::reduce_mean(
             &T::equal(predictions, ctx.placeholder("y", &[-1, 1])),

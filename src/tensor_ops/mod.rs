@@ -1685,6 +1685,8 @@ where
 /// Elementwise leaky relu.
 ///
 /// In common, `alpha` is around 0.1 ~ 0.2.
+///
+/// https://ai.stanford.edu/~amaas/papers/relu_hybrid_icml2013_final.pdf
 pub fn leaky_relu<'graph, A, F: Float>(x: A, alpha: F) -> Tensor<'graph, F>
 where
     A: AsRef<Tensor<'graph, F>> + Copy,
@@ -2938,7 +2940,10 @@ where
         })
 }
 
-pub(crate) fn control_dependencies<'graph, A, F: Float>(
+/// Controls evaluation order of tensors
+///
+/// Same as [crate::Tensor::depends_on()].
+pub fn control_dependencies<'graph, A, F: Float>(
     x: Tensor<'graph, F>,
     deps: &[A],
 ) -> Tensor<'graph, F>

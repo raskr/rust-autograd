@@ -5,13 +5,14 @@ use crate::tensor_ops::*;
 use crate::Float;
 use crate::Graph;
 use ndarray;
+use ndarray::Axis;
 use std::mem;
 
 pub struct AddOp;
 pub struct SubOp;
 pub struct MulOp;
 pub struct DivOp;
-pub struct MaybeReduce;
+pub struct MaybeReduceSum;
 pub struct MaybeBroadcast;
 
 #[cfg(feature = "mkl")]
@@ -35,60 +36,60 @@ macro_rules! bin_op_same_shape {
     };
 }
 
-impl<T: Float> op::Op<T> for MaybeReduce {
+impl<T: Float> op::Op<T> for MaybeReduceSum {
     fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) -> Result<(), crate::op::OpError> {
-        let input = ctx.input(0);
-        let target_shape__ = crate::ndarray_ext::as_shape(&ctx.input(1));
-        let target_shape = target_shape__.as_slice();
-        let input_shape = input.shape();
+        let gy = ctx.input(0);
+        let orig_shape__ = crate::ndarray_ext::as_shape(&ctx.input(1));
+        let orig_shape_ = orig_shape__.as_slice(); // x shape: []
+        let gy_shape = gy.shape(); // gy shape: [1]
 
-        if target_shape == input_shape {
+        if orig_shape_ == gy_shape {
             // The case where forward path didn't cause broadcast.
-            ctx.append_output_view(input.clone());
-        } else {
-            // Broadcast occurred. We need reduction of `input`.
-            // First, handle the case where `input` is scalar.
-            let target_shape_is_scalar = crate::ndarray_ext::is_scalar_shape(target_shape);
-            let target_shape_ = if target_shape_is_scalar {
-                vec![1; input_shape.len()]
-            } else {
-                target_shape.to_vec()
-            };
-
-            // Reduce each dim as necessary
-            let mut folded: Option<NdArray<T>> = None;
-            for (i, (x_axis, gy_axis)) in target_shape_.iter().zip(input_shape).enumerate() {
-                if x_axis < gy_axis {
-                    if *x_axis == 1 {
-                        // `fold_axis` squashes the axis automatically.
-                        let axis = ndarray::Axis(if target_shape_is_scalar { 0 } else { i });
-                        let ret = match folded {
-                            Some(ref a) => a.fold_axis(axis.clone(), T::zero(), |&a, &b| a + b),
-                            None => input.fold_axis(axis.clone(), T::zero(), |&a, &b| a + b),
-                        };
-                        if target_shape_is_scalar {
-                            mem::swap(&mut folded, &mut Some(ret));
-                        } else {
-                            // Expands squashed axis.
-                            mem::swap(
-                                &mut folded,
-                                &mut Some(crate::ndarray_ext::expand_dims(ret, i)),
-                            );
-                        }
-                    } else {
-                        return Err(op::OpError::IncompatibleShape(
-                            "Incorrect gradient shape".to_string(),
-                        ));
-                    }
-                }
-                // case of x_axis < gy_axis: unreachable
-                // case of x_axis == gy_axis: nothing to do
-            }
-            // TODO
-            let ret = folded.unwrap();
-            debug_assert_eq!(target_shape, ret.shape());
-            ctx.append_output(ret);
+            ctx.append_output_view(gy.clone());
+            return Ok(());
         }
+
+        // Broadcast occurred. We need reduction of the input.
+
+        // First, handle the case where `input` is scalar.
+        let target_shape_is_scalar = crate::ndarray_ext::is_scalar_shape(orig_shape_);
+        let orig_shape = if target_shape_is_scalar {
+            vec![1; gy_shape.len()]
+        } else {
+            orig_shape_.to_vec()
+        };
+
+        if orig_shape == gy_shape {
+            // The case where forward path didn't cause broadcast.
+            ctx.append_output_view(gy.into_shape(ndarray::IxDyn(orig_shape_)).unwrap());
+            return Ok(());
+        }
+
+        // Reduce each dim as necessary
+        let mut folded: Option<NdArray<T>> = None;
+
+        for (i, (&orig_ith_dim_size, &gy_ith_dim_size)) in
+            orig_shape.iter().zip(gy_shape).enumerate()
+        {
+            if orig_ith_dim_size == 1 && 1 < gy_ith_dim_size {
+                // broadcast occurred for this dim, so do reduction
+                let result = match folded {
+                    Some(ref tmp) => tmp.fold_axis(Axis(i), T::zero(), |&a, &b| a + b),
+                    None => gy.fold_axis(Axis(i), T::zero(), |&a, &b| a + b),
+                };
+                // Restore the axis squashed by `fold_axis` automatically.
+                let result = crate::ndarray_ext::expand_dims(result, i);
+                mem::swap(&mut folded, &mut Some(result));
+            } else if orig_ith_dim_size != gy_ith_dim_size {
+                unreachable!("bug of MaybeReduceSum probably");
+            }
+            // case of x_axis == gy_axis -> nothing to do
+        }
+        let ret = folded.unwrap();
+        ctx.append_output(
+            ret.into_shape(orig_shape_)
+                .expect("bug of MaybeReduceSum probably"),
+        );
         Ok(())
     }
 
@@ -297,7 +298,7 @@ fn maybe_reduce<'g, T: Float>(
         .append_input(x, false)
         .append_input(target_shape, false)
         .set_shape(target_shape)
-        .build(MaybeReduce)
+        .build(MaybeReduceSum)
 }
 
 macro_rules! impl_bin_op_forward {

@@ -31,8 +31,7 @@ where
 
     let ys: Vec<_> = losses.into_iter().map(|y| T::sum_all(y)).collect();
     let xs: Vec<_> = g.var_tensors_by_name(namespace).map(|(_a, b)| b).collect();
-    let mut gradients =
-        crate::gradient::compute_gradients(ys.as_slice(), xs.as_slice(), None, g);
+    let mut gradients = crate::gradient::compute_gradients(ys.as_slice(), xs.as_slice(), None, g);
     let mut vars = Vec::with_capacity(xs.len());
     let mut grads = Vec::with_capacity(xs.len());
     for x in xs.iter() {

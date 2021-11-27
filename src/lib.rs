@@ -79,10 +79,30 @@
 //! }
 //! ```
 //!
+//! ### Abstractions
+//! ```rust
+//! use autograd as ag;
+//! use ag::tensor_ops::*;
+//! use ag::ndarray;
+//!
+//! // Use `Tensor::map()` to create a new ndarray
+//! ag::run(|ctx| {
+//!     let x = ones(&[2, 3], ctx);
+//!     // apply ndarray's methods
+//!     let y = x.map(|x| x.fold_axis(ndarray::Axis(0), 0.0, |acc, x| acc + x));
+//!     let z = x.map(|x| ag::ndarray_ext::zeros(x.shape()));
+//! });
+//!
+//! // Hooks
+//! ag::run(|ctx| {
+//!     let x: ag::Tensor<f32> = ones(&[2, 3], ctx).show_shape();
+//!     let y: ag::Tensor<f32> = ones(&[2, 3], ctx).raw_hook(|x| println!("{}", x));
+//! });
+//! ```
+//!
 //! ### Other useful features
 //! - [Model persistence](variable#model-persistence)
 //! - [Variable namespace](variable#variable-and-namespace)
-//! - [Hook](hooks)
 
 #[allow(unused_imports)]
 // Expose to prevent version conflict

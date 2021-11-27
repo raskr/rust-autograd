@@ -80,7 +80,28 @@ for epoch in 0..3 {  // 0.11 sec/epoch on 2.7GHz Intel Core i5
         // adam.update(&[w, b], grads, ctx, feeder);
     });
 }
- ```
+```
+
+### Abstractions
+```rust
+use autograd as ag;
+use ag::tensor_ops::*;
+use ag::ndarray;
+
+// `Tensor::map()`
+ag::run(|ctx| {
+    let x = ones(&[2, 3], ctx);
+    // apply ndarray's methods
+    let y = x.map(|x| x.fold_axis(ndarray::Axis(0), 0.0, |acc, x| acc + x));
+    let z = x.map(|x| ag::ndarray_ext::zeros(x.shape()));
+});
+
+// Hooks
+ag::run(|ctx| {
+    let x: ag::Tensor<f32> = ones(&[2, 3], ctx).show_shape();
+    let y: ag::Tensor<f32> = ones(&[2, 3], ctx).raw_hook(|x| println!("{}", x));
+});
+```
 
 For detailed, see [documentation](https://docs.rs/autograd/) or
 [examples](https://github.com/raskr/rust-autograd/tree/master/examples)
