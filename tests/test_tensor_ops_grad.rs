@@ -1332,14 +1332,14 @@ fn reshape() {
 }
 
 #[test]
-#[should_panic]
+// zero grad
 fn reshape_grad() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
     let v = env.slot().set(rng.standard_normal(&[4, 4]));
     env.run(|graph| {
         let v = graph.variable(v);
-        let z = T::reshape(&(v), &[4, 2, 2]);
+        let z = T::reshape(&v, &[4, 2, 2]);
         let g = T::grad(&[z], &[v])[0];
         let gg = T::grad(&[g], &[v]);
         ag::test_helper::check_theoretical_grads(
@@ -1370,7 +1370,7 @@ fn conv2d_transpose() {
 }
 
 #[test]
-#[should_panic]
+// zero grad
 fn conv2d_transpose_filter_grad() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
@@ -1395,7 +1395,7 @@ fn conv2d_transpose_filter_grad() {
 }
 
 #[test]
-#[should_panic]
+// zero grad
 fn conv2d_filter_grad() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
@@ -1461,31 +1461,6 @@ fn conv2d_xw_grad() {
         let gg = T::grad(&[g], &[x]);
         ag::test_helper::check_theoretical_grads(
             g,
-            &gg,
-            &[x],
-            ag::Feeder::new(),
-            1e-3,
-            1e-2,
-            graph,
-        );
-    });
-}
-
-#[test]
-#[should_panic]
-fn conv2d_x_grad() {
-    let mut env = ag::VariableEnvironment::new();
-    let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let x = env.slot().set(rng.standard_normal(&[2, 3, 5, 5]));
-    let w = env.slot().set(rng.standard_normal(&[2, 3, 2, 2]));
-    env.run(|graph| {
-        let x = graph.variable(x);
-        let w = graph.variable(w);
-        let y = T::conv2d(x, w, 0, 1);
-        let g = T::grad(&[y], &[x])[0];
-        let gg = T::grad(&[g], &[x]); // can't differentiate with x twice
-        ag::test_helper::check_theoretical_grads(
-            y,
             &gg,
             &[x],
             ag::Feeder::new(),

@@ -99,11 +99,12 @@ where
     let ys: Vec<_> = ys.into_iter().map(|y| sum_all(y)).collect();
     let mut grads = crate::gradient::compute_gradients(ys.as_slice(), xs, None, g);
     let mut ret = Vec::with_capacity(xs.len());
-    for (i, x) in xs.into_iter().enumerate() {
+    for x in xs {
         if let Some(gx) = grads.get(x) {
             ret.push(gx);
         } else {
-            panic!("Variable at {} not differentiable", i)
+            // not differentiable
+            ret.push(zeros(&x.as_ref().shape(), g));
         }
     }
     ret
@@ -136,11 +137,12 @@ where
     let g = ys[0].as_ref().graph();
     let mut grads = crate::gradient::compute_gradients(ys, xs, Some(ys_grads), g);
     let mut ret = Vec::with_capacity(xs.len());
-    for (i, x) in xs.into_iter().enumerate() {
+    for x in xs {
         if let Some(gx) = grads.get(x) {
             ret.push(gx);
         } else {
-            panic!("Variable at {} not differentiable", i)
+            // not differentiable
+            ret.push(zeros(&x.as_ref().shape(), g));
         }
     }
     ret
@@ -2365,6 +2367,7 @@ where
 
 use crate::graph::AsGraph;
 use std::marker::PhantomData;
+use num_traits::zero;
 
 /// Converts an `ndarray::Array` to a `ag::Tensor`.
 ///

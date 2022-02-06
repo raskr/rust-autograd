@@ -17,7 +17,7 @@ pub use sgd::SGD;
 /// Differentiates `losses` with all the relevant variables in the `namespace`
 ///
 /// Returns a tuple `(variables, gradients)`.
-/// This is a superior version of [crate::tensor_ops::grad()].
+/// See also [crate::tensor_ops::grad()].
 pub fn grad_helper<'g, A, F: Float>(
     losses: &[A],
     namespace: &'g VariableNamespace<F>,
