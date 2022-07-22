@@ -206,8 +206,8 @@ fn slow_im2col_gemm_fused_kernel<F: Float>(
     unsafe {
         y.set_len(batch_size * y_size_per_batch);
         cols.set_len(batch_size * col_size_per_batch);
-        (y, cols)
     }
+    (y, cols)
 }
 
 #[cfg(feature = "blas")]
@@ -451,7 +451,7 @@ fn conv2d_impl<F: Float>(
         }
     }
 
-    unsafe {
+    
         let f;
         #[cfg(feature = "blas")]
         {
@@ -481,9 +481,9 @@ fn conv2d_impl<F: Float>(
         );
         let y = NdArray::from_shape_vec(IxDyn(&[batch_size, ych, yh, yw]), y).unwrap();
         let cols =
-            NdArray::from_shape_vec_unchecked(IxDyn(&[batch_size, xch, kw, kh, yh, yw]), cols);
+            unsafe { NdArray::from_shape_vec_unchecked(IxDyn(&[batch_size, xch, kw, kh, yh, yw]), cols) };
         Ok((y, cols))
-    }
+    
 }
 
 fn conv2d_with_cols_impl<F: Float>(cols: &NdArrayView<F>, w: &NdArrayView<F>) -> NdArray<F> {

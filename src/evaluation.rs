@@ -224,12 +224,12 @@ impl<'view, F: Float> OutputStorage<'view, F> {
 
     #[inline]
     fn push_view(&self, view: NdArrayView<'view, F>) -> usize {
-        unsafe {
-            let s = &mut self.inner_mut().view_storage;
+        
+            let s = unsafe { &mut self.inner_mut().view_storage };
             let ret = s.len();
             s.push(view);
             ret
-        }
+        
     }
 
     #[inline]
