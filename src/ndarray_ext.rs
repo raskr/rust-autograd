@@ -206,8 +206,8 @@ pub mod array_gen {
         {
             let size: usize = shape.iter().cloned().product();
             let mut rng = self.rng.borrow_mut();
+            let mut buf = Vec::with_capacity(size);
             unsafe {
-                let mut buf = Vec::with_capacity(size);
                 for i in 0..size {
                     *buf.get_unchecked_mut(i) = T::from(dist.sample(&mut *rng)).unwrap();
                 }
@@ -271,15 +271,15 @@ pub mod array_gen {
             let dist = rand_distr::Uniform::new(0., 1.);
             let mut rng = self.rng.borrow_mut();
             let size: usize = shape.iter().cloned().product();
-            unsafe {
+            
                 let mut buf = Vec::with_capacity(size);
                 for i in 0..size {
                     let val = dist.sample(&mut *rng);
-                    *buf.get_unchecked_mut(i) = T::from(i32::from(val < p)).unwrap();
+                    unsafe { *buf.get_unchecked_mut(i) = T::from(i32::from(val < p)).unwrap() };
                 }
-                buf.set_len(size);
+                unsafe { buf.set_len(size) };
                 NdArray::from_shape_vec(shape, buf).unwrap()
-            }
+            
         }
 
         /// Creates an ndarray sampled from the exponential distribution with given params.
