@@ -57,16 +57,16 @@ macro_rules! impl_reduce_forward {
             x: &NdArrayView<'v, T>,
             mut axes: Vec<usize>,
             keep_dims: bool,
-        ) -> crate::OpOutput<'v, T> {
+        ) -> crate::OpOutput<T> {
             let x_shape = x.shape();
 
             if ndarray_ext::is_scalar_shape(x_shape) {
                 // case of 0 rank
-                crate::OpOutput::View(x.clone())
+                crate::OpOutput::View(x.raw_view())
             } else {
                 // reduction axes are empty => do nothing
                 if axes.is_empty() {
-                    return crate::OpOutput::View(x.clone());
+                    return crate::OpOutput::View(x.raw_view());
                 }
 
                 // -- main logic --
@@ -164,7 +164,7 @@ impl<T: Float> op::Op<T> for ReduceSum {
         let axes = preprocess_axes(x, &ctx.input(1), self.sparse_axes);
         match compute_reduce_sum(x, axes, self.keep_dims) {
             crate::OpOutput::Owned(ret) => ctx.append_output(ret),
-            crate::OpOutput::View(ret) => ctx.append_output_view(ret),
+            crate::OpOutput::View(ret) => ctx.append_output_view_raw(ret),
             _ => unreachable!(),
         }
         Ok(())
@@ -210,7 +210,7 @@ impl<T: Float> op::Op<T> for ReduceMean {
                 arr.mapv_inplace(move |elem| elem * reduction_len_inv);
                 ctx.append_output(arr)
             }
-            crate::OpOutput::View(view) => ctx.append_output_view(view),
+            crate::OpOutput::View(view) => ctx.append_output_view_raw(view),
             _ => unreachable!(),
         };
         Ok(())
@@ -249,7 +249,7 @@ impl<T: Float> op::Op<T> for ReduceProd {
                 ctx.append_output(ret);
             }
             crate::OpOutput::View(ret) => {
-                ctx.append_output_view(ret);
+                ctx.append_output_view_raw(ret);
             }
             _ => unreachable!(),
         }
@@ -285,7 +285,7 @@ impl<T: Float> op::Op<T> for ReduceMin {
                 ctx.append_output(ret);
             }
             crate::OpOutput::View(ret) => {
-                ctx.append_output_view(ret);
+                ctx.append_output_view_raw(ret);
             }
             _ => unreachable!(),
         }
@@ -314,7 +314,7 @@ impl<T: Float> op::Op<T> for ReduceMax {
                 ctx.append_output(ret);
             }
             crate::OpOutput::View(ret) => {
-                ctx.append_output_view(ret);
+                ctx.append_output_view_raw(ret);
             }
             _ => unreachable!(),
         }

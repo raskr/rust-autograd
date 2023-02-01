@@ -6,15 +6,11 @@ use crate::tensor_ops as T;
 use crate::variable::{VariableID, VariableNamespace};
 use crate::{Float, FxHashMap, NdArray, VariableEnvironment};
 
-use std::cell::RefCell;
-use std::cell::{Ref, RefMut};
+use std::cell::{Ref, RefMut, RefCell};
 use std::fmt;
 use std::ops::Deref;
 
 pub type TensorID = usize;
-
-pub const NUM_NODES_WARN: usize = 50_000;
-pub const NUM_NODES_CRITICAL: usize = 500_000;
 
 /// Holds tensors inside.
 ///
@@ -25,9 +21,12 @@ pub struct Graph<F: Float> {
     pub(crate) variable2node: RefCell<FxHashMap<VariableID, TensorID>>,
 }
 
-impl<'t, 'g, F: Float> Graph<F> {
+pub const NUM_NODES_WARN: usize = 50_000;
+pub const NUM_NODES_CRITICAL: usize = 500_000;
+
+impl<'graph, F: Float> Graph<F> {
     #[inline]
-    pub(crate) fn install(&'g self, mut node: TensorInternal<F>) -> TensorID {
+    pub(crate) fn install(&'graph self, mut node: TensorInternal<F>) -> TensorID {
         let mut inner = self.node_set.borrow_mut();
         let id = inner.len();
         if id == NUM_NODES_WARN {
@@ -62,7 +61,7 @@ impl<'t, 'g, F: Float> Graph<F> {
     }
 
     #[inline(always)]
-    pub(crate) fn tensor(&'g self, id: TensorID) -> Tensor<'g, F> {
+    pub(crate) fn tensor(&'graph self, id: TensorID) -> Tensor<'graph, F> {
         Tensor { id, graph: self }
     }
 }
@@ -93,7 +92,7 @@ where
     };
     let mut g = Context {
         env_handle,
-        inner: graph_internal,
+        graph: graph_internal,
     };
     f(&mut g)
 }
@@ -112,7 +111,7 @@ where
 ///     let y = ctx.placeholder("y", &[]);
 ///     let z = 2.*x*x + 3.*y + 1.;
 ///
-///     // dz/dx (symbolic):
+///     // dz/dx
 ///     let grad = &T::grad(&[z], &[x])[0];
 ///
 ///     // Evaluate dz/dx when x=3:
@@ -125,10 +124,10 @@ where
 /// ```
 pub struct Context<'env, 'name, F: Float> {
     pub(crate) env_handle: &'env VariableEnvironment<'name, F>,
-    pub(crate) inner: Graph<F>,
+    pub(crate) graph: Graph<F>,
 }
 
-impl<'g, 'env, 'name, F: Float> Context<'env, 'name, F> {
+impl<'graph, 'env, 'name, F: Float> Context<'env, 'name, F> {
     /// Get or create a namespace with the specified name.
     ///
     /// Use `namespace_mut` for mutable usages such as variables registrations.
@@ -147,7 +146,7 @@ impl<'g, 'env, 'name, F: Float> Context<'env, 'name, F> {
 
     /// Returns a reference to the current VariableEnvironment
     #[inline]
-    pub fn env(&'g self) -> &'env VariableEnvironment<F> {
+    pub fn env(&'graph self) -> &'env VariableEnvironment<F> {
         self.env_handle
     }
 
@@ -156,8 +155,8 @@ impl<'g, 'env, 'name, F: Float> Context<'env, 'name, F> {
     /// Note that any tensors allocated prior to this method call are invalid.
     #[inline]
     pub fn clear(&mut self) {
-        self.inner.node_set.borrow_mut().clear();
-        self.inner.variable2node.borrow_mut().clear();
+        self.graph.node_set.borrow_mut().clear();
+        self.graph.variable2node.borrow_mut().clear();
     }
 
     /// Creates a placeholder tensor.
@@ -193,7 +192,7 @@ impl<'g, 'env, 'name, F: Float> Context<'env, 'name, F> {
     ///
     /// See also [crate::evaluation::Evaluator] example.
     #[inline]
-    pub fn placeholder(&'g self, name: &'static str, shape_: &[isize]) -> Tensor<'g, F> {
+    pub fn placeholder(&'graph self, name: &'static str, shape_: &[isize]) -> Tensor<'graph, F> {
         let b = Tensor::builder(self).set_placeholder_name(name);
         let rank = shape_.len();
         let b = if rank == 0 || -1 != shape_[0] {
@@ -222,7 +221,7 @@ impl<'env, 'name, F: Float> Deref for Context<'env, 'name, F> {
 
     #[inline]
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.graph
     }
 }
 
@@ -240,7 +239,7 @@ impl<F: Float> AsGraph<F> for Graph<F> {
 impl<F: Float> AsGraph<F> for Context<'_, '_, F> {
     #[inline]
     fn as_graph(&self) -> &Graph<F> {
-        &self.inner
+        &self.graph
     }
 }
 

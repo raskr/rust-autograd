@@ -1,7 +1,7 @@
 //! Defining things related to evaluation of `Tensor`s
 use crate::ndarray::ArrayView;
-use crate::ndarray_ext::{NdArray, NdArrayView};
-use crate::op::{self, ComputeContext, InputArray, OpInput};
+use crate::ndarray_ext::{NdArray, NdArrayView, RawNdArrayView};
+use crate::op::{self, OpInput};
 
 use crate::tensor::{Tensor, TensorInternal};
 use crate::variable::VariableID;
@@ -9,6 +9,8 @@ use crate::{Context, FxHashMap, VariableEnvironment};
 use crate::{Float, Graph};
 
 use std::cell::{Ref, RefMut, UnsafeCell};
+use std::collections::HashMap;
+use crate::graph::TensorID;
 
 /// Unique id for a placeholder tensor
 #[derive(Clone, Copy)]
@@ -56,9 +58,9 @@ impl Placeholder for &'static str {
 ///        .run();  // Do eval
 ///    });
 /// ```
-pub struct Evaluator<'view, 'graph, 'e, 'n, 'c, F: Float> {
-    ctx: &'c Context<'e, 'n, F>,
-    buf: Vec<Tensor<'graph, F>>,
+pub struct Evaluator<'view, 'graph, 'env, 'name, 'ctx, F: Float> {
+    ctx: &'ctx Context<'env, 'name, F>,
+    eval_targets: Vec<Tensor<'graph, F>>,
     feeder: Feeder<'view, F>,
 }
 
@@ -92,26 +94,26 @@ impl<'view, F: Float> Feeder<'view, F> {
     }
 }
 
-impl<'g, 'env, 'name, 'view, F: Float> Context<'env, 'name, F> {
+impl<'graph, 'env, 'name, 'view, F: Float> Context<'env, 'name, F> {
     /// Creates a new evaluator
     #[inline]
-    pub fn evaluator<'c>(&'c self) -> Evaluator<'view, 'g, 'env, 'name, 'c, F> {
+    pub fn evaluator<'c>(&'c self) -> Evaluator<'view, 'graph, 'env, 'name, 'c, F> {
         Evaluator {
             feeder: Feeder { feeds: Vec::new() },
             ctx: self,
-            buf: Vec::new(),
+            eval_targets: Vec::new(),
         }
     }
 }
 
-impl<'tensor, 'view, 'graph, 'e, 'n, 'c, F: Float> Evaluator<'view, 'graph, 'e, 'n, 'c, F> {
+impl<'tensor, 'view, 'graph, 'env, 'name, 'ctx, F: Float> Evaluator<'view, 'graph, 'env, 'name, 'ctx, F> {
     #[inline]
     /// Appends a tensor to the back of the evaluation targets.
     pub fn push<A>(&mut self, x: A) -> &mut Self
     where
         A: AsRef<Tensor<'graph, F>>,
     {
-        self.buf.push(*x.as_ref());
+        self.eval_targets.push(*x.as_ref());
         self
     }
 
@@ -137,7 +139,7 @@ impl<'tensor, 'view, 'graph, 'e, 'n, 'c, F: Float> Evaluator<'view, 'graph, 'e, 
     where
         A: AsRef<Tensor<'graph, F>>,
     {
-        self.buf.extend(xs.iter().map(|x| *x.as_ref()));
+        self.eval_targets.extend(xs.iter().map(|x| *x.as_ref()));
         self
     }
 
@@ -145,138 +147,80 @@ impl<'tensor, 'view, 'graph, 'e, 'n, 'c, F: Float> Evaluator<'view, 'graph, 'e, 
     /// Evaluates the buffered tensors.
     pub fn run(&'tensor self) -> Vec<Result<NdArray<F>, crate::EvalError>> {
         self.ctx
-            .inner
-            .eval(self.buf.as_slice(), &self.feeder.feeds, self.ctx.env_handle)
+            .graph
+            .eval(self.eval_targets.as_slice(), &self.feeder.feeds, self.ctx.env_handle)
     }
 }
 
 #[derive(Clone)]
-pub(crate) struct Feed<'v, T: Float> {
+pub(crate) struct Feed<'view, T: Float> {
     /// The id of the placeholder tensor
     placeholder_key: PlaceholderKey,
     /// A run-time value of the placeholder
-    value: NdArrayView<'v, T>,
+    value: NdArrayView<'view, T>,
 }
 
-#[derive(Copy, Clone)]
-enum ValueType {
-    Owned,
-    View,
+// Storage in which compute results are stored.
+struct OpOutputStorage<F: Float> {
+    inner: FxHashMap<TensorID, Result<op::SmallVec<OpOutput<F>>, op::OpError>>
 }
 
-#[derive(Copy, Clone)]
-struct ValueInfo {
-    ty: ValueType,
-    // key to lookup output
-    key: usize,
-}
+use crate::op::OpOutput;
 
-impl ValueInfo {
-    #[inline]
-    fn new(ty: ValueType, key: usize) -> Self {
-        ValueInfo { ty, key }
-    }
-}
-
-struct OutputStorage<'view, F: Float> {
-    // - storage itself is not shared between threads
-    // - items in the storage never gone while evaluation loop (NdArray's relocation is shallow copy).
-    inner: UnsafeCell<OutputStorageInner<'view, F>>,
-}
-
-struct OutputStorageInner<'view, F: Float> {
-    // Each of NdArray is Some right up until eval's ret-val extraction phase.
-    // In that phase, each of entry is replaced with None to avoid copying the entire vector.
-    value_storage: Vec<Option<NdArray<F>>>,
-    view_storage: Vec<NdArrayView<'view, F>>,
-}
-
-impl<'view, F: Float> OutputStorage<'view, F> {
-    #[inline]
+impl<F: Float> OpOutputStorage<F> {
     fn new() -> Self {
-        OutputStorage {
-            inner: UnsafeCell::new(OutputStorageInner {
-                value_storage: Vec::new(),
-                view_storage: Vec::new(),
-            }),
+        OpOutputStorage {
+            inner: FxHashMap::default()
         }
     }
 
     #[inline]
-    unsafe fn inner(&self) -> &OutputStorageInner<'view, F> {
-        &*self.inner.get()
+    fn insert(&mut self, key: TensorID, output: Result<op::SmallVec<OpOutput<F>>, op::OpError>) {
+        self.inner.insert(key, output);
     }
 
     #[inline]
-    unsafe fn inner_mut(&self) -> &mut OutputStorageInner<'view, F> {
-        &mut *self.inner.get()
-    }
-
-    #[inline]
-    fn push_owned(&self, val: NdArray<F>) -> usize {
-        unsafe {
-            let s = &mut self.inner_mut().value_storage;
-            let ret = s.len();
-            s.push(Some(val));
-            ret
+    fn get(&self, key: TensorID, selector: usize) -> Result<RawNdArrayView<F>, op::OpError> {
+        match self.inner.get(&key).unwrap() {
+            Ok(ys) => {
+                match &ys[selector] {
+                    OpOutput::Owned(arr) => Ok(arr.raw_view()),
+                    OpOutput::View(arr) => Ok(arr.clone())
+                }
+            },
+            Err(e) => Err(e.clone())
         }
     }
 
-    #[inline]
-    fn push_view(&self, view: NdArrayView<'view, F>) -> usize {
-        
-            let s = unsafe { &mut self.inner_mut().view_storage };
-            let ret = s.len();
-            s.push(view);
-            ret
-        
-    }
-
-    #[inline]
-    fn get_from_view(&self, i: usize) -> NdArrayView<'view, F> {
-        unsafe { self.inner().view_storage[i].clone() }
-    }
-
-    #[inline]
-    fn get_from_owned(&self, i: usize) -> NdArrayView<F> {
-        unsafe { self.inner().value_storage[i].as_ref().unwrap().view() }
-    }
-
-    #[inline]
-    fn take_from_owned(&self, i: usize) -> NdArray<F> {
-        unsafe { self.inner_mut().value_storage[i].take().unwrap() }
-    }
-
-    #[inline]
-    fn get(&'view self, vi: ValueInfo) -> NdArrayView<'view, F> {
-        match vi.ty {
-            ValueType::Owned => self.get_from_owned(vi.key),
-            ValueType::View => self.get_from_view(vi.key),
-        }
+    fn take(&mut self, key: TensorID, selector: usize) -> Result<NdArray<F>, op::OpError> {
+        self.inner.remove(&key).unwrap().and_then(|mut ys| {
+            // Use the first NdArray
+            match ys.swap_remove(selector) {
+                OpOutput::Owned(y) => Ok(y),
+                OpOutput::View(y) => Ok(unsafe { y.deref_into_view() }.to_owned())
+            }
+        })
     }
 }
 
-// search the feed using `in_node_id`
-fn retrieve_feed<'feeds, 'feed, F: Float>(
-    feeds: &'feeds [Feed<'feed, F>],
-    in_node: &Tensor<F>,
-    feed_name: &str,
+fn find_placeholder_value_by_key<'feeds, F: Float>(
+    feeds: &'feeds [Feed<F>],
+    node: &Tensor<F>,
+    placeholder_name: &str,
 ) -> NdArrayView<'feeds, F> {
-    let in_node_id = in_node.id;
-    // linear search is tolerable for feeds in most cases.
     for feed in feeds {
         match feed.placeholder_key {
             PlaceholderKey::ID(id) => {
-                if in_node_id == id {
+                if node.id == id {
                     let ret = feed.value.view();
-                    in_node.validate_using_known_shape(ret.shape());
+                    node.validate_using_known_shape(ret.shape());
                     return ret;
                 }
             }
             PlaceholderKey::Name(name) => {
-                if feed_name == name {
+                if placeholder_name == name {
                     let ret = feed.value.view();
-                    in_node.validate_using_known_shape(ret.shape());
+                    node.validate_using_known_shape(ret.shape());
                     return ret;
                 }
             }
@@ -285,214 +229,92 @@ fn retrieve_feed<'feeds, 'feed, F: Float>(
     panic!("Placeholder unfilled");
 }
 
-// Extract output arrays from `results` and stores into `storage`.
-fn install_compute_results<'view, F: Float>(
-    ys: Result<op::OutputArray<op::OpOutput<'view, F>>, op::OpError>,
-    storage: &OutputStorage<'view, F>,
-) -> Result<op::OutputArray<ValueInfo>, op::OpError> {
-    let mut value_info_list = op::OutputArray::new();
-    match ys {
-        Ok(ys) => {
-            debug_assert!(!ys.is_empty(), "Bad op implementation: empty return value");
-            for y in ys {
-                match y {
-                    crate::OpOutput::Reuse(existing_key) => {
-                        // push nothing to storage
-                        value_info_list.push(ValueInfo::new(ValueType::Owned, existing_key))
-                    }
-                    crate::OpOutput::Owned(val) => {
-                        let new_key = storage.push_owned(val);
-                        value_info_list.push(ValueInfo::new(ValueType::Owned, new_key));
-                    }
-                    crate::OpOutput::View(val) => {
-                        let new_key = storage.push_view(val);
-                        value_info_list.push(ValueInfo::new(ValueType::View, new_key));
-                    }
-                }
-            }
-            Ok(value_info_list)
-        }
-        Err(e) => Err(e),
-    }
-}
-
-struct VariableGuardRegister<'v, F: Float> {
-    immutable: Vec<Option<UnsafeCell<Ref<'v, NdArray<F>>>>>,
-    mutable: Vec<Option<UnsafeCell<RefMut<'v, NdArray<F>>>>>,
-}
-
-impl<'v, 'e, F: Float> VariableGuardRegister<'v, F> {
-    fn new(max_size: usize) -> Self {
-        let mut immutable = Vec::with_capacity(max_size);
-        let mut mutable = Vec::with_capacity(max_size);
-        // init with None
-        for _ in 0..max_size {
-            immutable.push(None);
-            mutable.push(None);
-        }
-        Self { immutable, mutable }
-    }
-
-    fn set(&mut self, vid: VariableID, mut_usage: bool, env: &'v VariableEnvironment<'e, F>) {
-        if mut_usage {
-            debug_assert!(
-                self.mutable[vid.0].is_none(),
-                "Bad op impl: taking a variable"
-            );
-            self.mutable[vid.0] = Some(UnsafeCell::new(env.array_list[vid.0].borrow_mut()));
-        } else {
-            debug_assert!(self.immutable[vid.0].is_none(), "Bad op impl");
-            self.immutable[vid.0] = Some(UnsafeCell::new(env.array_list[vid.0].borrow()));
-        }
-    }
-
-    fn borrow(&self, vid: VariableID, mut_usage: bool) -> OpInput<'v, F> {
-        unsafe {
-            if mut_usage {
-                OpInput::new_mut(
-                    (*self.mutable[vid.0]
-                        .as_ref()
-                        .expect("Variable array is not set")
-                        .get())
-                    .view_mut(),
-                    None,
-                )
-            } else {
-                OpInput::new(
-                    (*self.immutable[vid.0]
-                        .as_ref()
-                        .expect("`Variable array is not set")
-                        .get())
-                    .view(),
-                    None,
-                )
-            }
-        }
-    }
-
-    fn unset(&mut self, vid: VariableID, mut_usage: bool) {
-        if mut_usage {
-            self.mutable[vid.0] = None;
-        } else {
-            self.immutable[vid.0] = None;
-        }
-    }
-}
-
 impl<F: Float> Graph<F> {
-    pub(crate) fn eval<'feed, 'tensor, 'g, A>(
-        &'g self,
+    pub(crate) fn eval<'feed, 'graph, 'tensor, A>(
+        &'graph self,
         tensors: &'tensor [A],
         feeds: &[Feed<'feed, F>],
-        ctx: &VariableEnvironment<F>,
+        env: &VariableEnvironment<F>,
     ) -> Vec<Result<NdArray<F>, crate::EvalError>>
     where
-        A: AsRef<Tensor<'g, F>> + Copy,
+        A: AsRef<Tensor<'graph, F>> + Copy,
     {
-        let mut node_info_map: FxHashMap<usize, Result<op::OutputArray<ValueInfo>, op::OpError>> =
-            FxHashMap::default();
+        let mut storage = OpOutputStorage::new();
 
-        // Storage in which compute results are stored. Accessed through UnsafeCell.
-        let storage = OutputStorage::new();
+        // Graph traversal using depth-first-search
+        // Vec<(tensor_id, should_visit)>
+        let mut dfs_stack = Vec::<(TensorID, bool)>::with_capacity(1 << 10);
 
-        let mut variable_guard_register = VariableGuardRegister::new(ctx.array_list.len());
-
-        // Vec<(node_id, is_parent)>
-        let mut dfs_stack = Vec::<(usize, bool)>::with_capacity(1 << 10);
-
-        for t in tensors.iter() {
+        for t in tensors {
             crate::graph::assert_same_graph(self, t.as_ref().graph);
             dfs_stack.push((t.as_ref().id(), false));
         }
 
-        while let Some((node_id, is_parent)) = dfs_stack.pop() {
-            //  in this block, relocation of Graph::node_set's contents must not be occurred
-            let node = self.access_inner(node_id);
-            if is_parent {
-                if would_not_visit(&node, &node_info_map) {
+        while let Some((node_id, should_visit)) = dfs_stack.pop() {
+            let target_node = self.access_inner(node_id);
+
+            if should_visit {
+                if would_not_visit(&target_node, &storage) {
                     continue;
                 }
 
-                // =====================================================================================
-                // Aggregate input values for `node`. if any of the inputs failed, it's a total failure.
-                // =====================================================================================
+                // ===========================================
+                // Aggregate input values for the `target_node`
+                // ===========================================
 
-                let mut xs = InputArray::new();
+                // input arrays for `Op::compute`
+                let mut op_inputs = op::SmallVec::new();
 
-                let mut input_status = Ok(());
+                // Would be Err if fail to collect input arrays
+                let mut incoming_nodes_status = Ok(());
 
-                // Save var guards
-                for (in_node, _) in node.in_nodes.iter().zip(&node.input_indices) {
-                    if let Some(vid) = in_node.variable_id(self) {
-                        // is variable array
-                        variable_guard_register.set(vid, in_node.mut_usage, ctx);
-                    }
-                }
-
-                for (input, &in_idx) in node.in_nodes.iter().zip(&node.input_indices) {
-                    // `in_idx` is not 0 only when `in_node` is multi-output op and `node` selects nth value from it using `Graph::nth_tensor`.
-                    let in_node = input.as_tensor(self);
-                    let x = {
-                        if let Some(p_name) = in_node.placeholder_name() {
-                            Ok(OpInput::new(retrieve_feed(feeds, &in_node, p_name), None))
-                        } else if let Some(vid) = input.variable_id(self) {
-                            // is variable array
-                            Ok(variable_guard_register.borrow(vid, input.mut_usage))
-                        } else {
-                            // Search the value of input nodes.
-                            match &node_info_map.get(&input.id).unwrap() {
-                                Err(e) => Err(e.clone()),
-                                Ok(vi_list) => {
-                                    if let Some(&value_info) = vi_list.get(in_idx) {
-                                        Ok(OpInput::new(
-                                            storage.get(value_info),
-                                            Some(value_info.key),
-                                        ))
-                                    } else {
-                                        panic!("bad op impl: wrong number of output tensors")
-                                    }
-                                }
+                // Initialize `op_inputs`
+                for incoming in &target_node.incoming_nodes {
+                    let in_tensor = incoming.as_tensor(self);
+                    let in_ndarray = {
+                        if let Some(ph_name) = in_tensor.placeholder_name() {
+                            // use placeholder
+                            Ok(OpInput::new_non_variable(find_placeholder_value_by_key(feeds, &in_tensor, ph_name)))
+                        } else if let Some(vid) = incoming.get_variable_id(self) {
+                            // use variable
+                            if incoming.allow_mut {
+                                Ok(OpInput::new_rdwr_variable(env.as_view_mut(vid)))
+                            } else {
+                                Ok(OpInput::new_rdonly_variable(env.as_view(vid)))
                             }
+                        } else {
+                            storage.get(incoming.id, incoming.array_selector).and_then(|got| {
+                                Ok(OpInput::new_non_variable(unsafe { got.deref_into_view()}))
+                            })
                         }
                     };
-                    match x {
-                        Ok(x) => xs.push(x),
+                    match in_ndarray {
+                        Ok(x) => op_inputs.push(x),
                         Err(e) => {
-                            input_status = Err(e);
+                            incoming_nodes_status = Err(e);
                             break;
                         }
                     }
                 }
 
-                // ====================================================
-                // Run Op::compute() if `node`'s inputs were not failed
-                // ====================================================
-
-                let installed_node_info = input_status.and_then(|()| {
-                    let mut ctx = ComputeContext::new(xs);
-                    let status = node.get_op().compute(&mut ctx);
-                    let ret = status.map(|()| ctx.ys);
-                    // register compute result
-                    install_compute_results(ret, &storage)
+                // =================
+                // Run Op::compute()
+                // =================
+                let compute_result = incoming_nodes_status.and_then(|()| {
+                    let mut op_ctx = op::ComputeContext::new(op_inputs);
+                    let compute_status = target_node.get_op().compute(&mut op_ctx);
+                    debug_assert!(!op_ctx.ys.is_empty(), "Bad op implementation: empty return value");
+                    let output = compute_status.map(|()| op_ctx.ys);
+                    output
                 });
-
-                // Release var guards
-                for (in_node, _) in node.in_nodes.iter().zip(&node.input_indices) {
-                    if let Some(vid) = in_node.variable_id(self) {
-                        // is variable array
-                        variable_guard_register.unset(vid, in_node.mut_usage);
-                    }
-                }
-
-                // Cache the result
-                node_info_map.insert(node_id, installed_node_info);
+                storage.insert(node_id, compute_result);
             } else {
                 // Update dfs stack
                 dfs_stack.push((node_id, true));
                 // Push children if needed
-                for child in &node.in_nodes {
+                for child in &target_node.incoming_nodes {
                     let child = self.access_inner(child.id);
-                    if !would_not_visit(&child, &node_info_map) {
+                    if !would_not_visit(&child, &storage) {
                         dfs_stack.push((child.id, false));
                     }
                 }
@@ -505,28 +327,15 @@ impl<F: Float> Graph<F> {
             let t = t.as_ref();
             let arr = if let Some(vid) = t.get_variable_id() {
                 // case 1: variable tensor
-                Ok(ctx.array_list[vid.0].clone().into_inner())
+                Ok(env.array_list[vid.0].clone().into_inner())
             } else if let Some(name) = t.placeholder_name() {
                 // case 2: placeholder tensor
-                Ok(retrieve_feed(feeds, t, name).to_owned())
+                Ok(find_placeholder_value_by_key(feeds, t, name).to_owned())
             } else {
                 // case 3: normal tensor
-                match &node_info_map.get(&t.id()).unwrap() {
-                    Ok(value_info_list) => match value_info_list[0] {
-                        ValueInfo {
-                            ty: ValueType::Owned,
-                            key,
-                        } => Ok(storage.take_from_owned(key)),
-                        ValueInfo {
-                            ty: ValueType::View,
-                            key,
-                        } => Ok(storage.get_from_view(key).to_owned()),
-                    },
-                    Err(e) => {
-                        // convert to EvalError
-                        Err(crate::EvalError::OpError(e.clone()))
-                    }
-                }
+                storage.take(t.id, 0).map_err(|e| {
+                    crate::EvalError::OpError(e)
+                })
             };
             ret.push(arr);
         }
@@ -537,16 +346,16 @@ impl<F: Float> Graph<F> {
 #[inline]
 fn would_not_visit<F: Float>(
     node: &Ref<TensorInternal<F>>,
-    info_map: &FxHashMap<usize, Result<op::OutputArray<ValueInfo>, op::OpError>>,
+    storage: &OpOutputStorage<F>,
 ) -> bool {
-    node.placeholder_name.is_some() || node.is_variable() || info_map.contains_key(&node.id())
+    node.placeholder_name.is_some() || node.is_variable() || storage.inner.contains_key(&node.id())
 }
 
 #[test]
 fn test_eval2() {
     use crate::tensor_ops as T;
 
-    let ctx = crate::VariableEnvironment::new();
+    let ctx = VariableEnvironment::new();
     ctx.run(|g: &mut Context<f32>| {
         let a = T::ones(&[1, 1], g);
         let b = T::sigmoid(a);

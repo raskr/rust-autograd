@@ -4,7 +4,7 @@ use crate::{op, Context};
 use crate::{NdArray, NdArrayView};
 
 use crate::graph::{AsGraph, Graph, TensorID};
-use crate::op::{GradientContext, InputArray, OpError};
+use crate::op::{GradientContext, SmallVec, OpError};
 use crate::variable::VariableID;
 use std::cell::Ref;
 use std::fmt;
@@ -29,7 +29,7 @@ use std::ops::{Add, Div, Mul, Sub};
 /// let v = env.slot().set(ag::ndarray_ext::ones(&[2, 3])); // variable array id
 ///
 /// env.run(|ctx| {  // `Context` is necessary to create tensors.
-///     // `random` is just a symbolic object in this context
+///     // Create a tensor in this ctx
 ///     let random: ag::Tensor<f64> = T::standard_normal(&[2, 3], ctx);
 ///
 ///     // Getting the tensor associated with a pre-registered variable array.
@@ -38,7 +38,7 @@ use std::ops::{Add, Div, Mul, Sub};
 ///     // This is ok since tensor's binary operators are overloaded!
 ///     let mul = random * 3. + var;
 ///
-///     // Evaluates the symbolic tensor as an ndarray::Array<T, IxDyn>.
+///     // Evaluates the tensor as an ndarray::Array<T, IxDyn>.
 ///     type NdArray = ag::NdArray<f64>;
 ///     let mul_val: Result<NdArray, ag::EvalError> = mul.eval(ctx);
 ///
@@ -57,18 +57,19 @@ pub struct Tensor<'graph, F: Float> {
     pub(crate) graph: &'graph Graph<F>,
 }
 
-impl<'graph, F: Float> Tensor<'graph, F> {
-    pub(crate) fn input_tensors(&self) -> Ref<InputArray<Input>> {
-        Ref::map(self.inner(), |x| &x.in_nodes)
+impl<'t, 'graph: 't, F: Float> Tensor<'graph, F> {
+    #[inline]
+    pub(crate) fn get_incoming_tensors(&self) -> Ref<SmallVec<IncomingTensor>> {
+        Ref::map(self.inner(), |x| &x.incoming_nodes)
     }
 
     // Returns the i-th input node of this tensor
-    pub(crate) fn input_tensor(&self, i: usize, g: &'graph Graph<F>) -> Option<Tensor<'graph, F>> {
-        self.inner().in_nodes.get(i).map(|x| x.as_tensor(g))
+    pub(crate) fn get_incoming_tensor(&self, i: usize, g: &'graph Graph<F>) -> Option<Tensor<'graph, F>> {
+        self.inner().incoming_nodes.get(i).map(|x| x.as_tensor(g))
     }
 
     #[inline]
-    pub(crate) fn inner<'t>(&self) -> Ref<TensorInternal<F>> {
+    pub(crate) fn inner(&self) -> Ref<TensorInternal<F>> {
         self.graph.access_inner(self.id)
     }
 
@@ -92,7 +93,7 @@ impl<'graph, F: Float> Tensor<'graph, F> {
     /// ```
     ///
     /// See also [Evaluator](../evaluation/struct.Evaluator.html).
-    pub fn eval<'v>(&self, ctx: &Context<F>) -> Result<NdArray<F>, crate::EvalError> {
+    pub fn eval(&self, ctx: &Context<F>) -> Result<NdArray<F>, crate::EvalError> {
         crate::graph::assert_same_graph(ctx, self.graph);
         let mut ret = ctx.eval(&[self], &[], ctx.env_handle);
         debug_assert_eq!(ret.len(), 1);
@@ -145,10 +146,9 @@ impl<'graph, F: Float> Tensor<'graph, F> {
         TensorBuilder {
             graph: graph.as_graph(),
             shape: None,
-            in_nodes: op::InputArray::new(),
-            can_have_gradient: true,
+            in_nodes: op::SmallVec::new(),
+            differentiable: true,
             placeholder_name: None,
-            input_indices: None,
             backprop_inputs: None,
             known_shape: None,
             variable_id: None,
@@ -340,7 +340,7 @@ impl<'graph, F: Float> Tensor<'graph, F> {
         inner
             .backprop_inputs
             .as_ref()
-            .unwrap_or(&inner.in_nodes)
+            .unwrap_or(&inner.incoming_nodes)
             .len()
     }
 
@@ -415,13 +415,13 @@ pub(crate) struct TensorInternal<F: Float> {
     pub(crate) op: Option<Box<dyn op::Op<F>>>,
 
     /// References to immediate predecessors.
-    pub(crate) in_nodes: op::InputArray<Input>,
+    pub(crate) incoming_nodes: op::SmallVec<IncomingTensor>,
 
     /// The rank number for topological ordering in a graph.
     pub(crate) topo_rank: usize,
 
-    /// *Symbolic* shape of this tensor.
-    pub(crate) shape: Option<usize>,
+    /// The shape of this tensor
+    pub(crate) shape: Option<usize>, // usize is tensor id
 
     /// placeholder name
     pub(crate) placeholder_name: Option<&'static str>,
@@ -429,13 +429,10 @@ pub(crate) struct TensorInternal<F: Float> {
     /// This is true if this tensor can have gradient for any objectives.
     pub(crate) is_differentiable: bool,
 
-    /// Input indices of arrays used in `compute`
-    pub(crate) input_indices: op::InputArray<usize>,
-
     /// Input nodes used when backprop.
     ///
     /// This is same as `inputs` in most cases.
-    pub(crate) backprop_inputs: Option<op::InputArray<Input>>,
+    pub(crate) backprop_inputs: Option<op::SmallVec<IncomingTensor>>,
 
     /// Static shape of this tensor.
     /// Each dim size is *signed* for placeholders.
@@ -461,7 +458,7 @@ impl<F: Float> TensorInternal<F> {
     #[inline]
     /// Returns true if this node has no incoming nodes.
     pub(crate) fn is_source(&self) -> bool {
-        self.in_nodes.is_empty()
+        self.incoming_nodes.is_empty()
     }
 
     #[inline]
@@ -473,7 +470,7 @@ impl<F: Float> TensorInternal<F> {
     /// Returns the number of inputs of this tensor.
     #[inline]
     pub(crate) fn num_inputs(&self) -> usize {
-        self.in_nodes.len()
+        self.incoming_nodes.len()
     }
 
     /// True if the op of this tensor is differentiable
@@ -487,10 +484,10 @@ impl<F: Float> TensorInternal<F> {
     /// Input nodes used when backprop.
     ///
     /// This is same as `inputs` in most cases.
-    pub(crate) fn get_backprop_inputs(&self) -> &[Input] {
+    pub(crate) fn get_backprop_inputs(&self) -> &[IncomingTensor] {
         self.backprop_inputs
             .as_ref()
-            .unwrap_or(&self.in_nodes)
+            .unwrap_or(&self.incoming_nodes)
             .as_slice()
     }
 }
@@ -502,8 +499,8 @@ impl<T: Float> fmt::Debug for TensorInternal<T> {
             "Node name: {}, id: {}, num of inputs: {}, in-edges: {:?}",
             self.get_op().name(),
             self.id(),
-            self.in_nodes.len(),
-            self.in_nodes
+            self.incoming_nodes.len(),
+            self.incoming_nodes
         )
     }
 }
@@ -540,26 +537,38 @@ impl<T: Float> fmt::Display for TensorInternal<T> {
     }
 }
 
-/// A decorated `Tensor` passed to `TensorBuilder::set_inputs`.
+/// Denotes a tensor that enters a certain tensor in a computation graph
 ///
-/// Use `new` to create an immutable input, or `new_mut` to create a modifiable one.
 /// See also [TensorBuilder](struct.TensorBuilder.html).
-#[derive(Clone, Debug)]
-pub(crate) struct Input {
+#[derive(Debug)]
+pub(crate) struct IncomingTensor {
+    // Tensor id
     pub(crate) id: usize,
-    pub(crate) mut_usage: bool,
+    // true if this was created by `new_mut()`. allows to mutate this tensor
+    pub(crate) allow_mut: bool,
+    // If the tensor has multiple output arrays, i.e., multi-output op,
+    // we have to select which one to use with this selector.
+    pub(crate) array_selector: usize,
 }
 
-impl<'graph> Input {
-    /// Instantiates a new immutable `Input` object.
-    ///
-    /// Run-time value of `val` is passed as an `ndarray::ArrayView` or `ndarray::ArrayViewMut`
-    /// in `Op::compute` depending on `mut_usage`.
+impl<'graph> IncomingTensor {
+    /// Instantiates a new immutable `IncomingTensor`.
     #[inline]
-    pub(crate) fn new<F: Float>(val: &Tensor<'graph, F>, mut_usage: bool) -> Input {
-        Input {
+    pub(crate) fn new<F: Float>(val: &Tensor<'graph, F>, array_selector: usize) -> IncomingTensor {
+        IncomingTensor {
             id: val.id(),
-            mut_usage,
+            allow_mut: false,
+            array_selector
+        }
+    }
+
+    /// Instantiates a new `IncomingTensor` that references a variable tensor.
+    #[inline]
+    pub(crate) fn new_mut<F: Float>(val: &Tensor<'graph, F>, array_selector: usize) -> IncomingTensor {
+        IncomingTensor {
+            id: val.id(),
+            allow_mut: true,
+            array_selector
         }
     }
 
@@ -569,7 +578,7 @@ impl<'graph> Input {
     }
 
     #[inline]
-    pub(crate) fn variable_id<F: Float>(&self, graph: &Graph<F>) -> Option<VariableID> {
+    pub(crate) fn get_variable_id<F: Float>(&self, graph: &Graph<F>) -> Option<VariableID> {
         graph.access_inner(self.id).variable_id
     }
 }
@@ -601,20 +610,20 @@ impl<'graph> Input {
 /// ```
 pub struct TensorBuilder<'g, F: Float> {
     graph: &'g Graph<F>,
-    shape: Option<usize>,
-    in_nodes: op::InputArray<Input>,
-    can_have_gradient: bool,
-    input_indices: Option<op::InputArray<usize>>,
-    backprop_inputs: Option<op::InputArray<Input>>,
+    shape: Option<usize>, // usize is tensor id
+    in_nodes: op::SmallVec<IncomingTensor>,
+    differentiable: bool,
+    backprop_inputs: Option<op::SmallVec<IncomingTensor>>,
     known_shape: Option<KnownShape>,
     variable_id: Option<VariableID>,
     placeholder_name: Option<&'static str>,
 }
 
 const NUM_MAX_KNOWN_SHAPE_SIZE: usize = 4;
+type ShapeVec = crate::smallvec::SmallVec<[isize; NUM_MAX_KNOWN_SHAPE_SIZE]>;
 
 pub(crate) struct KnownShape {
-    shape: SmallVec<[isize; NUM_MAX_KNOWN_SHAPE_SIZE]>,
+    shape: ShapeVec,
     #[allow(dead_code)]
     is_fully_defined: bool,
 }
@@ -631,7 +640,7 @@ impl KnownShape {
         }
 
         Self {
-            shape: SmallVec::from(shape),
+            shape: ShapeVec::from(shape),
             is_fully_defined,
         }
     }
@@ -699,34 +708,43 @@ impl<'graph, F: Float> TensorBuilder<'graph, F> {
 
     #[inline]
     pub fn set_differentiable(mut self, differentiable: bool) -> TensorBuilder<'graph, F> {
-        self.can_have_gradient = differentiable;
+        self.differentiable = differentiable;
         self
     }
 
     #[inline]
     /// Appends input tensor.
     ///
-    /// `bool` indicates whether this tensor should be treated as mutable input or not.
+    /// `allow_mut` indicates whether this tensor should be treated as mutable input or not.
     pub fn append_input<T: AsRef<Tensor<'graph, F>>>(
+        self,
+        tensor: T,
+        allow_mut: bool,
+    ) -> TensorBuilder<'graph, F> {
+        self.append_input_with_selector(tensor, allow_mut, 0)
+    }
+
+    // only use by nth_tensor()
+    #[inline]
+    pub(crate) fn append_input_with_selector<T: AsRef<Tensor<'graph, F>>>(
         mut self,
         tensor: T,
-        mut_usage: bool,
+        allow_mut: bool,
+        array_selector: usize
     ) -> TensorBuilder<'graph, F> {
         let t = tensor.as_ref();
         crate::graph::assert_same_graph(t.graph, self.graph);
-        self.in_nodes.push(Input::new(t, mut_usage));
+        if allow_mut {
+            self.in_nodes.push(IncomingTensor::new_mut(t, array_selector));
+        } else {
+            self.in_nodes.push(IncomingTensor::new(t, array_selector));
+        }
         self
     }
 
     #[inline]
     pub(crate) fn set_placeholder_name(mut self, a: &'static str) -> TensorBuilder<'graph, F> {
         self.placeholder_name = Some(a);
-        self
-    }
-
-    #[inline]
-    pub(crate) fn set_input_indices(mut self, a: &[usize]) -> TensorBuilder<'graph, F> {
-        self.input_indices = Some(op::InputArray::from_slice(a));
         self
     }
 
@@ -740,10 +758,10 @@ impl<'graph, F: Float> TensorBuilder<'graph, F> {
     ) -> TensorBuilder<'graph, F> {
         crate::graph::assert_same_graph(a.as_ref().graph, self.graph);
         if let Some(ref mut inputs) = self.backprop_inputs {
-            inputs.push(Input::new(a.as_ref(), false));
+            inputs.push(IncomingTensor::new(a.as_ref(), 0));
         } else {
-            let mut inputs = InputArray::new();
-            inputs.push(Input::new(a.as_ref(), false));
+            let mut inputs = SmallVec::new();
+            inputs.push(IncomingTensor::new(a.as_ref(), 0));
             self.backprop_inputs = Some(inputs);
         }
         self
@@ -766,26 +784,14 @@ impl<'graph, F: Float> TensorBuilder<'graph, F> {
                 .unwrap_or(0)
         };
 
-        let input_indices = if let Some(a) = self.input_indices {
-            assert_eq!(
-                a.len(),
-                self.in_nodes.len(),
-                "input_indices.len() must match inputs length"
-            );
-            a
-        } else {
-            smallvec::smallvec!(0; self.in_nodes.len())
-        };
-
         let new = TensorInternal {
             // `id` is set in `Graph::install`
             id: usize::default(),
             op: Some(Box::new(op)),
-            in_nodes: self.in_nodes,
+            incoming_nodes: self.in_nodes,
             topo_rank: rank,
             shape: self.shape,
-            is_differentiable: self.can_have_gradient,
-            input_indices,
+            is_differentiable: self.differentiable,
             backprop_inputs: self.backprop_inputs,
             known_shape: self.known_shape,
             variable_id: self.variable_id,
@@ -808,7 +814,6 @@ impl<T: Float> crate::op::Op<T> for Dummy {
 }
 
 use crate::tensor_ops as T;
-use smallvec::SmallVec;
 
 // -- std::tensor_ops::{Add, Sub, Mul, Div} implementations --
 macro_rules! impl_bin_op_between_tensor_and_float_trait {

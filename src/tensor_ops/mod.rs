@@ -52,7 +52,7 @@ impl<'graph, F: Float> Tensor<'graph, F> {
     }
 }
 
-/// Symbolic gradient tensors of `xs` in the same order as `xs`'s
+/// Get gradient tensors of `xs` in the same order as `xs`'s
 ///
 /// * `ys` - Targets of differentiation that are arbitrary shapes.
 /// * `xs` - Tensors with which differentiate `ys`.
@@ -78,7 +78,7 @@ impl<'graph, F: Float> Tensor<'graph, F> {
 ///     // ddz/dx (differentiates `z` again)
 ///     let ggx = T::grad(&[gx], &[x])[0];
 ///
-///     // evaluation of symbolic gradients
+///     // evaluation of gradients
 ///     assert_eq!(3., gy.eval(g).unwrap()[ndarray::IxDyn(&[])]);
 ///     assert_eq!(4., ggx.eval(g).unwrap()[ndarray::IxDyn(&[])]);
 ///
@@ -274,7 +274,7 @@ where
         .build(array_ops::Shape)
 }
 
-/// Returns the (symbolic) size of the input tensor
+/// Returns the size of the input tensor
 ///
 /// ```
 /// use ndarray;
@@ -300,7 +300,7 @@ where
         .build(array_ops::Size)
 }
 
-/// Returns the (symbolic) rank of the input tensor
+/// Returns the rank of the input tensor
 ///
 /// ```
 /// use ndarray;
@@ -545,8 +545,7 @@ where
     let x = x.as_ref();
     let g = x.graph();
     Tensor::builder(g)
-        .append_input(x, false)
-        .set_input_indices(&[n])
+        .append_input_with_selector(x, false, n)
         .build(activation_ops::Identity)
 }
 
@@ -2367,7 +2366,6 @@ where
 
 use crate::graph::AsGraph;
 use std::marker::PhantomData;
-use num_traits::zero;
 
 /// Converts an `ndarray::Array` to a `ag::Tensor`.
 ///
@@ -2954,14 +2952,14 @@ where
     A: AsRef<Tensor<'graph, F>> + Copy,
 {
     let g = x.graph();
-    if let Some(x_input) = x.input_tensor(0, g) {
+    if let Some(x_input) = x.get_incoming_tensor(0, g) {
         let mut ctrl_deps = Tensor::builder(g).append_input(x_input, false);
         // requiring all deps
         for dep in deps {
             ctrl_deps = ctrl_deps.append_input(dep.as_ref(), false);
         }
         let new_x_input = ctrl_deps.build(graph_ops::ControlDependency);
-        g.access_inner_mut(x.id).in_nodes[0].id = new_x_input.id;
+        g.access_inner_mut(x.id).incoming_nodes[0].id = new_x_input.id;
         x
     } else {
         panic!("Source tensor cannot depend on any other tensors.");

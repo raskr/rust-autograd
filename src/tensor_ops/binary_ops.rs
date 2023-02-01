@@ -37,7 +37,7 @@ macro_rules! bin_op_same_shape {
 }
 
 impl<T: Float> op::Op<T> for MaybeReduceSum {
-    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) -> Result<(), crate::op::OpError> {
+    fn compute(&self, ctx: &mut op::ComputeContext<T>) -> Result<(), op::OpError> {
         let gy = ctx.input(0);
         let orig_shape__ = crate::ndarray_ext::as_shape(&ctx.input(1));
         let orig_shape_ = orig_shape__.as_slice(); // x shape: []
@@ -93,7 +93,7 @@ impl<T: Float> op::Op<T> for MaybeReduceSum {
         Ok(())
     }
 
-    fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
+    fn grad(&self, ctx: &mut op::GradientContext<T>) {
         let g = ctx.graph();
         let gx = Tensor::builder(g)
             .append_input(&ctx.output_grad(), false)
@@ -106,7 +106,7 @@ impl<T: Float> op::Op<T> for MaybeReduceSum {
 
 // Do broadcast if necessary.
 impl<T: Float> op::Op<T> for MaybeBroadcast {
-    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) -> Result<(), crate::op::OpError> {
+    fn compute(&self, ctx: &mut op::ComputeContext<T>) -> Result<(), op::OpError> {
         let target_shape_ = ctx.input(1);
         let target_shape_ = crate::ndarray_ext::as_shape(&target_shape_);
         let target_shape = target_shape_.as_slice();
@@ -136,7 +136,7 @@ impl<T: Float> op::Op<T> for MaybeBroadcast {
         }
     }
 
-    fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
+    fn grad(&self, ctx: &mut op::GradientContext<T>) {
         let g = ctx.graph();
         let gx = maybe_reduce(&shape(ctx.input(0)), &ctx.output_grad(), g);
         ctx.append_input_grad(Some(gx));
@@ -145,13 +145,13 @@ impl<T: Float> op::Op<T> for MaybeBroadcast {
 }
 
 impl<T: Float> op::Op<T> for AddOp {
-    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) -> Result<(), crate::op::OpError> {
+    fn compute(&self, ctx: &mut op::ComputeContext<T>) -> Result<(), op::OpError> {
         let ret = add_forward(&ctx.input(0), &ctx.input(1));
         ctx.append_output(ret);
         Ok(())
     }
 
-    fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
+    fn grad(&self, ctx: &mut op::GradientContext<T>) {
         let g = ctx.graph();
         let x0 = ctx.input(0);
         let x1 = ctx.input(1);
@@ -166,7 +166,7 @@ impl<T: Float> op::Op<T> for AddOp {
 }
 
 impl<T: Float> op::Op<T> for SubOp {
-    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) -> Result<(), crate::op::OpError> {
+    fn compute(&self, ctx: &mut op::ComputeContext<T>) -> Result<(), op::OpError> {
         let x0 = &ctx.input(0);
         let x1 = &ctx.input(1);
         let shape0: &[usize] = x0.shape();
@@ -192,7 +192,7 @@ impl<T: Float> op::Op<T> for SubOp {
         Ok(())
     }
 
-    fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
+    fn grad(&self, ctx: &mut op::GradientContext<T>) {
         let g = ctx.graph();
         let x0 = ctx.input(0);
         let x1 = ctx.input(1);
@@ -207,7 +207,7 @@ impl<T: Float> op::Op<T> for SubOp {
 }
 
 impl<T: Float> op::Op<T> for MulOp {
-    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) -> Result<(), crate::op::OpError> {
+    fn compute(&self, ctx: &mut op::ComputeContext<T>) -> Result<(), op::OpError> {
         let a = ctx.input(0);
         let b = ctx.input(1);
         let ret = mul_forward(&a, &b);
@@ -215,7 +215,7 @@ impl<T: Float> op::Op<T> for MulOp {
         Ok(())
     }
 
-    fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
+    fn grad(&self, ctx: &mut op::GradientContext<T>) {
         let graph = ctx.graph();
         let x0 = ctx.input(0);
         let x1 = ctx.input(1);
@@ -237,7 +237,7 @@ impl<T: Float> op::Op<T> for MulOp {
 }
 
 impl<T: Float> op::Op<T> for DivOp {
-    fn compute(&self, ctx: &mut crate::op::ComputeContext<T>) -> Result<(), crate::op::OpError> {
+    fn compute(&self, ctx: &mut op::ComputeContext<T>) -> Result<(), op::OpError> {
         let x0 = &ctx.input(0);
         let x1 = &ctx.input(1);
         let shape0: &[usize] = x0.shape();
@@ -270,7 +270,7 @@ impl<T: Float> op::Op<T> for DivOp {
         Ok(())
     }
 
-    fn grad(&self, ctx: &mut crate::op::GradientContext<T>) {
+    fn grad(&self, ctx: &mut op::GradientContext<T>) {
         let g = ctx.graph();
         let x0 = ctx.input(0);
         let x1 = ctx.input(1);

@@ -13,6 +13,12 @@ pub type NdArray<T> = ndarray::Array<T, ndarray::IxDyn>;
 /// alias for `ndarray::ArrayView<T, IxDyn>`
 pub type NdArrayView<'a, T> = ndarray::ArrayView<'a, T, ndarray::IxDyn>;
 
+/// alias for `ndarray::RawArrayView<T, IxDyn>`
+pub type RawNdArrayView<T> = ndarray::RawArrayView<T, ndarray::IxDyn>;
+
+/// alias for `ndarray::RawArrayViewMut<T, IxDyn>`
+pub type RawNdArrayViewMut<T> = ndarray::RawArrayViewMut<T, ndarray::IxDyn>;
+
 /// alias for `ndarray::ArrayViewMut<T, IxDyn>`
 pub type NdArrayViewMut<'a, T> = ndarray::ArrayViewMut<'a, T, ndarray::IxDyn>;
 

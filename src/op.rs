@@ -31,16 +31,16 @@
 //!     }
 //!
 //!     fn grad(&self, ctx: &mut ag::op::GradientContext<T>) {
-//!         // Symbolic gradient of the output of Sigmoid
+//!         // gradient of the output of Sigmoid
 //!         let gy = ctx.output_grad();
 //!         let y = ctx.output();
-//!         // Symbolic gradient of the input of Sigmoid
+//!         // gradient of the input of Sigmoid
 //!         let gx = gy * (y - square(y));
 //!         ctx.append_input_grad(Some(gx));
 //!     }
 //! }
 //!
-//! // Symbolic `sigmoid` function for end-user.
+//! // `sigmoid` function for end-user.
 //! fn sigmoid<'graph, F: ag::Float>(x: &ag::Tensor<'graph, F>, g: &'graph ag::Context<F>)
 //! -> ag::Tensor<'graph, F> {
 //!     ag::Tensor::builder(g)
@@ -54,18 +54,15 @@ use std::fmt;
 use std::marker::PhantomData;
 use std::mem;
 
-use crate::ndarray_ext::{NdArrayView, NdArrayViewMut};
-use crate::smallvec::SmallVec;
+use crate::ndarray_ext::{NdArrayView, NdArrayViewMut, RawNdArrayView};
+use crate::smallvec::SmallVec as RawSmallVec;
 use crate::tensor::Tensor;
 use crate::{Float, NdArray};
+use crate::op::OpInput::NonVariable;
 
-// Properties for op's `compute` method.
-// Actual number of inout/output nodes are around 1~2 in most cases.
-pub(crate) const NUM_MAX_OUTPUT: usize = 2;
-pub(crate) const NUM_MAX_INPUT: usize = 2;
+pub(crate) const DEFAULT_NUM_EDGES: usize = 2;
 
-pub(crate) type InputArray<T> = SmallVec<[T; NUM_MAX_INPUT]>;
-pub(crate) type OutputArray<T> = SmallVec<[T; NUM_MAX_OUTPUT]>;
+pub(crate) type SmallVec<T> = RawSmallVec<[T; DEFAULT_NUM_EDGES]>;
 
 /// Error in `Op`'s computation.
 #[derive(Clone, Debug, PartialEq)]
@@ -101,7 +98,7 @@ pub trait Op<F: Float> {
     /// Runs this op with `ComputeContext`.
     fn compute(&self, ctx: &mut ComputeContext<F>) -> Result<(), OpError>;
 
-    /// Returns symbolic gradients for input nodes by use of output's gradients etc.
+    /// Returns gradients for input nodes by use of output's gradients etc.
     fn grad(&self, ctx: &mut GradientContext<F>);
 }
 
@@ -129,35 +126,35 @@ impl<F: Float> Op<F> for DummyOp<F> {
 ///
 /// Used in `Op::ComputeContext`.
 pub(crate) enum OpInput<'v, T: Float> {
-    // (Option<array>, value_key)
-    RdOnly(Option<NdArrayView<'v, T>>, Option<usize>),
-    RdWr(Option<NdArrayViewMut<'v, T>>, Option<usize>),
+    NonVariable(Option<NdArrayView<'v, T>>),
+    RdOnlyVariable(Option<NdArrayView<'v, T>>),
+    RdWrVariable(Option<NdArrayViewMut<'v, T>>),
 }
 
 /// `Op::compute`'s output
 #[derive(Clone)]
-pub(crate) enum OpOutput<'v, T: Float> {
-    /// Represents `ndarray::Array<T: Float, ndarray::IxDyn>`
+pub(crate) enum OpOutput<T: Float> {
     Owned(NdArray<T>),
-
-    /// Represents `ndarray::ArrayView<'a, T: Float, ndarray::IxDyn>`
-    View(NdArrayView<'v, T>),
-
-    /// key to lookup output array
-    Reuse(usize),
+    View(RawNdArrayView<T>),
 }
 
-impl<'v, T: Float> OpInput<'v, T> {
+impl<'view, T: Float> OpInput<'view, T> {
     #[inline]
     /// Make a read-only input array
-    pub fn new(x: NdArrayView<'v, T>, x_key: Option<usize>) -> Self {
-        OpInput::RdOnly(Some(x), x_key)
+    pub fn new_non_variable(x: NdArrayView<'view, T>) -> Self {
+        NonVariable(Some(x))
+    }
+
+    #[inline]
+    /// Make a read-only input array
+    pub fn new_rdonly_variable(x: NdArrayView<'view, T>) -> Self {
+        OpInput::RdOnlyVariable(Some(x))
     }
 
     #[inline]
     /// Make a read/write input array
-    pub fn new_mut(x: NdArrayViewMut<'v, T>, x_id: Option<usize>) -> Self {
-        OpInput::RdWr(Some(x), x_id)
+    pub fn new_rdwr_variable(x: NdArrayViewMut<'view, T>) -> Self {
+        OpInput::RdWrVariable(Some(x))
     }
 }
 
@@ -190,17 +187,17 @@ impl<'v, T: Float> OpInput<'v, T> {
 /// ```
 pub struct ComputeContext<'v, T: Float> {
     // Input arrays
-    xs: InputArray<OpInput<'v, T>>,
+    xs: SmallVec<OpInput<'v, T>>,
     // Output arrays
-    pub(crate) ys: OutputArray<OpOutput<'v, T>>,
+    pub(crate) ys: SmallVec<OpOutput<T>>,
 }
 
-impl<'g, 't, 'v, T: Float> ComputeContext<'v, T> {
+impl<'graph, 'view, T: Float> ComputeContext<'view, T> {
     #[inline]
-    pub(crate) fn new(xs: InputArray<OpInput<'v, T>>) -> Self {
+    pub(crate) fn new(xs: SmallVec<OpInput<'view, T>>) -> Self {
         ComputeContext {
             xs,
-            ys: OutputArray::new(),
+            ys: SmallVec::new(),
         }
     }
 
@@ -208,40 +205,31 @@ impl<'g, 't, 'v, T: Float> ComputeContext<'v, T> {
     ///
     /// Calling `input(i)` more than once causes panic.
     #[inline]
-    pub fn input(&mut self, i: usize) -> NdArrayView<'v, T> {
+    pub fn input(&mut self, i: usize) -> NdArrayView<'view, T> {
         let x = match self.xs.get_mut(i) {
             Some(x) => x,
             None => panic!("Bad op impl: input index out of range."),
         };
         match x {
-            OpInput::RdOnly(ref mut a, _) => match a.take() {
+            NonVariable(ref mut a) => match a.take() {
                 Some(ret) => ret,
                 None => panic!(
                     "Bad op impl: input({})/input_mut({}) cannot be called twice",
                     i, i
                 ),
             },
-            _ => {
+            OpInput::RdOnlyVariable(ref mut a) => match a.take() {
+                Some(ret) => ret,
+                None => panic!(
+                    "Bad op impl: input({})/input_mut({}) cannot be called twice",
+                    i, i
+                ),
+            },
+            OpInput::RdWrVariable(_) => {
                 panic!(
-                    "Bad op impl: cannot perform immutable borrowing for input({})",
+                    "Bad op impl: cannot perform mutable borrowing for input({}). Use input_mut() instead.",
                     i
                 );
-            }
-        }
-    }
-
-    /// Returns the tensor id of the i th input.
-    #[inline]
-    fn input_val_key(&self, i: usize) -> usize {
-        let x = match self.xs.get(i) {
-            Some(x) => x,
-            None => panic!("Bad op impl: input index out of range."),
-        };
-        match x {
-            OpInput::RdOnly(_, Some(key)) => *key,
-            OpInput::RdWr(_, Some(key)) => *key,
-            _ => {
-                panic!("Bad op impl");
             }
         }
     }
@@ -250,13 +238,13 @@ impl<'g, 't, 'v, T: Float> ComputeContext<'v, T> {
     ///
     /// Calling `input_mut(i)` more than once causes panic.
     #[inline]
-    pub fn input_mut(&mut self, i: usize) -> NdArrayViewMut<'v, T> {
+    pub fn input_mut(&mut self, i: usize) -> NdArrayViewMut<'view, T> {
         let x = match self.xs.get_mut(i) {
             Some(x) => x,
             None => panic!("Bad op impl: {}'s input doesn't exist.", i),
         };
         match x {
-            OpInput::RdWr(ref mut a, _) => match a.take() {
+            OpInput::RdWrVariable(ref mut a) => match a.take() {
                 Some(ret) => ret,
                 None => panic!(
                     "Bad op impl: input({})/input_mut({}) cannot be called twice",
@@ -276,21 +264,35 @@ impl<'g, 't, 'v, T: Float> ComputeContext<'v, T> {
     ///
     /// NOTE: Implementor of `Op::compute` must not forget to call `append_*` as many as the number of its output in `Op::compute`, otherwise panic occurs.
     #[inline]
-    pub fn append_output_view(&mut self, y: NdArrayView<'v, T>) {
-        self.ys.push(crate::OpOutput::View(y));
+    pub fn append_output_view(&mut self, y: NdArrayView<'view, T>) {
+        self.append_output_view_raw(y.raw_view());
+    }
+
+    /// Appends an `ndarray::ArrayView` to the back of the output list of the current op.
+    ///
+    /// NOTE: Implementor of `Op::compute` must not forget to call `append_*` as many as the number of its output in `Op::compute`, otherwise panic occurs.
+    #[inline]
+    pub(crate) fn append_output_view_raw(&mut self, y: RawNdArrayView<T>) {
+        let mut contains_variable_input= false;
+        for x in &self.xs {
+            match x {
+                NonVariable(_) => {},
+                _ => contains_variable_input = true
+            }
+        }
+        if contains_variable_input {
+            // copy it beforehand to avoid use-after-free
+            self.ys.push(OpOutput::Owned(unsafe { y.deref_into_view().to_owned() }));
+        } else {
+            self.ys.push(OpOutput::View(y));
+        }
     }
 
     #[inline]
     pub fn append_empty_output(&mut self) {
-        self.ys.push(crate::OpOutput::Owned(NdArray::zeros(
+        self.ys.push(OpOutput::Owned(NdArray::zeros(
             crate::ndarray::IxDyn(&[]),
         )));
-    }
-
-    #[inline]
-    pub fn append_input_reuse(&mut self, input_idx: usize) {
-        self.ys
-            .push(crate::OpOutput::Reuse(self.input_val_key(input_idx)));
     }
 
     /// Appends an ndarray to the back of the output list of the current op.
@@ -298,7 +300,7 @@ impl<'g, 't, 'v, T: Float> ComputeContext<'v, T> {
     /// NOTE: Implementor of `Op::compute` must not forget to call `append_*` as many as the number of its output in `Op::compute`, otherwise panic occurs.
     #[inline]
     pub fn append_output(&mut self, y: NdArray<T>) {
-        self.ys.push(crate::OpOutput::Owned(y));
+        self.ys.push(OpOutput::Owned(y));
     }
 
     /// Returns a number of input arrays.
@@ -328,9 +330,9 @@ impl<'g, 't, 'v, T: Float> ComputeContext<'v, T> {
 ///     }
 ///
 ///     fn grad(&self, ctx: &mut ag::op::GradientContext<F>) {
-///         // Symbolic gradient of the input of Sigmoid
+///         // gradient of the input of Sigmoid
 ///         let gy = ctx.output_grad();
-///         // Symbolic output tensor
+///         // output tensor
 ///         let y = ctx.output();
 ///         // `Tensor` computations
 ///         let gx = gy * (y - T::square(y));
@@ -339,30 +341,30 @@ impl<'g, 't, 'v, T: Float> ComputeContext<'v, T> {
 ///     }
 /// }
 /// ```
-pub struct GradientContext<'g, T: Float> {
-    gy: Tensor<'g, T>,
-    y: Tensor<'g, T>,
-    graph: &'g crate::graph::Graph<T>,
-    gxs: InputArray<Option<Tensor<'g, T>>>,
+pub struct GradientContext<'graph, T: Float> {
+    gy: Tensor<'graph, T>,
+    y: Tensor<'graph, T>,
+    graph: &'graph crate::graph::Graph<T>,
+    gxs: SmallVec<Option<Tensor<'graph, T>>>,
 }
 
-impl<'g, T: Float> GradientContext<'g, T> {
+impl<'graph, T: Float> GradientContext<'graph, T> {
     #[inline]
     pub(crate) fn new(
-        gy: Tensor<'g, T>,
-        y: Tensor<'g, T>,
-        graph: &'g crate::graph::Graph<T>,
+        gy: Tensor<'graph, T>,
+        y: Tensor<'graph, T>,
+        graph: &'graph crate::graph::Graph<T>,
     ) -> Self {
         GradientContext {
             gy,
             y,
             graph,
-            gxs: InputArray::new(),
+            gxs: SmallVec::new(),
         }
     }
 
     // Call Op::grad and return `gxs`
-    pub(crate) fn get_input_grads(mut self) -> InputArray<Option<Tensor<'g, T>>> {
+    pub(crate) fn compute_input_grads(mut self) -> SmallVec<Option<Tensor<'graph, T>>> {
         let id = self.y.id;
         // steal op
         let stolen = self.graph().access_inner_mut(id).op.take().unwrap();
@@ -379,46 +381,46 @@ impl<'g, T: Float> GradientContext<'g, T> {
         self.gxs
     }
 
-    /// Returns the symbolic gradient of the op's output.
+    /// Returns the gradient of the op's output.
     #[inline]
-    pub fn output_grad(&self) -> Tensor<'g, T> {
+    pub fn output_grad(&self) -> Tensor<'graph, T> {
         self.gy
     }
 
-    /// Grabs the symbolic output of the op.
+    /// Grabs the output of the op.
     #[inline]
-    pub fn output(&self) -> Tensor<'g, T> {
+    pub fn output(&self) -> Tensor<'graph, T> {
         self.y
     }
 
     /// Returns input tensors.
     #[inline]
-    pub fn inputs(&self) -> InputArray<Tensor<'g, T>> {
-        let mut ret = InputArray::new();
-        for input in self.y.input_tensors().iter() {
+    pub fn inputs(&self) -> SmallVec<Tensor<'graph, T>> {
+        let mut ret = SmallVec::new();
+        for input in self.y.get_incoming_tensors().iter() {
             ret.push(self.graph.tensor(input.id));
         }
         ret
     }
 
-    /// Grabs the `i` th symbolic input.
+    /// Grabs the `i` th input tensor.
     #[inline]
-    pub fn input(&self, i: usize) -> Tensor<'g, T> {
+    pub fn input(&self, i: usize) -> Tensor<'graph, T> {
         return self
             .y
-            .input_tensor(i, self.graph)
+            .get_incoming_tensor(i, self.graph)
             .expect("bad Op::grad impl");
     }
 
     /// Returns the number of inputs.
     #[inline]
     pub fn num_inputs(&self) -> usize {
-        self.y.inner().in_nodes.len()
+        self.y.inner().incoming_nodes.len()
     }
 
     /// Returns a graph object that is usable for tensor computations in the context.
     #[inline]
-    pub fn graph(&self) -> &'g crate::graph::Graph<T> {
+    pub fn graph(&self) -> &'graph crate::graph::Graph<T> {
         self.graph
     }
 
@@ -428,7 +430,7 @@ impl<'g, T: Float> GradientContext<'g, T> {
     /// `None` argument indicates that the `Op`'s input doesn't have gradient.
     /// Note that `Op::grad` must call this function as many as `num_inputs()`.
     #[inline]
-    pub fn append_input_grad(&mut self, gx: Option<Tensor<'g, T>>) {
+    pub fn append_input_grad(&mut self, gx: Option<Tensor<'graph, T>>) {
         self.gxs.push(gx);
     }
 }

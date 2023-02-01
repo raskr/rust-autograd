@@ -70,17 +70,19 @@
 //! // new_env.run(...
 //! ```
 use crate::graph::Context;
-use crate::{uuid::Uuid, Float, FxHashMap, Graph, NdArray, Tensor};
+use crate::{uuid::Uuid, Float, FxHashMap, Graph, NdArray, Tensor, ndarray_ext, NdArrayViewMut, NdArrayView};
 use serde::Deserialize;
 use serde_json;
 use smallvec::alloc::fmt::Formatter;
 use std::borrow::Cow;
-use std::cell::RefCell;
+use std::cell::{RefCell, UnsafeCell, Ref, RefMut};
 
 use std::error::Error;
 use std::fs::File;
 use std::ops::Deref;
 use std::path::Path;
+use crate::ndarray_ext::RawNdArrayView;
+use crate::op::OpInput;
 
 #[derive(Copy, Clone, Hash, PartialEq, Eq, Debug, Serialize, Deserialize)]
 /// Variable array's ID that is unique in a `VariableEnvironment`.
@@ -109,6 +111,7 @@ impl std::fmt::Display for VariableID {
 const DEFAULT_NAMESPACE_ID: &'static str = "";
 
 pub(crate) type Variable<F> = RefCell<NdArray<F>>;
+pub(crate) type UnsafeVariable<F> = UnsafeCell<NdArray<F>>;
 
 /// Get or create a variable tensor.
 pub trait GetVariableTensor<'g, F: Float, Arg> {
@@ -120,17 +123,17 @@ impl<'g, 'e: 'name + 'g, 'name, F: Float> GetVariableTensor<'g, F, &'static str>
 {
     /// Get or create a variable tensor by name in the default namespace.
     fn variable(&'g self, name: &'name str) -> Tensor<'g, F> {
-        self.inner
+        self.graph
             .variable_by_name(name, &self.env_handle.default_namespace())
     }
 }
 
-impl<'g, 'e: 'name + 'g, 'name, F: Float> GetVariableTensor<'g, F, crate::variable::VariableID>
+impl<'g, 'e: 'name + 'g, 'name, F: Float> GetVariableTensor<'g, F, VariableID>
     for Context<'e, 'name, F>
 {
     /// Get or create a variable tensor by [`VariableID`]
-    fn variable(&'g self, id: crate::variable::VariableID) -> Tensor<'g, F> {
-        self.inner.variable_by_id(id)
+    fn variable(&'g self, id: VariableID) -> Tensor<'g, F> {
+        self.graph.variable_by_id(id)
     }
 }
 
@@ -139,7 +142,7 @@ impl<'g, 'e: 'name + 'g, 'name, F: Float> GetVariableTensor<'g, F, (&'static str
 {
     /// Get or create a variable tensor by VariableID
     fn variable(&'g self, id: (&'static str, &'static str)) -> Tensor<'g, F> {
-        self.inner
+        self.graph
             .variable_by_name(id.1, &self.env_handle.namespace(id.0))
     }
 }
@@ -419,8 +422,8 @@ impl<'ns, 'env, 'name, F: Float> VariableNamespaceMut<'env, 'name, F> {
 #[test]
 fn test_env_iter() {
     let mut env = VariableEnvironment::<f32>::new();
-    let v1 = env.slot().set(crate::ndarray_ext::zeros(&[3, 2]));
-    let v2 = env.slot().set(crate::ndarray_ext::zeros(&[2, 3]));
+    let v1 = env.slot().set(ndarray_ext::zeros(&[3, 2]));
+    let v2 = env.slot().set(ndarray_ext::zeros(&[2, 3]));
     for (i, (vid, arr)) in env.iter().enumerate() {
         if i == 0 {
             assert_eq!(vid, v1);
@@ -438,10 +441,10 @@ fn test_namespace_iter() {
     let mut env = VariableEnvironment::<f32>::new();
     env.slot()
         .name("v1")
-        .set(crate::ndarray_ext::zeros(&[3, 2]));
+        .set(ndarray_ext::zeros(&[3, 2]));
     env.slot()
         .name("v2")
-        .set(crate::ndarray_ext::zeros(&[2, 3]));
+        .set(ndarray_ext::zeros(&[2, 3]));
 
     for (i, (name, arr)) in env.default_namespace().iter().enumerate() {
         if i == 0 {
@@ -537,7 +540,7 @@ impl<'env, 'name, F: Float> VariableEnvironment<'name, F> {
         }
     }
 
-    /// Returns an iterator of variable arrays and their ids in this env.
+    /// Returns an iterator of the variable arrays and their ids in this env.
     #[allow(unused)]
     pub fn iter(&'env self) -> impl Iterator<Item = (VariableID, &RefCell<NdArray<F>>)> {
         self.array_list
@@ -621,7 +624,7 @@ impl<'env, 'name, F: Float> VariableEnvironment<'name, F> {
     /// Get or create a namespace with specified id.
     ///
     /// See [variable](crate::variable).
-    /// Same as [`Context::namespace`](crate::graph::Context::namespace()).
+    /// Same as [`Context::namespace`](Context::namespace()).
     #[inline]
     pub fn namespace(&'env self, namespace_id: &'static str) -> VariableNamespace<'env, 'name, F> {
         VariableNamespace {
@@ -648,7 +651,7 @@ impl<'env, 'name, F: Float> VariableEnvironment<'name, F> {
     /// Get or create the *default* namespace.
     ///
     /// See [variable](crate::variable).
-    /// Same as [`Context::default_namespace`](crate::graph::Context::default_namespace).
+    /// Same as [`Context::default_namespace`](Context::default_namespace).
     #[inline]
     pub fn default_namespace(&'env self) -> VariableNamespace<'env, 'name, F> {
         self.namespace(DEFAULT_NAMESPACE_ID)
@@ -683,9 +686,21 @@ impl<'env, 'name, F: Float> VariableEnvironment<'name, F> {
         };
         let mut c = Context {
             env_handle: self,
-            inner: g,
+            graph: g,
         };
         f(&mut c)
+    }
+
+    pub(crate) fn as_view(&self, vid: VariableID) -> NdArrayView<F> {
+        unsafe {
+            self.array_list[vid.0].borrow().raw_view().clone().deref_into_view()
+        }
+    }
+
+    pub(crate) fn as_view_mut(&self, vid: VariableID) -> NdArrayViewMut<F> {
+        unsafe {
+            self.array_list[vid.0].borrow_mut().raw_view_mut().clone().deref_into_view_mut()
+        }
     }
 }
 
@@ -712,7 +727,6 @@ impl<'t, 'g, F: Float> Graph<F> {
     }
 
     /// Same as `Context::variable((namespace, name))`
-    #[inline]
     pub fn variable_by_name<S: AsRef<str>>(
         &self,
         name: S,
@@ -730,7 +744,7 @@ impl<'t, 'g, F: Float> Graph<F> {
                     name.as_ref()
                 )
             } else {
-                panic!("variable array not found in `{}`: {}", ns, name.as_ref())
+                panic!("variable array `{}` not found in namespace {}", name.as_ref(), ns)
             }
         }
     }
@@ -795,10 +809,10 @@ fn save_and_load() {
     use std::collections::HashMap;
     use std::fs;
 
-    let dir = "/tmp/autograd/test_save_and_load";
+    let dir = "/tmp/rust-autograd/test/save_and_load";
     fs::create_dir_all(dir).unwrap();
     let path = format!("{}/model.json", dir);
-    let rng = crate::ndarray_ext::ArrayRng::<f64>::default();
+    let rng = ndarray_ext::ArrayRng::<f64>::default();
 
     let mut env = VariableEnvironment::new();
     env.slot().name("a").set(rng.standard_normal(&[2, 3]));
@@ -826,10 +840,10 @@ fn save_and_load() {
 fn save_and_init() {
     use std::fs;
 
-    let dir = "/tmp/autograd/test_save_and_init";
+    let dir = "/tmp/rust-autograd/test/save_and_init";
     fs::create_dir_all(dir).unwrap();
     let path = format!("{}/model.json", dir);
-    let rng = crate::ndarray_ext::ArrayRng::<f64>::default();
+    let rng = ndarray_ext::ArrayRng::<f64>::default();
 
     let mut env = VariableEnvironment::new();
     let a = env.name("a").set(rng.standard_normal(&[2, 3]));
