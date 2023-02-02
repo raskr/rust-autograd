@@ -2182,9 +2182,9 @@ where
                 Some(if e < -1 { e + 1 } else { e })
             };
             let slice = ndarray::Slice::new(*s, e, 1);
-            ndarray::SliceOrIndex::from(slice)
+            ndarray::SliceInfoElem::from(slice)
         })
-        .collect::<Vec<ndarray::SliceOrIndex>>();
+        .collect::<Vec<ndarray::SliceInfoElem>>();
 
     Tensor::builder(g)
         .append_input(x.as_ref(), false)

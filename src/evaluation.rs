@@ -4,12 +4,10 @@ use crate::ndarray_ext::{NdArray, NdArrayView, RawNdArrayView};
 use crate::op::{self, OpInput};
 
 use crate::tensor::{Tensor, TensorInternal};
-use crate::variable::VariableID;
 use crate::{Context, FxHashMap, VariableEnvironment};
 use crate::{Float, Graph};
 
-use std::cell::{Ref, RefMut, UnsafeCell};
-use std::collections::HashMap;
+use std::cell::Ref;
 use crate::graph::TensorID;
 
 /// Unique id for a placeholder tensor

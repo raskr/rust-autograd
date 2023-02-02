@@ -114,7 +114,7 @@ fn test_batch_matmul_normal() {
         let size = shape.iter().product();
         let ans = NdArray::<_>::from_shape_vec(ndarray::IxDyn(shape), vec![2f32; size]).unwrap();
         let ret = c.eval(g).unwrap();
-        ret.all_close(&ans, 1e-4);
+        ret.abs_diff_eq(&ans, 1e-4);
     });
 }
 
@@ -128,7 +128,7 @@ fn test_batch_matmul_trans_not_square() {
         let c = T::batch_matmul(a, b);
         let ans = array![[[7., 10.], [15., 22.]], [[7., 10.], [15., 22.]]].into_dyn();
         let ret = c.eval(g).unwrap();
-        assert!(ret.all_close(&ans, 1e-4));
+        assert!(ret.abs_diff_eq(&ans, 1e-4));
         assert_eq!(ret.shape(), &[2, 2, 2]);
     });
 }
@@ -146,7 +146,7 @@ fn test_batch_matmul_trans_square_both() {
         let c = T::batch_matmul(a, b);
         let ans = array![[[7., 15.], [10., 22.]], [[7., 15.], [10., 22.]]].into_dyn();
         let ret = c.eval(g).unwrap();
-        assert!(ret.all_close(&ans, 1e-4));
+        assert!(ret.abs_diff_eq(&ans, 1e-4));
         assert_eq!(ret.shape(), &[2, 2, 2]);
     });
 }
@@ -163,7 +163,7 @@ fn test_batch_matmul_trans_square_lhs() {
         let c = T::batch_matmul(a, b);
         let ans = array![[[10., 14.], [14., 20.]], [[10., 14.], [14., 20.]]].into_dyn();
         let ret = c.eval(g).unwrap();
-        assert!(ret.all_close(&ans, 1e-4));
+        assert!(ret.abs_diff_eq(&ans, 1e-4));
         assert_eq!(ret.shape(), &[2, 2, 2]);
     });
 }
@@ -179,7 +179,7 @@ fn test_batch_matmul_with_copy() {
         let c = T::batch_matmul(a, b);
         let ans = array![[[10., 14.], [14., 20.]], [[10., 14.], [14., 20.]]].into_dyn();
         let ret = c.eval(g).unwrap();
-        assert!(ret.all_close(&ans, 1e-4));
+        assert!(ret.abs_diff_eq(&ans, 1e-4));
         assert_eq!(ret.shape(), &[2, 2, 2]);
     });
 }

@@ -8,7 +8,7 @@ use std::collections::HashMap;
 #[test]
 fn get() {
     let mut env = ag::VariableEnvironment::new();
-    let v = &env.slot().set(ndarray::arr1(&[1., 2., 3.]));
+    let v = &env.set(ndarray::arr1(&[1., 2., 3.]));
 
     env.run(|graph| {
         let var = graph
@@ -57,7 +57,7 @@ fn add_n() {
 #[test]
 fn clip() {
     let mut env = ag::VariableEnvironment::new();
-    let v = env.slot().set(ndarray::arr1(&[1., 2., 3.]));
+    let v = env.set(ndarray::arr1(&[1., 2., 3.]));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::clip(v, 1.5, 2.5);
@@ -78,7 +78,7 @@ fn clip() {
 fn asinh() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.random_uniform(&[3], 0., 0.2));
+    let v = env.set(rng.random_uniform(&[3], 0., 0.2));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::asinh(v);
@@ -99,7 +99,7 @@ fn asinh() {
 fn acosh() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.random_uniform(&[3], 0., 0.2));
+    let v = env.set(rng.random_uniform(&[3], 0., 0.2));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::acosh(v);
@@ -120,7 +120,7 @@ fn acosh() {
 fn atanh() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f32>::default();
-    let v = env.slot().set(rng.random_uniform(&[3], 0., 0.2));
+    let v = env.set(rng.random_uniform(&[3], 0., 0.2));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::atanh(v);
@@ -141,7 +141,7 @@ fn atanh() {
 fn sinh() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.random_uniform(&[3], 0., 0.2));
+    let v = env.set(rng.random_uniform(&[3], 0., 0.2));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::sinh(v);
@@ -162,7 +162,7 @@ fn sinh() {
 fn cosh() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.random_uniform(&[3], 0., 0.2));
+    let v = env.set(rng.random_uniform(&[3], 0., 0.2));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::cosh(v);
@@ -183,7 +183,7 @@ fn cosh() {
 fn tanh() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.random_uniform(&[3], 0., 0.2));
+    let v = env.set(rng.random_uniform(&[3], 0., 0.2));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::tanh(v);
@@ -204,7 +204,7 @@ fn tanh() {
 fn asin() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.random_uniform(&[3], 0., 0.2));
+    let v = env.set(rng.random_uniform(&[3], 0., 0.2));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::asin(v);
@@ -225,7 +225,7 @@ fn asin() {
 fn acos() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.random_uniform(&[3], 0., 0.2));
+    let v = env.set(rng.random_uniform(&[3], 0., 0.2));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::acos(v);
@@ -246,7 +246,7 @@ fn acos() {
 fn atan() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.random_uniform(&[3], 0., 0.2));
+    let v = env.set(rng.random_uniform(&[3], 0., 0.2));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::atan(v);
@@ -267,7 +267,7 @@ fn atan() {
 fn sin() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.random_uniform(&[3], 0., 0.2));
+    let v = env.set(rng.random_uniform(&[3], 0., 0.2));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::sin(v);
@@ -288,7 +288,7 @@ fn sin() {
 fn cos() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.random_uniform(&[3], 0., 0.2));
+    let v = env.set(rng.random_uniform(&[3], 0., 0.2));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::cos(v);
@@ -309,7 +309,7 @@ fn cos() {
 fn tan() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.random_uniform(&[3], 0., 0.2));
+    let v = env.set(rng.random_uniform(&[3], 0., 0.2));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::tan(v);
@@ -330,7 +330,7 @@ fn tan() {
 fn pow() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.random_uniform(&[3], 0.9, 1.1));
+    let v = env.set(rng.random_uniform(&[3], 0.9, 1.1));
     env.run(|ctx| {
         let v = ctx.variable(v);
         let z = T::pow(v, 1.1);
@@ -351,7 +351,7 @@ fn pow() {
 fn sqrt() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.random_uniform(&[3], 0.9, 1.1));
+    let v = env.set(rng.random_uniform(&[3], 0.9, 1.1));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::sqrt(v);
@@ -373,7 +373,7 @@ fn sqrt() {
 fn exp() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.random_uniform(&[3], 0.9, 1.1));
+    let v = env.set(rng.random_uniform(&[3], 0.9, 1.1));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::exp(v);
@@ -394,7 +394,7 @@ fn exp() {
 fn ln() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.random_uniform(&[3], 1., 1.1));
+    let v = env.set(rng.random_uniform(&[3], 1., 1.1));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::ln(v);
@@ -415,7 +415,7 @@ fn ln() {
 fn expand_dims() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.standard_normal(&[3]));
+    let v = env.set(rng.standard_normal(&[3]));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::expand_dims(v, &[0, 2]);
@@ -436,7 +436,7 @@ fn expand_dims() {
 fn squeeze() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.standard_normal(&[3, 1, 2, 1]));
+    let v = env.set(rng.standard_normal(&[3, 1, 2, 1]));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::squeeze(v, &[3, 1]);
@@ -457,7 +457,7 @@ fn squeeze() {
 fn matmul() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.standard_normal(&[2, 3]));
+    let v = env.set(rng.standard_normal(&[2, 3]));
     env.run(|graph| {
         let a = T::convert_to_tensor(rng.standard_normal(&[4, 2]), graph);
         let v = graph.variable(v);
@@ -479,7 +479,7 @@ fn matmul() {
 fn batch_matmul() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.standard_normal(&[2, 2, 3]));
+    let v = env.set(rng.standard_normal(&[2, 2, 3]));
     env.run(|graph| {
         let a = T::convert_to_tensor(rng.standard_normal(&[2, 4, 2]), graph);
         let v = graph.variable(v);
@@ -501,7 +501,7 @@ fn batch_matmul() {
 fn implicit_broadcast() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let b = env.slot().set(rng.standard_normal(&[1, 3]));
+    let b = env.set(rng.standard_normal(&[1, 3]));
     env.run(|graph| {
         let x = T::convert_to_tensor(rng.standard_normal(&[4, 3]), graph);
         let b = graph.variable(b);
@@ -523,8 +523,8 @@ fn implicit_broadcast() {
 fn wx_plus_b() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let w = env.slot().set(rng.standard_normal(&[2, 3]));
-    let b = env.slot().set(rng.standard_normal(&[1, 3]));
+    let w = env.set(rng.standard_normal(&[2, 3]));
+    let b = env.set(rng.standard_normal(&[1, 3]));
     env.run(|graph| {
         let x = T::convert_to_tensor(rng.standard_normal(&[4, 2]), graph);
         let w = graph.variable(w);
@@ -546,7 +546,7 @@ fn wx_plus_b() {
 #[test]
 fn reduce_min() {
     let mut env = ag::VariableEnvironment::new();
-    let v = env.slot().set(ndarray::arr2(&[[0., 1.], [3., 2.]]));
+    let v = env.set(ndarray::arr2(&[[0., 1.], [3., 2.]]));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::reduce_min(v, &[1], false); // keep_dims=false
@@ -566,7 +566,7 @@ fn reduce_min() {
 #[test]
 fn reduce_min_keep() {
     let mut env = ag::VariableEnvironment::new();
-    let v = env.slot().set(ndarray::arr2(&[[0., 1.], [3., 2.]]));
+    let v = env.set(ndarray::arr2(&[[0., 1.], [3., 2.]]));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::reduce_min(v, &[1], true); // keep_dims=true
@@ -586,7 +586,7 @@ fn reduce_min_keep() {
 #[test]
 fn reduce_max() {
     let mut env = ag::VariableEnvironment::new();
-    let v = env.slot().set(ndarray::arr2(&[[0., 1.], [3., 2.]]));
+    let v = env.set(ndarray::arr2(&[[0., 1.], [3., 2.]]));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::reduce_max(v, &[1], false); // keep_dims=false
@@ -606,7 +606,7 @@ fn reduce_max() {
 #[test]
 fn reduce_max_keep() {
     let mut env = ag::VariableEnvironment::new();
-    let v = env.slot().set(ndarray::arr2(&[[0., 1.], [3., 2.]]));
+    let v = env.set(ndarray::arr2(&[[0., 1.], [3., 2.]]));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::reduce_max(v, &[1], true); // keep_dims=true
@@ -627,7 +627,7 @@ fn reduce_max_keep() {
 fn reduce_mean() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.standard_normal(&[3, 2, 2]));
+    let v = env.set(rng.standard_normal(&[3, 2, 2]));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::reduce_mean(v, &[1], false); // keep_dims=false
@@ -648,7 +648,7 @@ fn reduce_mean() {
 fn reduce_mean_keep() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.standard_normal(&[3, 2, 2]));
+    let v = env.set(rng.standard_normal(&[3, 2, 2]));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::reduce_mean(v, &[1], true); // keep_dims=true
@@ -669,7 +669,7 @@ fn reduce_mean_keep() {
 fn reduce_sum() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.standard_normal(&[3, 2, 2]));
+    let v = env.set(rng.standard_normal(&[3, 2, 2]));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::reduce_sum(v, &[1], false); // keep_dims=false
@@ -690,7 +690,7 @@ fn reduce_sum() {
 fn reduce_sum_keep() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.standard_normal(&[3, 2, 2]));
+    let v = env.set(rng.standard_normal(&[3, 2, 2]));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::reduce_sum(v, &[1], true); // keep_dims=true
@@ -711,7 +711,7 @@ fn reduce_sum_keep() {
 fn reduce_prod() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.standard_normal(&[3, 2, 2]));
+    let v = env.set(rng.standard_normal(&[3, 2, 2]));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::reduce_prod(v, &[1], false); // keep_dims=false
@@ -731,8 +731,8 @@ fn reduce_prod() {
 #[test]
 fn maximum() {
     let mut env = ag::VariableEnvironment::new();
-    let v1 = env.slot().set(ndarray::arr1(&[1., 2., 3.]));
-    let v2 = env.slot().set(ndarray::arr1(&[4., 5., 6.]));
+    let v1 = env.set(ndarray::arr1(&[1., 2., 3.]));
+    let v2 = env.set(ndarray::arr1(&[4., 5., 6.]));
     env.run(|graph| {
         let v1 = graph.variable(v1);
         let v2 = graph.variable(v2);
@@ -753,8 +753,8 @@ fn maximum() {
 #[test]
 fn minimum() {
     let mut env = ag::VariableEnvironment::new();
-    let v1 = env.slot().set(ndarray::arr1(&[1., 2., 3.]));
-    let v2 = env.slot().set(ndarray::arr1(&[4., 5., 6.]));
+    let v1 = env.set(ndarray::arr1(&[1., 2., 3.]));
+    let v2 = env.set(ndarray::arr1(&[4., 5., 6.]));
     env.run(|graph| {
         let v1 = graph.variable(v1);
         let v2 = graph.variable(v2);
@@ -775,7 +775,7 @@ fn minimum() {
 #[test]
 fn abs() {
     let mut env = ag::VariableEnvironment::new();
-    let v = env.slot().set(ndarray::arr1(&[1., 2., 3.]));
+    let v = env.set(ndarray::arr1(&[1., 2., 3.]));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::abs(v);
@@ -796,7 +796,7 @@ fn abs() {
 fn neg() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.standard_normal(&[2, 3]));
+    let v = env.set(rng.standard_normal(&[2, 3]));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::neg(v);
@@ -817,7 +817,7 @@ fn neg() {
 fn square() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.standard_normal(&[2, 3]));
+    let v = env.set(rng.standard_normal(&[2, 3]));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::square(v);
@@ -838,7 +838,7 @@ fn square() {
 fn reciprocal() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.random_uniform(&[2, 3], 1., 1.01));
+    let v = env.set(rng.random_uniform(&[2, 3], 1., 1.01));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::inv(v);
@@ -859,7 +859,7 @@ fn reciprocal() {
 fn lgamma() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.random_uniform(&[2, 3], 1., 1.01));
+    let v = env.set(rng.random_uniform(&[2, 3], 1., 1.01));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::lgamma_f64(v);
@@ -880,7 +880,7 @@ fn lgamma() {
 fn dropout() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.random_uniform(&[2, 3], 1., 1.01));
+    let v = env.set(rng.random_uniform(&[2, 3], 1., 1.01));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::dropout(v, 0.01, true);
@@ -901,7 +901,7 @@ fn dropout() {
 fn transpose() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.standard_normal(&[1, 2, 3, 4]));
+    let v = env.set(rng.standard_normal(&[1, 2, 3, 4]));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::transpose(v, &[2, 3, 0, 1]);
@@ -922,7 +922,7 @@ fn transpose() {
 fn reshape_after_transpose() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.standard_normal(&[2, 3, 4]));
+    let v = env.set(rng.standard_normal(&[2, 3, 4]));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::transpose(v, &[2, 1, 0]);
@@ -944,8 +944,8 @@ fn reshape_after_transpose() {
 fn transpose_then_reshape_then_mm() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.standard_normal(&[1, 2, 3, 4, 5]));
-    let v2 = env.slot().set(rng.standard_normal(&[8, 2]));
+    let v = env.set(rng.standard_normal(&[1, 2, 3, 4, 5]));
+    let v2 = env.set(rng.standard_normal(&[8, 2]));
     env.run(|graph| {
         let v = graph.variable(v);
         let v2 = graph.variable(v2);
@@ -969,8 +969,8 @@ fn transpose_then_reshape_then_mm() {
 fn add() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let a = env.slot().set(rng.standard_normal(&[2, 2]));
-    let b = env.slot().set(rng.standard_normal(&[2, 2]));
+    let a = env.set(rng.standard_normal(&[2, 2]));
+    let b = env.set(rng.standard_normal(&[2, 2]));
     env.run(|graph| {
         let a = graph.variable(a);
         let b = graph.variable(b);
@@ -992,8 +992,8 @@ fn add() {
 fn mul() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let a = env.slot().set(rng.standard_normal(&[2, 2]));
-    let b = env.slot().set(rng.standard_normal(&[2, 2]));
+    let a = env.set(rng.standard_normal(&[2, 2]));
+    let b = env.set(rng.standard_normal(&[2, 2]));
     env.run(|graph| {
         let a = graph.variable(a);
         let b = graph.variable(b);
@@ -1015,7 +1015,7 @@ fn mul() {
 fn sigmoid() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.standard_normal(&[2, 2]));
+    let v = env.set(rng.standard_normal(&[2, 2]));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::sigmoid(v);
@@ -1036,7 +1036,7 @@ fn sigmoid() {
 fn elu() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.standard_normal(&[2, 2]));
+    let v = env.set(rng.standard_normal(&[2, 2]));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::elu(v, 1.);
@@ -1056,7 +1056,7 @@ fn elu() {
 #[test]
 fn relu() {
     let mut env = ag::VariableEnvironment::new();
-    let v = env.slot().set(ag::ndarray::arr1(&[0.2, 0.5]));
+    let v = env.set(ag::ndarray::arr1(&[0.2, 0.5]));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::relu(v);
@@ -1077,7 +1077,7 @@ fn relu() {
 fn softplus() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.standard_normal(&[2, 2]));
+    let v = env.set(rng.standard_normal(&[2, 2]));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::softplus(v);
@@ -1098,7 +1098,7 @@ fn softplus() {
 fn logsumexp() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.standard_normal(&[2, 3]));
+    let v = env.set(rng.standard_normal(&[2, 3]));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::reduce_logsumexp(v, 1, true);
@@ -1119,7 +1119,7 @@ fn logsumexp() {
 fn log_softmax() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.standard_normal(&[1, 3]));
+    let v = env.set(rng.standard_normal(&[1, 3]));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::log_softmax(v, 1);
@@ -1140,7 +1140,7 @@ fn log_softmax() {
 fn softmax_cross_entropy() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.standard_normal(&[1, 3]));
+    let v = env.set(rng.standard_normal(&[1, 3]));
     env.run(|graph| {
         let t = T::convert_to_tensor(ndarray::arr2(&[[1., 0., 0.]]), graph);
         let v = graph.variable(v);
@@ -1162,7 +1162,7 @@ fn softmax_cross_entropy() {
 fn sigmoid_cross_entropy() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.standard_normal(&[1, 3]));
+    let v = env.set(rng.standard_normal(&[1, 3]));
     env.run(|graph| {
         let t = T::convert_to_tensor(rng.standard_normal(&[1, 3]), graph);
         let v = graph.variable(v);
@@ -1184,7 +1184,7 @@ fn sigmoid_cross_entropy() {
 fn sparse_softmax_cross_entropy() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.standard_normal(&[2, 3]));
+    let v = env.set(rng.standard_normal(&[2, 3]));
     env.run(|graph| {
         let t = T::convert_to_tensor(ndarray::arr1(&[1., 0.]), graph);
         let v = graph.variable(v);
@@ -1206,7 +1206,7 @@ fn sparse_softmax_cross_entropy() {
 fn gather() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.standard_normal(&[5, 4, 8, 2]));
+    let v = env.set(rng.standard_normal(&[5, 4, 8, 2]));
     env.run(|graph| {
         let v = graph.variable(v);
         let x = T::convert_to_tensor(ndarray::arr2(&[[5., 4., 3.], [2., 1., 0.]]), graph);
@@ -1228,8 +1228,8 @@ fn gather() {
 fn concat() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v1 = env.slot().set(rng.standard_normal(&[1, 2]));
-    let v2 = env.slot().set(rng.standard_normal(&[1, 2]));
+    let v1 = env.set(rng.standard_normal(&[1, 2]));
+    let v2 = env.set(rng.standard_normal(&[1, 2]));
     env.run(|graph| {
         let v1 = graph.variable(v1);
         let v2 = graph.variable(v2);
@@ -1251,7 +1251,7 @@ fn concat() {
 fn slice() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.standard_normal(&[4, 4]));
+    let v = env.set(rng.standard_normal(&[4, 4]));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::slice(v, &[0, 0], &[-1, 2]); // numpy equivalent is v[:, 0:2]
@@ -1272,7 +1272,7 @@ fn slice() {
 fn split() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.standard_normal(&[3, 7, 5]));
+    let v = env.set(rng.standard_normal(&[3, 7, 5]));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::split(v, &[2, 3, 2], 1);
@@ -1293,7 +1293,7 @@ fn split() {
 fn flatten() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.standard_normal(&[4, 4]));
+    let v = env.set(rng.standard_normal(&[4, 4]));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::flatten(v);
@@ -1314,7 +1314,7 @@ fn flatten() {
 fn reshape() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.standard_normal(&[4, 4]));
+    let v = env.set(rng.standard_normal(&[4, 4]));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::reshape(v, &[4, 2, 2]);
@@ -1336,7 +1336,7 @@ fn reshape() {
 fn reshape_grad() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let v = env.slot().set(rng.standard_normal(&[4, 4]));
+    let v = env.set(rng.standard_normal(&[4, 4]));
     env.run(|graph| {
         let v = graph.variable(v);
         let z = T::reshape(&v, &[4, 2, 2]);
@@ -1358,8 +1358,8 @@ fn reshape_grad() {
 fn conv2d_transpose() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let x = env.slot().set(rng.standard_normal(&[3, 2, 2, 2]));
-    let w = env.slot().set(rng.standard_normal(&[2, 3, 2, 2]));
+    let x = env.set(rng.standard_normal(&[3, 2, 2, 2]));
+    let w = env.set(rng.standard_normal(&[2, 3, 2, 2]));
     env.run(|graph| {
         let x = graph.variable(x);
         let w = graph.variable(w);
@@ -1374,8 +1374,8 @@ fn conv2d_transpose() {
 fn conv2d_transpose_filter_grad() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let x = env.slot().set(rng.standard_normal(&[2, 2, 2, 2]));
-    let w = env.slot().set(rng.standard_normal(&[2, 3, 2, 2]));
+    let x = env.set(rng.standard_normal(&[2, 2, 2, 2]));
+    let w = env.set(rng.standard_normal(&[2, 3, 2, 2]));
     env.run(|graph| {
         let x = graph.variable(x);
         let w = graph.variable(w);
@@ -1399,8 +1399,8 @@ fn conv2d_transpose_filter_grad() {
 fn conv2d_filter_grad() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let x = env.slot().set(rng.standard_normal(&[2, 3, 5, 5]));
-    let w = env.slot().set(rng.standard_normal(&[2, 3, 2, 2]));
+    let x = env.set(rng.standard_normal(&[2, 3, 5, 5]));
+    let w = env.set(rng.standard_normal(&[2, 3, 2, 2]));
     env.run(|graph| {
         let x = graph.variable(x);
         let w = graph.variable(w);
@@ -1423,9 +1423,9 @@ fn conv2d_filter_grad() {
 fn conv2d_grad() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let x = env.slot().set(rng.standard_normal(&[2, 3, 5, 5]));
-    let w = env.slot().set(rng.standard_normal(&[2, 3, 2, 2]));
-    let gy = env.slot().set(ag::ndarray_ext::ones(&[2, 2, 2, 2]));
+    let x = env.set(rng.standard_normal(&[2, 3, 5, 5]));
+    let w = env.set(rng.standard_normal(&[2, 3, 2, 2]));
+    let gy = env.set(ag::ndarray_ext::ones(&[2, 2, 2, 2]));
     env.run(|graph| {
         let x = graph.variable(x);
         let w = graph.variable(w);
@@ -1451,8 +1451,8 @@ fn conv2d_grad() {
 fn conv2d_xw_grad() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let x = env.slot().set(rng.standard_normal(&[2, 3, 5, 5]));
-    let w = env.slot().set(rng.standard_normal(&[2, 3, 2, 2]));
+    let x = env.set(rng.standard_normal(&[2, 3, 5, 5]));
+    let w = env.set(rng.standard_normal(&[2, 3, 2, 2]));
     env.run(|graph| {
         let x = graph.variable(x);
         let w = graph.variable(w);
@@ -1475,8 +1475,8 @@ fn conv2d_xw_grad() {
 fn conv2d() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let x = env.slot().set(rng.standard_normal(&[2, 3, 5, 5]));
-    let w = env.slot().set(rng.standard_normal(&[2, 3, 3, 3]));
+    let x = env.set(rng.standard_normal(&[2, 3, 5, 5]));
+    let w = env.set(rng.standard_normal(&[2, 3, 3, 3]));
     env.run(|graph| {
         let x = graph.variable(x);
         let w = graph.variable(w);
@@ -1497,7 +1497,7 @@ fn conv2d() {
 #[test]
 fn max_pool2d() {
     let mut env = ag::VariableEnvironment::new();
-    let x = env.slot().set(ndarray::Array::linspace(0., 1., 9));
+    let x = env.set(ndarray::Array::linspace(0., 1., 9));
     env.run(|graph| {
         let x = graph.variable(x);
         let y = T::max_pool2d(T::reshape(x, &[1, 1, 3, 3]), 2, 0, 1);
@@ -1509,8 +1509,8 @@ fn max_pool2d() {
 #[test]
 fn max_pool2d_grad() {
     let mut env = ag::VariableEnvironment::new();
-    let x = env.slot().set(ndarray::Array::linspace(0., 1., 36));
-    let gy = env.slot().set(
+    let x = env.set(ndarray::Array::linspace(0., 1., 36));
+    let gy = env.set(
         ndarray::Array::linspace(0., 1., 16)
             .into_shape(ndarray::IxDyn(&[2, 2, 2, 2]))
             .unwrap(),
@@ -1539,7 +1539,7 @@ fn max_pool2d_grad() {
 fn tensordot() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let a = env.slot().set(rng.standard_normal(&[3, 4, 5]));
+    let a = env.set(rng.standard_normal(&[3, 4, 5]));
     env.run(|graph| {
         let a = graph.variable(a);
         let b = T::convert_to_tensor(rng.standard_normal(&[4, 3, 2]), graph);
@@ -1553,11 +1553,11 @@ fn tensordot() {
 fn primitive_back_propagation_through_time() {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
-    let lookup_table = env.slot().set(rng.standard_normal(&[5, 3]));
+    let lookup_table = env.set(rng.standard_normal(&[5, 3]));
     // (vector_dim -> vocab)
-    let wo = env.slot().set(rng.standard_normal(&[3, 5]));
+    let wo = env.set(rng.standard_normal(&[3, 5]));
     // (vector_dim -> vector_dim)
-    let wh = env.slot().set(rng.standard_normal(&[3, 3]));
+    let wh = env.set(rng.standard_normal(&[3, 3]));
 
     env.run(|graph| {
         let max_sent = 3;

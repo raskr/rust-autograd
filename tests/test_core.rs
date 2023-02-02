@@ -31,7 +31,7 @@ fn test_nth_tensor() {
         let a = ag::Tensor::builder(g).build(MultiOutputOp);
         let b = T::nth_tensor(a, 1);
         let c = T::exp(b);
-        c.eval(g);
+        c.eval(g).unwrap();
     });
 }
 
@@ -42,7 +42,7 @@ fn test_hook() {
         let a: ag::Tensor<f64> = T::ones(&[4, 2], g).show();
         let b: ag::Tensor<f64> = T::zeros(&[2, 3], g).show_shape();
         let c = T::matmul(a, b).print("aaa");
-        c.eval(g);
+        c.eval(g).unwrap();
     });
     ctx.run(|g| {
         let x = g.placeholder("x", &[]);

@@ -498,12 +498,12 @@ fn test_deconv() {
     )
     .unwrap();
 
-    let ctx = crate::VariableEnvironment::new();
+    let ctx = crate::VariableEnvironment::<f32>::new();
     let out_val = ctx.run(|graph| {
         let w = T::ones(&[ych, xch, kh, kw], graph);
         let g = T::ones(&[batch_size, ych, yh, yw], graph);
         let out = T::conv2d_transpose(g, w, 0, 1);
         out.eval(graph).unwrap()
     });
-    out_val.all_close(&ans, 1e-3);
+    out_val.abs_diff_eq(&ans, 1e-3);
 }

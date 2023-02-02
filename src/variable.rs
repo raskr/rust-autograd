@@ -70,19 +70,17 @@
 //! // new_env.run(...
 //! ```
 use crate::graph::Context;
-use crate::{uuid::Uuid, Float, FxHashMap, Graph, NdArray, Tensor, ndarray_ext, NdArrayViewMut, NdArrayView};
+use crate::{uuid::Uuid, Float, FxHashMap, Graph, NdArray, Tensor, NdArrayViewMut, NdArrayView};
 use serde::Deserialize;
 use serde_json;
 use smallvec::alloc::fmt::Formatter;
 use std::borrow::Cow;
-use std::cell::{RefCell, UnsafeCell, Ref, RefMut};
+use std::cell::RefCell;
 
 use std::error::Error;
 use std::fs::File;
 use std::ops::Deref;
 use std::path::Path;
-use crate::ndarray_ext::RawNdArrayView;
-use crate::op::OpInput;
 
 #[derive(Copy, Clone, Hash, PartialEq, Eq, Debug, Serialize, Deserialize)]
 /// Variable array's ID that is unique in a `VariableEnvironment`.
@@ -111,7 +109,6 @@ impl std::fmt::Display for VariableID {
 const DEFAULT_NAMESPACE_ID: &'static str = "";
 
 pub(crate) type Variable<F> = RefCell<NdArray<F>>;
-pub(crate) type UnsafeVariable<F> = UnsafeCell<NdArray<F>>;
 
 /// Get or create a variable tensor.
 pub trait GetVariableTensor<'g, F: Float, Arg> {
@@ -421,6 +418,8 @@ impl<'ns, 'env, 'name, F: Float> VariableNamespaceMut<'env, 'name, F> {
 
 #[test]
 fn test_env_iter() {
+    use crate::ndarray_ext;
+
     let mut env = VariableEnvironment::<f32>::new();
     let v1 = env.slot().set(ndarray_ext::zeros(&[3, 2]));
     let v2 = env.slot().set(ndarray_ext::zeros(&[2, 3]));
@@ -435,6 +434,8 @@ fn test_env_iter() {
         }
     }
 }
+
+use crate::ndarray_ext;
 
 #[test]
 fn test_namespace_iter() {

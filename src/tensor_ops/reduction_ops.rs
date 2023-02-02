@@ -165,7 +165,6 @@ impl<T: Float> op::Op<T> for ReduceSum {
         match compute_reduce_sum(x, axes, self.keep_dims) {
             crate::OpOutput::Owned(ret) => ctx.append_output(ret),
             crate::OpOutput::View(ret) => ctx.append_output_view_raw(ret),
-            _ => unreachable!(),
         }
         Ok(())
     }
@@ -211,7 +210,6 @@ impl<T: Float> op::Op<T> for ReduceMean {
                 ctx.append_output(arr)
             }
             crate::OpOutput::View(view) => ctx.append_output_view_raw(view),
-            _ => unreachable!(),
         };
         Ok(())
     }
@@ -251,7 +249,6 @@ impl<T: Float> op::Op<T> for ReduceProd {
             crate::OpOutput::View(ret) => {
                 ctx.append_output_view_raw(ret);
             }
-            _ => unreachable!(),
         }
         Ok(())
     }
@@ -287,7 +284,6 @@ impl<T: Float> op::Op<T> for ReduceMin {
             crate::OpOutput::View(ret) => {
                 ctx.append_output_view_raw(ret);
             }
-            _ => unreachable!(),
         }
         Ok(())
     }
@@ -316,7 +312,6 @@ impl<T: Float> op::Op<T> for ReduceMax {
             crate::OpOutput::View(ret) => {
                 ctx.append_output_view_raw(ret);
             }
-            _ => unreachable!(),
         }
         Ok(())
     }
@@ -387,7 +382,7 @@ fn argx_helper<T: Float>(
             ndarray::Zip::from(&mut sub)
                 .and(&mut found)
                 .and(&maxed)
-                .apply(|r, f, m| {
+                .for_each(|r, f, m| {
                     let z = r == m && !*f;
                     if z {
                         *f = true;

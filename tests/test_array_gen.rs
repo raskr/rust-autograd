@@ -6,7 +6,7 @@ fn random_uniform() {
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
     let a = rng.random_uniform(&[3], 0., 1.);
     let b = rng.random_uniform(&[3], 0., 1.);
-    assert!(a.all_close(&ndarray::arr1(&[0.5, 0.5, 0.5]), 0.5));
+    assert!(a.abs_diff_eq(&ndarray::arr1(&[0.5, 0.5, 0.5]).into_dyn(), 0.5));
     assert_ne!(a, b);
 }
 
@@ -33,7 +33,7 @@ fn standard_uniform() {
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
     let a = rng.standard_uniform(&[3]);
     let b = rng.standard_uniform(&[3]);
-    assert!(a.all_close(&ndarray::arr1(&[0.5, 0.5, 0.5]), 0.5));
+    assert!(a.abs_diff_eq(&ndarray::arr1(&[0.5, 0.5, 0.5]).into_dyn(), 0.5));
     assert_ne!(a, b);
 }
 

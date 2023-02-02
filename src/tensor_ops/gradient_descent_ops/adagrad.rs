@@ -14,7 +14,7 @@ impl<F: Float> crate::op::Op<F> for AdaGradOp<F> {
         ndarray::Zip::from(param)
             .and(grad)
             .and(h)
-            .apply(move |p, &g, h| *p -= self.lr * g / (h.sqrt() + eps));
+            .for_each(move |p, &g, h| *p -= self.lr * g / (h.sqrt() + eps));
 
         ctx.append_empty_output();
         Ok(())

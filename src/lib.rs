@@ -135,7 +135,6 @@ extern crate uuid;
 extern crate serde_derive;
 extern crate approx;
 extern crate special;
-extern crate core;
 
 pub mod evaluation;
 mod gradient;

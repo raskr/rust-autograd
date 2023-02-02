@@ -132,7 +132,7 @@ pub fn check_theoretical_grads<'g, 't, 'v, F: Float, A>(
             }
 
             let two = F::one() + F::one();
-            let g_num = (obj_pos - obj_neg).scalar_sum() / (two * eps);
+            let g_num = (obj_pos - obj_neg).sum() / (two * eps);
             let g_th = unsafe { *th_ptr.offset(i) };
 
             // compare
