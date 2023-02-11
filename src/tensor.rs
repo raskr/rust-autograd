@@ -34,7 +34,7 @@ use std::ops::{Add, Div, Mul, Sub};
 ///     let random: ag::Tensor<f64> = T::standard_normal(&[2, 3], ctx);
 ///
 ///     // Binary operators are implemented
-///     let mul = 3. * random;
+///     let mul = random * 3.;
 ///
 ///     // Tensor is evaluated as an ndarray::Array<T, IxDyn>.
 ///     type NdArray = ag::NdArray<f64>;

@@ -40,7 +40,7 @@ fn test_momentum() {
     run(opt, env);
 }
 
-fn make_env() -> VariableEnvironment<'static, f64> {
+fn make_env() -> VariableEnvironment<f64> {
     let mut env = ag::VariableEnvironment::new();
     let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
     env.name("w").set(rng.glorot_uniform(&[2, 2]));
