@@ -1,5 +1,3 @@
-//! Defining things related to hooks
-//!
 //! You can register hooks on `ag::Tensor` objects for debugging.
 //! ```rust
 //! use autograd as ag;

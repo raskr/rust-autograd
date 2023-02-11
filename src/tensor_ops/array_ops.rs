@@ -377,12 +377,7 @@ impl<T: Float> op::Op<T> for Gather {
                 .map(|a| a.to_usize().expect("Invalid index value"))
                 .into_raw_vec()
         };
-        let selected = param.select(ndarray::Axis(axis), flat_indices.as_slice());
-        // FIXME: ndarray vup で挙動が変わったっぽい
-        // [5, 4, 6, 2]
-        // [5, 4, 2, 3, 2]
-        println!("{:?}", selected.shape());
-        println!("{:?}", output_shape);
+        let selected = ndarray_ext::select(param, ndarray::Axis(axis), flat_indices.as_slice());
         let ret = selected.into_shape(output_shape.as_slice()).unwrap();
         ctx.append_output(ret);
         Ok(())

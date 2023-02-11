@@ -161,7 +161,6 @@ fn mat_mul_impl_blas<F: Float>(
         let mut lhs_ = lhs.view();
         let mut rhs_ = rhs.view();
         let mut c_ = c.view_mut();
-        let aaa = c_.raw_view().view();
         let lhs_s0 = lhs_.strides()[0];
         let rhs_s0 = rhs_.strides()[0];
         let both_f = lhs_s0 == 1 && rhs_s0 == 1;

@@ -1,4 +1,3 @@
-//! Defining things related to gradient computation.
 use crate::graph::TensorID;
 use crate::op::{GradientContext, SmallVec};
 use crate::tensor::Tensor;
@@ -28,53 +27,52 @@ where
     A: AsRef<Tensor<'graph, F>>,
     B: AsRef<Tensor<'graph, F>>,
 {
-    let mut grad_map = make_gradient_map(g, ys, xs);
+    let mut grad_map = init_gradient_map(g, ys, xs);
 
-    // Set default grads.
+    // Setup default grads.
     if let Some(gys) = gys {
         assert_eq!(ys.len(), gys.len(), "`ys.len()` must match `gys.len()`");
-        for (y, gy) in ys.into_iter().zip(gys) {
-            grad_map.get_mut(&y.as_ref().id).unwrap().default_grad = Some(gy.as_ref().clone());
+        for (y, &gy) in ys.into_iter().zip(gys) {
+            grad_map.push_grad(y.as_ref().id, gy);
         }
     } else {
         let start_gy = T::scalar(F::one(), g);
         for y in ys.into_iter() {
-            grad_map.get_mut(&y.as_ref().id).unwrap().default_grad = Some(start_gy.clone());
+            grad_map.push_grad(y.as_ref().id, start_gy);
         }
     }
 
-    // Prepare a heap with given ys.
+    // Prepare a heap with given ys for backprop.
     let mut heap = ys
         .iter()
         .map(|y| y.as_ref().to_node())
         .collect::<BinaryHeap<Node>>();
 
-    // Backprop.
-    // Starts with `ys`.
+    // Start backprop from `ys`.
     while let Some(y) = heap.pop() {
         let gxs = {
-            let g_info = grad_map.get_mut(&y.id).unwrap();
+            let y_grad_info = grad_map.get_mut(y.id);
+            let gy = y_grad_info.gradient();
 
-            let gy = g_info.get_grad_tensor();
-
-            // Call Op::grad (mutate the graph)
+            // Call Op::grad
             let y_tensor = g.tensor(y.id);
-            let gxs = GradientContext::new(gy, y_tensor, g).compute_input_grads();
+            let ctx = GradientContext::new(gy, y_tensor, g);
+            let gxs = ctx.compute_input_grads();
             debug_assert_eq!(y_tensor.num_backprop_inputs(), gxs.len());
             gxs
         };
 
         // Register computed gradients
         let y = g.tensor(y.id);
-        for (i, x) in y.inner().get_backprop_inputs().iter().enumerate() {
+        for (x, gx) in y.inner().get_backprop_inputs().iter().zip(gxs) {
             let x = x.as_tensor(g);
-            let mut x_info = grad_map.get_mut(&x.id).unwrap();
-            if x_info.on_gradient_path {
-                if let Some(gx) = gxs[i] {
-                    x_info.push_grad(gx);
+            let x_grad_info = grad_map.get_mut(x.id);
+            if x_grad_info.on_backprop_path {
+                if let Some(gx) = gx {
+                    let x_not_visited =  x_grad_info.gradients.len() == 0;
+                    grad_map.push_grad(x.id, gx);
                     // update heap
-                    if !x.is_source() && !x_info.grad_computed {
-                        x_info.grad_computed = true;
+                    if !x.is_source() && x_not_visited {
                         heap.push(x.to_node());
                     }
                 }
@@ -82,20 +80,19 @@ where
         }
     }
 
-    GradientMap {
-        inner: grad_map,
-    }
+    grad_map
 }
 
+// a graph node in a gradient subgraph
 struct Node {
     id: usize,
-    rank: usize,
+    topo_rank: usize,
 }
 
 impl Ord for Node {
     // Compares the ranks in topological ordering
     fn cmp(&self, other: &Self) -> Ordering {
-        self.rank.cmp(&other.rank)
+        self.topo_rank.cmp(&other.topo_rank)
     }
 }
 
@@ -103,7 +100,7 @@ impl PartialOrd for Node {
     #[inline]
     // Compares the ranks in topological ordering
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.rank.cmp(&other.rank))
+        Some(self.topo_rank.cmp(&other.topo_rank))
     }
 }
 
@@ -121,85 +118,66 @@ impl<'tensor, T: Float> Tensor<'tensor, T> {
     fn to_node(&'tensor self) -> Node {
         Node {
             id: self.id,
-            rank: self.inner().topo_rank,
+            topo_rank: self.graph.topo_rank(self.id)
         }
     }
 }
 
-// compute_gradients's return value
 pub(crate) struct GradientMap<'graph, F: Float> {
-    inner: FxHashMap<TensorID, GradientMapValue<'graph, F>>,
+    inner: FxHashMap<TensorID, GradientInfo<'graph, F>>,
 }
 
 impl<'graph, F: Float> GradientMap<'graph, F> {
-    #[inline]
-    pub(crate) fn get(&mut self, x: impl AsRef<Tensor<'graph, F>>) -> Option<Tensor<'graph, F>> {
+    pub(crate) fn extract_grad(&mut self, x: impl AsRef<Tensor<'graph, F>>) -> Option<Tensor<'graph, F>> {
         if let Some(info) = self.inner.get_mut(&x.as_ref().id) {
-            if info.on_gradient_path && info.default_grad.is_none() {
-                return Some(info.accumulate_then_get());
+            if info.on_backprop_path {
+                return Some(info.gradient());
             }
         }
         // can't differentiate!
         None
     }
+
+    #[inline]
+    fn get_mut(&mut self, key: TensorID) -> &mut GradientInfo<'graph, F> {
+        self.inner.get_mut(&key).unwrap()
+    }
+
+    #[inline]
+    fn push_grad(&mut self, key: TensorID, grad: Tensor<'graph, F>) {
+        self.inner.get_mut(&key).unwrap().gradients.push(grad);
+    }
 }
 
-// Return value of compute_gradients()
-// Used like HashMap<TensorID, GradInfo>
-struct GradientMapValue<'graph, F: Float> {
-    on_gradient_path: bool,
-    grad_computed: bool,
-    computed_grads: SmallVec<Tensor<'graph, F>>,
-    accumulated_grad: Option<Tensor<'graph, F>>,
-    default_grad: Option<Tensor<'graph, F>>,
+// GradientInfo is keyed by a TensorID and holds its gradient info for back-prop
+struct GradientInfo<'graph, F: Float> {
+    gradients: SmallVec<Tensor<'graph, F>>,
+    on_backprop_path: bool,
 }
 
-impl<'graph, F: Float> GradientMapValue<'graph, F> {
+impl<'graph, F: Float> GradientInfo<'graph, F> {
     #[inline]
-    fn new(has_gradient: bool) -> GradientMapValue<'graph, F> {
-        GradientMapValue {
-            on_gradient_path: has_gradient,
-            computed_grads: SmallVec::new(),
-            grad_computed: false,
-            accumulated_grad: None,
-            default_grad: None,
+    fn new(on_backprop_path: bool) -> GradientInfo<'graph, F> {
+        GradientInfo {
+            on_backprop_path,
+            gradients: SmallVec::new(),
         }
     }
 
     #[inline]
-    fn push_grad(&mut self, g: Tensor<'graph, F>) {
-        self.computed_grads.push(g);
-    }
-
-    fn accumulate_then_get(&mut self) -> Tensor<'graph, F> {
-        if let Some(acc) = self.accumulated_grad {
-            return acc;
+    fn gradient(&mut self) -> Tensor<'graph, F> {
+        if self.gradients.len() > 1 { // the accumulated gradients are added together at this time.
+            self.gradients[0] = T::add_n(self.gradients.as_slice());
         }
-        if self.computed_grads.len() == 1 {
-            self.computed_grads[0]
-        } else {
-            // accumulation is required
-            let accumulated = T::add_n(self.computed_grads.as_slice());
-            self.accumulated_grad = Some(accumulated);
-            accumulated
-        }
-    }
-
-    #[inline]
-    fn get_grad_tensor(&mut self) -> Tensor<'graph, F> {
-        if let Some(def) = self.default_grad {
-            def
-        } else {
-            self.accumulate_then_get()
-        }
+        self.gradients[0]
     }
 }
 
 #[inline]
-fn has_child_on_path<T: Float>(parent: Tensor<T>, path: &FxHashMap<usize, GradientMapValue<T>>) -> bool {
+fn has_child_on_path<T: Float>(parent: Tensor<T>, path: &FxHashMap<usize, GradientInfo<T>>) -> bool {
     let inner = parent.inner();
     for child in inner.get_backprop_inputs() {
-        if path.get(&child.id).unwrap().on_gradient_path {
+        if path.get(&child.id).unwrap().on_backprop_path {
             return true;
         }
     }
@@ -221,28 +199,28 @@ fn is_given_xs<'graph, F: Float, A>(candidate: usize, xs: &[A]) -> bool
 }
 
 // Go backward from ys and collect reachable nodes.
-// Nodes between `ys` and `xs` are marked as `on_gradient_path`.
-fn make_gradient_map<'graph, A, B, F: Float>(
+// Nodes between `ys` and `xs` are marked as `on_backprop_path`.
+fn init_gradient_map<'graph, A, B, F: Float>(
     g: &'graph Graph<F>,
     ys: &[A],
     xs: &[B],
-) -> FxHashMap<TensorID, GradientMapValue<'graph, F>>
+) -> GradientMap<'graph, F>
     where
         A: AsRef<Tensor<'graph, F>>,
         B: AsRef<Tensor<'graph, F>>,
 {
-    let mut ret = FxHashMap::<TensorID, GradientMapValue<F>>::default();
+    let mut map = FxHashMap::<TensorID, GradientInfo<F>>::default();
 
-    // Builds GradInfo while performing depth-first-search.
+    // Builds GradientInfo while performing depth-first-search.
 
     // dfs_stack: (node, should_visit)
     let mut dfs_stack: Vec<(TensorID, bool)> = ys.iter().map(|y| (y.as_ref().id, false)).collect();
     while let Some((curr_id, should_visit)) = dfs_stack.pop() {
         let curr_node = g.tensor(curr_id);
         if should_visit {
-            let on_grad_path =
-                curr_node.is_differentiable() && (is_given_xs(curr_id, xs) || has_child_on_path(curr_node, &ret));
-            ret.insert(curr_id, GradientMapValue::new(on_grad_path));
+            let on_backprop_path =
+                curr_node.is_differentiable() && (is_given_xs(curr_id, xs) || has_child_on_path(curr_node, &map));
+            map.insert(curr_id, GradientInfo::new(on_backprop_path));
         } else {
             // Put self on the stack top (should visit next time)
             dfs_stack.push((curr_id, true));
@@ -250,13 +228,13 @@ fn make_gradient_map<'graph, A, B, F: Float>(
             let curr_node = curr_node.inner();
             for child in curr_node.get_backprop_inputs() {
                 let child = child.as_tensor(g);
-                if ret.get(&curr_id).is_none() {
+                if map.get(&curr_id).is_none() {
                     if child.is_source() || !child.is_differentiable() {
                         // Add to result, but don't allow any more recursive search
                         // because there will be no `xs` nodes in this direction....
-                        ret.insert(
+                        map.insert(
                             child.id,
-                            GradientMapValue::new(child.is_differentiable() && is_given_xs(child.id, xs)),
+                            GradientInfo::new(child.is_differentiable() && is_given_xs(child.id, xs)),
                         );
                     } else {
                         // Recurse
@@ -266,6 +244,5 @@ fn make_gradient_map<'graph, A, B, F: Float>(
             }
         }
     }
-    ret
+    GradientMap { inner: map }
 }
-

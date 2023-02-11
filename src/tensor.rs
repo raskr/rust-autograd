@@ -1,4 +1,3 @@
-//! Defining things related to `autograd::Tensor`.
 use crate::Float;
 use crate::{op, Context};
 use crate::{NdArray, NdArrayView};
@@ -12,37 +11,36 @@ use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 use std::ops::{Add, Div, Mul, Sub};
 
-/// Lazy N-dimensional array.
+/// Lazy-evaluated multi-dimensional array
 ///
-/// `Tensor` is:
+/// Similar to numpy array, but is designed a bit differently:
+/// - `Tensor` itself doesn't have its content
+///   - cheap to `Copy`
+///   - Lazily evaluated to [ndarray::Array], i.e. the value is obtained only after call `Tensor::eval`, `Evaluator::run`, or `Optimizer::update`.
+/// - `Tensor` belongs to a particular [Graph] and is shorter lived than the graph
+///   - Note the lifetime parameter: `Tensor<'graph, _>`
+///   - The graph is always wrapped in [Context]
+/// - `Tensor` can behave as a trainable variable when in-place operations are applied
+///   - See [crate::variable]
 ///
-/// - created using `autograd::Context`.
-/// - not evaluated until `Tensor::eval`, `Evaluator::run`, or `Optimizer::update` is called.
-/// - cheap to `Copy` since it's just a symbol
-///
+/// ### Basic usages
 /// ```
 /// use autograd as ag;
 /// use ag::tensor_ops as T;
 /// use ag::prelude::*;
 ///
-/// let mut env = ag::VariableEnvironment::new();
-/// let v = env.slot().set(ag::ndarray_ext::ones(&[2, 3])); // variable array id
-///
-/// env.run(|ctx| {  // `Context` is necessary to create tensors.
-///     // Create a tensor in this ctx
+/// ag::run(|ctx: &mut ag::Context<_>| {  // `Context` is required to play with tensors
+///     // Create a random tensor with shape [2, 3] in this context
 ///     let random: ag::Tensor<f64> = T::standard_normal(&[2, 3], ctx);
 ///
-///     // Getting the tensor associated with a pre-registered variable array.
-///     let var = ctx.variable(v);
+///     // Binary operators are implemented
+///     let mul = 3. * random;
 ///
-///     // This is ok since tensor's binary operators are overloaded!
-///     let mul = random * 3. + var;
-///
-///     // Evaluates the tensor as an ndarray::Array<T, IxDyn>.
+///     // Tensor is evaluated as an ndarray::Array<T, IxDyn>.
 ///     type NdArray = ag::NdArray<f64>;
 ///     let mul_val: Result<NdArray, ag::EvalError> = mul.eval(ctx);
 ///
-///     // Reshapes the tensor without copy (ArrayView is used internally).
+///     // Internally used ndarray::ArrayView allows reshaping tensors without copying
 ///     let reshaped = T::reshape(random, &[6]);
 ///
 ///     // Evaluating multiple tensors at once.
@@ -57,7 +55,7 @@ pub struct Tensor<'graph, F: Float> {
     pub(crate) graph: &'graph Graph<F>,
 }
 
-impl<'t, 'graph: 't, F: Float> Tensor<'graph, F> {
+impl<'tensor, 'graph: 'tensor, F: Float> Tensor<'graph, F> {
     #[inline]
     pub(crate) fn get_incoming_tensors(&self) -> Ref<SmallVec<IncomingTensor>> {
         Ref::map(self.inner(), |x| &x.incoming_nodes)
@@ -68,7 +66,7 @@ impl<'t, 'graph: 't, F: Float> Tensor<'graph, F> {
         self.inner().incoming_nodes.get(i).map(|x| x.as_tensor(g))
     }
 
-    #[inline]
+    #[inline(always)]
     pub(crate) fn inner(&self) -> Ref<TensorInternal<F>> {
         self.graph.access_inner(self.id)
     }
@@ -95,7 +93,7 @@ impl<'t, 'graph: 't, F: Float> Tensor<'graph, F> {
     /// See also [Evaluator](../evaluation/struct.Evaluator.html).
     pub fn eval(&self, ctx: &Context<F>) -> Result<NdArray<F>, crate::EvalError> {
         crate::graph::assert_same_graph(ctx, self.graph);
-        let mut ret = ctx.eval(&[self], &[], ctx.env_handle);
+        let mut ret = ctx.eval(&[self], &[], ctx.var_env_ref);
         debug_assert_eq!(ret.len(), 1);
         ret.remove(0)
     }
@@ -146,7 +144,7 @@ impl<'t, 'graph: 't, F: Float> Tensor<'graph, F> {
         TensorBuilder {
             graph: graph.as_graph(),
             shape: None,
-            in_nodes: op::SmallVec::new(),
+            in_nodes: SmallVec::new(),
             differentiable: true,
             placeholder_name: None,
             backprop_inputs: None,
@@ -171,7 +169,7 @@ impl<'t, 'graph: 't, F: Float> Tensor<'graph, F> {
     /// ```
     pub fn map(
         &self,
-        f: fn(crate::ndarray_ext::NdArrayView<F>) -> NdArray<F>,
+        f: fn(NdArrayView<F>) -> NdArray<F>,
     ) -> Tensor<'graph, F> {
         crate::tensor_ops::map(self, f)
     }
@@ -415,7 +413,7 @@ pub(crate) struct TensorInternal<F: Float> {
     pub(crate) op: Option<Box<dyn op::Op<F>>>,
 
     /// References to immediate predecessors.
-    pub(crate) incoming_nodes: op::SmallVec<IncomingTensor>,
+    pub(crate) incoming_nodes: SmallVec<IncomingTensor>,
 
     /// The rank number for topological ordering in a graph.
     pub(crate) topo_rank: usize,
@@ -432,7 +430,7 @@ pub(crate) struct TensorInternal<F: Float> {
     /// Input nodes used when backprop.
     ///
     /// This is same as `inputs` in most cases.
-    pub(crate) backprop_inputs: Option<op::SmallVec<IncomingTensor>>,
+    pub(crate) backprop_inputs: Option<SmallVec<IncomingTensor>>,
 
     /// Static shape of this tensor.
     /// Each dim size is *signed* for placeholders.
@@ -611,16 +609,16 @@ impl<'graph> IncomingTensor {
 pub struct TensorBuilder<'g, F: Float> {
     graph: &'g Graph<F>,
     shape: Option<usize>, // usize is tensor id
-    in_nodes: op::SmallVec<IncomingTensor>,
+    in_nodes: SmallVec<IncomingTensor>,
     differentiable: bool,
-    backprop_inputs: Option<op::SmallVec<IncomingTensor>>,
+    backprop_inputs: Option<SmallVec<IncomingTensor>>,
     known_shape: Option<KnownShape>,
     variable_id: Option<VariableID>,
     placeholder_name: Option<&'static str>,
 }
 
 const NUM_MAX_KNOWN_SHAPE_SIZE: usize = 4;
-type ShapeVec = crate::smallvec::SmallVec<[isize; NUM_MAX_KNOWN_SHAPE_SIZE]>;
+type ShapeVec = smallvec::SmallVec<[isize; NUM_MAX_KNOWN_SHAPE_SIZE]>;
 
 pub(crate) struct KnownShape {
     shape: ShapeVec,
@@ -806,8 +804,8 @@ impl<'graph, F: Float> TensorBuilder<'graph, F> {
 
 pub(crate) struct Dummy;
 
-impl<T: Float> crate::op::Op<T> for Dummy {
-    fn compute(&self, _: &mut crate::op::ComputeContext<T>) -> Result<(), OpError> {
+impl<T: Float> op::Op<T> for Dummy {
+    fn compute(&self, _: &mut op::ComputeContext<T>) -> Result<(), OpError> {
         Ok(())
     }
     fn grad(&self, _: &mut GradientContext<T>) {}

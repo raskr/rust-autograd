@@ -145,6 +145,73 @@ pub(crate) fn shape_of<T: Float>(x: &NdArray<T>) -> NdArray<T> {
     NdArray::from_shape_vec(ndarray::IxDyn(&[rank]), shape).unwrap()
 }
 
+use std::iter;
+
+pub(crate) fn zip<I, J>(i: I, j: J) -> iter::Zip<I::IntoIter, J::IntoIter>
+    where
+        I: IntoIterator,
+        J: IntoIterator,
+{
+    i.into_iter().zip(j)
+}
+
+pub fn select<F: Clone>(param: &NdArrayView<F>, axis: ndarray::Axis, indices: &[ndarray::Ix]) -> NdArray<F>
+{
+    let mut subs = vec![param.view(); indices.len()];
+    for (&i, sub) in zip(indices, &mut subs[..]) {
+        sub.collapse_axis(axis, i);
+    }
+    assert!(!subs.is_empty(), "Got empty indices for select");
+    concatenate(axis, subs.as_slice()).unwrap()
+}
+
+use ndarray::Dimension;
+use ndarray::RemoveAxis;
+
+// copied from ndarray <= 0.14 for compatibility
+pub fn concatenate<F: Clone>(axis: ndarray::Axis, arrays: &[NdArrayView<F>]) -> Result<NdArray<F>, ndarray::ShapeError>
+{
+    if arrays.is_empty() {
+        return Err(ndarray::ShapeError::from_kind(ndarray::ErrorKind::Unsupported));
+    }
+    let mut res_dim = arrays[0].raw_dim();
+    if axis.index() >= res_dim.ndim() {
+        return Err(ndarray::ShapeError::from_kind(ndarray::ErrorKind::OutOfBounds));
+    }
+    let common_dim = res_dim.remove_axis(axis);
+    if arrays
+        .iter()
+        .any(|a| a.raw_dim().remove_axis(axis) != common_dim)
+    {
+        return Err(ndarray::ShapeError::from_kind(ndarray::ErrorKind::IncompatibleShape));
+    }
+
+    let stacked_dim = arrays.iter().fold(0, |acc, a| acc + a.len_of(axis));
+    res_dim[axis.index()] = stacked_dim;
+    // res_dim.set_axis(axis, stacked_dim);
+
+    // we can safely use uninitialized values here because they are Copy
+    // and we will only ever write to them
+    let size = res_dim.size();
+    let mut v = Vec::with_capacity(size);
+    unsafe {
+        v.set_len(size);
+    }
+    let mut res = ndarray::Array::from_shape_vec(res_dim, v)?;
+
+    {
+        let mut assign_view = res.view_mut();
+        for array in arrays {
+            let len = array.len_of(axis);
+            let (mut front, rest) = assign_view.split_at(axis, len);
+            front.assign(array);
+            assign_view = rest;
+        }
+    }
+    Ok(res)
+}
+
+
 /// A collection of array generator functions.
 pub mod array_gen {
     use rand::distributions::Distribution;

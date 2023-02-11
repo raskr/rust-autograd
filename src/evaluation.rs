@@ -1,4 +1,3 @@
-//! Defining things related to evaluation of `Tensor`s
 use crate::ndarray::ArrayView;
 use crate::ndarray_ext::{NdArray, NdArrayView, RawNdArrayView};
 use crate::op::{self, OpInput};
@@ -56,16 +55,38 @@ impl Placeholder for &'static str {
 ///        .run();  // Do eval
 ///    });
 /// ```
-pub struct Evaluator<'view, 'graph, 'env, 'name, 'ctx, F: Float> {
-    ctx: &'ctx Context<'env, 'name, F>,
+pub struct Evaluator<'graph, 'env, 'feed, F: Float> {
+    graph: &'graph Graph<F>,
+    var_env: &'env VariableEnvironment<F>,
+    feeder: Feeder<'feed, F>,
     eval_targets: Vec<Tensor<'graph, F>>,
-    feeder: Feeder<'view, F>,
 }
 
 /// Utility for feeding NdArrays to graphs at run-time
 ///
 /// Helpful when used with [optimizers::Optimizer::update](crate::optimizers::Optimizer::update).
-/// See [crate::optimizers::momentum_sgd::MomentumSGD].
+///
+/// ```
+/// use autograd as ag;
+/// use ag::prelude::*;
+/// use ag::optimizers;
+/// use ag::optimizers::MomentumSGD;
+///
+/// type Tensor<'g> = ag::Tensor<'g, f64>;
+/// let mut env = ag::VariableEnvironment::new();
+/// let opt = MomentumSGD::default("sgd", env.default_namespace().current_var_ids(), &mut env);
+///
+/// env.run(|g| {
+///    let p = g.placeholder("p", &[]);
+///
+///    let mut feeder = ag::Feeder::new();
+///    let feed = ag::ndarray::arr0(2.);
+///    feeder.push(p, feed.view());
+///
+///    let (params, grads): (&[Tensor], &[Tensor]) = (&[], &[]); // dummy here
+///    opt.update(params, grads, g, feeder); // do parameter update
+/// });
+/// ```
 #[derive(Clone)]
 pub struct Feeder<'view, F: Float> {
     feeds: Vec<Feed<'view, F>>,
@@ -92,19 +113,20 @@ impl<'view, F: Float> Feeder<'view, F> {
     }
 }
 
-impl<'graph, 'env, 'name, 'view, F: Float> Context<'env, 'name, F> {
+impl<'graph, 'env, 'view, F: Float> Context<'env, F> {
     /// Creates a new evaluator
     #[inline]
-    pub fn evaluator<'c>(&'c self) -> Evaluator<'view, 'graph, 'env, 'name, 'c, F> {
+    pub fn evaluator<'c: 'graph + 'env>(&'c self) -> Evaluator<'view, 'graph, 'env, F> {
         Evaluator {
             feeder: Feeder { feeds: Vec::new() },
-            ctx: self,
+            var_env: self.var_env_ref,
+            graph: &self.graph,
             eval_targets: Vec::new(),
         }
     }
 }
 
-impl<'tensor, 'view, 'graph, 'env, 'name, 'ctx, F: Float> Evaluator<'view, 'graph, 'env, 'name, 'ctx, F> {
+impl<'tensor, 'view, 'graph, 'env, 'ctx, F: Float> Evaluator<'view, 'graph, 'env, F> {
     #[inline]
     /// Appends a tensor to the back of the evaluation targets.
     pub fn push<A>(&mut self, x: A) -> &mut Self
@@ -144,9 +166,8 @@ impl<'tensor, 'view, 'graph, 'env, 'name, 'ctx, F: Float> Evaluator<'view, 'grap
     #[inline]
     /// Evaluates the buffered tensors.
     pub fn run(&'tensor self) -> Vec<Result<NdArray<F>, crate::EvalError>> {
-        self.ctx
-            .graph
-            .eval(self.eval_targets.as_slice(), &self.feeder.feeds, self.ctx.env_handle)
+        self.graph
+            .eval(self.eval_targets.as_slice(), &self.feeder.feeds, self.var_env)
     }
 }
 

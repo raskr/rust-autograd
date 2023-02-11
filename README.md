@@ -19,7 +19,7 @@ autograd = {"<version>", features = ["blas", "<blas-implementation-choice>"] }
 - `openblas`
 
 ## Features
-### Reverse-mode automatic differentiation using lazy tensors
+### Reverse-mode automatic differentiation
 Here we are just computing partial derivatives of `z = 2x^2 + 3y + 1`.
  ```rust
 use autograd as ag;

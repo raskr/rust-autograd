@@ -35,7 +35,7 @@ where
     let mut vars = Vec::with_capacity(xs.len());
     let mut grads = Vec::with_capacity(xs.len());
     for x in xs.iter() {
-        let gx = gradients.get(x);
+        let gx = gradients.extract_grad(x);
         if let Some(a) = gx {
             vars.push(*x);
             grads.push(a);

@@ -27,7 +27,7 @@ use crate::{Context, Float, VariableEnvironment};
 ///    let feed = ag::ndarray::arr0(2.);
 ///    feeder.push(p, feed.view());
 ///
-///    let (params, grads): (&[Tensor], &[Tensor]) = (&[], &[]); // dummy
+///    let (params, grads): (&[Tensor], &[Tensor]) = (&[], &[]); // dummy here
 ///    opt.update(params, grads, g, feeder); // do parameter update
 /// });
 /// ```
@@ -38,7 +38,7 @@ pub struct MomentumSGD<F> {
 }
 
 impl<'t, 'g, F: Float> MomentumSGD<F> {
-    /// Instantiates `Adam` optimizer with the recommended parameters in the original paper.
+    /// Instantiates `MomentumSGD` optimizer with the recommended parameters.
     pub fn default(
         unique_namespace_id: &'static str,
         var_id_list: impl IntoIterator<Item = VariableID>,

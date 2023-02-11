@@ -1,5 +1,3 @@
-//! Defining things related to `autograd::op::Op`.
-//!
 //! # Implementing differentiable operations
 //!
 //! Many of well-known ops are pre-defined in [crate::tensor_ops], but you can also

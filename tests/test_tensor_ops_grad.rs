@@ -1431,19 +1431,17 @@ fn conv2d_grad() {
         let w = graph.variable(w);
         let y = T::conv2d(x, w, 0, 1);
         let gy = graph.variable(gy);
-        unsafe {
-            let g = T::grad_with_default(&[y], &[x], &[gy])[0];
-            let gg = T::grad(&[g], &[gy])[0];
-            ag::test_helper::check_theoretical_grads(
-                g,
-                &[gg],
-                &[gy],
-                ag::Feeder::new(),
-                1e-3,
-                1e-2,
-                graph,
-            );
-        }
+        let g = T::grad_with_default(&[y], &[x], &[gy])[0];
+        let gg = T::grad(&[g], &[gy])[0];
+        ag::test_helper::check_theoretical_grads(
+            g,
+            &[gg],
+            &[gy],
+            ag::Feeder::new(),
+            1e-3,
+            1e-2,
+            graph,
+        );
     });
 }
 
@@ -1519,19 +1517,17 @@ fn max_pool2d_grad() {
         let x = graph.variable(x);
         let y = T::max_pool2d(T::reshape(x, &[2, 2, 3, 3]), 2, 0, 1);
         let gy = graph.variable(gy);
-        unsafe {
-            let g = T::grad_with_default(&[y], &[x], &[gy])[0];
-            let gg = T::grad(&[g], &[gy])[0];
-            ag::test_helper::check_theoretical_grads(
-                g,
-                &[gg],
-                &[gy],
-                ag::Feeder::new(),
-                1e-3,
-                1e-2,
-                graph,
-            );
-        }
+        let g = T::grad_with_default(&[y], &[x], &[gy])[0];
+        let gg = T::grad(&[g], &[gy])[0];
+        ag::test_helper::check_theoretical_grads(
+            g,
+            &[gg],
+            &[gy],
+            ag::Feeder::new(),
+            1e-3,
+            1e-2,
+            graph,
+        );
     });
 }
 

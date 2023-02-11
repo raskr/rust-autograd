@@ -57,6 +57,7 @@ impl<'graph, F: Float> Tensor<'graph, F> {
 /// * `ys` - Targets of differentiation that are arbitrary shapes.
 /// * `xs` - Tensors with which differentiate `ys`.
 ///
+/// `ys`
 /// See the more useful helper: [crate::optimizers::grad_helper()]
 ///
 /// ```
@@ -65,9 +66,9 @@ impl<'graph, F: Float> Tensor<'graph, F> {
 /// use autograd as ag;
 /// use ag::tensor_ops as T;
 ///
-/// ag::run(|g| {
-///     let x = g.placeholder("x", &[]);
-///     let y = g.placeholder("y", &[]);
+/// ag::run(|ctx| {
+///     let x = ctx.placeholder("x", &[]);
+///     let y = ctx.placeholder("y", &[]);
 ///     let z = 2.*x*x + 3.*y + 1.;
 ///
 ///     // dz/dy
@@ -79,11 +80,11 @@ impl<'graph, F: Float> Tensor<'graph, F> {
 ///     let ggx = T::grad(&[gx], &[x])[0];
 ///
 ///     // evaluation of gradients
-///     assert_eq!(3., gy.eval(g).unwrap()[ndarray::IxDyn(&[])]);
-///     assert_eq!(4., ggx.eval(g).unwrap()[ndarray::IxDyn(&[])]);
+///     assert_eq!(3., gy.eval(ctx).unwrap()[ndarray::IxDyn(&[])]);
+///     assert_eq!(4., ggx.eval(ctx).unwrap()[ndarray::IxDyn(&[])]);
 ///
-///     // dz/dx requires to fill the placeholder `x`
-///     let gx = g.evaluator()
+///     // Evaluate dz/dx when x=2:
+///     let gx = ctx.evaluator()
 ///         .push(gx)
 ///         .feed(x, ndarray::arr0(2.).view())
 ///         .run();
@@ -95,12 +96,14 @@ where
     A: AsRef<Tensor<'graph, F>>,
     B: AsRef<Tensor<'graph, F>>,
 {
+    use crate::gradient::compute_gradients;
+
     let g = ys[0].as_ref().graph();
     let ys: Vec<_> = ys.into_iter().map(|y| sum_all(y)).collect();
-    let mut grads = crate::gradient::compute_gradients(ys.as_slice(), xs, None, g);
+    let mut grads = compute_gradients(ys.as_slice(), xs, None, g);
     let mut ret = Vec::with_capacity(xs.len());
     for x in xs {
-        if let Some(gx) = grads.get(x) {
+        if let Some(gx) = grads.extract_grad(x) {
             ret.push(gx);
         } else {
             // not differentiable
@@ -113,10 +116,9 @@ where
 /// Computes `xs`'s gradients with `ys`'s already known gradients.
 ///
 /// Almost same spec as `grad`'s except that you can pass `ys`s already known gradients.
-/// If `ys_grads` are tensors filled with 1s, this function should be replaced with `grad`.
+/// If `ys_grads` are tensors filled with 1s, this function should be replaced with [crate::tensor_ops::grad()].
 ///
-/// NOTE: Please be careful to match `ys_grads[i].shape` and `ys[i].shape`,
-/// otherwise **undefined behavior** would happen.
+/// NOTE: Please be careful to match `ys_grads[i].shape` and `ys[i].shape`.
 ///
 /// # Arguments
 /// * `ys` - Targets of differentiation.
@@ -125,7 +127,7 @@ where
 ///
 /// # Returns
 /// Gradient tensors of `xs` in the same order as `xs`'graph.
-pub unsafe fn grad_with_default<'graph, F: Float, A, B>(
+pub fn grad_with_default<'graph, F: Float, A, B>(
     ys: &[A],
     xs: &[B],
     ys_grads: &[Tensor<'graph, F>],
@@ -134,11 +136,13 @@ where
     A: AsRef<Tensor<'graph, F>>,
     B: AsRef<Tensor<'graph, F>>,
 {
+    use crate::gradient::compute_gradients;
+
     let g = ys[0].as_ref().graph();
-    let mut grads = crate::gradient::compute_gradients(ys, xs, Some(ys_grads), g);
+    let mut grads = compute_gradients(ys, xs, Some(ys_grads), g);
     let mut ret = Vec::with_capacity(xs.len());
     for x in xs {
-        if let Some(gx) = grads.get(x) {
+        if let Some(gx) = grads.extract_grad(x) {
             ret.push(gx);
         } else {
             // not differentiable

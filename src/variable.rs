@@ -1,6 +1,9 @@
-//! Defining things related to variable tensors
-//!
 //! ## Variable and namespace
+//!
+//! [Tensor] can behave like a trainable variable if the corresponding NdArray were registered in a [VariableEnvironment].
+//!
+//! ### Basic usages
+//!
 //! ```
 //! use autograd as ag;
 //! use ag::ndarray_ext;
@@ -8,12 +11,12 @@
 //! use ag::Tensor;
 //! use ag::prelude::*;
 //!
-//!
 //! let mut env = ag::VariableEnvironment::new();
 //!
 //! // Register variable arrays in the *default* namespace.
 //! // `set` method returns the id of the given array;
 //! let a: VariableID = env.set(ndarray_ext::zeros(&[1, 10]));
+//!
 //! // You can name arrays and lookup them later
 //! let b: VariableID = env.name("b")
 //!                        .set(ndarray_ext::zeros(&[1, 10]));
@@ -26,6 +29,7 @@
 //!
 //! // Create and run some graphs with the env.
 //! for epoch in 0..10 {
+//!     // use VariableEnvironment::run() to lookup the vars.
 //!     env.run(|ctx| {
 //!         // Lookup variable tensors.
 //!         let _: Tensor<f32> = ctx.variable(a); // with VariableID
@@ -42,13 +46,15 @@
 //! let names_: Vec<&str> = env.namespace("my_namespace").current_var_names();
 //! ```
 //!
+//! See also neural network examples in `examples` directory.
+//!
 //! # Model persistence
 //! ```
 //! use autograd as ag;
 //! use std::fs;
 //! use std::error::Error;
 //!
-//! let dir = "/tmp/autograd/test_save_and_load";
+//! let dir = "/tmp/rust-autograd/test/model_persistence";
 //! fs::create_dir_all(dir).unwrap();
 //! let path = format!("{}/model.json", dir);
 //! let rng = ag::ndarray_ext::ArrayRng::<f64>::default();
@@ -63,7 +69,7 @@
 //! // load it
 //! let loaded_env = ag::VariableEnvironment::<f64>::load(&path).unwrap();
 //!
-//! // it's possible to initialize the existing env
+//! // alternatively, it's possible to initialize the existing env
 //! let mut new_env = ag::VariableEnvironment::<f64>::new();
 //! let _: Result<(), Box<dyn Error>> = new_env.initialize(path);
 //!
@@ -74,7 +80,6 @@ use crate::{uuid::Uuid, Float, FxHashMap, Graph, NdArray, Tensor, NdArrayViewMut
 use serde::Deserialize;
 use serde_json;
 use smallvec::alloc::fmt::Formatter;
-use std::borrow::Cow;
 use std::cell::RefCell;
 
 use std::error::Error;
@@ -108,25 +113,25 @@ impl std::fmt::Display for VariableID {
 
 const DEFAULT_NAMESPACE_ID: &'static str = "";
 
-pub(crate) type Variable<F> = RefCell<NdArray<F>>;
+pub type Variable<F> = RefCell<NdArray<F>>;
 
 /// Get or create a variable tensor.
 pub trait GetVariableTensor<'g, F: Float, Arg> {
     fn variable(&'g self, id: Arg) -> Tensor<'g, F>;
 }
 
-impl<'g, 'e: 'name + 'g, 'name, F: Float> GetVariableTensor<'g, F, &'static str>
-    for Context<'e, 'name, F>
+impl<'g, 'e: 'g, F: Float> GetVariableTensor<'g, F, &'static str>
+    for Context<'e, F>
 {
     /// Get or create a variable tensor by name in the default namespace.
-    fn variable(&'g self, name: &'name str) -> Tensor<'g, F> {
+    fn variable(&'g self, name: &str) -> Tensor<'g, F> {
         self.graph
-            .variable_by_name(name, &self.env_handle.default_namespace())
+            .variable_by_name(name, &self.var_env_ref.default_namespace())
     }
 }
 
-impl<'g, 'e: 'name + 'g, 'name, F: Float> GetVariableTensor<'g, F, VariableID>
-    for Context<'e, 'name, F>
+impl<'g, 'e: 'g, F: Float> GetVariableTensor<'g, F, VariableID>
+    for Context<'e, F>
 {
     /// Get or create a variable tensor by [`VariableID`]
     fn variable(&'g self, id: VariableID) -> Tensor<'g, F> {
@@ -134,13 +139,13 @@ impl<'g, 'e: 'name + 'g, 'name, F: Float> GetVariableTensor<'g, F, VariableID>
     }
 }
 
-impl<'g, 'e: 'name + 'g, 'name, F: Float> GetVariableTensor<'g, F, (&'static str, &'static str)>
-    for Context<'e, 'name, F>
+impl<'g, 'e: 'g, F: Float, S: AsRef<str>> GetVariableTensor<'g, F, (&'static str, &'static str)>
+    for Context<'e, F>
 {
     /// Get or create a variable tensor by VariableID
-    fn variable(&'g self, id: (&'static str, &'static str)) -> Tensor<'g, F> {
+    fn variable(&'g self, id: (S, S)) -> Tensor<'g, F> {
         self.graph
-            .variable_by_name(id.1, &self.env_handle.namespace(id.0))
+            .variable_by_name(id.1, &self.var_env_ref.namespace(id.0))
     }
 }
 
@@ -148,16 +153,16 @@ impl<'g, 'e: 'name + 'g, 'name, F: Float> GetVariableTensor<'g, F, (&'static str
 ///
 /// See [variable](crate::variable).
 #[derive(Clone)]
-pub struct VariableEnvironment<'name, F> {
+pub struct VariableEnvironment<F> {
     pub(crate) array_list: Vec<Variable<F>>,
-    pub(crate) name_to_id: FxHashMap<FullName<'name>, VariableID>,
+    pub(crate) name_to_id: FxHashMap<FullName, VariableID>,
 }
 
 // Identifies variable array
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub(crate) struct FullName<'name> {
-    pub(crate) namespace_id: Cow<'name, str>,
-    pub(crate) variable_name: Cow<'name, str>,
+pub(crate) struct FullName {
+    pub(crate) namespace_id: String,
+    pub(crate) variable_name: String,
 }
 
 /// Anonymous slot to register a variable
@@ -165,8 +170,8 @@ pub(crate) struct FullName<'name> {
 /// The registered variable array will be kept in the associated namespace.
 ///
 /// Use `VariableNamespaceMut::slot` to instantiate this.
-pub struct VariableSlot<'ns, 'env, 'name, F: Float> {
-    namespace: &'ns mut VariableNamespaceMut<'env, 'name, F>,
+pub struct VariableSlot<'ns, 'env, F: Float> {
+    namespace: &'ns mut VariableNamespaceMut<'env, F>,
 }
 
 /// Named slot to register a variable
@@ -175,24 +180,24 @@ pub struct VariableSlot<'ns, 'env, 'name, F: Float> {
 ///
 /// The registered variable array will be kept in the associated namespace.
 /// You can lookup the array's tensor representation using the name later.
-pub struct NamedVariableSlot<'ns, 'env, 'name, F: Float, S: Into<String>> {
-    namespace: &'ns mut VariableNamespaceMut<'env, 'name, F>,
+pub struct NamedVariableSlot<'ns, 'env, F: Float, S: Into<String>> {
+    namespace: &'ns mut VariableNamespaceMut<'env, F>,
     name: S,
 }
 
 /// Anonymous slot to register a variable
 ///
 /// The registered variable array will be kept in the *default* namespace.
-pub struct DefaultVariableSlot<'env, 'name, F: Float> {
-    env: &'env mut VariableEnvironment<'name, F>,
+pub struct DefaultVariableSlot<'env, F: Float> {
+    env: &'env mut VariableEnvironment<F>,
 }
 
 /// Named slot where a variable array can be registered
 ///
 /// The registered variable array will be kept in the *default* namespace.
 /// You can lookup the array's tensor representation using the name later.
-pub struct NamedDefaultVariableSlot<'env, 'name, F: Float, S: Into<String>> {
-    env: &'env mut VariableEnvironment<'name, F>,
+pub struct NamedDefaultVariableSlot<'env, F: Float, S: Into<String>> {
+    env: &'env mut VariableEnvironment<F>,
     name: S,
 }
 
@@ -200,23 +205,23 @@ pub struct NamedDefaultVariableSlot<'env, 'name, F: Float, S: Into<String>> {
 ///
 /// Each of the variables managed by autograd is always associated to a single namespace.
 /// See [variable](crate::variable).
-pub struct VariableNamespace<'env, 'name, F: Float> {
-    pub(crate) env: &'env VariableEnvironment<'name, F>,
+pub struct VariableNamespace<'env, F: Float> {
+    pub(crate) env: &'env VariableEnvironment<F>,
     pub(crate) namespace_id: &'static str,
 }
 
 /// Mutable version of `VariableNamespace`.
 ///
 /// You can register a new variable array with this namespace using `slot` method.
-pub struct VariableNamespaceMut<'env, 'name, F: Float> {
-    pub(crate) env: &'env mut VariableEnvironment<'name, F>,
+pub struct VariableNamespaceMut<'env, F: Float> {
+    pub(crate) env: &'env mut VariableEnvironment<F>,
     pub(crate) namespace_id: &'static str,
 }
 
-impl<'name> FullName<'name> {
-    fn new(namespace_id: &'static str, variable_name: Cow<'name, str>) -> Self {
+impl FullName {
+    fn new(namespace_id: &'static str, variable_name: String) -> Self {
         FullName {
-            namespace_id: Cow::Borrowed(namespace_id),
+            namespace_id: namespace_id.to_string(),
             variable_name,
         }
     }
@@ -246,7 +251,7 @@ pub trait NamespaceTrait<F: Float> {
     /// Returns `None` if the given name is not valid in this namespace.
     #[inline]
     fn get_array_by_name<S: AsRef<str>>(&self, name: S) -> Option<&RefCell<NdArray<F>>> {
-        let name = &FullName::new(self.name(), Cow::Borrowed(name.as_ref()));
+        let name = &FullName::new(self.name(), name.as_ref().to_string());
         self.env()
             .name_to_id
             .get(name)
@@ -284,7 +289,7 @@ pub trait NamespaceTrait<F: Float> {
     }
 }
 
-impl<'ns, 'env, 'name, F: Float, S: Into<String>> NamedVariableSlot<'ns, 'env, 'name, F, S> {
+impl<'ns, 'env, F: Float, S: Into<String>> NamedVariableSlot<'ns, 'env, F, S> {
     /// Registers the given name and array with the specified namespace.
     pub fn set<D: ndarray::Dimension>(self, v: ndarray::Array<F, D>) -> VariableID {
         register_variable(
@@ -296,7 +301,7 @@ impl<'ns, 'env, 'name, F: Float, S: Into<String>> NamedVariableSlot<'ns, 'env, '
     }
 }
 
-impl<'env, 'name, F: Float> DefaultVariableSlot<'env, 'name, F> {
+impl<'env, F: Float> DefaultVariableSlot<'env, F> {
     /// Registers the given array with the *default* namespace.
     pub fn set<D: ndarray::Dimension>(self, v: ndarray::Array<F, D>) -> VariableID {
         register_variable(
@@ -308,7 +313,7 @@ impl<'env, 'name, F: Float> DefaultVariableSlot<'env, 'name, F> {
     }
 
     /// Specifies the name for the array that will be registered.
-    pub fn name<S: Into<String>>(self, name: S) -> NamedDefaultVariableSlot<'env, 'name, F, S> {
+    pub fn name<S: Into<String>>(self, name: S) -> NamedDefaultVariableSlot<'env, F, S> {
         NamedDefaultVariableSlot {
             env: self.env,
             name,
@@ -316,14 +321,14 @@ impl<'env, 'name, F: Float> DefaultVariableSlot<'env, 'name, F> {
     }
 }
 
-impl<'env, 'name, F: Float, S: Into<String>> NamedDefaultVariableSlot<'env, 'name, F, S> {
+impl<'env, F: Float, S: Into<String>> NamedDefaultVariableSlot<'env, F, S> {
     /// Registers the given name and array with the specified namespace.
     pub fn set<D: ndarray::Dimension>(self, v: ndarray::Array<F, D>) -> VariableID {
         register_variable(v, DEFAULT_NAMESPACE_ID, self.name.into(), self.env)
     }
 }
 
-impl<'ns, 'env, 'name, F: Float> VariableSlot<'ns, 'env, 'name, F> {
+impl<'ns, 'env, F: Float> VariableSlot<'ns, 'env, F> {
     /// Registers the given array with the specified namespace.
     pub fn set<D: ndarray::Dimension>(self, v: ndarray::Array<F, D>) -> VariableID {
         register_variable(
@@ -335,7 +340,7 @@ impl<'ns, 'env, 'name, F: Float> VariableSlot<'ns, 'env, 'name, F> {
     }
 
     /// Specifies the name for the array that will be registered.
-    pub fn name<S: Into<String>>(self, name: S) -> NamedVariableSlot<'ns, 'env, 'name, F, S> {
+    pub fn name<S: Into<String>>(self, name: S) -> NamedVariableSlot<'ns, 'env, F, S> {
         NamedVariableSlot {
             namespace: self.namespace,
             name,
@@ -349,14 +354,14 @@ fn register_variable<F: Float, D: ndarray::Dimension, S: Into<String>>(
     variable_name: S,
     env: &mut VariableEnvironment<F>,
 ) -> VariableID {
-    let vid = FullName::new(namespace_id, Cow::Owned(variable_name.into()));
+    let vid = FullName::new(namespace_id, variable_name.into());
     let next_id = env.array_list.len().into();
     env.name_to_id.insert(vid, next_id);
     env.array_list.push(RefCell::new(v.into_dyn()));
     next_id
 }
 
-impl<'env, 'name, F: Float> NamespaceTrait<F> for VariableNamespace<'env, 'name, F> {
+impl<'env, F: Float> NamespaceTrait<F> for VariableNamespace<'env, F> {
     #[inline]
     fn name(&self) -> &'static str {
         self.namespace_id
@@ -367,7 +372,7 @@ impl<'env, 'name, F: Float> NamespaceTrait<F> for VariableNamespace<'env, 'name,
     }
 }
 
-impl<'env, 'name, F: Float> NamespaceTrait<F> for VariableNamespaceMut<'env, 'name, F> {
+impl<'env, F: Float> NamespaceTrait<F> for VariableNamespaceMut<'env, F> {
     #[inline]
     fn name(&self) -> &'static str {
         self.namespace_id
@@ -378,25 +383,25 @@ impl<'env, 'name, F: Float> NamespaceTrait<F> for VariableNamespaceMut<'env, 'na
     }
 }
 
-impl<'e: 'name, 'name, F: Float> VariableNamespace<'e, 'name, F> {
+impl<'e, F: Float> VariableNamespace<'e, F> {
     /// Returns an iterator of variable arrays and their names in this namespace
     #[allow(unused)]
-    pub fn iter(&'name self) -> impl Iterator<Item = (&'name str, &RefCell<NdArray<F>>)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &RefCell<NdArray<F>>)> {
         iter(self)
     }
 }
 
-impl<'e: 'name, 'name, F: Float> VariableNamespaceMut<'e, 'name, F> {
+impl<'e, F: Float> VariableNamespaceMut<'e, F> {
     /// Returns an iterator of variable arrays and their names in this namespace
     #[allow(unused)]
-    pub fn iter(&'name self) -> impl Iterator<Item = (&'name str, &RefCell<NdArray<F>>)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &RefCell<NdArray<F>>)> {
         iter(self)
     }
 }
 
-fn iter<'name, F: Float>(
-    ns: &'name impl NamespaceTrait<F>,
-) -> impl Iterator<Item = (&'name str, &RefCell<NdArray<F>>)> {
+fn iter<F: Float>(
+    ns: &impl NamespaceTrait<F>,
+) -> impl Iterator<Item = (&str, &RefCell<NdArray<F>>)> {
     ns.env().name_to_id.iter().filter_map(move |ent| {
         // filter out other namespaces
         if &ent.0.namespace_id == ns.name() {
@@ -409,9 +414,9 @@ fn iter<'name, F: Float>(
         }
     })
 }
-impl<'ns, 'env, 'name, F: Float> VariableNamespaceMut<'env, 'name, F> {
+impl<'ns, 'env, F: Float> VariableNamespaceMut<'env, F> {
     /// Makes a temporary slot for registering a variable array in this namespace.
-    pub fn slot(&'ns mut self) -> VariableSlot<'ns, 'env, 'name, F> {
+    pub fn slot(&'ns mut self) -> VariableSlot<'ns, 'env, F> {
         VariableSlot { namespace: self }
     }
 }
@@ -483,13 +488,13 @@ struct DeserializedVariableEnvironment<F> {
 }
 
 // f32 save and load
-impl<'env, 'name> VariableEnvironment<'name, f32> {
+impl<'env> VariableEnvironment<f32> {
     /// Creates a new `VariableEnvironment` using the one that was previously persisted.
     ///
     /// Returns the result of the execution.
     pub fn load<P: AsRef<Path>>(
         path: P,
-    ) -> Result<VariableEnvironment<'name, f32>, Box<dyn Error>> {
+    ) -> Result<VariableEnvironment<f32>, Box<dyn Error>> {
         let raw: DeserializedVariableEnvironment<f32> = Self::deserialize(path)?;
         Self::load_internal(raw)
     }
@@ -508,13 +513,13 @@ impl<'env, 'name> VariableEnvironment<'name, f32> {
 }
 
 // f64 save and load
-impl<'env, 'name> VariableEnvironment<'name, f64> {
+impl<'env> VariableEnvironment<f64> {
     /// Creates a new `VariableEnvironment` using the one that was previously persisted.
     ///
     /// Returns the result of the execution.
     pub fn load<P: AsRef<Path>>(
         path: P,
-    ) -> Result<VariableEnvironment<'name, f64>, Box<dyn Error>> {
+    ) -> Result<VariableEnvironment<f64>, Box<dyn Error>> {
         let raw: DeserializedVariableEnvironment<f64> = Self::deserialize(path)?;
         Self::load_internal(raw)
     }
@@ -532,9 +537,9 @@ impl<'env, 'name> VariableEnvironment<'name, f64> {
     }
 }
 
-impl<'env, 'name, F: Float> VariableEnvironment<'name, F> {
+impl<'env, F: Float> VariableEnvironment<F> {
     // New
-    pub fn new() -> VariableEnvironment<'name, F> {
+    pub fn new() -> VariableEnvironment<F> {
         Self {
             name_to_id: FxHashMap::default(),
             array_list: Vec::new(),
@@ -570,7 +575,7 @@ impl<'env, 'name, F: Float> VariableEnvironment<'name, F> {
 
     fn load_internal<T>(
         env: DeserializedVariableEnvironment<T>,
-    ) -> Result<VariableEnvironment<'name, T>, Box<dyn Error>> {
+    ) -> Result<VariableEnvironment<T>, Box<dyn Error>> {
         let name_to_id: FxHashMap<FullName, VariableID> = env
             .name_to_id
             .iter()
@@ -579,8 +584,8 @@ impl<'env, 'name, F: Float> VariableEnvironment<'name, F> {
                 let namespace_id = split.next().unwrap().to_owned();
                 let var_name = split.next().unwrap().to_owned();
                 let fullname = FullName {
-                    namespace_id: Cow::Owned(namespace_id),
-                    variable_name: Cow::Owned(var_name),
+                    namespace_id,
+                    variable_name: var_name,
                 };
                 (fullname, vid)
             })
@@ -605,7 +610,7 @@ impl<'env, 'name, F: Float> VariableEnvironment<'name, F> {
     }
 
     /// Makes a temporary slot for registering a variable array in the *default* namespace.
-    pub fn slot(&'env mut self) -> DefaultVariableSlot<'env, 'name, F> {
+    pub fn slot(&'env mut self) -> DefaultVariableSlot<'env, F> {
         DefaultVariableSlot { env: self }
     }
 
@@ -618,7 +623,7 @@ impl<'env, 'name, F: Float> VariableEnvironment<'name, F> {
     pub fn name<S: Into<String>>(
         &'env mut self,
         name: S,
-    ) -> NamedDefaultVariableSlot<'env, 'name, F, S> {
+    ) -> NamedDefaultVariableSlot<'env, F, S> {
         NamedDefaultVariableSlot { env: self, name }
     }
 
@@ -627,7 +632,7 @@ impl<'env, 'name, F: Float> VariableEnvironment<'name, F> {
     /// See [variable](crate::variable).
     /// Same as [`Context::namespace`](Context::namespace()).
     #[inline]
-    pub fn namespace(&'env self, namespace_id: &'static str) -> VariableNamespace<'env, 'name, F> {
+    pub fn namespace(&'env self, namespace_id: &'static str) -> VariableNamespace<'env, F> {
         VariableNamespace {
             namespace_id,
             env: self,
@@ -642,7 +647,7 @@ impl<'env, 'name, F: Float> VariableEnvironment<'name, F> {
     pub fn namespace_mut(
         &'env mut self,
         namespace_id: &'static str,
-    ) -> VariableNamespaceMut<'env, 'name, F> {
+    ) -> VariableNamespaceMut<'env, F> {
         VariableNamespaceMut {
             namespace_id,
             env: self,
@@ -654,7 +659,7 @@ impl<'env, 'name, F: Float> VariableEnvironment<'name, F> {
     /// See [variable](crate::variable).
     /// Same as [`Context::default_namespace`](Context::default_namespace).
     #[inline]
-    pub fn default_namespace(&'env self) -> VariableNamespace<'env, 'name, F> {
+    pub fn default_namespace(&'env self) -> VariableNamespace<'env, F> {
         self.namespace(DEFAULT_NAMESPACE_ID)
     }
 
@@ -662,7 +667,7 @@ impl<'env, 'name, F: Float> VariableEnvironment<'name, F> {
     ///
     /// Return value is used for variable registration.
     #[inline]
-    pub fn default_namespace_mut(&'env mut self) -> VariableNamespaceMut<'env, 'name, F> {
+    pub fn default_namespace_mut(&'env mut self) -> VariableNamespaceMut<'env, F> {
         self.namespace_mut(DEFAULT_NAMESPACE_ID)
     }
 
@@ -679,14 +684,14 @@ impl<'env, 'name, F: Float> VariableEnvironment<'name, F> {
     /// See [variable](crate::variable).
     pub fn run<FN, R>(&'env self, f: FN) -> R
     where
-        FN: FnOnce(&mut Context<'env, 'name, F>) -> R,
+        FN: FnOnce(&mut Context<'env, F>) -> R,
     {
         let g = Graph {
             node_set: RefCell::new(Vec::with_capacity(256)),
             variable2node: RefCell::new(FxHashMap::default()),
         };
         let mut c = Context {
-            env_handle: self,
+            var_env_ref: self,
             graph: g,
         };
         f(&mut c)
@@ -733,7 +738,7 @@ impl<'t, 'g, F: Float> Graph<F> {
         name: S,
         namespace: &impl NamespaceTrait<F>,
     ) -> Tensor<F> {
-        let full_name = &FullName::new(namespace.name(), Cow::Borrowed(name.as_ref()));
+        let full_name = &FullName::new(namespace.name(), name.as_ref().to_string());
         if let Some(&vid) = namespace.env().name_to_id.get(full_name) {
             // find VariableID
             self.variable_by_id(vid)
@@ -763,10 +768,10 @@ impl<'t, 'g, F: Float> Graph<F> {
     /// Get tensors and their variable names in the specified namespace.
     ///
     /// See `VariableEnvironment` for the usages.
-    pub fn var_tensors_by_name<'e: 'name + 'g, 'name>(
+    pub fn var_tensors_by_name<'ns, 'e: 'g>(
         &'g self,
-        ns: &'name VariableNamespace<'e, 'name, F>,
-    ) -> impl Iterator<Item = (&'name str, Tensor<'g, F>)> {
+        ns: &'ns VariableNamespace<'e, F>,
+    ) -> impl Iterator<Item = (&'ns str, Tensor<'g, F>)> {
         ns.env().name_to_id.iter().filter_map(move |ent| {
             // filter out other namespaces
             if &ent.0.namespace_id == ns.name() {
