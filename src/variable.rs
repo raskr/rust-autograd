@@ -139,11 +139,11 @@ impl<'g, 'e: 'g, F: Float> GetVariableTensor<'g, F, VariableID>
     }
 }
 
-impl<'g, 'e: 'g, F: Float, S: AsRef<str>> GetVariableTensor<'g, F, (&'static str, &'static str)>
+impl<'g, 'e: 'g, F: Float> GetVariableTensor<'g, F, (&'static str, &'static str)>
     for Context<'e, F>
 {
     /// Get or create a variable tensor by VariableID
-    fn variable(&'g self, id: (S, S)) -> Tensor<'g, F> {
+    fn variable(&'g self, id: (&'static str, &'static str)) -> Tensor<'g, F> {
         self.graph
             .variable_by_name(id.1, &self.var_env_ref.namespace(id.0))
     }

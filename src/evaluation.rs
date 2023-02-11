@@ -116,7 +116,7 @@ impl<'view, F: Float> Feeder<'view, F> {
 impl<'graph, 'env, 'view, F: Float> Context<'env, F> {
     /// Creates a new evaluator
     #[inline]
-    pub fn evaluator<'c: 'graph + 'env>(&'c self) -> Evaluator<'view, 'graph, 'env, F> {
+    pub fn evaluator<'c: 'graph + 'env>(&'c self) -> Evaluator<'graph, 'env, 'view, F> {
         Evaluator {
             feeder: Feeder { feeds: Vec::new() },
             var_env: self.var_env_ref,
@@ -126,7 +126,7 @@ impl<'graph, 'env, 'view, F: Float> Context<'env, F> {
     }
 }
 
-impl<'tensor, 'view, 'graph, 'env, 'ctx, F: Float> Evaluator<'view, 'graph, 'env, F> {
+impl<'tensor, 'view, 'graph, 'env, 'ctx, F: Float> Evaluator<'graph, 'env, 'view, F> {
     #[inline]
     /// Appends a tensor to the back of the evaluation targets.
     pub fn push<A>(&mut self, x: A) -> &mut Self
