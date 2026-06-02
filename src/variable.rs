@@ -76,7 +76,7 @@
 //! // new_env.run(...
 //! ```
 use crate::graph::Context;
-use crate::{uuid::Uuid, Float, FxHashMap, Graph, NdArray, Tensor, NdArrayViewMut, NdArrayView};
+use crate::{uuid::Uuid, Float, FxHashMap, Graph, NdArray, NdArrayView, NdArrayViewMut, Tensor};
 use serde::Deserialize;
 use serde_json;
 use smallvec::alloc::fmt::Formatter;
@@ -120,9 +120,7 @@ pub trait GetVariableTensor<'g, F: Float, Arg> {
     fn variable(&'g self, id: Arg) -> Tensor<'g, F>;
 }
 
-impl<'g, 'e: 'g, F: Float> GetVariableTensor<'g, F, &'static str>
-    for Context<'e, F>
-{
+impl<'g, 'e: 'g, F: Float> GetVariableTensor<'g, F, &'static str> for Context<'e, F> {
     /// Get or create a variable tensor by name in the default namespace.
     fn variable(&'g self, name: &str) -> Tensor<'g, F> {
         self.graph
@@ -130,9 +128,7 @@ impl<'g, 'e: 'g, F: Float> GetVariableTensor<'g, F, &'static str>
     }
 }
 
-impl<'g, 'e: 'g, F: Float> GetVariableTensor<'g, F, VariableID>
-    for Context<'e, F>
-{
+impl<'g, 'e: 'g, F: Float> GetVariableTensor<'g, F, VariableID> for Context<'e, F> {
     /// Get or create a variable tensor by [`VariableID`]
     fn variable(&'g self, id: VariableID) -> Tensor<'g, F> {
         self.graph.variable_by_id(id)
@@ -445,12 +441,8 @@ use crate::ndarray_ext;
 #[test]
 fn test_namespace_iter() {
     let mut env = VariableEnvironment::<f32>::new();
-    env.slot()
-        .name("v1")
-        .set(ndarray_ext::zeros(&[3, 2]));
-    env.slot()
-        .name("v2")
-        .set(ndarray_ext::zeros(&[2, 3]));
+    env.slot().name("v1").set(ndarray_ext::zeros(&[3, 2]));
+    env.slot().name("v2").set(ndarray_ext::zeros(&[2, 3]));
 
     for (i, (name, arr)) in env.default_namespace().iter().enumerate() {
         if i == 0 {
@@ -492,9 +484,7 @@ impl<'env> VariableEnvironment<f32> {
     /// Creates a new `VariableEnvironment` using the one that was previously persisted.
     ///
     /// Returns the result of the execution.
-    pub fn load<P: AsRef<Path>>(
-        path: P,
-    ) -> Result<VariableEnvironment<f32>, Box<dyn Error>> {
+    pub fn load<P: AsRef<Path>>(path: P) -> Result<VariableEnvironment<f32>, Box<dyn Error>> {
         let raw: DeserializedVariableEnvironment<f32> = Self::deserialize(path)?;
         Self::load_internal(raw)
     }
@@ -517,9 +507,7 @@ impl<'env> VariableEnvironment<f64> {
     /// Creates a new `VariableEnvironment` using the one that was previously persisted.
     ///
     /// Returns the result of the execution.
-    pub fn load<P: AsRef<Path>>(
-        path: P,
-    ) -> Result<VariableEnvironment<f64>, Box<dyn Error>> {
+    pub fn load<P: AsRef<Path>>(path: P) -> Result<VariableEnvironment<f64>, Box<dyn Error>> {
         let raw: DeserializedVariableEnvironment<f64> = Self::deserialize(path)?;
         Self::load_internal(raw)
     }
@@ -620,10 +608,7 @@ impl<'env, F: Float> VariableEnvironment<F> {
     }
 
     /// Prepares a slot for the *default* namespace to register a variable array
-    pub fn name<S: Into<String>>(
-        &'env mut self,
-        name: S,
-    ) -> NamedDefaultVariableSlot<'env, F, S> {
+    pub fn name<S: Into<String>>(&'env mut self, name: S) -> NamedDefaultVariableSlot<'env, F, S> {
         NamedDefaultVariableSlot { env: self, name }
     }
 
@@ -699,13 +684,21 @@ impl<'env, F: Float> VariableEnvironment<F> {
 
     pub(crate) fn as_view(&self, vid: VariableID) -> NdArrayView<F> {
         unsafe {
-            self.array_list[vid.0].borrow().raw_view().clone().deref_into_view()
+            self.array_list[vid.0]
+                .borrow()
+                .raw_view()
+                .clone()
+                .deref_into_view()
         }
     }
 
     pub(crate) fn as_view_mut(&self, vid: VariableID) -> NdArrayViewMut<F> {
         unsafe {
-            self.array_list[vid.0].borrow_mut().raw_view_mut().clone().deref_into_view_mut()
+            self.array_list[vid.0]
+                .borrow_mut()
+                .raw_view_mut()
+                .clone()
+                .deref_into_view_mut()
         }
     }
 }
@@ -750,7 +743,11 @@ impl<'t, 'g, F: Float> Graph<F> {
                     name.as_ref()
                 )
             } else {
-                panic!("variable array `{}` not found in namespace {}", name.as_ref(), ns)
+                panic!(
+                    "variable array `{}` not found in namespace {}",
+                    name.as_ref(),
+                    ns
+                )
             }
         }
     }
@@ -811,7 +808,7 @@ fn compile_common_usages() {
 
 #[test]
 fn save_and_load() {
-    use crate::approx::AbsDiffEq;
+    use approx::AbsDiffEq;
     use std::collections::HashMap;
     use std::fs;
 
